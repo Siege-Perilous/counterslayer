@@ -23,6 +23,9 @@
 		printBedSize: number;
 		exploded?: boolean;
 		showAllTrays?: boolean;
+		boxWallThickness?: number;
+		boxTolerance?: number;
+		boxFloorThickness?: number;
 	}
 
 	let {
@@ -33,8 +36,14 @@
 		importedGeometry,
 		printBedSize,
 		exploded = false,
-		showAllTrays = false
+		showAllTrays = false,
+		boxWallThickness = 3,
+		boxTolerance = 0.5,
+		boxFloorThickness = 2
 	}: Props = $props();
+
+	// Interior offset from box origin (wall + tolerance)
+	let interiorStartOffset = $derived(boxWallThickness + boxTolerance);
 
 	// Helper to get geometry bounds
 	function getGeomBounds(geom: BufferGeometry | null): THREE.Box3 | null {
@@ -190,15 +199,15 @@
 		return size * 1.5;
 	});
 
-	// Exploded view offsets (vertical stacking)
+	// Exploded view offsets - trays inside box, lid floating above
 	let explodedOffset = $derived.by(() => {
-		if (!exploded || !combinedBounds) return { box: 0, trays: 0, lid: 0 };
-		const height = combinedBounds.max.z - combinedBounds.min.z;
-		const gap = height * 0.5;
+		if (!exploded) return { box: 0, trays: 0, lid: 0 };
+		// Get box height for lid positioning
+		const boxHeight = boxBounds ? (boxBounds.max.z - boxBounds.min.z) : 0;
 		return {
 			box: 0,
-			trays: gap,
-			lid: gap * 2
+			trays: 0,  // Trays sit inside box at same Y level
+			lid: boxHeight * 1.5  // Lid floats one box height above
 		};
 	});
 
@@ -237,10 +246,10 @@
 		{@const placement = trayData.placement}
 		{@const boxDepth = boxBounds ? (boxBounds.max.y - boxBounds.min.y) : traysGroupDepth}
 		{@const interiorOffset = (boxDepth - traysGroupDepth) / 2}
-		{@const xOffset = exploded ? meshOffset.x : sidePositions.traysGroup.x}
-		{@const yOffset = explodedOffset.trays}
+		{@const xOffset = exploded ? (meshOffset.x + interiorStartOffset) : sidePositions.traysGroup.x}
+		{@const yOffset = exploded ? boxFloorThickness : explodedOffset.trays}
 		{@const zOffset = exploded
-			? (meshOffset.z + placement.y)
+			? (meshOffset.z - interiorStartOffset - placement.y)
 			: (sidePositions.traysGroup.z + interiorOffset - placement.y)}
 		<T.Mesh
 			geometry={trayData.geometry}
@@ -267,12 +276,13 @@
 
 <!-- Lid geometry (purple) -->
 {#if lidGeometry}
+	{@const lidDepth = lidBounds ? (lidBounds.max.y - lidBounds.min.y) : 0}
 	<T.Mesh
 		geometry={lidGeometry}
-		rotation.x={-Math.PI / 2}
+		rotation.x={exploded ? Math.PI / 2 : -Math.PI / 2}
 		position.x={showAllTrays && !exploded ? sidePositions.lid.x : meshOffset.x}
 		position.y={explodedOffset.lid}
-		position.z={showAllTrays && !exploded ? sidePositions.lid.z : meshOffset.z}
+		position.z={showAllTrays && !exploded ? sidePositions.lid.z : (exploded ? meshOffset.z - lidDepth : meshOffset.z)}
 	>
 		<T.MeshStandardMaterial color="#a855f7" roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
 	</T.Mesh>

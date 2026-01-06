@@ -22,6 +22,9 @@
 		printBedSize: number;
 		exploded?: boolean;
 		showAllTrays?: boolean;
+		boxWallThickness?: number;
+		boxTolerance?: number;
+		boxFloorThickness?: number;
 	}
 
 	let {
@@ -32,7 +35,10 @@
 		importedGeometry,
 		printBedSize,
 		exploded = false,
-		showAllTrays = false
+		showAllTrays = false,
+		boxWallThickness = 3,
+		boxTolerance = 0.5,
+		boxFloorThickness = 2
 	}: Props = $props();
 </script>
 
@@ -47,6 +53,9 @@
 			{printBedSize}
 			{exploded}
 			{showAllTrays}
+			{boxWallThickness}
+			{boxTolerance}
+			{boxFloorThickness}
 		/>
 	</Canvas>
 </div>

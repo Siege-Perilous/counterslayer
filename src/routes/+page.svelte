@@ -252,6 +252,9 @@
 					{printBedSize}
 					exploded={visibleGeometries.exploded}
 					showAllTrays={visibleGeometries.showAllTrays}
+					boxWallThickness={selectedBox?.wallThickness ?? 3}
+					boxTolerance={selectedBox?.tolerance ?? 0.5}
+					boxFloorThickness={selectedBox?.floorThickness ?? 2}
 				/>
 			{/await}
 		{/if}
