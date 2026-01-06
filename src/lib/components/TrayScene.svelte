@@ -62,11 +62,11 @@
 	// Gap between objects in side-by-side view
 	const sideGap = 20;
 
-	// Calculate total depth of trays group (stacked along Y/Z)
+	// Calculate total depth of trays group (accounting for bin-packing)
 	let traysGroupDepth = $derived.by(() => {
 		if (allTrays.length === 0) return 0;
-		// Sum of all tray depths (they're stacked along Y)
-		return allTrays.reduce((sum, t) => sum + t.placement.dimensions.depth, 0);
+		// With bin-packing, trays can share rows. Total depth is max(y + depth)
+		return Math.max(...allTrays.map(t => t.placement.y + t.placement.dimensions.depth));
 	});
 
 	// Calculate side-by-side positions for "All" view (box | trays-in-box | lid)
@@ -219,6 +219,32 @@
 
 	// Tray colors for visual distinction
 	const trayColors = ['#4a9eff', '#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8'];
+
+	// Debug logging
+	$effect(() => {
+		if (showAllTrays && allTrays.length > 0) {
+			const maxTrayW = Math.max(...allTrays.map(t => t.placement.dimensions.width));
+			console.log('=== TrayScene Debug ===');
+			console.log('exploded:', exploded);
+			console.log('showAllTrays:', showAllTrays);
+			console.log('maxTrayWidth:', maxTrayW);
+			console.log('traysGroupDepth:', traysGroupDepth);
+			console.log('sidePositions.traysGroup:', JSON.stringify(sidePositions.traysGroup));
+			console.log('meshOffset:', JSON.stringify(meshOffset));
+			console.log('interiorStartOffset:', interiorStartOffset);
+			allTrays.forEach((t, i) => {
+				const p = t.placement;
+				// Calculate actual positions based on current mode
+				const xPos = exploded
+					? meshOffset.x + interiorStartOffset + p.x
+					: sidePositions.traysGroup.x - maxTrayW / 2 + p.x;
+				const zPos = exploded
+					? meshOffset.z - interiorStartOffset - p.y
+					: traysGroupDepth - p.y;
+				console.log(`Tray ${i} "${t.name}": placement(x=${p.x}, y=${p.y}), dims(w=${p.dimensions.width.toFixed(1)}, d=${p.dimensions.depth}) -> actual position(x=${xPos.toFixed(1)}, z=${zPos.toFixed(1)})`);
+			});
+		}
+	});
 </script>
 
 <T.PerspectiveCamera
@@ -235,10 +261,11 @@
 
 <!-- Box geometry (green) -->
 {#if boxGeometry}
+	{@const boxWidth = boxBounds ? (boxBounds.max.x - boxBounds.min.x) : 0}
 	<T.Mesh
 		geometry={boxGeometry}
 		rotation.x={-Math.PI / 2}
-		position.x={showAllTrays && !exploded ? sidePositions.box.x : meshOffset.x}
+		position.x={showAllTrays && !exploded ? sidePositions.box.x - boxWidth / 2 : meshOffset.x}
 		position.y={explodedOffset.box}
 		position.z={showAllTrays && !exploded ? sidePositions.box.z : meshOffset.z}
 	>
@@ -248,17 +275,22 @@
 
 <!-- All trays with positions (when showAllTrays is true) -->
 {#if showAllTrays && allTrays.length > 0}
+	{@const maxTrayWidth = Math.max(...allTrays.map(t => t.placement.dimensions.width))}
 	{#each allTrays as trayData, i (trayData.trayId)}
 		{@const placement = trayData.placement}
+		{@const trayWidth = placement.dimensions.width}
 		{@const boxDepth = boxBounds ? (boxBounds.max.y - boxBounds.min.y) : traysGroupDepth}
 		{@const interiorOffset = (boxDepth - traysGroupDepth) / 2}
-		{@const xOffset = exploded ? (meshOffset.x + interiorStartOffset) : sidePositions.traysGroup.x}
+		{@const xOffset = exploded
+			? (meshOffset.x + interiorStartOffset + placement.x)
+			: (sidePositions.traysGroup.x - maxTrayWidth / 2 + placement.x)}
 		{@const trayHeight = trayData.placement.dimensions.height}
 		{@const traySpacing = (explosionAmount / 100) * trayHeight * 1.2}
 		{@const yOffset = exploded ? (boxFloorThickness + explodedOffset.trays + i * traySpacing) : 0}
+		{@const trayDepth = placement.dimensions.depth}
 		{@const zOffset = exploded
 			? (meshOffset.z - interiorStartOffset - placement.y)
-			: (sidePositions.traysGroup.z + interiorOffset - placement.y)}
+			: (traysGroupDepth - placement.y)}
 		<T.Mesh
 			geometry={trayData.geometry}
 			rotation.x={-Math.PI / 2}
@@ -284,6 +316,7 @@
 
 <!-- Lid geometry (purple) -->
 {#if lidGeometry}
+	{@const lidWidth = lidBounds ? (lidBounds.max.x - lidBounds.min.x) : 0}
 	{@const lidHeight = lidBounds ? (lidBounds.max.z - lidBounds.min.z) : 0}
 	{@const lidDepth = lidBounds ? (lidBounds.max.y - lidBounds.min.y) : 0}
 	{@const maxTrayHeight = allTrays.length > 0 ? Math.max(...allTrays.map(t => t.placement.dimensions.height)) : 0}
@@ -291,7 +324,7 @@
 	<T.Mesh
 		geometry={lidGeometry}
 		rotation.x={exploded ? Math.PI / 2 : -Math.PI / 2}
-		position.x={showAllTrays && !exploded ? sidePositions.lid.x : meshOffset.x}
+		position.x={showAllTrays && !exploded ? sidePositions.lid.x - lidWidth / 2 : meshOffset.x}
 		position.y={exploded ? (explodedOffset.lid + lidHeight + topTraySpacing) : explodedOffset.lid}
 		position.z={showAllTrays && !exploded ? sidePositions.lid.z : (exploded ? -lidDepth / 2 : meshOffset.z)}
 	>

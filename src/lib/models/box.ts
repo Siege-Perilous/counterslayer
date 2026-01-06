@@ -131,7 +131,8 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	};
 }
 
-// Arrange trays in a box layout (stack side-by-side along Y axis)
+// Arrange trays in a box layout with bin-packing
+// Smaller trays can share a row if their combined width fits within the max tray width
 export function arrangeTrays(trays: Tray[]): TrayPlacement[] {
 	if (trays.length === 0) return [];
 
@@ -144,18 +145,53 @@ export function arrangeTrays(trays: Tray[]): TrayPlacement[] {
 	// Sort by width (X dimension) descending so widest trays are first
 	trayDims.sort((a, b) => b.dimensions.width - a.dimensions.width);
 
-	// Stack side-by-side along Y axis (depth)
+	// The widest tray determines the max row width
+	const maxRowWidth = trayDims[0].dimensions.width;
+
+	// Track rows: each row has a Y position, current X fill, and max depth
+	interface Row {
+		y: number;
+		currentX: number;
+		depth: number;
+	}
+	const rows: Row[] = [];
+
 	const placements: TrayPlacement[] = [];
-	let currentY = 0;
 
 	for (const { tray, dimensions } of trayDims) {
-		placements.push({
-			tray,
-			dimensions,
-			x: 0,
-			y: currentY
-		});
-		currentY += dimensions.depth;
+		// Try to find an existing row where this tray fits
+		let placed = false;
+		for (const row of rows) {
+			if (row.currentX + dimensions.width <= maxRowWidth) {
+				// Fits in this row
+				placements.push({
+					tray,
+					dimensions,
+					x: row.currentX,
+					y: row.y
+				});
+				row.currentX += dimensions.width;
+				row.depth = Math.max(row.depth, dimensions.depth);
+				placed = true;
+				break;
+			}
+		}
+
+		if (!placed) {
+			// Create a new row
+			const newY = rows.length === 0 ? 0 : rows.reduce((sum, r) => sum + r.depth, 0);
+			rows.push({
+				y: newY,
+				currentX: dimensions.width,
+				depth: dimensions.depth
+			});
+			placements.push({
+				tray,
+				dimensions,
+				x: 0,
+				y: newY
+			});
+		}
 	}
 
 	return placements;

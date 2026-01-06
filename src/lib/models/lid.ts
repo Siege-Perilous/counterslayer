@@ -91,11 +91,21 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		});
 		trayCavities.push(cavity);
 
-		// 2b. Create fill cell if this tray is narrower than the widest
-		const widthDiff = maxTrayWidth - placement.dimensions.width;
-		if (widthDiff > wall) {
+		// 2b. Create fill cell only if this tray ends the row AND there's space remaining
+		// With bin-packing, we need to check if space to the right is actually empty
+		const trayEndX = placement.x + placement.dimensions.width;
+		const spaceRemaining = maxTrayWidth - trayEndX;
+
+		// Check if any other tray occupies space to the right in the same row
+		const hasNeighborToRight = placements.some(other =>
+			other !== placement &&
+			other.y === placement.y &&  // Same row (same Y position)
+			other.x >= trayEndX  // To the right of this tray
+		);
+
+		if (spaceRemaining > wall && !hasNeighborToRight) {
 			// Fill cell: X from (tray pocket end + wall) to (where widest pocket ends)
-			const fillWidth = widthDiff - wall;
+			const fillWidth = spaceRemaining - wall;
 			const fillX = pocketX + pocketWidth + wall;
 			// Inset Y to leave wall between fill cell and adjacent tray pocket
 			const fillY = pocketY + wall;
