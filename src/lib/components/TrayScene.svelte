@@ -199,15 +199,17 @@
 		return size * 1.5;
 	});
 
-	// Exploded view offsets - trays inside box, lid floating above
+	// Exploded view offsets - trays inside box, lid resting on top
 	let explodedOffset = $derived.by(() => {
 		if (!exploded) return { box: 0, trays: 0, lid: 0 };
 		// Get box height for lid positioning
 		const boxHeight = boxBounds ? (boxBounds.max.z - boxBounds.min.z) : 0;
+		// Lid lip height = wall thickness, lower lid so lip fits over box
+		const lipHeight = boxWallThickness;
 		return {
 			box: 0,
 			trays: 0,  // Trays sit inside box at same Y level
-			lid: boxHeight * 1.5  // Lid floats one box height above
+			lid: boxHeight - lipHeight  // Lid sits with lip over box inner wall
 		};
 	});
 
@@ -276,13 +278,14 @@
 
 <!-- Lid geometry (purple) -->
 {#if lidGeometry}
+	{@const lidHeight = lidBounds ? (lidBounds.max.z - lidBounds.min.z) : 0}
 	{@const lidDepth = lidBounds ? (lidBounds.max.y - lidBounds.min.y) : 0}
 	<T.Mesh
 		geometry={lidGeometry}
 		rotation.x={exploded ? Math.PI / 2 : -Math.PI / 2}
 		position.x={showAllTrays && !exploded ? sidePositions.lid.x : meshOffset.x}
-		position.y={explodedOffset.lid}
-		position.z={showAllTrays && !exploded ? sidePositions.lid.z : (exploded ? meshOffset.z - lidDepth : meshOffset.z)}
+		position.y={exploded ? (explodedOffset.lid + lidHeight) : explodedOffset.lid}
+		position.z={showAllTrays && !exploded ? sidePositions.lid.z : (exploded ? -lidDepth / 2 : meshOffset.z)}
 	>
 		<T.MeshStandardMaterial color="#a855f7" roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
 	</T.Mesh>
