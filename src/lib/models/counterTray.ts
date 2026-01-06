@@ -55,7 +55,7 @@ export const defaultParams: CounterTrayParams = {
 const sumTo = (arr: number[], idx: number): number =>
 	arr.slice(0, idx + 1).reduce((a, b) => a + b, 0);
 
-export function createCounterTray(params: CounterTrayParams) {
+export function createCounterTray(params: CounterTrayParams, trayName?: string) {
 	const {
 		squareWidth,
 		squareLength,
@@ -74,6 +74,18 @@ export function createCounterTray(params: CounterTrayParams) {
 		extraTrayRows,
 		stacks
 	} = params;
+
+	const nameLabel = trayName ? `Tray "${trayName}"` : 'Tray';
+
+	// Validate stacks
+	if (!stacks || stacks.length === 0) {
+		throw new Error(`${nameLabel}: No counter stacks defined. Add at least one stack.`);
+	}
+
+	// Validate counter dimensions
+	if (counterThickness <= 0) {
+		throw new Error(`${nameLabel}: Counter thickness must be greater than zero.`);
+	}
 
 	// Pocket dimensions per shape (counter + clearance)
 	const squarePocketWidth = squareWidth + clearance * 2;
