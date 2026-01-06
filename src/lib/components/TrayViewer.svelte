@@ -25,6 +25,7 @@
 		boxWallThickness?: number;
 		boxTolerance?: number;
 		boxFloorThickness?: number;
+		explosionAmount?: number;
 	}
 
 	let {
@@ -38,7 +39,8 @@
 		showAllTrays = false,
 		boxWallThickness = 3,
 		boxTolerance = 0.5,
-		boxFloorThickness = 2
+		boxFloorThickness = 2,
+		explosionAmount = 0
 	}: Props = $props();
 </script>
 
@@ -56,6 +58,7 @@
 			{boxWallThickness}
 			{boxTolerance}
 			{boxFloorThickness}
+			{explosionAmount}
 		/>
 	</Canvas>
 </div>

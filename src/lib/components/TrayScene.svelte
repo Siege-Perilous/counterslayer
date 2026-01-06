@@ -26,6 +26,7 @@
 		boxWallThickness?: number;
 		boxTolerance?: number;
 		boxFloorThickness?: number;
+		explosionAmount?: number;
 	}
 
 	let {
@@ -39,7 +40,8 @@
 		showAllTrays = false,
 		boxWallThickness = 3,
 		boxTolerance = 0.5,
-		boxFloorThickness = 2
+		boxFloorThickness = 2,
+		explosionAmount = 0
 	}: Props = $props();
 
 	// Interior offset from box origin (wall + tolerance)
@@ -206,10 +208,12 @@
 		const boxHeight = boxBounds ? (boxBounds.max.z - boxBounds.min.z) : 0;
 		// Lid lip height = wall thickness, lower lid so lip fits over box
 		const lipHeight = boxWallThickness;
+		// Explosion factor: 0-100 maps to 0-1.5x box height of additional separation
+		const explosionFactor = (explosionAmount / 100) * boxHeight * 1.5;
 		return {
 			box: 0,
-			trays: 0,  // Trays sit inside box at same Y level
-			lid: boxHeight - lipHeight  // Lid sits with lip over box inner wall
+			trays: explosionFactor * 0.5,  // Trays lift up half as much
+			lid: boxHeight - lipHeight + explosionFactor  // Lid lifts up fully
 		};
 	});
 
@@ -249,7 +253,9 @@
 		{@const boxDepth = boxBounds ? (boxBounds.max.y - boxBounds.min.y) : traysGroupDepth}
 		{@const interiorOffset = (boxDepth - traysGroupDepth) / 2}
 		{@const xOffset = exploded ? (meshOffset.x + interiorStartOffset) : sidePositions.traysGroup.x}
-		{@const yOffset = exploded ? boxFloorThickness : explodedOffset.trays}
+		{@const trayHeight = trayData.placement.dimensions.height}
+		{@const traySpacing = (explosionAmount / 100) * trayHeight * 1.2}
+		{@const yOffset = exploded ? (boxFloorThickness + explodedOffset.trays + i * traySpacing) : 0}
 		{@const zOffset = exploded
 			? (meshOffset.z - interiorStartOffset - placement.y)
 			: (sidePositions.traysGroup.z + interiorOffset - placement.y)}
@@ -280,11 +286,13 @@
 {#if lidGeometry}
 	{@const lidHeight = lidBounds ? (lidBounds.max.z - lidBounds.min.z) : 0}
 	{@const lidDepth = lidBounds ? (lidBounds.max.y - lidBounds.min.y) : 0}
+	{@const maxTrayHeight = allTrays.length > 0 ? Math.max(...allTrays.map(t => t.placement.dimensions.height)) : 0}
+	{@const topTraySpacing = allTrays.length > 0 ? (allTrays.length - 1) * (explosionAmount / 100) * maxTrayHeight * 1.2 : 0}
 	<T.Mesh
 		geometry={lidGeometry}
 		rotation.x={exploded ? Math.PI / 2 : -Math.PI / 2}
 		position.x={showAllTrays && !exploded ? sidePositions.lid.x : meshOffset.x}
-		position.y={exploded ? (explodedOffset.lid + lidHeight) : explodedOffset.lid}
+		position.y={exploded ? (explodedOffset.lid + lidHeight + topTraySpacing) : explodedOffset.lid}
 		position.z={showAllTrays && !exploded ? sidePositions.lid.z : (exploded ? -lidDepth / 2 : meshOffset.z)}
 	>
 		<T.MeshStandardMaterial color="#a855f7" roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />

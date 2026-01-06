@@ -34,6 +34,7 @@
 	let generating = $state(false);
 	let error = $state('');
 	let fileInput: HTMLInputElement;
+	let explosionAmount = $state(0);
 
 	// Initialize project from localStorage
 	$effect(() => {
@@ -255,6 +256,7 @@
 					boxWallThickness={selectedBox?.wallThickness ?? 3}
 					boxTolerance={selectedBox?.tolerance ?? 0.5}
 					boxFloorThickness={selectedBox?.floorThickness ?? 2}
+					{explosionAmount}
 				/>
 			{/await}
 		{/if}
@@ -266,17 +268,31 @@
 		{/if}
 
 		<!-- View mode buttons -->
-		<div class="absolute top-4 left-1/2 -translate-x-1/2 flex gap-1 rounded bg-gray-800 p-1">
-			{#each viewModes as { mode, label }}
-				<button
-					onclick={() => (viewMode = mode)}
-					class="rounded px-3 py-1.5 text-sm font-medium transition {viewMode === mode
-						? 'bg-blue-600 text-white'
-						: 'text-gray-300 hover:bg-gray-700'}"
-				>
-					{label}
-				</button>
-			{/each}
+		<div class="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-4">
+			<div class="flex gap-1 rounded bg-gray-800 p-1">
+				{#each viewModes as { mode, label }}
+					<button
+						onclick={() => (viewMode = mode)}
+						class="rounded px-3 py-1.5 text-sm font-medium transition {viewMode === mode
+							? 'bg-blue-600 text-white'
+							: 'text-gray-300 hover:bg-gray-700'}"
+					>
+						{label}
+					</button>
+				{/each}
+			</div>
+			{#if viewMode === 'exploded'}
+				<div class="flex items-center gap-2 rounded bg-gray-800 px-3 py-1.5">
+					<span class="text-xs text-gray-400">Explode</span>
+					<input
+						type="range"
+						min="0"
+						max="100"
+						bind:value={explosionAmount}
+						class="h-1 w-24 cursor-pointer appearance-none rounded-lg bg-gray-600"
+					/>
+				</div>
+			{/if}
 		</div>
 
 		<!-- Bottom toolbar -->
