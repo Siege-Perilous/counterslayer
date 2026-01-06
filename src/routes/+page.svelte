@@ -108,14 +108,19 @@
 		await new Promise((resolve) => setTimeout(resolve, 10));
 
 		try {
-			// Generate selected tray
-			jscadSelectedTray = createCounterTray(tray.params, tray.name);
-			selectedTrayGeometry = jscadToBufferGeometry(jscadSelectedTray);
-
 			// Generate all trays with their placements
 			const placements = arrangeTrays(box.trays);
+
+			// Calculate max height so all trays are normalized to box interior height
+			const maxHeight = Math.max(...placements.map((p) => p.dimensions.height));
+
+			// Generate selected tray at box height (all trays in a box share the same height)
+			jscadSelectedTray = createCounterTray(tray.params, tray.name, maxHeight);
+			selectedTrayGeometry = jscadToBufferGeometry(jscadSelectedTray);
+
+			// Generate all trays at box height
 			allTrayGeometries = placements.map((placement) => {
-				const jscadGeom = createCounterTray(placement.tray.params, placement.tray.name);
+				const jscadGeom = createCounterTray(placement.tray.params, placement.tray.name, maxHeight);
 				return {
 					trayId: placement.tray.id,
 					name: placement.tray.name,

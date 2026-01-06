@@ -1,6 +1,6 @@
 import jscad from '@jscad/modeling';
 
-const { cuboid, cylinder } = jscad.primitives;
+const { cuboid, cylinder, roundedCuboid } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
 const { translate, rotateY, rotateZ } = jscad.transforms;
 
@@ -55,7 +55,7 @@ export const defaultParams: CounterTrayParams = {
 const sumTo = (arr: number[], idx: number): number =>
 	arr.slice(0, idx + 1).reduce((a, b) => a + b, 0);
 
-export function createCounterTray(params: CounterTrayParams, trayName?: string) {
+export function createCounterTray(params: CounterTrayParams, trayName?: string, targetHeight?: number) {
 	const {
 		squareWidth,
 		squareLength,
@@ -180,7 +180,13 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string) 
 	const trayLength = trayLengthOverride > 0 ? trayLengthOverride : trayLengthAuto;
 	const trayWidth =
 		wallThickness + frontRowDepth + wallThickness + backRowDepth + wallThickness;
-	const trayHeight = floorThickness + maxStackHeight + rimHeight;
+
+	// Base tray height from this tray's stacks
+	const baseTrayHeight = floorThickness + maxStackHeight + rimHeight;
+	// If targetHeight provided, use it (increases rim to match tallest tray in box)
+	const trayHeight = targetHeight && targetHeight > baseTrayHeight ? targetHeight : baseTrayHeight;
+	// Effective rim height may be taller to reach target
+	const effectiveRimHeight = trayHeight - floorThickness - maxStackHeight;
 
 	// Extra tray area
 	const extraTrayLength = trayLength > trayLengthAuto ? trayLength - trayLengthAuto : 0;
@@ -232,7 +238,7 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string) 
 		rowDepth: number
 	) => {
 		const pocketDepth = stackCount * counterThickness;
-		const pocketFloorZ = trayHeight - rimHeight - pocketDepth;
+		const pocketFloorZ = trayHeight - effectiveRimHeight - pocketDepth;
 
 		const pw = getPocketWidth(shape);
 		const pl = getPocketLength(shape);
@@ -242,7 +248,7 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string) 
 
 		return translate(
 			[xOffset, yOffset, pocketFloorZ],
-			createPocketShape(shape, pocketDepth + rimHeight + 1)
+			createPocketShape(shape, pocketDepth + effectiveRimHeight + 1)
 		);
 	};
 
@@ -256,34 +262,35 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string) 
 		});
 	};
 
-	// Scoopable cell
+	// Scoopable cell - uses rounded cuboid for easy finger access
 	const createScoopableCell = (width: number, length: number, depth: number) => {
-		const scoopRadius = length / 2;
+		// Guard against invalid dimensions
+		if (width <= 0 || length <= 0 || depth <= 0) {
+			return cuboid({ size: [0.1, 0.1, 0.1], center: [0, 0, 0] });
+		}
 
-		const mainPocket = translate(
-			[width / 2, length / 2, scoopRadius + (depth - scoopRadius + 1) / 2],
-			cuboid({ size: [width, length, depth - scoopRadius + 1] })
-		);
+		// Round the bottom corners - radius limited to half the smallest dimension
+		const roundRadius = Math.min(length / 2, depth / 2, width / 2, 8);
 
-		const scoopCylinder = translate(
-			[width / 2, length / 2, scoopRadius],
-			rotateY(
-				Math.PI / 2,
-				cylinder({ height: width, radius: scoopRadius, segments: 32, center: [0, 0, 0] })
-			)
-		);
-
-		return union(mainPocket, scoopCylinder);
+		return roundedCuboid({
+			size: [width, length, depth + roundRadius], // Extra height so rounding is at bottom
+			center: [width / 2, length / 2, (depth + roundRadius) / 2],
+			roundRadius,
+			segments: 16
+		});
 	};
 
 	// Extra tray area cells
 	const createExtraTrayArea = () => {
-		if (extraTrayLength <= 0) return [];
+		if (extraTrayLength <= 0 || extraTrayInnerLength <= 0) return [];
 
 		const totalColWalls = (extraTrayCols - 1) * wallThickness;
 		const totalRowWalls = (extraTrayRows - 1) * wallThickness;
 		const cellWidth = (extraTrayInnerLength - totalColWalls) / extraTrayCols;
 		const cellLength = (extraTrayInnerWidth - totalRowWalls) / extraTrayRows;
+
+		// Guard against invalid cell dimensions
+		if (cellWidth <= 0 || cellLength <= 0) return [];
 
 		const cells = [];
 		for (let col = 0; col < extraTrayCols; col++) {
