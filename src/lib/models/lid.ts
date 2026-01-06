@@ -3,8 +3,9 @@ import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { Box, LidParams } from '$lib/types/project';
 import { arrangeTrays, getBoxInteriorDimensions } from './box';
 
-const { cuboid } = jscad.primitives;
+const { cuboid, roundedCuboid } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
+const { translate } = jscad.transforms;
 
 export const defaultLidParams: LidParams = {
 	thickness: 2.0,
@@ -65,6 +66,11 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	// 2. Create individual tray pockets instead of one big cavity
 	// Each tray gets its own form-fitting pocket with tolerance
 	const trayCavities: Geom3[] = [];
+	const fillCells: Geom3[] = [];
+
+	// Find the widest tray to calculate fill areas
+	const maxTrayWidth = Math.max(...placements.map((p) => p.dimensions.width));
+
 	for (const placement of placements) {
 		const pocketWidth = placement.dimensions.width + tolerance * 2;
 		const pocketDepth = placement.dimensions.depth + tolerance * 2;
@@ -84,6 +90,27 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			]
 		});
 		trayCavities.push(cavity);
+
+		// 2b. Create fill cell if this tray is narrower than the widest
+		const widthDiff = maxTrayWidth - placement.dimensions.width;
+		if (widthDiff > wall) {
+			// Fill cell: X from (tray pocket end + wall) to (where widest pocket ends)
+			const fillWidth = widthDiff - wall;
+			const fillX = pocketX + pocketWidth + wall;
+			// Inset Y to leave wall between fill cell and adjacent tray pocket
+			const fillY = pocketY + wall;
+			const fillDepth = pocketDepth - wall;
+			const fillHeight = interior.height + 1;
+
+			const fillCell = translate(
+				[fillX, fillY, floor],
+				cuboid({
+					size: [fillWidth, fillDepth, fillHeight],
+					center: [fillWidth / 2, fillDepth / 2, fillHeight / 2]
+				})
+			);
+			fillCells.push(fillCell);
+		}
 	}
 
 	// 3. Cut recess on outside of walls at top
@@ -105,7 +132,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 
 	const recess = subtract(outerRecess, innerWallKeep);
 
-	return subtract(outerBox, ...trayCavities, recess);
+	return subtract(outerBox, ...trayCavities, ...fillCells, recess);
 }
 
 /**
