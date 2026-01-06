@@ -11,6 +11,7 @@
 		deleteTray,
 		updateBox,
 		updateTrayParams,
+		resetProject,
 		type Box,
 		type Tray
 	} from '$lib/stores/project.svelte';
@@ -66,6 +67,12 @@
 	function handleParamsChange(newParams: CounterTrayParams) {
 		if (selectedTray) {
 			updateTrayParams(selectedTray.id, newParams);
+		}
+	}
+
+	function handleReset() {
+		if (confirm('Reset project to defaults? This will delete all boxes and trays.')) {
+			resetProject();
 		}
 	}
 </script>
@@ -174,6 +181,12 @@
 			class="w-full rounded bg-blue-600 px-4 py-2 font-medium transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
 		>
 			{generating ? 'Generating...' : 'Regenerate'}
+		</button>
+		<button
+			onclick={handleReset}
+			class="w-full rounded bg-gray-700 px-4 py-2 text-sm text-gray-300 transition hover:bg-gray-600"
+		>
+			Reset Project
 		</button>
 	</footer>
 </aside>

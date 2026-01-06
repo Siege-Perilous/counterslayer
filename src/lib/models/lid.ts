@@ -4,21 +4,31 @@ import type { Box, LidParams } from '$lib/types/project';
 import { arrangeTrays, getBoxInteriorDimensions } from './box';
 
 const { cuboid } = jscad.primitives;
-const { union } = jscad.booleans;
+const { subtract, union } = jscad.booleans;
 
 export const defaultLidParams: LidParams = {
-	thickness: 2.0,        // Top plate thickness
-	railHeight: 6.0,       // How deep the inner part drops into box
-	railWidth: 0,          // Unused
-	railInset: 0,          // Unused
-	ledgeHeight: 0,        // Unused
-	fingerNotchRadius: 0,  // Unused
-	fingerNotchDepth: 0    // Unused
+	thickness: 2.0,
+	railHeight: 6.0,
+	railWidth: 0,
+	railInset: 0,
+	ledgeHeight: 0,
+	fingerNotchRadius: 0,
+	fingerNotchDepth: 0
 };
 
 /**
- * Simple open-top box.
- * The lid will sit on top of the walls.
+ * Box with recess cut from OUTSIDE of walls at top.
+ * Interior height = tray height exactly.
+ *
+ * Cross-section:
+ *        ___     ___
+ *       |   |   |   |  <- inner wall (full height)
+ *    ___|   |___|   |___  <- outer wall cut short (recess)
+ *   |                   |
+ *   |      interior     |
+ *   |___________________|  <- floor
+ *
+ *   The recess is on the OUTSIDE of the wall.
  */
 export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	if (box.trays.length === 0) return null;
@@ -34,41 +44,62 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 
 	const wall = box.wallThickness;
 	const floor = box.floorThickness;
+	const recessDepth = wall; // How deep the lid lip goes
 
-	// Exterior dimensions
+	// Box exterior at the base
 	const extWidth = interior.width + wall * 2;
 	const extDepth = interior.depth + wall * 2;
-	const extHeight = interior.height + floor;
+	const extHeight = interior.height + floor; // No extra height - interior = tray height
 
-	// Outer solid
-	const outer = cuboid({
+	// Inner wall dimensions (thinner wall that goes full height)
+	const innerWallThickness = wall / 2;
+
+	// 1. Create full box with thick walls
+	const outerBox = cuboid({
 		size: [extWidth, extDepth, extHeight],
 		center: [extWidth / 2, extDepth / 2, extHeight / 2]
 	});
 
-	// Inner cavity (open top)
-	const inner = cuboid({
+	// 2. Cut interior cavity
+	const innerCavity = cuboid({
 		size: [interior.width, interior.depth, interior.height + 1],
 		center: [extWidth / 2, extDepth / 2, floor + (interior.height + 1) / 2]
 	});
 
-	return jscad.booleans.subtract(outer, inner);
+	// 3. Cut recess on outside of walls at top
+	// This removes the outer portion of the wall, leaving inner portion
+	const recessWidth = extWidth + 1;
+	const recessDepthY = extDepth + 1;
+	const recessHeight = recessDepth;
+
+	const outerRecess = cuboid({
+		size: [recessWidth, recessDepthY, recessHeight],
+		center: [extWidth / 2, extDepth / 2, extHeight - recessHeight / 2]
+	});
+
+	// Keep the inner wall portion (don't cut this part)
+	const innerWallKeep = cuboid({
+		size: [interior.width + innerWallThickness * 2, interior.depth + innerWallThickness * 2, recessHeight + 1],
+		center: [extWidth / 2, extDepth / 2, extHeight - recessHeight / 2]
+	});
+
+	const recess = subtract(outerRecess, innerWallKeep);
+
+	return subtract(outerBox, innerCavity, recess);
 }
 
 /**
- * Stepped lid:
- * - Top plate: covers entire box (exterior dimensions)
- * - Bottom plug: drops into the box (interior dimensions)
+ * Lid is a shallow box - solid top with short walls.
+ * Fits over the box's inner wall.
  *
  * Cross-section:
- *   ___________________
- *  |   top plate      |  <- exterior width, thickness
- *  |___|_________|____|
- *      |  plug   |       <- interior width, railHeight
- *      |_________|
+ *    ___________________
+ *   |___________________|  <- solid top
+ *   |   |           |   |  <- short walls (lip)
+ *   |___|           |___|
+ *       (open here)
  */
 export function createLid(box: Box): Geom3 | null {
-	const lp = box.lidParams;
 	if (box.trays.length === 0) return null;
 
 	const placements = arrangeTrays(box.trays);
@@ -79,30 +110,33 @@ export function createLid(box: Box): Geom3 | null {
 	}
 
 	const wall = box.wallThickness;
-	const clearance = 0.5; // Gap between plug and box walls
+	const clearance = 0.3;
+	const innerWallThickness = wall / 2;
 
-	// Exterior (matches box)
+	// Lid exterior matches box exterior
 	const extWidth = interior.width + wall * 2;
 	const extDepth = interior.depth + wall * 2;
 
-	// Both layers are wall thickness tall
-	const plateHeight = wall;
-	const plugHeight = wall;
+	// Total lid height = 2× wall thickness
+	const lidHeight = wall * 2;
+	const lipHeight = wall; // Walls go down 1× wall thickness
 
-	// Top plate - covers the whole box (exterior size)
-	const topPlate = cuboid({
-		size: [extWidth, extDepth, plateHeight],
-		center: [extWidth / 2, extDepth / 2, plateHeight / 2]
+	// 1. Solid block (exterior size, full lid height)
+	// Flat side at Z=0 for printing
+	const solid = cuboid({
+		size: [extWidth, extDepth, lidHeight],
+		center: [extWidth / 2, extDepth / 2, lidHeight / 2]
 	});
 
-	// Bottom plug - drops into the box opening (interior size minus clearance)
-	const plugWidth = interior.width - clearance * 2;
-	const plugDepth = interior.depth - clearance * 2;
+	// 2. Subtract cavity from TOP (matches box's inner wall size + clearance)
+	// This leaves the flat plate at bottom and short walls around the edges
+	const cavityWidth = interior.width + innerWallThickness * 2 + clearance * 2;
+	const cavityDepth = interior.depth + innerWallThickness * 2 + clearance * 2;
 
-	const bottomPlug = cuboid({
-		size: [plugWidth, plugDepth, plugHeight],
-		center: [extWidth / 2, extDepth / 2, plateHeight + plugHeight / 2]
+	const cavity = cuboid({
+		size: [cavityWidth, cavityDepth, lipHeight + 1],
+		center: [extWidth / 2, extDepth / 2, lidHeight - lipHeight / 2 + 0.5]
 	});
 
-	return union(topPlate, bottomPlug);
+	return subtract(solid, cavity);
 }

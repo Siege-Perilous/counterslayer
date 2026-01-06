@@ -23,7 +23,7 @@ function createDefaultBox(name: string): Box {
 		name,
 		trays: [],
 		tolerance: 0.5,
-		wallThickness: 2.0,
+		wallThickness: 3.0,
 		floorThickness: 2.0,
 		lidParams: { ...defaultLidParams }
 	};
