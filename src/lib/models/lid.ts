@@ -19,13 +19,14 @@ export const defaultLidParams: LidParams = {
 /**
  * Box with recess cut from OUTSIDE of walls at top.
  * Interior height = tray height exactly.
+ * Each tray gets its own form-fitting pocket.
  *
  * Cross-section:
  *        ___     ___
  *       |   |   |   |  <- inner wall (full height)
  *    ___|   |___|   |___  <- outer wall cut short (recess)
  *   |                   |
- *   |      interior     |
+ *   |   [tray pockets]  |
  *   |___________________|  <- floor
  *
  *   The recess is on the OUTSIDE of the wall.
@@ -44,6 +45,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 
 	const wall = box.wallThickness;
 	const floor = box.floorThickness;
+	const tolerance = box.tolerance;
 	const recessDepth = wall; // How deep the lid lip goes
 
 	// Box exterior at the base
@@ -60,11 +62,29 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		center: [extWidth / 2, extDepth / 2, extHeight / 2]
 	});
 
-	// 2. Cut interior cavity
-	const innerCavity = cuboid({
-		size: [interior.width, interior.depth, interior.height + 1],
-		center: [extWidth / 2, extDepth / 2, floor + (interior.height + 1) / 2]
-	});
+	// 2. Create individual tray pockets instead of one big cavity
+	// Each tray gets its own form-fitting pocket with tolerance
+	const trayCavities: Geom3[] = [];
+	for (const placement of placements) {
+		const pocketWidth = placement.dimensions.width + tolerance * 2;
+		const pocketDepth = placement.dimensions.depth + tolerance * 2;
+		// All pockets go to full interior height so trays sit flush at top
+		const pocketHeight = interior.height + 1;
+
+		// Position pocket: wall + tolerance offset, plus the tray's Y position
+		const pocketX = wall + tolerance + placement.x;
+		const pocketY = wall + tolerance + placement.y;
+
+		const cavity = cuboid({
+			size: [pocketWidth, pocketDepth, pocketHeight],
+			center: [
+				pocketX + pocketWidth / 2,
+				pocketY + pocketDepth / 2,
+				floor + pocketHeight / 2
+			]
+		});
+		trayCavities.push(cavity);
+	}
 
 	// 3. Cut recess on outside of walls at top
 	// This removes the outer portion of the wall, leaving inner portion
@@ -85,7 +105,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 
 	const recess = subtract(outerRecess, innerWallKeep);
 
-	return subtract(outerBox, innerCavity, recess);
+	return subtract(outerBox, ...trayCavities, recess);
 }
 
 /**
