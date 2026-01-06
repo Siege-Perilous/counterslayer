@@ -222,7 +222,7 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 				cylinder({
 					height,
 					radius: circleDiameter / 2,
-					segments: 32,
+					segments: 64,
 					center: [0, 0, height / 2]
 				})
 			);
@@ -257,7 +257,7 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 		return cylinder({
 			height: trayHeight + 2,
 			radius,
-			segments: 32,
+			segments: 64,
 			center: [0, 0, trayHeight / 2]
 		});
 	};
@@ -276,7 +276,7 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 			size: [width, length, depth + roundRadius], // Extra height so rounding is at bottom
 			center: [width / 2, length / 2, (depth + roundRadius) / 2],
 			roundRadius,
-			segments: 16
+			segments: 32
 		});
 	};
 

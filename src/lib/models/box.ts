@@ -224,6 +224,9 @@ export function getBoxInteriorDimensions(placements: TrayPlacement[], tolerance:
 // Corner radius for rounded boxes (proportional to wall thickness)
 const getCornerRadius = (wallThickness: number): number => Math.max(wallThickness * 1.5, 3);
 
+// Segment count for rounded corners (higher = smoother, but slower generation)
+const CORNER_SEGMENTS = 64;
+
 // Create a rounded rectangle outline using hull of cylinders at corners
 function createRoundedBox(
 	width: number,
@@ -237,10 +240,10 @@ function createRoundedBox(
 
 	// Create cylinders at 4 corners and hull them
 	const corners = [
-		translate([cx - width / 2 + r, cy - depth / 2 + r, cz], cylinder({ radius: r, height, segments: 32 })),
-		translate([cx + width / 2 - r, cy - depth / 2 + r, cz], cylinder({ radius: r, height, segments: 32 })),
-		translate([cx - width / 2 + r, cy + depth / 2 - r, cz], cylinder({ radius: r, height, segments: 32 })),
-		translate([cx + width / 2 - r, cy + depth / 2 - r, cz], cylinder({ radius: r, height, segments: 32 })),
+		translate([cx - width / 2 + r, cy - depth / 2 + r, cz], cylinder({ radius: r, height, segments: CORNER_SEGMENTS })),
+		translate([cx + width / 2 - r, cy - depth / 2 + r, cz], cylinder({ radius: r, height, segments: CORNER_SEGMENTS })),
+		translate([cx - width / 2 + r, cy + depth / 2 - r, cz], cylinder({ radius: r, height, segments: CORNER_SEGMENTS })),
+		translate([cx + width / 2 - r, cy + depth / 2 - r, cz], cylinder({ radius: r, height, segments: CORNER_SEGMENTS })),
 	];
 
 	return hull(...corners);
