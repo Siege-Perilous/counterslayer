@@ -18,7 +18,7 @@ export const defaultLidParams: LidParams = {
 	snapEnabled: true,
 	snapBumpHeight: 0.4,
 	snapBumpWidth: 4.0,
-	railEngagement: 0.6
+	railEngagement: 0.5
 };
 
 /**
@@ -166,7 +166,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	// where the lid's rails slide into
 	const snapBumpHeight = box.lidParams?.snapBumpHeight ?? 0.4;
 	const snapBumpWidth = box.lidParams?.snapBumpWidth ?? 4.0;
-	const railEngagement = box.lidParams?.railEngagement ?? 0.6;
+	const railEngagement = box.lidParams?.railEngagement ?? 0.5;
 
 	if (snapEnabled && snapBumpHeight > 0) {
 		// Groove depth slightly larger than bump height for easy sliding
@@ -288,7 +288,7 @@ export function createLid(box: Box): Geom3 | null {
 	const snapEnabled = box.lidParams?.snapEnabled ?? true;
 	const snapBumpHeight = box.lidParams?.snapBumpHeight ?? 0.4;
 	const snapBumpWidth = box.lidParams?.snapBumpWidth ?? 4.0;
-	const railEngagement = box.lidParams?.railEngagement ?? 0.6;
+	const railEngagement = box.lidParams?.railEngagement ?? 0.5;
 
 	// Lid exterior matches box exterior
 	const extWidth = interior.width + wall * 2;
@@ -371,6 +371,9 @@ export function createLid(box: Box): Geom3 | null {
 		// Position rail at BOTTOM of lip (opening edge) - more material above for strength
 		const bumpZ = lidHeight - railHeight / 2;
 
+		// Rail thickness must bridge the clearance gap AND extend into the groove
+		const railThickness = clearance + snapBumpHeight;
+
 		// Wall positions (inner surface of lid cavity)
 		const lipThickness = (extWidth - cavityWidth) / 2; // thickness of lid lip walls
 		const innerLeftX = lipThickness;
@@ -381,9 +384,9 @@ export function createLid(box: Box): Geom3 | null {
 
 		// Back rail - runs full width along back wall
 		const backRail = translate(
-			[extWidth / 2, innerBackY - snapBumpHeight / 2, bumpZ],
+			[extWidth / 2, innerBackY - railThickness / 2, bumpZ],
 			cuboid({
-				size: [cavityWidth, snapBumpHeight, railHeight],
+				size: [cavityWidth, railThickness, railHeight],
 				center: [0, 0, 0]
 			})
 		);
@@ -392,11 +395,11 @@ export function createLid(box: Box): Geom3 | null {
 		// Left rail - runs from after corner cutout to back wall
 		// Start after the corner cutout (wall thickness from front)
 		const railStartY = lipThickness + wall; // after corner cutout
-		const leftRailLength = cavityDepth - snapBumpHeight - wall; // shortened to account for corner
+		const leftRailLength = cavityDepth - railThickness - wall; // shortened to account for corner
 		const leftRail = translate(
-			[innerLeftX + snapBumpHeight / 2, railStartY + leftRailLength / 2, bumpZ],
+			[innerLeftX + railThickness / 2, railStartY + leftRailLength / 2, bumpZ],
 			cuboid({
-				size: [snapBumpHeight, leftRailLength, railHeight],
+				size: [railThickness, leftRailLength, railHeight],
 				center: [0, 0, 0]
 			})
 		);
@@ -404,9 +407,9 @@ export function createLid(box: Box): Geom3 | null {
 
 		// Right rail - runs from after corner cutout to back wall
 		const rightRail = translate(
-			[innerRightX - snapBumpHeight / 2, railStartY + leftRailLength / 2, bumpZ],
+			[innerRightX - railThickness / 2, railStartY + leftRailLength / 2, bumpZ],
 			cuboid({
-				size: [snapBumpHeight, leftRailLength, railHeight],
+				size: [railThickness, leftRailLength, railHeight],
 				center: [0, 0, 0]
 			})
 		);
