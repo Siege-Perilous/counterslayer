@@ -3,9 +3,9 @@ import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { Box, LidParams } from '$lib/types/project';
 import { arrangeTrays, getBoxInteriorDimensions } from './box';
 
-const { cuboid, roundedCuboid } = jscad.primitives;
+const { cuboid, roundedCuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
-const { translate } = jscad.transforms;
+const { translate, rotateX, rotateY } = jscad.transforms;
 
 export const defaultLidParams: LidParams = {
 	thickness: 2.0,
@@ -14,7 +14,10 @@ export const defaultLidParams: LidParams = {
 	railInset: 0,
 	ledgeHeight: 0,
 	fingerNotchRadius: 0,
-	fingerNotchDepth: 0
+	fingerNotchDepth: 0,
+	snapEnabled: true,
+	snapBumpHeight: 0.4,
+	snapBumpWidth: 4.0
 };
 
 /**
@@ -142,17 +145,81 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 
 	const recess = subtract(outerRecess, innerWallKeep);
 
-	return subtract(outerBox, ...trayCavities, ...fillCells, recess);
+	let result = subtract(outerBox, ...trayCavities, ...fillCells, recess);
+
+	// 4. Add snap notches if enabled
+	// These are grooves cut into the outer surface of the inner wall
+	// where the lid's snap bumps will click into
+	const snapEnabled = box.lidParams?.snapEnabled ?? true;
+	const snapBumpHeight = box.lidParams?.snapBumpHeight ?? 0.4;
+	const snapBumpWidth = box.lidParams?.snapBumpWidth ?? 4.0;
+
+	if (snapEnabled && snapBumpHeight > 0) {
+		// Notch depth slightly larger than bump height for easy engagement
+		const notchDepth = snapBumpHeight + 0.1;
+		// Notch height - make it tall enough to catch the bump
+		const notchHeight = snapBumpHeight * 2;
+
+		// The inner wall is centered in the box with depth = interior.depth + wall
+		// So its outer surfaces are at:
+		//   Front (low Y): wall / 2
+		//   Back (high Y): extDepth - wall / 2
+		// Notches cut INTO the inner wall from these surfaces
+		const notchZ = extHeight - wall / 2;
+
+		// Front notch - cuts into inner wall from Y = wall/2 going inward (+Y)
+		const frontNotch = translate(
+			[extWidth / 2, wall / 2 + notchDepth / 2, notchZ],
+			cuboid({
+				size: [snapBumpWidth, notchDepth, notchHeight],
+				center: [0, 0, 0]
+			})
+		);
+
+		// Back notch - cuts into inner wall from Y = extDepth - wall/2 going inward (-Y)
+		const backNotch = translate(
+			[extWidth / 2, extDepth - wall / 2 - notchDepth / 2, notchZ],
+			cuboid({
+				size: [snapBumpWidth, notchDepth, notchHeight],
+				center: [0, 0, 0]
+			})
+		);
+
+		result = subtract(result, frontNotch, backNotch);
+	}
+
+	return result;
+}
+
+/**
+ * Create a snap bump - a half-cylinder that protrudes from the lid wall.
+ * The bump has a gentle ramp on entry side for easier snapping.
+ */
+function createSnapBump(
+	bumpHeight: number,
+	bumpWidth: number,
+	lipHeight: number
+): Geom3 {
+	// Half-cylinder bump rotated to lie along the wall
+	// Height of cylinder = width of bump along the wall
+	const bump = cylinder({
+		radius: bumpHeight,
+		height: bumpWidth,
+		segments: 16
+	});
+	// Rotate so cylinder axis is along X (bump protrudes in Y)
+	return rotateY(Math.PI / 2, bump);
 }
 
 /**
  * Lid is a shallow box - solid top with short walls.
  * Fits over the box's inner wall.
+ * Includes optional snap-lock bumps for secure closure.
  *
  * Cross-section:
  *    ___________________
  *   |___________________|  <- solid top
- *   |   |           |   |  <- short walls (lip)
+ *   |   |     ●     |   |  <- short walls (lip) with snap bump
  *   |___|           |___|
  *       (open here)
  */
@@ -169,6 +236,11 @@ export function createLid(box: Box): Geom3 | null {
 	const wall = box.wallThickness;
 	const clearance = 0.3;
 	const innerWallThickness = wall / 2;
+
+	// Snap-lock parameters (with defaults for backwards compatibility)
+	const snapEnabled = box.lidParams?.snapEnabled ?? true;
+	const snapBumpHeight = box.lidParams?.snapBumpHeight ?? 0.4;
+	const snapBumpWidth = box.lidParams?.snapBumpWidth ?? 4.0;
 
 	// Lid exterior matches box exterior
 	const extWidth = interior.width + wall * 2;
@@ -195,5 +267,31 @@ export function createLid(box: Box): Geom3 | null {
 		center: [extWidth / 2, extDepth / 2, lidHeight - lipHeight / 2 + 0.5]
 	});
 
-	return subtract(solid, cavity);
+	let lid = subtract(solid, cavity);
+
+	// 3. Add snap bumps if enabled
+	if (snapEnabled && snapBumpHeight > 0) {
+		// Position bumps on the inner surface of the front and back walls (Y walls)
+		// Bumps are centered on each wall, near the top of the lip
+		const bumpZ = lidHeight - lipHeight / 2; // Middle of lip height
+
+		// Distance from lid center to inner surface of cavity wall
+		const cavityHalfDepth = cavityDepth / 2;
+
+		// Front wall bump (Y = low side) - bump protrudes in +Y direction
+		const frontBump = translate(
+			[extWidth / 2, (extDepth - cavityDepth) / 2 + snapBumpHeight / 2, bumpZ],
+			rotateX(Math.PI / 2, createSnapBump(snapBumpHeight, snapBumpWidth, lipHeight))
+		);
+
+		// Back wall bump (Y = high side) - bump protrudes in -Y direction
+		const backBump = translate(
+			[extWidth / 2, extDepth - (extDepth - cavityDepth) / 2 - snapBumpHeight / 2, bumpZ],
+			rotateX(Math.PI / 2, createSnapBump(snapBumpHeight, snapBumpWidth, lipHeight))
+		);
+
+		lid = union(lid, frontBump, backBump);
+	}
+
+	return lid;
 }

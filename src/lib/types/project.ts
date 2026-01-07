@@ -14,6 +14,10 @@ export interface LidParams {
 	ledgeHeight: number;    // Height of outer wall before step-in
 	fingerNotchRadius: number;
 	fingerNotchDepth: number;
+	// Snap-lock parameters
+	snapEnabled: boolean;      // Enable snap-lock mechanism
+	snapBumpHeight: number;    // How far bump protrudes (0.4-0.5mm typical)
+	snapBumpWidth: number;     // Width of bump along wall (3-5mm typical)
 }
 
 export interface Box {
