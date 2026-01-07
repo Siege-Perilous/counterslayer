@@ -5,8 +5,12 @@ import { arrangeTrays, getBoxInteriorDimensions } from './box';
 
 const { cuboid, roundedCuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
-const { translate, rotateX, rotateY } = jscad.transforms;
+const { translate, rotateX, rotateY, rotateZ, scale, mirrorX } = jscad.transforms;
 const { hull } = jscad.hulls;
+const { vectorText } = jscad.text;
+const { path2 } = jscad.geometries;
+const { expand } = jscad.expansions;
+const { extrudeLinear } = jscad.extrusions;
 
 export const defaultLidParams: LidParams = {
 	thickness: 2.0,
@@ -19,7 +23,8 @@ export const defaultLidParams: LidParams = {
 	snapEnabled: true,
 	snapBumpHeight: 0.4,
 	snapBumpWidth: 4.0,
-	railEngagement: 0.5
+	railEngagement: 0.5,
+	showName: true
 };
 
 /**
@@ -235,6 +240,33 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			}))
 		);
 		result = subtract(result, detentNotch);
+
+		// Add grip lines on back of side walls to match lid grip lines
+		// These create a continuous tactile feature when lid is attached
+		const gripLineDepth = 0.3; // Same as lid
+		const gripLineWidth = 0.8; // Same as lid
+		const gripLineSpacing = 2.5; // Same as lid
+		const numGripLines = 5;
+		const totalGripWidth = (numGripLines - 1) * gripLineSpacing;
+		const gripStartY = extDepth - wall - 1 - totalGripWidth; // Same positioning as lid
+
+		for (let i = 0; i < numGripLines; i++) {
+			const lineY = gripStartY + i * gripLineSpacing;
+
+			// Left side grip lines (on outer X surface) - full box height
+			const leftGrip = cuboid({
+				size: [gripLineDepth, gripLineWidth, extHeight + 1],
+				center: [gripLineDepth / 2, lineY, extHeight / 2]
+			});
+
+			// Right side grip lines (on outer X surface) - full box height
+			const rightGrip = cuboid({
+				size: [gripLineDepth, gripLineWidth, extHeight + 1],
+				center: [extWidth - gripLineDepth / 2, lineY, extHeight / 2]
+			});
+
+			result = subtract(result, leftGrip, rightGrip);
+		}
 	}
 
 	return result;
@@ -482,6 +514,87 @@ export function createLid(box: Box): Geom3 | null {
 			}))
 		);
 		lid = union(lid, detentBump);
+	}
+
+	// 4. Emboss box name on lid top if enabled
+	const showName = box.lidParams?.showName ?? true;
+	if (showName && box.name && box.name.trim().length > 0) {
+		const textDepth = 0.6; // How deep the text is recessed
+		const strokeWidth = 1.4; // Width of the text strokes (thicker = bolder)
+		const textHeight = 8; // Font height in mm
+		const margin = wall * 2; // Margin from edges
+
+		// Determine if text should be rotated to read along the longest dimension
+		const rotateText = extDepth > extWidth;
+
+		// Get text outlines (uppercase renders better with vector font)
+		const textSegments = vectorText({ height: textHeight, align: 'center' }, box.name.trim().toUpperCase());
+
+		if (textSegments.length > 0) {
+			// Convert segments to path2, expand to give stroke width, and extrude
+			const textShapes: Geom3[] = [];
+			for (const segment of textSegments) {
+				if (segment.length >= 2) {
+					const pathObj = path2.fromPoints({ closed: false }, segment);
+					const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 64 }, pathObj);
+					const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
+					textShapes.push(extruded);
+				}
+			}
+
+			if (textShapes.length > 0) {
+				// Calculate text bounds to center it
+				let minX = Infinity, maxX = -Infinity;
+				let minY = Infinity, maxY = -Infinity;
+				for (const segment of textSegments) {
+					for (const point of segment) {
+						minX = Math.min(minX, point[0]);
+						maxX = Math.max(maxX, point[0]);
+						minY = Math.min(minY, point[1]);
+						maxY = Math.max(maxY, point[1]);
+					}
+				}
+				const textWidth = maxX - minX + strokeWidth;
+				const textHeightY = maxY - minY + strokeWidth;
+
+				// Available space depends on orientation
+				const availableLong = (rotateText ? extDepth : extWidth) - margin * 2;
+				const availableShort = (rotateText ? extWidth : extDepth) - margin * 2;
+
+				// Scale to fit: text width goes along long dimension, text height along short
+				const scaleLong = Math.min(1, availableLong / textWidth);
+				const scaleShort = Math.min(1, availableShort / textHeightY);
+				const textScale = Math.min(scaleLong, scaleShort);
+
+				// Center position on lid top
+				const centerX = extWidth / 2;
+				const centerY = extDepth / 2;
+				const textCenterX = (minX + maxX) / 2;
+				const textCenterY = (minY + maxY) / 2;
+
+				// Combine all text shapes and position them
+				// Mirror in X because lid top is at Z=0 (print surface faces up when in use)
+				let combinedText: Geom3 = union(...textShapes);
+				combinedText = mirrorX(combinedText); // Mirror horizontally
+
+				// If lid is longer in Y, rotate text 90° to read along Y axis
+				if (rotateText) {
+					combinedText = rotateZ(Math.PI / 2, combinedText);
+					// After rotation: old X becomes Y, old Y becomes -X
+					const positionedText = translate(
+						[centerX + textCenterY * textScale, centerY + textCenterX * textScale, -0.1],
+						scale([textScale, textScale, 1], combinedText)
+					);
+					lid = subtract(lid, positionedText);
+				} else {
+					const positionedText = translate(
+						[centerX + textCenterX * textScale, centerY - textCenterY * textScale, -0.1],
+						scale([textScale, textScale, 1], combinedText)
+					);
+					lid = subtract(lid, positionedText);
+				}
+			}
+		}
 	}
 
 	return lid;

@@ -18,7 +18,9 @@ export interface LidParams {
 	snapEnabled: boolean;      // Enable snap-lock mechanism
 	snapBumpHeight: number;    // How far bump protrudes (0.4-0.5mm typical)
 	snapBumpWidth: number;     // Width of bump along wall (3-5mm typical)
-	railEngagement: number;    // Fraction of lip height used for rail (0.0-1.0, default 0.6)
+	railEngagement: number;    // Fraction of lip height used for rail (0.0-1.0, default 0.5)
+	// Text embossing
+	showName: boolean;         // Emboss box name on lid top (default true)
 }
 
 export interface Box {
