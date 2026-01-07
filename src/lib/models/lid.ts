@@ -17,7 +17,8 @@ export const defaultLidParams: LidParams = {
 	fingerNotchDepth: 0,
 	snapEnabled: true,
 	snapBumpHeight: 0.4,
-	snapBumpWidth: 4.0
+	snapBumpWidth: 4.0,
+	railEngagement: 0.6
 };
 
 /**
@@ -165,16 +166,19 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	// where the lid's rails slide into
 	const snapBumpHeight = box.lidParams?.snapBumpHeight ?? 0.4;
 	const snapBumpWidth = box.lidParams?.snapBumpWidth ?? 4.0;
+	const railEngagement = box.lidParams?.railEngagement ?? 0.6;
 
 	if (snapEnabled && snapBumpHeight > 0) {
 		// Groove depth slightly larger than bump height for easy sliding
 		const grooveDepth = snapBumpHeight + 0.1;
-		// Groove height matches the rail height
-		const grooveHeight = snapBumpHeight * 2 + 0.2;
+		// Groove height uses railEngagement fraction of lip height (wall) for stronger hold
+		const lipHeight = wall;
+		const grooveHeight = lipHeight * railEngagement + 0.2;
 
 		// Inner wall outer surfaces form a rectangle
 		// Front (low Y) is entry side - no groove there
-		const notchZ = extHeight - wall / 2;
+		// Position groove at BOTTOM of recess area (more material above for strength)
+		const notchZ = extHeight - wall + grooveHeight / 2;
 
 		// Inner wall dimensions (same as innerWallKeep)
 		const innerWallWidth = interior.width + innerWallThickness * 2;
@@ -284,6 +288,7 @@ export function createLid(box: Box): Geom3 | null {
 	const snapEnabled = box.lidParams?.snapEnabled ?? true;
 	const snapBumpHeight = box.lidParams?.snapBumpHeight ?? 0.4;
 	const snapBumpWidth = box.lidParams?.snapBumpWidth ?? 4.0;
+	const railEngagement = box.lidParams?.railEngagement ?? 0.6;
 
 	// Lid exterior matches box exterior
 	const extWidth = interior.width + wall * 2;
@@ -361,7 +366,10 @@ export function createLid(box: Box): Geom3 | null {
 
 	// 3. Add continuous U-shaped rail on 3 sides for sliding fit (not front/entry side)
 	if (snapEnabled && snapBumpHeight > 0) {
-		const bumpZ = lidHeight - lipHeight / 2;
+		// Rail height uses railEngagement fraction of lip height for stronger hold
+		const railHeight = lipHeight * railEngagement;
+		// Position rail at BOTTOM of lip (opening edge) - more material above for strength
+		const bumpZ = lidHeight - railHeight / 2;
 
 		// Wall positions (inner surface of lid cavity)
 		const lipThickness = (extWidth - cavityWidth) / 2; // thickness of lid lip walls
@@ -375,7 +383,7 @@ export function createLid(box: Box): Geom3 | null {
 		const backRail = translate(
 			[extWidth / 2, innerBackY - snapBumpHeight / 2, bumpZ],
 			cuboid({
-				size: [cavityWidth, snapBumpHeight, snapBumpHeight * 2],
+				size: [cavityWidth, snapBumpHeight, railHeight],
 				center: [0, 0, 0]
 			})
 		);
@@ -388,7 +396,7 @@ export function createLid(box: Box): Geom3 | null {
 		const leftRail = translate(
 			[innerLeftX + snapBumpHeight / 2, railStartY + leftRailLength / 2, bumpZ],
 			cuboid({
-				size: [snapBumpHeight, leftRailLength, snapBumpHeight * 2],
+				size: [snapBumpHeight, leftRailLength, railHeight],
 				center: [0, 0, 0]
 			})
 		);
@@ -398,7 +406,7 @@ export function createLid(box: Box): Geom3 | null {
 		const rightRail = translate(
 			[innerRightX - snapBumpHeight / 2, railStartY + leftRailLength / 2, bumpZ],
 			cuboid({
-				size: [snapBumpHeight, leftRailLength, snapBumpHeight * 2],
+				size: [snapBumpHeight, leftRailLength, railHeight],
 				center: [0, 0, 0]
 			})
 		);
