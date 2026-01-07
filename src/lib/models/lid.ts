@@ -519,13 +519,10 @@ export function createLid(box: Box): Geom3 | null {
 			center: [innerRightX - railThickness / 2, sideRailCenterY, topZ - railHeight / 2]
 		});
 
-		// Union the blocks
-		let railBlock = union(backRailBlock, leftRailBlock, rightRailBlock);
+		// Cut 45° chamfers on each rail piece BEFORE unioning
+		// This prevents manifold errors from overlapping cuts at corners
 
-		// Cut 45° chamfers on the bottom using rotated cuboids
-		// Chamfers face toward the center (cavity), not toward the lip wall
-
-		// Back chamfer - full width through corners
+		// Back chamfer - applied to back rail only
 		const backCut = translate(
 			[extWidth / 2, innerBackY - railThickness, bottomZ],
 			rotateX(Math.PI / 4, cuboid({
@@ -533,9 +530,9 @@ export function createLid(box: Box): Geom3 | null {
 				center: [0, 0, 0]
 			}))
 		);
+		const backRailChamfered = subtract(backRailBlock, backCut);
 
-		// Side chamfers - full length
-		// Left chamfer - at tip (innerLeftX + railThickness), facing toward center (+X)
+		// Left chamfer - applied to left rail only
 		const leftCut = translate(
 			[innerLeftX + railThickness, sideRailCenterY, bottomZ],
 			rotateY(-Math.PI / 4, cuboid({
@@ -543,8 +540,9 @@ export function createLid(box: Box): Geom3 | null {
 				center: [0, 0, 0]
 			}))
 		);
+		const leftRailChamfered = subtract(leftRailBlock, leftCut);
 
-		// Right chamfer - at tip (innerRightX - railThickness), facing toward center (-X)
+		// Right chamfer - applied to right rail only
 		const rightCut = translate(
 			[innerRightX - railThickness, sideRailCenterY, bottomZ],
 			rotateY(Math.PI / 4, cuboid({
@@ -552,8 +550,10 @@ export function createLid(box: Box): Geom3 | null {
 				center: [0, 0, 0]
 			}))
 		);
+		const rightRailChamfered = subtract(rightRailBlock, rightCut);
 
-		railBlock = subtract(railBlock, backCut, leftCut, rightCut);
+		// Union the chamfered pieces
+		const railBlock = union(backRailChamfered, leftRailChamfered, rightRailChamfered);
 
 		lid = union(lid, railBlock);
 
