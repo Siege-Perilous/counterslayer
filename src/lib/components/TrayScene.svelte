@@ -324,9 +324,10 @@
 	<T.Mesh
 		geometry={lidGeometry}
 		rotation.x={exploded ? Math.PI / 2 : -Math.PI / 2}
-		position.x={showAllTrays && !exploded ? sidePositions.lid.x - lidWidth / 2 : meshOffset.x}
+		rotation.z={exploded ? Math.PI : 0}
+		position.x={showAllTrays && !exploded ? sidePositions.lid.x - lidWidth / 2 : (exploded ? meshOffset.x + lidWidth : meshOffset.x)}
 		position.y={exploded ? (explodedOffset.lid + lidHeight + topTraySpacing) : explodedOffset.lid}
-		position.z={showAllTrays && !exploded ? sidePositions.lid.z : (exploded ? -lidDepth / 2 : meshOffset.z)}
+		position.z={showAllTrays && !exploded ? sidePositions.lid.z : (exploded ? lidDepth / 2 : meshOffset.z)}
 	>
 		<T.MeshStandardMaterial color="#a855f7" roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
 	</T.Mesh>

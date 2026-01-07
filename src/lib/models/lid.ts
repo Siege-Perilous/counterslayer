@@ -143,49 +143,77 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		center: [extWidth / 2, extDepth / 2, extHeight - recessHeight / 2]
 	});
 
-	const recess = subtract(outerRecess, innerWallKeep);
+	// For sliding lid, extend the front outer wall to full height (no recess on entry side)
+	const snapEnabled = box.lidParams?.snapEnabled ?? true;
+	let recess;
+	if (snapEnabled) {
+		// Keep front wall full height by not cutting recess there
+		// Subtract the front portion from the recess cut
+		const frontWallKeep = cuboid({
+			size: [extWidth + 1, wall, recessHeight + 1],
+			center: [extWidth / 2, wall / 2, extHeight - recessHeight / 2]
+		});
+		recess = subtract(outerRecess, innerWallKeep, frontWallKeep);
+	} else {
+		recess = subtract(outerRecess, innerWallKeep);
+	}
 
 	let result = subtract(outerBox, ...trayCavities, ...fillCells, recess);
 
-	// 4. Add snap notches if enabled
+	// 4. Add snap grooves if enabled
 	// These are grooves cut into the outer surface of the inner wall
-	// where the lid's snap bumps will click into
-	const snapEnabled = box.lidParams?.snapEnabled ?? true;
+	// where the lid's rails slide into
 	const snapBumpHeight = box.lidParams?.snapBumpHeight ?? 0.4;
 	const snapBumpWidth = box.lidParams?.snapBumpWidth ?? 4.0;
 
 	if (snapEnabled && snapBumpHeight > 0) {
-		// Notch depth slightly larger than bump height for easy engagement
-		const notchDepth = snapBumpHeight + 0.1;
-		// Notch height - make it tall enough to catch the bump
-		const notchHeight = snapBumpHeight * 2;
+		// Groove depth slightly larger than bump height for easy sliding
+		const grooveDepth = snapBumpHeight + 0.1;
+		// Groove height matches the rail height
+		const grooveHeight = snapBumpHeight * 2 + 0.2;
 
-		// The inner wall is centered in the box with depth = interior.depth + wall
-		// So its outer surfaces are at:
-		//   Front (low Y): wall / 2
-		//   Back (high Y): extDepth - wall / 2
-		// Notches cut INTO the inner wall from these surfaces
+		// Inner wall outer surfaces form a rectangle
+		// Front (low Y) is entry side - no groove there
 		const notchZ = extHeight - wall / 2;
 
-		// Front notch - cuts into inner wall from Y = wall/2 going inward (+Y)
-		const frontNotch = translate(
-			[extWidth / 2, wall / 2 + notchDepth / 2, notchZ],
+		// Inner wall dimensions (same as innerWallKeep)
+		const innerWallWidth = interior.width + innerWallThickness * 2;
+		const innerWallDepth = interior.depth + innerWallThickness * 2;
+
+		const grooves: Geom3[] = [];
+
+		// Back groove - runs full width along back inner wall
+		const backGroove = translate(
+			[extWidth / 2, extDepth - wall / 2 - grooveDepth / 2, notchZ],
 			cuboid({
-				size: [snapBumpWidth, notchDepth, notchHeight],
+				size: [innerWallWidth, grooveDepth, grooveHeight],
 				center: [0, 0, 0]
 			})
 		);
+		grooves.push(backGroove);
 
-		// Back notch - cuts into inner wall from Y = extDepth - wall/2 going inward (-Y)
-		const backNotch = translate(
-			[extWidth / 2, extDepth - wall / 2 - notchDepth / 2, notchZ],
+		// Left groove - runs from front to back along left inner wall
+		const sideGrooveLength = innerWallDepth - grooveDepth; // don't overlap with back
+		const leftGroove = translate(
+			[wall / 2 + grooveDepth / 2, wall / 2 + sideGrooveLength / 2, notchZ],
 			cuboid({
-				size: [snapBumpWidth, notchDepth, notchHeight],
+				size: [grooveDepth, sideGrooveLength, grooveHeight],
 				center: [0, 0, 0]
 			})
 		);
+		grooves.push(leftGroove);
 
-		result = subtract(result, frontNotch, backNotch);
+		// Right groove - runs from front to back along right inner wall
+		const rightGroove = translate(
+			[extWidth - wall / 2 - grooveDepth / 2, wall / 2 + sideGrooveLength / 2, notchZ],
+			cuboid({
+				size: [grooveDepth, sideGrooveLength, grooveHeight],
+				center: [0, 0, 0]
+			})
+		);
+		grooves.push(rightGroove);
+
+		result = subtract(result, ...grooves);
 	}
 
 	return result;
@@ -269,28 +297,73 @@ export function createLid(box: Box): Geom3 | null {
 
 	let lid = subtract(solid, cavity);
 
-	// 3. Add snap bumps if enabled
+	// Remove front lip for sliding entry (if snap enabled)
+	if (snapEnabled) {
+		const frontLipCutout = cuboid({
+			size: [cavityWidth, wall, lipHeight + 1],
+			center: [extWidth / 2, wall / 2, lidHeight - lipHeight / 2 + 0.5]
+		});
+		lid = subtract(lid, frontLipCutout);
+
+		// Cut notches from front corners of left/right walls
+		// These would otherwise overlap with the box's full-height front wall
+		const cornerCutoutLeft = cuboid({
+			size: [wall, wall, lipHeight + 1],
+			center: [wall / 2, wall / 2, lidHeight - lipHeight / 2 + 0.5]
+		});
+		const cornerCutoutRight = cuboid({
+			size: [wall, wall, lipHeight + 1],
+			center: [extWidth - wall / 2, wall / 2, lidHeight - lipHeight / 2 + 0.5]
+		});
+		lid = subtract(lid, cornerCutoutLeft, cornerCutoutRight);
+	}
+
+	// 3. Add continuous U-shaped rail on 3 sides for sliding fit (not front/entry side)
 	if (snapEnabled && snapBumpHeight > 0) {
-		// Position bumps on the inner surface of the front and back walls (Y walls)
-		// Bumps are centered on each wall, near the top of the lip
-		const bumpZ = lidHeight - lipHeight / 2; // Middle of lip height
+		const bumpZ = lidHeight - lipHeight / 2;
 
-		// Distance from lid center to inner surface of cavity wall
-		const cavityHalfDepth = cavityDepth / 2;
+		// Wall positions (inner surface of lid cavity)
+		const lipThickness = (extWidth - cavityWidth) / 2; // thickness of lid lip walls
+		const innerLeftX = lipThickness;
+		const innerRightX = extWidth - lipThickness;
+		const innerBackY = extDepth - lipThickness;
 
-		// Front wall bump (Y = low side) - bump protrudes in +Y direction
-		const frontBump = translate(
-			[extWidth / 2, (extDepth - cavityDepth) / 2 + snapBumpHeight / 2, bumpZ],
-			rotateX(Math.PI / 2, createSnapBump(snapBumpHeight, snapBumpWidth, lipHeight))
+		const rails: Geom3[] = [];
+
+		// Back rail - runs full width along back wall
+		const backRail = translate(
+			[extWidth / 2, innerBackY - snapBumpHeight / 2, bumpZ],
+			cuboid({
+				size: [cavityWidth, snapBumpHeight, snapBumpHeight * 2],
+				center: [0, 0, 0]
+			})
 		);
+		rails.push(backRail);
 
-		// Back wall bump (Y = high side) - bump protrudes in -Y direction
-		const backBump = translate(
-			[extWidth / 2, extDepth - (extDepth - cavityDepth) / 2 - snapBumpHeight / 2, bumpZ],
-			rotateX(Math.PI / 2, createSnapBump(snapBumpHeight, snapBumpWidth, lipHeight))
+		// Left rail - runs from after corner cutout to back wall
+		// Start after the corner cutout (wall thickness from front)
+		const railStartY = lipThickness + wall; // after corner cutout
+		const leftRailLength = cavityDepth - snapBumpHeight - wall; // shortened to account for corner
+		const leftRail = translate(
+			[innerLeftX + snapBumpHeight / 2, railStartY + leftRailLength / 2, bumpZ],
+			cuboid({
+				size: [snapBumpHeight, leftRailLength, snapBumpHeight * 2],
+				center: [0, 0, 0]
+			})
 		);
+		rails.push(leftRail);
 
-		lid = union(lid, frontBump, backBump);
+		// Right rail - runs from after corner cutout to back wall
+		const rightRail = translate(
+			[innerRightX - snapBumpHeight / 2, railStartY + leftRailLength / 2, bumpZ],
+			cuboid({
+				size: [snapBumpHeight, leftRailLength, snapBumpHeight * 2],
+				center: [0, 0, 0]
+			})
+		);
+		rails.push(rightRail);
+
+		lid = union(lid, ...rails);
 	}
 
 	return lid;
