@@ -170,6 +170,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	// 4. Add snap grooves if enabled
 	// These are grooves cut into the outer surface of the inner wall
 	// where the lid's rails slide into
+	// Using simple rectangular grooves - the small overhang (~0.8mm) is acceptable
 	const snapBumpHeight = box.lidParams?.snapBumpHeight ?? 0.4;
 	const snapBumpWidth = box.lidParams?.snapBumpWidth ?? 4.0;
 	const railEngagement = box.lidParams?.railEngagement ?? 0.5;
@@ -225,6 +226,77 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		grooves.push(rightGroove);
 
 		result = subtract(result, ...grooves);
+
+		// Add supports to eliminate groove ceiling overhang (makes printing without supports possible)
+		//
+		// CHAMFER TECHNIQUE: Creating 45° chamfers for self-supporting overhangs
+		// ======================================================================
+		// 1. Create rectangular blocks that fill the areas needing chamfers
+		//    - Blocks can overlap at corners - union handles this cleanly
+		//    - Size the blocks to cover the full depth/height of the chamfer area
+		//
+		// 2. Subtract rotated cuboids to cut the 45° slopes
+		//    - Rotate the cutting cuboid 45° (Math.PI/4) around the appropriate axis:
+		//      * rotateX for chamfers facing -Y or +Y (back/front walls)
+		//      * rotateY for chamfers facing -X or +X (left/right walls)
+		//    - Size the cutter: chamferSize = depth * Math.sqrt(2) for the rotated dimensions
+		//    - Position the cutter at the edge where the slope should start
+		//
+		// This technique avoids complex triangular hull() geometry and handles corners
+		// automatically through the union of overlapping blocks.
+		// ======================================================================
+		const grooveTopZ = notchZ + grooveHeight / 2;
+		const chamferSize = grooveDepth * Math.sqrt(2); // diagonal of the chamfer square
+
+		// Rectangular support blocks (will overlap at corners - that's fine)
+		const backBlock = cuboid({
+			size: [innerWallWidth, grooveDepth, grooveDepth],
+			center: [extWidth / 2, extDepth - wall / 2 - grooveDepth / 2, grooveTopZ - grooveDepth / 2]
+		});
+
+		const leftBlock = cuboid({
+			size: [grooveDepth, sideGrooveLength + grooveDepth, grooveDepth],
+			center: [wall / 2 + grooveDepth / 2, wall / 2 + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth / 2]
+		});
+
+		const rightBlock = cuboid({
+			size: [grooveDepth, sideGrooveLength + grooveDepth, grooveDepth],
+			center: [extWidth - wall / 2 - grooveDepth / 2, wall / 2 + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth / 2]
+		});
+
+		// Union the blocks
+		let supportBlock = union(backBlock, leftBlock, rightBlock);
+
+		// Cut 45° chamfers using rotated cuboids
+		// Back chamfer - rotated around X axis
+		const backCut = translate(
+			[extWidth / 2, extDepth - wall / 2, grooveTopZ - grooveDepth],
+			rotateX(Math.PI / 4, cuboid({
+				size: [innerWallWidth + grooveDepth * 2, chamferSize, chamferSize],
+				center: [0, 0, 0]
+			}))
+		);
+
+		// Left chamfer - rotated around Y axis
+		const leftCut = translate(
+			[wall / 2, wall / 2 + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth],
+			rotateY(-Math.PI / 4, cuboid({
+				size: [chamferSize, sideGrooveLength + grooveDepth * 2, chamferSize],
+				center: [0, 0, 0]
+			}))
+		);
+
+		// Right chamfer - rotated around Y axis
+		const rightCut = translate(
+			[extWidth - wall / 2, wall / 2 + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth],
+			rotateY(Math.PI / 4, cuboid({
+				size: [chamferSize, sideGrooveLength + grooveDepth * 2, chamferSize],
+				center: [0, 0, 0]
+			}))
+		);
+
+		supportBlock = subtract(supportBlock, backCut, leftCut, rightCut);
+		result = union(result, supportBlock);
 
 		// Add detent notch on top of flush front wall - lid bump clicks into this
 		// Half-cylinder groove running along X axis for smooth sliding engagement
@@ -399,14 +471,21 @@ export function createLid(box: Box): Geom3 | null {
 	}
 
 	// 3. Add continuous U-shaped rail on 3 sides for sliding fit (not front/entry side)
+	// Rails are designed with 45° chamfered bottoms to be self-supporting when printing
 	if (snapEnabled && snapBumpHeight > 0) {
 		// Rail height uses railEngagement fraction of lip height for stronger hold
 		const railHeight = lipHeight * railEngagement;
 		// Position rail at BOTTOM of lip (opening edge) - more material above for strength
-		const bumpZ = lidHeight - railHeight / 2;
+		const topZ = lidHeight; // Top of rail (flush with lip top)
+		const bottomAtWallZ = lidHeight - railHeight; // Bottom at wall
 
 		// Rail thickness must bridge the clearance gap AND extend into the groove
-		const railThickness = clearance + snapBumpHeight;
+		// Extra protrusion needed because chamfer reduces effective engagement at bottom
+		const railThickness = clearance + snapBumpHeight * 1.5;
+
+		// 45° chamfer: bottom at tip is raised (keeps ~45° slope for printability)
+		const chamferDrop = clearance + snapBumpHeight; // original depth for 45° slope
+		const bottomAtTipZ = bottomAtWallZ + chamferDrop;
 
 		// Wall positions (inner surface of lid cavity)
 		const lipThickness = (extWidth - cavityWidth) / 2; // thickness of lid lip walls
@@ -416,13 +495,62 @@ export function createLid(box: Box): Geom3 | null {
 
 		const rails: Geom3[] = [];
 
-		// Back rail - runs full width along back wall
-		const backRail = translate(
-			[extWidth / 2, innerBackY - railThickness / 2, bumpZ],
-			cuboid({
-				size: [cavityWidth, railThickness, railHeight],
-				center: [0, 0, 0]
-			})
+		// Helper: create a chamfered rail cross-section using hull
+		// Creates a trapezoidal shape: full height at wall, chamfered bottom at tip
+		const createChamferedRailX = (
+			wallX: number,
+			direction: 1 | -1, // 1 = protrudes right (+X), -1 = protrudes left (-X)
+			y1: number,
+			y2: number
+		): Geom3 => {
+			const tipX = wallX + direction * railThickness;
+			const yLen = y2 - y1;
+			const yCenter = (y1 + y2) / 2;
+			const wallHeight = topZ - bottomAtWallZ;
+			const tipHeight = topZ - bottomAtTipZ;
+
+			// Two thin slices: full height at wall, reduced height at tip
+			const wallSlice = cuboid({
+				size: [0.1, yLen, wallHeight],
+				center: [wallX + direction * 0.05, yCenter, topZ - wallHeight / 2]
+			});
+			const tipSlice = cuboid({
+				size: [0.1, yLen, tipHeight],
+				center: [tipX - direction * 0.05, yCenter, topZ - tipHeight / 2]
+			});
+			return hull(wallSlice, tipSlice);
+		};
+
+		const createChamferedRailY = (
+			wallY: number,
+			direction: 1 | -1, // 1 = protrudes back (+Y), -1 = protrudes front (-Y)
+			x1: number,
+			x2: number
+		): Geom3 => {
+			const tipY = wallY + direction * railThickness;
+			const xLen = x2 - x1;
+			const xCenter = (x1 + x2) / 2;
+			const wallHeight = topZ - bottomAtWallZ;
+			const tipHeight = topZ - bottomAtTipZ;
+
+			// Two thin slices: full height at wall, reduced height at tip
+			const wallSlice = cuboid({
+				size: [xLen, 0.1, wallHeight],
+				center: [xCenter, wallY + direction * 0.05, topZ - wallHeight / 2]
+			});
+			const tipSlice = cuboid({
+				size: [xLen, 0.1, tipHeight],
+				center: [xCenter, tipY - direction * 0.05, topZ - tipHeight / 2]
+			});
+			return hull(wallSlice, tipSlice);
+		};
+
+		// Back rail - runs full width along back wall, protrudes forward (-Y)
+		const backRail = createChamferedRailY(
+			innerBackY,
+			-1,
+			innerLeftX,
+			innerRightX
 		);
 		rails.push(backRail);
 
@@ -431,68 +559,67 @@ export function createLid(box: Box): Geom3 | null {
 		const railStartY = lipThickness + wall; // after corner cutout
 		const totalRailLength = cavityDepth - railThickness - wall; // full length to back
 
-		// Taper the front end for smoother insertion - creates a "point" entry
-		const taperLength = Math.min(5, totalRailLength / 3); // 5mm or 1/3 of rail, whichever is smaller
-		const taperTipSize = 0.2; // Small point at entry (both X thickness and Z height)
+		// Taper the front end for smoother insertion
+		const taperLength = Math.min(5, totalRailLength / 3);
 		const mainRailLength = totalRailLength - taperLength;
 
-		// Main rectangular section of left rail (after taper)
-		const leftRailMain = translate(
-			[innerLeftX + railThickness / 2, railStartY + taperLength + mainRailLength / 2, bumpZ],
-			cuboid({
-				size: [railThickness, mainRailLength, railHeight],
-				center: [0, 0, 0]
-			})
+		// Main chamfered section of left rail (after taper), protrudes right (+X)
+		const leftRailMain = createChamferedRailX(
+			innerLeftX,
+			1,
+			railStartY + taperLength,
+			railStartY + taperLength + mainRailLength
 		);
-
-		// Tapered front section - hull between small point and full cross-section
-		// Entry point is small in both X (thickness) and Z (height)
-		const leftTaperEntry = translate(
-			[innerLeftX + taperTipSize / 2, railStartY, bumpZ + (railHeight - taperTipSize) / 2],
-			cuboid({
-				size: [taperTipSize, 0.1, taperTipSize],
-				center: [0, 0, 0]
-			})
-		);
-		const leftTaperEnd = translate(
-			[innerLeftX + railThickness / 2, railStartY + taperLength, bumpZ],
-			cuboid({
-				size: [railThickness, 0.1, railHeight],
-				center: [0, 0, 0]
-			})
-		);
-		const leftTaper = hull(leftTaperEntry, leftTaperEnd);
-
 		rails.push(leftRailMain);
+
+		// Tapered front section with chamfer maintained
+		// Entry: narrow tip at railStartY, expands to full rail at railStartY + taperLength
+		// Use hull of two chamfered cross-sections of different sizes
+		const taperTipSize = 0.3; // Entry tip thickness
+		const taperTipHeight = Math.max(0.3, railHeight - railThickness * 0.8); // Maintain some chamfer
+
+		// Entry point: small chamfered profile
+		const leftTaperEntry = cuboid({
+			size: [taperTipSize, 0.1, taperTipHeight],
+			center: [innerLeftX + taperTipSize / 2, railStartY, topZ - taperTipHeight / 2]
+		});
+		// End of taper: full chamfered profile (thin slice)
+		const tipHeight = topZ - bottomAtTipZ;
+		const wallHeight = topZ - bottomAtWallZ;
+		const leftTaperEndWall = cuboid({
+			size: [0.1, 0.1, wallHeight],
+			center: [innerLeftX + 0.05, railStartY + taperLength, topZ - wallHeight / 2]
+		});
+		const leftTaperEndTip = cuboid({
+			size: [0.1, 0.1, tipHeight],
+			center: [innerLeftX + railThickness - 0.05, railStartY + taperLength, topZ - tipHeight / 2]
+		});
+		const leftTaper = hull(leftTaperEntry, leftTaperEndWall, leftTaperEndTip);
 		rails.push(leftTaper);
 
-		// Right rail - mirror of left rail
-		const rightRailMain = translate(
-			[innerRightX - railThickness / 2, railStartY + taperLength + mainRailLength / 2, bumpZ],
-			cuboid({
-				size: [railThickness, mainRailLength, railHeight],
-				center: [0, 0, 0]
-			})
+		// Right rail - mirror of left rail, protrudes left (-X)
+		const rightRailMain = createChamferedRailX(
+			innerRightX,
+			-1,
+			railStartY + taperLength,
+			railStartY + taperLength + mainRailLength
 		);
-
-		// Tapered front section for right rail - point entry
-		const rightTaperEntry = translate(
-			[innerRightX - taperTipSize / 2, railStartY, bumpZ + (railHeight - taperTipSize) / 2],
-			cuboid({
-				size: [taperTipSize, 0.1, taperTipSize],
-				center: [0, 0, 0]
-			})
-		);
-		const rightTaperEnd = translate(
-			[innerRightX - railThickness / 2, railStartY + taperLength, bumpZ],
-			cuboid({
-				size: [railThickness, 0.1, railHeight],
-				center: [0, 0, 0]
-			})
-		);
-		const rightTaper = hull(rightTaperEntry, rightTaperEnd);
-
 		rails.push(rightRailMain);
+
+		// Tapered front section for right rail
+		const rightTaperEntry = cuboid({
+			size: [taperTipSize, 0.1, taperTipHeight],
+			center: [innerRightX - taperTipSize / 2, railStartY, topZ - taperTipHeight / 2]
+		});
+		const rightTaperEndWall = cuboid({
+			size: [0.1, 0.1, wallHeight],
+			center: [innerRightX - 0.05, railStartY + taperLength, topZ - wallHeight / 2]
+		});
+		const rightTaperEndTip = cuboid({
+			size: [0.1, 0.1, tipHeight],
+			center: [innerRightX - railThickness + 0.05, railStartY + taperLength, topZ - tipHeight / 2]
+		});
+		const rightTaper = hull(rightTaperEntry, rightTaperEndWall, rightTaperEndTip);
 		rails.push(rightTaper);
 
 		lid = union(lid, ...rails);
