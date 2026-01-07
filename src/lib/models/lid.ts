@@ -214,6 +214,21 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		grooves.push(rightGroove);
 
 		result = subtract(result, ...grooves);
+
+		// Add detent notch on top of flush front wall - lid bump clicks into this
+		// Half-cylinder groove running along X axis for smooth sliding engagement
+		const detentRadius = snapBumpHeight + 0.1; // Slightly larger than bump for clearance
+		const detentLength = snapBumpWidth * 2; // Wider for stability
+		const detentNotch = translate(
+			[extWidth / 2, wall / 2, extHeight],
+			rotateY(Math.PI / 2, cylinder({
+				radius: detentRadius,
+				height: detentLength,
+				segments: 32,
+				center: [0, 0, 0]
+			}))
+		);
+		result = subtract(result, detentNotch);
 	}
 
 	return result;
@@ -390,6 +405,24 @@ export function createLid(box: Box): Geom3 | null {
 		rails.push(rightRail);
 
 		lid = union(lid, ...rails);
+
+		// Add detent bump on underside of lid - clicks into notch on box's front wall
+		// Half-cylinder ridge running along X axis for smooth sliding engagement
+		// Center at surface level so only half protrudes
+		const detentRadius = snapBumpHeight;
+		const detentLength = snapBumpWidth * 2; // Match notch width for stability
+		const topPlateInnerZ = lidHeight - lipHeight; // Inner surface of top plate
+
+		const detentBump = translate(
+			[extWidth / 2, wall / 2, topPlateInnerZ],
+			rotateY(Math.PI / 2, cylinder({
+				radius: detentRadius,
+				height: detentLength,
+				segments: 32,
+				center: [0, 0, 0]
+			}))
+		);
+		lid = union(lid, detentBump);
 	}
 
 	return lid;
