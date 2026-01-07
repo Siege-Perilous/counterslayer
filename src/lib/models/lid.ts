@@ -341,6 +341,24 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		}
 	}
 
+	// 5. Add poke holes at the center of each tray position for easy removal
+	const POKE_HOLE_DIAMETER = 20;
+	for (const p of placements) {
+		// Calculate center of tray in box coordinates
+		const centerX = wall + tolerance + p.x + p.dimensions.width / 2;
+		const centerY = wall + tolerance + p.y + p.dimensions.depth / 2;
+
+		const hole = translate(
+			[centerX, centerY, floor / 2],
+			cylinder({
+				radius: POKE_HOLE_DIAMETER / 2,
+				height: floor + 1,
+				segments: 32
+			})
+		);
+		result = subtract(result, hole);
+	}
+
 	return result;
 }
 

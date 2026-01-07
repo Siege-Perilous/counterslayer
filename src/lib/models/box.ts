@@ -249,6 +249,9 @@ function createRoundedBox(
 	return hull(...corners);
 }
 
+// Diameter of poke holes for pushing trays out from below
+const POKE_HOLE_DIAMETER = 15;
+
 // Create box geometry with rounded corners
 export function createBox(box: Box): Geom3 | null {
 	if (box.trays.length === 0) return null;
@@ -285,7 +288,27 @@ export function createBox(box: Box): Geom3 | null {
 		)
 	);
 
-	return subtract(outer, inner);
+	let result = subtract(outer, inner);
+
+	// Create poke holes at the center of each tray position
+	for (const p of placements) {
+		// Calculate center of tray in box coordinates
+		// Tray positions are relative to interior, add wall thickness and tolerance offset
+		const centerX = box.wallThickness + box.tolerance + p.x + p.dimensions.width / 2;
+		const centerY = box.wallThickness + box.tolerance + p.y + p.dimensions.depth / 2;
+
+		const hole = translate(
+			[centerX, centerY, box.floorThickness / 2],
+			cylinder({
+				radius: POKE_HOLE_DIAMETER / 2,
+				height: box.floorThickness + 1,
+				segments: 32
+			})
+		);
+		result = subtract(result, hole);
+	}
+
+	return result;
 }
 
 // Get box exterior dimensions
