@@ -6,6 +6,7 @@ import { arrangeTrays, getBoxInteriorDimensions } from './box';
 const { cuboid, roundedCuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
 const { translate, rotateX, rotateY } = jscad.transforms;
+const { hull } = jscad.hulls;
 
 export const defaultLidParams: LidParams = {
 	thickness: 2.0,
@@ -169,8 +170,9 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	const railEngagement = box.lidParams?.railEngagement ?? 0.5;
 
 	if (snapEnabled && snapBumpHeight > 0) {
-		// Groove depth slightly larger than bump height for easy sliding
-		const grooveDepth = snapBumpHeight + 0.1;
+		// Groove depth must accommodate the rail which bridges clearance gap + extends into groove
+		const clearance = 0.3; // Same as lid cavity clearance
+		const grooveDepth = clearance + snapBumpHeight + 0.1;
 		// Groove height uses railEngagement fraction of lip height (wall) for stronger hold
 		const lipHeight = wall;
 		const grooveHeight = lipHeight * railEngagement + 0.2;
@@ -395,25 +397,71 @@ export function createLid(box: Box): Geom3 | null {
 		// Left rail - runs from after corner cutout to back wall
 		// Start after the corner cutout (wall thickness from front)
 		const railStartY = lipThickness + wall; // after corner cutout
-		const leftRailLength = cavityDepth - railThickness - wall; // shortened to account for corner
-		const leftRail = translate(
-			[innerLeftX + railThickness / 2, railStartY + leftRailLength / 2, bumpZ],
-			cuboid({
-				size: [railThickness, leftRailLength, railHeight],
-				center: [0, 0, 0]
-			})
-		);
-		rails.push(leftRail);
+		const totalRailLength = cavityDepth - railThickness - wall; // full length to back
 
-		// Right rail - runs from after corner cutout to back wall
-		const rightRail = translate(
-			[innerRightX - railThickness / 2, railStartY + leftRailLength / 2, bumpZ],
+		// Taper the front end for smoother insertion - creates a "point" entry
+		const taperLength = Math.min(5, totalRailLength / 3); // 5mm or 1/3 of rail, whichever is smaller
+		const taperTipSize = 0.2; // Small point at entry (both X thickness and Z height)
+		const mainRailLength = totalRailLength - taperLength;
+
+		// Main rectangular section of left rail (after taper)
+		const leftRailMain = translate(
+			[innerLeftX + railThickness / 2, railStartY + taperLength + mainRailLength / 2, bumpZ],
 			cuboid({
-				size: [railThickness, leftRailLength, railHeight],
+				size: [railThickness, mainRailLength, railHeight],
 				center: [0, 0, 0]
 			})
 		);
-		rails.push(rightRail);
+
+		// Tapered front section - hull between small point and full cross-section
+		// Entry point is small in both X (thickness) and Z (height)
+		const leftTaperEntry = translate(
+			[innerLeftX + taperTipSize / 2, railStartY, bumpZ + (railHeight - taperTipSize) / 2],
+			cuboid({
+				size: [taperTipSize, 0.1, taperTipSize],
+				center: [0, 0, 0]
+			})
+		);
+		const leftTaperEnd = translate(
+			[innerLeftX + railThickness / 2, railStartY + taperLength, bumpZ],
+			cuboid({
+				size: [railThickness, 0.1, railHeight],
+				center: [0, 0, 0]
+			})
+		);
+		const leftTaper = hull(leftTaperEntry, leftTaperEnd);
+
+		rails.push(leftRailMain);
+		rails.push(leftTaper);
+
+		// Right rail - mirror of left rail
+		const rightRailMain = translate(
+			[innerRightX - railThickness / 2, railStartY + taperLength + mainRailLength / 2, bumpZ],
+			cuboid({
+				size: [railThickness, mainRailLength, railHeight],
+				center: [0, 0, 0]
+			})
+		);
+
+		// Tapered front section for right rail - point entry
+		const rightTaperEntry = translate(
+			[innerRightX - taperTipSize / 2, railStartY, bumpZ + (railHeight - taperTipSize) / 2],
+			cuboid({
+				size: [taperTipSize, 0.1, taperTipSize],
+				center: [0, 0, 0]
+			})
+		);
+		const rightTaperEnd = translate(
+			[innerRightX - railThickness / 2, railStartY + taperLength, bumpZ],
+			cuboid({
+				size: [railThickness, 0.1, railHeight],
+				center: [0, 0, 0]
+			})
+		);
+		const rightTaper = hull(rightTaperEntry, rightTaperEnd);
+
+		rails.push(rightRailMain);
+		rails.push(rightTaper);
 
 		lid = union(lid, ...rails);
 
