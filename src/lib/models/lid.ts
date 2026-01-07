@@ -520,7 +520,8 @@ export function createLid(box: Box): Geom3 | null {
 		});
 
 		// Cut 45° chamfers on each rail piece BEFORE unioning
-		// This prevents manifold errors from overlapping cuts at corners
+		// IMPORTANT: Apply cuts to separate pieces first, then union - this prevents
+		// manifold errors that occur when overlapping rotated cuts intersect
 
 		// Back chamfer - applied to back rail only
 		const backCut = translate(
