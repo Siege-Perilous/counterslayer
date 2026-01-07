@@ -87,9 +87,10 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		// All pockets go to full interior height so trays sit flush at top
 		const pocketHeight = interior.height + 1;
 
-		// Position pocket: wall + tolerance offset, plus the tray's Y position
-		const pocketX = wall + tolerance + placement.x;
-		const pocketY = wall + tolerance + placement.y;
+		// Position pocket: wall offset plus the tray's position
+		// Note: tolerance is already included in interior.width/depth, don't add it again here
+		const pocketX = wall + placement.x;
+		const pocketY = wall + placement.y;
 
 		const cavity = cuboid({
 			size: [pocketWidth, pocketDepth, pocketHeight],
@@ -205,9 +206,10 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		grooves.push(backGroove);
 
 		// Left groove - runs from front to back along left inner wall
-		const sideGrooveLength = innerWallDepth - grooveDepth; // don't overlap with back
+		// Start at Y = wall (not wall/2) to avoid cutting into front wall area
+		const sideGrooveLength = innerWallDepth - grooveDepth - wall / 2; // don't overlap with front or back
 		const leftGroove = translate(
-			[wall / 2 + grooveDepth / 2, wall / 2 + sideGrooveLength / 2, notchZ],
+			[wall / 2 + grooveDepth / 2, wall + sideGrooveLength / 2, notchZ],
 			cuboid({
 				size: [grooveDepth, sideGrooveLength, grooveHeight],
 				center: [0, 0, 0]
@@ -217,7 +219,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 
 		// Right groove - runs from front to back along right inner wall
 		const rightGroove = translate(
-			[extWidth - wall / 2 - grooveDepth / 2, wall / 2 + sideGrooveLength / 2, notchZ],
+			[extWidth - wall / 2 - grooveDepth / 2, wall + sideGrooveLength / 2, notchZ],
 			cuboid({
 				size: [grooveDepth, sideGrooveLength, grooveHeight],
 				center: [0, 0, 0]
@@ -256,12 +258,12 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 
 		const leftBlock = cuboid({
 			size: [grooveDepth, sideGrooveLength + grooveDepth, grooveDepth],
-			center: [wall / 2 + grooveDepth / 2, wall / 2 + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth / 2]
+			center: [wall / 2 + grooveDepth / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth / 2]
 		});
 
 		const rightBlock = cuboid({
 			size: [grooveDepth, sideGrooveLength + grooveDepth, grooveDepth],
-			center: [extWidth - wall / 2 - grooveDepth / 2, wall / 2 + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth / 2]
+			center: [extWidth - wall / 2 - grooveDepth / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth / 2]
 		});
 
 		// Union the blocks
@@ -279,7 +281,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 
 		// Left chamfer - rotated around Y axis
 		const leftCut = translate(
-			[wall / 2, wall / 2 + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth],
+			[wall / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth],
 			rotateY(-Math.PI / 4, cuboid({
 				size: [chamferSize, sideGrooveLength + grooveDepth * 2, chamferSize],
 				center: [0, 0, 0]
@@ -288,7 +290,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 
 		// Right chamfer - rotated around Y axis
 		const rightCut = translate(
-			[extWidth - wall / 2, wall / 2 + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth],
+			[extWidth - wall / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth],
 			rotateY(Math.PI / 4, cuboid({
 				size: [chamferSize, sideGrooveLength + grooveDepth * 2, chamferSize],
 				center: [0, 0, 0]
