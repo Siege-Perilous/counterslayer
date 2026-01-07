@@ -238,7 +238,9 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 		rowDepth: number
 	) => {
 		const pocketDepth = stackCount * counterThickness;
-		const pocketFloorZ = trayHeight - effectiveRimHeight - pocketDepth;
+		// Use original rimHeight (not effectiveRimHeight) so pocket depth stays constant
+		// regardless of tray height - taller trays just have more solid material below
+		const pocketFloorZ = trayHeight - rimHeight - pocketDepth;
 
 		const pw = getPocketWidth(shape);
 		const pl = getPocketLength(shape);
@@ -248,7 +250,7 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 
 		return translate(
 			[xOffset, yOffset, pocketFloorZ],
-			createPocketShape(shape, pocketDepth + effectiveRimHeight + 1)
+			createPocketShape(shape, pocketDepth + rimHeight + 1)
 		);
 	};
 
