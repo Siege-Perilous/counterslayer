@@ -316,6 +316,32 @@ export function createLid(box: Box): Geom3 | null {
 			center: [extWidth - wall / 2, wall / 2, lidHeight - lipHeight / 2 + 0.5]
 		});
 		lid = subtract(lid, cornerCutoutLeft, cornerCutoutRight);
+
+		// Add grip lines on back of side walls to indicate pull direction
+		const gripLineDepth = 0.3; // How deep the groove is
+		const gripLineWidth = 0.8; // Width of each groove
+		const gripLineSpacing = 2.5; // Space between grooves
+		const numGripLines = 5;
+		const totalGripWidth = (numGripLines - 1) * gripLineSpacing;
+		const gripStartY = extDepth - wall - 1 - totalGripWidth; // Start from back
+
+		for (let i = 0; i < numGripLines; i++) {
+			const lineY = gripStartY + i * gripLineSpacing;
+
+			// Left side grip lines (on outer X surface) - full height
+			const leftGrip = cuboid({
+				size: [gripLineDepth, gripLineWidth, lidHeight + 1],
+				center: [gripLineDepth / 2, lineY, lidHeight / 2]
+			});
+
+			// Right side grip lines (on outer X surface) - full height
+			const rightGrip = cuboid({
+				size: [gripLineDepth, gripLineWidth, lidHeight + 1],
+				center: [extWidth - gripLineDepth / 2, lineY, lidHeight / 2]
+			});
+
+			lid = subtract(lid, leftGrip, rightGrip);
+		}
 	}
 
 	// 3. Add continuous U-shaped rail on 3 sides for sliding fit (not front/entry side)
