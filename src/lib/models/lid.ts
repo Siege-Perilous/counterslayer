@@ -524,7 +524,6 @@ export function createLid(box: Box): Geom3 | null {
 
 		// Cut 45° chamfers on the bottom using rotated cuboids
 		// Chamfers face toward the center (cavity), not toward the lip wall
-		// Cuts extend through corners - overlapping cuts are fine since they remove the same chamfer material
 
 		// Back chamfer - full width through corners
 		const backCut = translate(
@@ -535,7 +534,7 @@ export function createLid(box: Box): Geom3 | null {
 			}))
 		);
 
-		// Side chamfers - full length including taper area
+		// Side chamfers - full length
 		// Left chamfer - at tip (innerLeftX + railThickness), facing toward center (+X)
 		const leftCut = translate(
 			[innerLeftX + railThickness, sideRailCenterY, bottomZ],
