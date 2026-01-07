@@ -55,6 +55,189 @@ export const defaultParams: CounterTrayParams = {
 const sumTo = (arr: number[], idx: number): number =>
 	arr.slice(0, idx + 1).reduce((a, b) => a + b, 0);
 
+// Counter preview data for visualization
+export interface CounterStack {
+	shape: 'square' | 'hex' | 'circle';
+	x: number;           // Center X position in tray
+	y: number;           // Center Y position in tray
+	z: number;           // Bottom Z position of stack
+	width: number;       // Counter width (X)
+	length: number;      // Counter length (Y)
+	thickness: number;   // Single counter thickness
+	count: number;       // Number of counters in stack
+	hexPointyTop: boolean;
+	color: string;       // Random color for this stack
+}
+
+// Generate random pastel colors for counter stacks
+function generateStackColor(index: number): string {
+	const hue = (index * 137.508) % 360; // Golden angle for good distribution
+	return `hsl(${hue}, 70%, 60%)`;
+}
+
+// Calculate counter positions for preview rendering
+export function getCounterPositions(params: CounterTrayParams, targetHeight?: number): CounterStack[] {
+	const {
+		squareWidth,
+		squareLength,
+		hexFlatToFlat: hexFlatToFlatBase,
+		circleDiameter: circleDiameterBase,
+		counterThickness,
+		hexPointyTop,
+		clearance,
+		wallThickness,
+		floorThickness,
+		rimHeight,
+		stacks
+	} = params;
+
+	if (!stacks || stacks.length === 0) return [];
+
+	// Pocket dimensions (same logic as createCounterTray)
+	const squarePocketWidth = squareWidth + clearance * 2;
+	const squarePocketLength = squareLength + clearance * 2;
+
+	const hexFlatToFlat = hexFlatToFlatBase + clearance * 2;
+	const hexPointToPoint = hexFlatToFlat / Math.cos(Math.PI / 6);
+	const hexPocketWidth = hexPointyTop ? hexFlatToFlat : hexPointToPoint;
+	const hexPocketLength = hexPointyTop ? hexPointToPoint : hexFlatToFlat;
+
+	const circleDiameter = circleDiameterBase + clearance * 2;
+
+	const getPocketWidth = (shape: string): number => {
+		if (shape === 'square') return squarePocketWidth;
+		if (shape === 'hex') return hexPocketWidth;
+		return circleDiameter;
+	};
+
+	const getPocketLength = (shape: string): number => {
+		if (shape === 'square') return squarePocketLength;
+		if (shape === 'hex') return hexPocketLength;
+		return circleDiameter;
+	};
+
+	const getMaxPocketDim = (shape: string): number =>
+		Math.max(getPocketWidth(shape), getPocketLength(shape));
+
+	// Sort stacks (same as createCounterTray)
+	const sortedStacks = [...stacks].sort((a, b) => {
+		const keyA = getMaxPocketDim(a[0]) * 10000 + a[1];
+		const keyB = getMaxPocketDim(b[0]) * 10000 + b[1];
+		return keyA - keyB;
+	});
+
+	const numColumns = Math.ceil(sortedStacks.length / 2);
+
+	const getCount = (idx: number): number =>
+		idx < sortedStacks.length ? sortedStacks[idx][1] : 0;
+	const getPw = (idx: number): number =>
+		idx < sortedStacks.length ? getPocketWidth(sortedStacks[idx][0]) : 0;
+	const getPl = (idx: number): number =>
+		idx < sortedStacks.length ? getPocketLength(sortedStacks[idx][0]) : 0;
+
+	// Column widths
+	const columnWidths: number[] = [];
+	for (let col = 0; col < numColumns; col++) {
+		const idx1 = col * 2;
+		const idx2 = col * 2 + 1;
+		columnWidths.push(Math.max(getPw(idx1), getPw(idx2)));
+	}
+
+	const columnXOffset = (col: number): number => {
+		if (col === 0) return wallThickness;
+		return wallThickness + sumTo(columnWidths, col - 1) + col * wallThickness;
+	};
+
+	// Row depths
+	let frontRowDepth = 0;
+	let backRowDepth = 0;
+	for (let col = 0; col < numColumns; col++) {
+		frontRowDepth = Math.max(frontRowDepth, getPl(col * 2));
+		const idx2 = col * 2 + 1;
+		if (idx2 < sortedStacks.length) {
+			backRowDepth = Math.max(backRowDepth, getPl(idx2));
+		}
+	}
+
+	// Calculate tray height
+	const columnHeight = (col: number): number => {
+		const idx1 = col * 2;
+		const idx2 = col * 2 + 1;
+		return Math.max(getCount(idx1), getCount(idx2)) * counterThickness;
+	};
+
+	let maxStackHeight = 0;
+	for (let col = 0; col < numColumns; col++) {
+		maxStackHeight = Math.max(maxStackHeight, columnHeight(col));
+	}
+
+	const baseTrayHeight = floorThickness + maxStackHeight + rimHeight;
+	const trayHeight = targetHeight && targetHeight > baseTrayHeight ? targetHeight : baseTrayHeight;
+
+	const counterStacks: CounterStack[] = [];
+
+	for (let col = 0; col < numColumns; col++) {
+		const idx1 = col * 2;
+		const idx2 = col * 2 + 1;
+		const xOffset = columnXOffset(col);
+		const colW = columnWidths[col];
+
+		// Front row
+		if (idx1 < sortedStacks.length) {
+			const shape = sortedStacks[idx1][0] as 'square' | 'hex' | 'circle';
+			const count = sortedStacks[idx1][1];
+			const pw = getPocketWidth(shape);
+			const pl = getPocketLength(shape);
+			const pocketDepth = count * counterThickness;
+			const pocketFloorZ = trayHeight - rimHeight - pocketDepth;
+
+			const xCenter = xOffset + (colW - pw) / 2 + pw / 2;
+			const yCenter = wallThickness + pl / 2;
+
+			counterStacks.push({
+				shape,
+				x: xCenter,
+				y: yCenter,
+				z: pocketFloorZ,
+				width: shape === 'square' ? squareWidth : shape === 'hex' ? (hexPointyTop ? hexFlatToFlatBase : hexFlatToFlatBase / Math.cos(Math.PI / 6)) : circleDiameterBase,
+				length: shape === 'square' ? squareLength : shape === 'hex' ? (hexPointyTop ? hexFlatToFlatBase / Math.cos(Math.PI / 6) : hexFlatToFlatBase) : circleDiameterBase,
+				thickness: counterThickness,
+				count,
+				hexPointyTop,
+				color: generateStackColor(idx1)
+			});
+		}
+
+		// Back row
+		if (idx2 < sortedStacks.length) {
+			const shape = sortedStacks[idx2][0] as 'square' | 'hex' | 'circle';
+			const count = sortedStacks[idx2][1];
+			const pw = getPocketWidth(shape);
+			const pl = getPocketLength(shape);
+			const pocketDepth = count * counterThickness;
+			const pocketFloorZ = trayHeight - rimHeight - pocketDepth;
+
+			const xCenter = xOffset + (colW - pw) / 2 + pw / 2;
+			const yCenter = wallThickness + frontRowDepth + wallThickness + (backRowDepth - pl) + pl / 2;
+
+			counterStacks.push({
+				shape,
+				x: xCenter,
+				y: yCenter,
+				z: pocketFloorZ,
+				width: shape === 'square' ? squareWidth : shape === 'hex' ? (hexPointyTop ? hexFlatToFlatBase : hexFlatToFlatBase / Math.cos(Math.PI / 6)) : circleDiameterBase,
+				length: shape === 'square' ? squareLength : shape === 'hex' ? (hexPointyTop ? hexFlatToFlatBase / Math.cos(Math.PI / 6) : hexFlatToFlatBase) : circleDiameterBase,
+				thickness: counterThickness,
+				count,
+				hexPointyTop,
+				color: generateStackColor(idx2)
+			});
+		}
+	}
+
+	return counterStacks;
+}
+
 export function createCounterTray(params: CounterTrayParams, trayName?: string, targetHeight?: number) {
 	const {
 		squareWidth,

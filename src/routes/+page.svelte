@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import Sidebar from '$lib/components/Sidebar.svelte';
-	import { createCounterTray } from '$lib/models/counterTray';
+	import { createCounterTray, getCounterPositions, type CounterStack } from '$lib/models/counterTray';
 	import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
 	import { arrangeTrays, type TrayPlacement } from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
@@ -19,10 +19,12 @@
 		geometry: BufferGeometry;
 		jscadGeom: Geom3;
 		placement: TrayPlacement;
+		counterStacks: CounterStack[];
 	}
 
 	let viewMode = $state<ViewMode>('tray');
 	let selectedTrayGeometry = $state<BufferGeometry | null>(null);
+	let selectedTrayCounters = $state<CounterStack[]>([]);
 	let allTrayGeometries = $state<TrayGeometryData[]>([]);
 	let boxGeometry = $state<BufferGeometry | null>(null);
 	let lidGeometry = $state<BufferGeometry | null>(null);
@@ -35,6 +37,7 @@
 	let error = $state('');
 	let fileInput: HTMLInputElement;
 	let explosionAmount = $state(0);
+	let showCounters = $state(false);
 
 	// Initialize project from localStorage
 	$effect(() => {
@@ -118,6 +121,7 @@
 			// Generate selected tray at box height (all trays in a box share the same height)
 			jscadSelectedTray = createCounterTray(tray.params, tray.name, maxHeight);
 			selectedTrayGeometry = jscadToBufferGeometry(jscadSelectedTray);
+			selectedTrayCounters = getCounterPositions(tray.params, maxHeight);
 
 			// Generate all trays at box height
 			allTrayGeometries = placements.map((placement) => {
@@ -127,7 +131,8 @@
 					name: placement.tray.name,
 					geometry: jscadToBufferGeometry(jscadGeom),
 					jscadGeom,
-					placement
+					placement,
+					counterStacks: getCounterPositions(placement.tray.params, maxHeight)
 				};
 			});
 
@@ -257,6 +262,8 @@
 					boxTolerance={selectedBox?.tolerance ?? 0.5}
 					boxFloorThickness={selectedBox?.floorThickness ?? 2}
 					{explosionAmount}
+					{showCounters}
+					selectedTrayCounters={selectedTrayCounters}
 				/>
 			{/await}
 		{/if}
@@ -293,6 +300,14 @@
 					/>
 				</div>
 			{/if}
+			<label class="flex items-center gap-2 rounded bg-gray-800 px-3 py-1.5 cursor-pointer">
+				<input
+					type="checkbox"
+					bind:checked={showCounters}
+					class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-blue-600"
+				/>
+				<span class="text-sm text-gray-300">Show Counters</span>
+			</label>
 		</div>
 
 		<!-- Bottom toolbar -->
