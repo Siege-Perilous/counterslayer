@@ -196,3 +196,28 @@ export function resetProject(): void {
 	project = createDefaultProject();
 	autosave();
 }
+
+// Import project from JSON data
+export function importProject(data: Project): void {
+	project = data;
+	// Ensure selection is valid
+	if (project.boxes.length > 0) {
+		const selectedBox = project.boxes.find((b) => b.id === project.selectedBoxId);
+		if (!selectedBox) {
+			project.selectedBoxId = project.boxes[0].id;
+		}
+		const box = project.boxes.find((b) => b.id === project.selectedBoxId);
+		if (box && box.trays.length > 0) {
+			const selectedTray = box.trays.find((t) => t.id === project.selectedTrayId);
+			if (!selectedTray) {
+				project.selectedTrayId = box.trays[0].id;
+			}
+		} else {
+			project.selectedTrayId = null;
+		}
+	} else {
+		project.selectedBoxId = null;
+		project.selectedTrayId = null;
+	}
+	autosave();
+}

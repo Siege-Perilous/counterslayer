@@ -6,8 +6,8 @@
 	import { arrangeTrays, type TrayPlacement } from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 	import { exportStl } from '$lib/utils/exportStl';
-	import { importStlFromFile } from '$lib/utils/importStl';
-	import { initProject, getSelectedTray, getSelectedBox } from '$lib/stores/project.svelte';
+	import { initProject, getSelectedTray, getSelectedBox, getProject, importProject } from '$lib/stores/project.svelte';
+import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
 	import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
@@ -31,11 +31,9 @@
 	let jscadSelectedTray = $state<Geom3 | null>(null);
 	let jscadBox = $state<Geom3 | null>(null);
 	let jscadLid = $state<Geom3 | null>(null);
-	let importedGeometry = $state<BufferGeometry | null>(null);
-	let importedFileName = $state<string | null>(null);
 	let generating = $state(false);
 	let error = $state('');
-	let fileInput: HTMLInputElement;
+	let jsonFileInput: HTMLInputElement;
 	let explosionAmount = $state(0);
 	let showCounters = $state(false);
 
@@ -200,26 +198,34 @@
 		}
 	}
 
-	async function handleImport(event: Event) {
+	function handleExportJson() {
+		const project = getProject();
+		const json = JSON.stringify(project, null, 2);
+		const blob = new Blob([json], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = 'counter-tray-project.json';
+		a.click();
+		URL.revokeObjectURL(url);
+	}
+
+	async function handleImportJson(event: Event) {
 		const input = event.target as HTMLInputElement;
 		const file = input.files?.[0];
 		if (!file) return;
 
 		try {
-			importedGeometry = await importStlFromFile(file);
-			importedFileName = file.name;
+			const text = await file.text();
+			const data = JSON.parse(text) as Project;
+			importProject(data);
 			error = '';
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to import STL';
-			console.error('Import error:', e);
+			error = e instanceof Error ? e.message : 'Failed to import JSON';
+			console.error('Import JSON error:', e);
 		}
 
 		input.value = '';
-	}
-
-	function clearImport() {
-		importedGeometry = null;
-		importedFileName = null;
 	}
 
 	// Generate on mount and when tray/box changes
@@ -254,7 +260,6 @@
 					allTrays={visibleGeometries.allTrays}
 					boxGeometry={visibleGeometries.box}
 					lidGeometry={visibleGeometries.lid}
-					{importedGeometry}
 					{printBedSize}
 					exploded={visibleGeometries.exploded}
 					showAllTrays={visibleGeometries.showAllTrays}
@@ -314,25 +319,24 @@
 		<div class="absolute bottom-4 left-4 right-4 flex items-center justify-between">
 			<div class="flex gap-2">
 				<input
-					bind:this={fileInput}
+					bind:this={jsonFileInput}
 					type="file"
-					accept=".stl"
-					onchange={handleImport}
+					accept=".json"
+					onchange={handleImportJson}
 					class="hidden"
 				/>
-				{#if importedFileName}
-					<div class="flex items-center gap-2 rounded bg-gray-800 px-3 py-2 text-sm">
-						<span class="text-orange-400">{importedFileName}</span>
-						<button onclick={clearImport} class="text-gray-400 hover:text-white">&times;</button>
-					</div>
-				{:else}
-					<button
-						onclick={() => fileInput.click()}
-						class="rounded bg-gray-700 px-3 py-2 text-sm hover:bg-gray-600"
-					>
-						Import Reference STL
-					</button>
-				{/if}
+				<button
+					onclick={() => jsonFileInput.click()}
+					class="rounded bg-gray-700 px-3 py-2 text-sm hover:bg-gray-600"
+				>
+					Import JSON
+				</button>
+				<button
+					onclick={handleExportJson}
+					class="rounded bg-gray-700 px-3 py-2 text-sm hover:bg-gray-600"
+				>
+					Export JSON
+				</button>
 			</div>
 
 			<div class="flex gap-2">

@@ -21,7 +21,6 @@
 		allTrays?: TrayGeometryData[];
 		boxGeometry?: BufferGeometry | null;
 		lidGeometry?: BufferGeometry | null;
-		importedGeometry: BufferGeometry | null;
 		printBedSize: number;
 		exploded?: boolean;
 		showAllTrays?: boolean;
@@ -38,7 +37,6 @@
 		allTrays = [],
 		boxGeometry = null,
 		lidGeometry = null,
-		importedGeometry,
 		printBedSize,
 		exploded = false,
 		showAllTrays = false,
@@ -140,7 +138,6 @@
 		if (geometry) geoms.push(geometry);
 		if (boxGeometry) geoms.push(boxGeometry);
 		if (lidGeometry) geoms.push(lidGeometry);
-		if (importedGeometry) geoms.push(importedGeometry);
 		for (const t of allTrays) {
 			geoms.push(t.geometry);
 		}
@@ -347,18 +344,6 @@
 		position.z={showAllTrays && !exploded ? sidePositions.lid.z : (exploded ? lidDepth / 2 - explodedOffset.lidSlide : meshOffset.z)}
 	>
 		<T.MeshStandardMaterial color="#a855f7" roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
-	</T.Mesh>
-{/if}
-
-<!-- Imported geometry (orange) -->
-{#if importedGeometry}
-	<T.Mesh
-		geometry={importedGeometry}
-		rotation.x={-Math.PI / 2}
-		position.x={meshOffset.x}
-		position.z={meshOffset.z}
-	>
-		<T.MeshStandardMaterial color="#ff9f4a" roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
 	</T.Mesh>
 {/if}
 

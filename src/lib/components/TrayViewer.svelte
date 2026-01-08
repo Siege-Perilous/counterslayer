@@ -20,7 +20,6 @@
 		allTrays?: TrayGeometryData[];
 		boxGeometry?: BufferGeometry | null;
 		lidGeometry?: BufferGeometry | null;
-		importedGeometry: BufferGeometry | null;
 		printBedSize: number;
 		exploded?: boolean;
 		showAllTrays?: boolean;
@@ -37,7 +36,6 @@
 		allTrays = [],
 		boxGeometry = null,
 		lidGeometry = null,
-		importedGeometry,
 		printBedSize,
 		exploded = false,
 		showAllTrays = false,
@@ -57,7 +55,6 @@
 			{allTrays}
 			{boxGeometry}
 			{lidGeometry}
-			{importedGeometry}
 			{printBedSize}
 			{exploded}
 			{showAllTrays}
