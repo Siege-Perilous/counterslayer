@@ -262,18 +262,19 @@ export function getCounterPositions(params: CounterTrayParams, targetHeight?: nu
 	let backRowX = wallThickness;
 
 	// Assign lengthwise slots to rows using greedy approach (shortest row first)
+	// Adjacent slots share a half-cylinder cutout; first slot uses wall cutout (no left space needed)
 	for (const slot of lengthwiseSlots) {
 		const cutoutRadius = getSlotCutoutRadius(slot);
-		const slotTotalWidth = cutoutRadius + slot.slotWidth + cutoutRadius + wallThickness;
 
 		if (frontRowX <= backRowX) {
 			(slot as EdgeLoadedSlot & { rowAssignment: string; xPosition: number }).rowAssignment = 'front';
-			(slot as EdgeLoadedSlot & { xPosition: number }).xPosition = frontRowX + cutoutRadius;
-			frontRowX += slotTotalWidth;
+			// First slot uses wall cutout (no left space needed)
+			(slot as EdgeLoadedSlot & { xPosition: number }).xPosition = frontRowX;
+			frontRowX += slot.slotWidth + cutoutRadius + wallThickness;
 		} else {
 			(slot as EdgeLoadedSlot & { rowAssignment: string; xPosition: number }).rowAssignment = 'back';
-			(slot as EdgeLoadedSlot & { xPosition: number }).xPosition = backRowX + cutoutRadius;
-			backRowX += slotTotalWidth;
+			(slot as EdgeLoadedSlot & { xPosition: number }).xPosition = backRowX;
+			backRowX += slot.slotWidth + cutoutRadius + wallThickness;
 		}
 	}
 
@@ -741,24 +742,22 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 	let backRowSlotCount = 0;
 
 	// Assign lengthwise slots to rows using greedy approach (shortest row first)
-	// Adjacent slots in same row share a half-cylinder cutout (saves space vs two quarter-spheres)
+	// Adjacent slots share a half-cylinder cutout; first slot uses wall cutout (no internal space needed)
 	for (const slot of lengthwiseSlots) {
 		const cutoutRadius = getSlotCutoutRadius(slot);
 
 		// Assign to row with shorter current X
 		if (frontRowX <= backRowX) {
 			(slot as EdgeLoadedSlot & { rowAssignment: string; xPosition: number }).rowAssignment = 'front';
-			// First slot needs quarter-sphere on left; subsequent slots share half-cylinder with previous
-			const leftSpace = frontRowSlotCount === 0 ? cutoutRadius : 0;
-			(slot as EdgeLoadedSlot & { xPosition: number }).xPosition = frontRowX + leftSpace;
-			// Always reserve quarter-sphere space on right (will be replaced by half-cylinder if another slot follows)
-			frontRowX += leftSpace + slot.slotWidth + cutoutRadius + wallThickness;
+			// First slot uses wall cutout (no left space needed); subsequent slots share half-cylinder
+			(slot as EdgeLoadedSlot & { xPosition: number }).xPosition = frontRowX;
+			// Reserve quarter-sphere space on right (will be replaced by half-cylinder if another slot follows)
+			frontRowX += slot.slotWidth + cutoutRadius + wallThickness;
 			frontRowSlotCount++;
 		} else {
 			(slot as EdgeLoadedSlot & { rowAssignment: string; xPosition: number }).rowAssignment = 'back';
-			const leftSpace = backRowSlotCount === 0 ? cutoutRadius : 0;
-			(slot as EdgeLoadedSlot & { xPosition: number }).xPosition = backRowX + leftSpace;
-			backRowX += leftSpace + slot.slotWidth + cutoutRadius + wallThickness;
+			(slot as EdgeLoadedSlot & { xPosition: number }).xPosition = backRowX;
+			backRowX += slot.slotWidth + cutoutRadius + wallThickness;
 			backRowSlotCount++;
 		}
 	}
@@ -1089,7 +1088,7 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 		.sort((a, b) => (a as EdgeLoadedSlot & { xPosition: number }).xPosition - (b as EdgeLoadedSlot & { xPosition: number }).xPosition);
 
 	// Process lengthwise slots with optimized cutouts
-	// Adjacent slots share a half-cylinder cutout; outer edges get quarter-spheres
+	// Adjacent slots share a half-cylinder cutout; outer edges get quarter-spheres or wall cutouts
 	const processRowSlots = (slots: EdgeLoadedSlot[], yStart: number, rowDepth: number) => {
 		for (let i = 0; i < slots.length; i++) {
 			const slot = slots[i];
@@ -1098,14 +1097,27 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 
 			pocketCuts.push(createEdgeLoadedPocket(slot, slotXStart, yStart));
 
-			// Left cutout: quarter-sphere if first slot, otherwise half-cylinder was added by previous slot
+			// Left cutout: if first slot against wall, use vertical wall cutout; otherwise quarter-sphere
 			if (i === 0) {
-				fingerCuts.push(
-					translate(
-						[slotXStart, yStart + slot.slotDepth / 2, 0],
-						createHalfSphereCutout(cutoutRadius)
-					)
-				);
+				// Check if slot is against the left wall (starts at wallThickness or very close)
+				const isAgainstLeftWall = slotXStart <= wallThickness + cutoutRadius + 0.1;
+				if (isAgainstLeftWall) {
+					// Vertical half-cylinder at left tray edge (like top-loaded stacks)
+					fingerCuts.push(
+						translate(
+							[0, yStart + rowDepth / 2, 0],
+							createFingerCutout(cutoutRadius)
+						)
+					);
+				} else {
+					// Quarter-sphere at left edge of slot
+					fingerCuts.push(
+						translate(
+							[slotXStart, yStart + slot.slotDepth / 2, 0],
+							createHalfSphereCutout(cutoutRadius)
+						)
+					);
+				}
 			}
 
 			// Right cutout: half-cylinder if there's a next slot, quarter-sphere if last

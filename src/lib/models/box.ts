@@ -177,19 +177,19 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	}
 
 	// === GREEDY BIN-PACKING FOR LENGTHWISE SLOTS ===
+	// Adjacent slots share a half-cylinder cutout; first slot uses wall cutout (no left space needed)
 	let frontRowX = wallThickness;
 	let backRowX = wallThickness;
 
 	for (const slot of lengthwiseSlots) {
 		const cutoutRadius = Math.min(cutoutMax, slot.slotDepth * cutoutRatio);
-		const slotTotalWidth = cutoutRadius + slot.slotWidth + cutoutRadius + wallThickness;
 
 		if (frontRowX <= backRowX) {
 			slot.rowAssignment = 'front';
-			frontRowX += slotTotalWidth;
+			frontRowX += slot.slotWidth + cutoutRadius + wallThickness;
 		} else {
 			slot.rowAssignment = 'back';
-			backRowX += slotTotalWidth;
+			backRowX += slot.slotWidth + cutoutRadius + wallThickness;
 		}
 	}
 
