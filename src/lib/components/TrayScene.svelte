@@ -205,30 +205,37 @@
 	});
 
 	// Exploded view offsets - lid slides out first, then trays lift
+	// Lid slides along longest dimension of box
 	let explodedOffset = $derived.by(() => {
-		if (!exploded) return { box: 0, trays: 0, lidY: 0, lidSlide: 0 };
+		if (!exploded) return { box: 0, trays: 0, lidY: 0, lidSlideX: 0, lidSlideZ: 0, slidesAlongX: false };
 		// Get box dimensions for positioning
 		const boxHeight = boxBounds ? (boxBounds.max.z - boxBounds.min.z) : 0;
+		const boxWidth = boxBounds ? (boxBounds.max.x - boxBounds.min.x) : 0;
 		const boxDepth = boxBounds ? (boxBounds.max.y - boxBounds.min.y) : 0;
 		// Lid lip height = wall thickness
 		const lipHeight = boxWallThickness;
 
+		// Determine slide direction based on longest dimension
+		const slidesAlongX = boxWidth > boxDepth;
+
 		// Two-phase explosion:
 		// Phase 1 (0-50%): Lid slides out
 		// Phase 2 (50-100%): Trays lift up
-		const slidePhase = Math.min(explosionAmount / 50, 1); // 0-1 during first 50%
-		const liftPhase = Math.max((explosionAmount - 50) / 50, 0); // 0-1 during second 50%
+		const slidePhase = Math.min(explosionAmount / 50, 1);
+		const liftPhase = Math.max((explosionAmount - 50) / 50, 0);
 
-		// Lid slides out by box depth + some extra
-		const lidSlideDistance = (boxDepth + boxHeight * 0.5) * slidePhase;
-		// Trays lift after lid is out
+		// Lid slides out along longest dimension
+		const slideLength = slidesAlongX ? boxWidth : boxDepth;
+		const lidSlideDistance = (slideLength + boxHeight * 0.5) * slidePhase;
 		const trayLiftDistance = boxHeight * liftPhase;
 
 		return {
 			box: 0,
 			trays: trayLiftDistance,
-			lidY: boxHeight - lipHeight,  // Lid sits at box top (no vertical explosion)
-			lidSlide: lidSlideDistance    // Lid slides out in Z
+			lidY: boxHeight - lipHeight,
+			lidSlideX: slidesAlongX ? lidSlideDistance : 0,
+			lidSlideZ: slidesAlongX ? 0 : lidSlideDistance,
+			slidesAlongX
 		};
 	});
 
@@ -258,6 +265,20 @@
 					: traysGroupDepth - p.y;
 				console.log(`Tray ${i} "${t.name}": placement(x=${p.x}, y=${p.y}), dims(w=${p.dimensions.width.toFixed(1)}, d=${p.dimensions.depth}) -> actual position(x=${xPos.toFixed(1)}, z=${zPos.toFixed(1)})`);
 			});
+		}
+		// Lid debug
+		if (exploded && lidBounds && boxBounds) {
+			const bw = boxBounds.max.x - boxBounds.min.x;
+			const bd = boxBounds.max.y - boxBounds.min.y;
+			const lw = lidBounds.max.x - lidBounds.min.x;
+			const ld = lidBounds.max.y - lidBounds.min.y;
+			const slidesX = bw > bd;
+			console.log('=== Lid Debug ===');
+			console.log('boxWidth:', bw, 'boxDepth:', bd);
+			console.log('lidWidth:', lw, 'lidDepth:', ld);
+			console.log('slidesAlongX:', slidesX);
+			console.log('meshOffset:', meshOffset);
+			console.log('explodedOffset:', explodedOffset);
 		}
 	});
 </script>
@@ -335,13 +356,35 @@
 	{@const lidWidth = lidBounds ? (lidBounds.max.x - lidBounds.min.x) : 0}
 	{@const lidHeight = lidBounds ? (lidBounds.max.z - lidBounds.min.z) : 0}
 	{@const lidDepth = lidBounds ? (lidBounds.max.y - lidBounds.min.y) : 0}
+	{@const boxWidth = boxBounds ? (boxBounds.max.x - boxBounds.min.x) : lidWidth}
+	{@const boxDepth = boxBounds ? (boxBounds.max.y - boxBounds.min.y) : lidDepth}
+	{@const slidesX = explodedOffset.slidesAlongX}
+	<!-- When exploded: position lid on top of box, then slide it off toward exit -->
+	<!-- After +90° X rotation, lid extends in +Z instead of -Z, so offset by -lidDepth -->
+	{@const lidPosX = showAllTrays && !exploded
+		? sidePositions.lid.x - lidWidth / 2
+		: (exploded
+			? (slidesX
+				? meshOffset.x + explodedOffset.lidSlideX
+				: meshOffset.x + lidWidth)  // After 180° Z rot, lid extends in -X, so add lidWidth
+			: meshOffset.x)}
+	{@const lidPosZ = showAllTrays && !exploded
+		? sidePositions.lid.z
+		: (exploded
+			? (slidesX
+				? meshOffset.z - lidDepth  // +90° X rot flips Z direction
+				: meshOffset.z - lidDepth + explodedOffset.lidSlideZ)  // Slide in +Z direction
+			: meshOffset.z)}
+	{@const lidRotZ = exploded
+		? (slidesX ? 0 : Math.PI)
+		: 0}
 	<T.Mesh
 		geometry={lidGeometry}
 		rotation.x={exploded ? Math.PI / 2 : -Math.PI / 2}
-		rotation.z={exploded ? Math.PI : 0}
-		position.x={showAllTrays && !exploded ? sidePositions.lid.x - lidWidth / 2 : (exploded ? meshOffset.x + lidWidth : meshOffset.x)}
+		rotation.z={lidRotZ}
+		position.x={lidPosX}
 		position.y={exploded ? (explodedOffset.lidY + lidHeight) : explodedOffset.lidY}
-		position.z={showAllTrays && !exploded ? sidePositions.lid.z : (exploded ? lidDepth / 2 - explodedOffset.lidSlide : meshOffset.z)}
+		position.z={lidPosZ}
 	>
 		<T.MeshStandardMaterial color="#a855f7" roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
 	</T.Mesh>
@@ -350,69 +393,98 @@
 <!-- Counter preview for single tray view (only when tray geometry is visible) -->
 {#if showCounters && !showAllTrays && geometry && selectedTrayCounters.length > 0}
 	{#each selectedTrayCounters as stack, stackIdx}
-		{#each Array(stack.count) as _, counterIdx}
-			{@const counterZ = stack.z + counterIdx * stack.thickness + stack.thickness / 2}
-			{@const posX = meshOffset.x + stack.x}
-			{@const posY = counterZ}
-			{@const posZ = meshOffset.z - stack.y}
-			{@const isAlt = counterIdx % 2 === 1}
-			{@const counterColor = isAlt ? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)` : stack.color}
-			{#if stack.shape === 'square'}
-				<T.Mesh
-					position.x={posX}
-					position.y={posY}
-					position.z={posZ}
-				>
-					<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
-					<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-				</T.Mesh>
-			{:else if stack.shape === 'circle'}
-				<T.Mesh
-					position.x={posX}
-					position.y={posY}
-					position.z={posZ}
-				>
-					<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
-					<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-				</T.Mesh>
-			{:else}
-				<!-- hex -->
-				<T.Mesh
-					position.x={posX}
-					position.y={posY}
-					position.z={posZ}
-					rotation.y={stack.hexPointyTop ? 0 : Math.PI / 6}
-				>
-					<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
-					<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-				</T.Mesh>
-			{/if}
-		{/each}
-	{/each}
-{/if}
-
-<!-- Counter preview for all trays view -->
-{#if showCounters && showAllTrays && allTrays.length > 0}
-	{@const maxTrayWidth = Math.max(...allTrays.map(t => t.placement.dimensions.width))}
-	{#each allTrays as trayData, trayIdx}
-		{@const placement = trayData.placement}
-		{@const boxDepth = boxBounds ? (boxBounds.max.y - boxBounds.min.y) : traysGroupDepth}
-		{@const trayHeight = placement.dimensions.height}
-		{@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
-		{@const traySpacing = liftPhase * trayHeight * 1.2}
-		{@const trayXOffset = exploded
-			? (meshOffset.x + interiorStartOffset + placement.x)
-			: (sidePositions.traysGroup.x - maxTrayWidth / 2 + placement.x)}
-		{@const trayYOffset = exploded ? (boxFloorThickness + explodedOffset.trays + trayIdx * traySpacing) : 0}
-		{@const trayZOffset = exploded
-			? (meshOffset.z - interiorStartOffset - placement.y)
-			: (traysGroupDepth - placement.y)}
-		{#each trayData.counterStacks as stack, stackIdx}
+		{#if stack.isEdgeLoaded}
+			<!-- Edge-loaded: counters standing on edge like books -->
+			{#each Array(stack.count) as _, counterIdx}
+				{@const standingHeight = Math.max(stack.width, stack.length)}
+				{@const counterY = stack.z + standingHeight / 2}
+				{@const isAlt = counterIdx % 2 === 1}
+				{@const counterColor = isAlt ? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)` : stack.color}
+				{#if stack.edgeOrientation === 'lengthwise'}
+					<!-- Lengthwise: counters arranged along X axis, standing on edge -->
+					{@const counterSpacing = (stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
+					{@const posX = meshOffset.x + stack.x + (counterIdx + 0.5) * counterSpacing}
+					{@const posZ = meshOffset.z - stack.y - (stack.slotDepth ?? stack.length) / 2}
+					{#if stack.shape === 'square'}
+						<!-- Standing on edge: thickness along X (stacking), height along Y, length along Z -->
+						<T.Mesh
+							position.x={posX}
+							position.y={counterY}
+							position.z={posZ}
+						>
+							<T.BoxGeometry args={[stack.thickness, standingHeight, stack.length]} />
+							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+						</T.Mesh>
+					{:else if stack.shape === 'circle'}
+						<!-- Cylinder standing on edge: rotate so axis is along X -->
+						<T.Mesh
+							position.x={posX}
+							position.y={counterY}
+							position.z={posZ}
+							rotation.z={Math.PI / 2}
+						>
+							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
+							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+						</T.Mesh>
+					{:else}
+						<!-- hex: rotate so axis is along X -->
+						<T.Mesh
+							position.x={posX}
+							position.y={counterY}
+							position.z={posZ}
+							rotation.z={Math.PI / 2}
+							rotation.x={stack.hexPointyTop ? 0 : Math.PI / 6}
+						>
+							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
+							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+						</T.Mesh>
+					{/if}
+				{:else}
+					<!-- Crosswise: counters arranged along Y axis (Z in Three.js) -->
+					{@const counterSpacing = (stack.slotDepth ?? stack.count * stack.thickness) / stack.count}
+					{@const posX = meshOffset.x + stack.x + (stack.slotWidth ?? stack.length) / 2}
+					{@const posZ = meshOffset.z - stack.y - (counterIdx + 0.5) * counterSpacing}
+					{#if stack.shape === 'square'}
+						<T.Mesh
+							position.x={posX}
+							position.y={counterY}
+							position.z={posZ}
+						>
+							<T.BoxGeometry args={[stack.length, standingHeight, stack.thickness]} />
+							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+						</T.Mesh>
+					{:else if stack.shape === 'circle'}
+						<T.Mesh
+							position.x={posX}
+							position.y={counterY}
+							position.z={posZ}
+							rotation.x={Math.PI / 2}
+						>
+							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
+							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+						</T.Mesh>
+					{:else}
+						<!-- hex -->
+						<T.Mesh
+							position.x={posX}
+							position.y={counterY}
+							position.z={posZ}
+							rotation.x={Math.PI / 2}
+							rotation.y={stack.hexPointyTop ? Math.PI / 6 : 0}
+						>
+							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
+							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+						</T.Mesh>
+					{/if}
+				{/if}
+			{/each}
+		{:else}
+			<!-- Top-loaded: traditional vertical stacks -->
 			{#each Array(stack.count) as _, counterIdx}
 				{@const counterZ = stack.z + counterIdx * stack.thickness + stack.thickness / 2}
-				{@const posX = trayXOffset + stack.x}
-				{@const posY = trayYOffset + counterZ}
-				{@const posZ = trayZOffset - stack.y}
+				{@const posX = meshOffset.x + stack.x}
+				{@const posY = counterZ}
+				{@const posZ = meshOffset.z - stack.y}
 				{@const isAlt = counterIdx % 2 === 1}
 				{@const counterColor = isAlt ? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)` : stack.color}
 				{#if stack.shape === 'square'}
@@ -446,6 +518,151 @@
 					</T.Mesh>
 				{/if}
 			{/each}
+		{/if}
+	{/each}
+{/if}
+
+<!-- Counter preview for all trays view -->
+{#if showCounters && showAllTrays && allTrays.length > 0}
+	{@const maxTrayWidth = Math.max(...allTrays.map(t => t.placement.dimensions.width))}
+	{#each allTrays as trayData, trayIdx}
+		{@const placement = trayData.placement}
+		{@const boxDepth = boxBounds ? (boxBounds.max.y - boxBounds.min.y) : traysGroupDepth}
+		{@const trayHeight = placement.dimensions.height}
+		{@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
+		{@const traySpacing = liftPhase * trayHeight * 1.2}
+		{@const trayXOffset = exploded
+			? (meshOffset.x + interiorStartOffset + placement.x)
+			: (sidePositions.traysGroup.x - maxTrayWidth / 2 + placement.x)}
+		{@const trayYOffset = exploded ? (boxFloorThickness + explodedOffset.trays + trayIdx * traySpacing) : 0}
+		{@const trayZOffset = exploded
+			? (meshOffset.z - interiorStartOffset - placement.y)
+			: (traysGroupDepth - placement.y)}
+		{#each trayData.counterStacks as stack, stackIdx}
+			{#if stack.isEdgeLoaded}
+				<!-- Edge-loaded: counters standing on edge like books -->
+				{#each Array(stack.count) as _, counterIdx}
+					{@const standingHeight = Math.max(stack.width, stack.length)}
+					{@const counterY = trayYOffset + stack.z + standingHeight / 2}
+					{@const isAlt = counterIdx % 2 === 1}
+					{@const counterColor = isAlt ? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)` : stack.color}
+					{#if stack.edgeOrientation === 'lengthwise'}
+						{@const counterSpacing = (stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
+						{@const posX = trayXOffset + stack.x + (counterIdx + 0.5) * counterSpacing}
+						{@const posZ = trayZOffset - stack.y - (stack.slotDepth ?? stack.length) / 2}
+						{#if stack.shape === 'square'}
+							<!-- Standing on edge: thickness along X (stacking), height along Y, length along Z -->
+							<T.Mesh
+								position.x={posX}
+								position.y={counterY}
+								position.z={posZ}
+							>
+								<T.BoxGeometry args={[stack.thickness, standingHeight, stack.length]} />
+								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+							</T.Mesh>
+						{:else if stack.shape === 'circle'}
+							<!-- Cylinder standing on edge: rotate so axis is along X -->
+							<T.Mesh
+								position.x={posX}
+								position.y={counterY}
+								position.z={posZ}
+								rotation.z={Math.PI / 2}
+							>
+								<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
+								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+							</T.Mesh>
+						{:else}
+							<!-- hex: rotate so axis is along X -->
+							<T.Mesh
+								position.x={posX}
+								position.y={counterY}
+								position.z={posZ}
+								rotation.z={Math.PI / 2}
+								rotation.x={stack.hexPointyTop ? 0 : Math.PI / 6}
+							>
+								<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
+								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+							</T.Mesh>
+						{/if}
+					{:else}
+						<!-- Crosswise: counters arranged along Y axis (Z in Three.js) -->
+						{@const counterSpacing = (stack.slotDepth ?? stack.count * stack.thickness) / stack.count}
+						{@const posX = trayXOffset + stack.x + (stack.slotWidth ?? stack.length) / 2}
+						{@const posZ = trayZOffset - stack.y - (counterIdx + 0.5) * counterSpacing}
+						{#if stack.shape === 'square'}
+							<T.Mesh
+								position.x={posX}
+								position.y={counterY}
+								position.z={posZ}
+							>
+								<T.BoxGeometry args={[stack.length, standingHeight, stack.thickness]} />
+								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+							</T.Mesh>
+						{:else if stack.shape === 'circle'}
+							<T.Mesh
+								position.x={posX}
+								position.y={counterY}
+								position.z={posZ}
+								rotation.x={Math.PI / 2}
+							>
+								<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
+								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+							</T.Mesh>
+						{:else}
+							<T.Mesh
+								position.x={posX}
+								position.y={counterY}
+								position.z={posZ}
+								rotation.x={Math.PI / 2}
+								rotation.y={stack.hexPointyTop ? Math.PI / 6 : 0}
+							>
+								<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
+								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+							</T.Mesh>
+						{/if}
+					{/if}
+				{/each}
+			{:else}
+				<!-- Top-loaded: traditional vertical stacks -->
+				{#each Array(stack.count) as _, counterIdx}
+					{@const counterZ = stack.z + counterIdx * stack.thickness + stack.thickness / 2}
+					{@const posX = trayXOffset + stack.x}
+					{@const posY = trayYOffset + counterZ}
+					{@const posZ = trayZOffset - stack.y}
+					{@const isAlt = counterIdx % 2 === 1}
+					{@const counterColor = isAlt ? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)` : stack.color}
+					{#if stack.shape === 'square'}
+						<T.Mesh
+							position.x={posX}
+							position.y={posY}
+							position.z={posZ}
+						>
+							<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
+							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+						</T.Mesh>
+					{:else if stack.shape === 'circle'}
+						<T.Mesh
+							position.x={posX}
+							position.y={posY}
+							position.z={posZ}
+						>
+							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
+							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+						</T.Mesh>
+					{:else}
+						<!-- hex -->
+						<T.Mesh
+							position.x={posX}
+							position.y={posY}
+							position.z={posZ}
+							rotation.y={stack.hexPointyTop ? 0 : Math.PI / 6}
+						>
+							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
+							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+						</T.Mesh>
+					{/if}
+				{/each}
+			{/if}
 		{/each}
 	{/each}
 {/if}

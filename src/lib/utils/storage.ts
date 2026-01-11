@@ -1,5 +1,6 @@
-import type { Project, Box, LidParams } from '$lib/types/project';
+import type { Project, Box, LidParams, Tray } from '$lib/types/project';
 import { defaultLidParams } from '$lib/models/lid';
+import { defaultParams, type CounterTrayParams } from '$lib/models/counterTray';
 
 const STORAGE_KEY = 'counter-tray-project';
 
@@ -19,10 +20,37 @@ function migrateLidParams(stored: Partial<LidParams> | undefined): LidParams {
 	};
 }
 
+// Migrate tray params to handle stacks -> topLoadedStacks/edgeLoadedStacks rename
+function migrateTrayParams(params: CounterTrayParams & { stacks?: [string, number][] }): CounterTrayParams {
+	const migrated = { ...defaultParams, ...params };
+
+	// Handle migration from old 'stacks' field to 'topLoadedStacks'
+	if (params.stacks && !params.topLoadedStacks) {
+		migrated.topLoadedStacks = params.stacks;
+		delete (migrated as { stacks?: [string, number][] }).stacks;
+	}
+
+	// Ensure edgeLoadedStacks exists
+	if (!migrated.edgeLoadedStacks) {
+		migrated.edgeLoadedStacks = [];
+	}
+
+	return migrated;
+}
+
+// Migrate a tray to ensure all fields have valid values
+function migrateTray(tray: Tray): Tray {
+	return {
+		...tray,
+		params: migrateTrayParams(tray.params)
+	};
+}
+
 // Migrate a box to ensure all fields have valid values
 function migrateBox(box: Box): Box {
 	return {
 		...box,
+		trays: box.trays.map(migrateTray),
 		lidParams: migrateLidParams(box.lidParams)
 	};
 }

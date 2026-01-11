@@ -151,17 +151,25 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		center: [extWidth / 2, extDepth / 2, extHeight - recessHeight / 2]
 	});
 
-	// For sliding lid, extend the front outer wall to full height (no recess on entry side)
+	// For sliding lid, extend the entry wall to full height (no recess on entry side)
+	// Lid slides along the LONGEST dimension for better ergonomics
 	const snapEnabled = box.lidParams?.snapEnabled ?? true;
+	const slidesAlongX = extWidth > extDepth; // true if box is longer in X
+
 	let recess;
 	if (snapEnabled) {
-		// Keep front wall full height by not cutting recess there
-		// Subtract the front portion from the recess cut
-		const frontWallKeep = cuboid({
-			size: [extWidth + 1, wall, recessHeight + 1],
-			center: [extWidth / 2, wall / 2, extHeight - recessHeight / 2]
-		});
-		recess = subtract(outerRecess, innerWallKeep, frontWallKeep);
+		// Keep entry wall full height by not cutting recess there
+		// Entry is at low X if sliding along X, low Y if sliding along Y
+		const entryWallKeep = slidesAlongX
+			? cuboid({
+				size: [wall, extDepth + 1, recessHeight + 1],
+				center: [wall / 2, extDepth / 2, extHeight - recessHeight / 2]
+			})
+			: cuboid({
+				size: [extWidth + 1, wall, recessHeight + 1],
+				center: [extWidth / 2, wall / 2, extHeight - recessHeight / 2]
+			});
+		recess = subtract(outerRecess, innerWallKeep, entryWallKeep);
 	} else {
 		recess = subtract(outerRecess, innerWallKeep);
 	}
@@ -184,8 +192,6 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		const lipHeight = wall;
 		const grooveHeight = lipHeight * railEngagement + 0.2;
 
-		// Inner wall outer surfaces form a rectangle
-		// Front (low Y) is entry side - no groove there
 		// Position groove at BOTTOM of recess area (more material above for strength)
 		const notchZ = extHeight - wall + grooveHeight / 2;
 
@@ -195,151 +201,228 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 
 		const grooves: Geom3[] = [];
 
-		// Back groove - runs full width along back inner wall
-		const backGroove = translate(
-			[extWidth / 2, extDepth - wall / 2 - grooveDepth / 2, notchZ],
-			cuboid({
-				size: [innerWallWidth, grooveDepth, grooveHeight],
-				center: [0, 0, 0]
-			})
-		);
-		grooves.push(backGroove);
+		if (slidesAlongX) {
+			// Lid slides along X: grooves on front, back, and right (NOT left = entry)
+			// Right groove - runs full depth along right inner wall (exit side)
+			const rightGroove = translate(
+				[extWidth - wall / 2 - grooveDepth / 2, extDepth / 2, notchZ],
+				cuboid({
+					size: [grooveDepth, innerWallDepth, grooveHeight],
+					center: [0, 0, 0]
+				})
+			);
+			grooves.push(rightGroove);
 
-		// Left groove - runs from front to back along left inner wall
-		// Start at Y = wall (not wall/2) to avoid cutting into front wall area
-		const sideGrooveLength = innerWallDepth - grooveDepth - wall / 2; // don't overlap with front or back
-		const leftGroove = translate(
-			[wall / 2 + grooveDepth / 2, wall + sideGrooveLength / 2, notchZ],
-			cuboid({
-				size: [grooveDepth, sideGrooveLength, grooveHeight],
-				center: [0, 0, 0]
-			})
-		);
-		grooves.push(leftGroove);
+			// Front and back grooves - run from entry to exit along X
+			// Start at X = wall (not wall/2) to avoid cutting into entry wall area
+			const sideGrooveLength = innerWallWidth - grooveDepth - wall / 2;
+			const frontGroove = translate(
+				[wall + sideGrooveLength / 2, wall / 2 + grooveDepth / 2, notchZ],
+				cuboid({
+					size: [sideGrooveLength, grooveDepth, grooveHeight],
+					center: [0, 0, 0]
+				})
+			);
+			grooves.push(frontGroove);
 
-		// Right groove - runs from front to back along right inner wall
-		const rightGroove = translate(
-			[extWidth - wall / 2 - grooveDepth / 2, wall + sideGrooveLength / 2, notchZ],
-			cuboid({
-				size: [grooveDepth, sideGrooveLength, grooveHeight],
-				center: [0, 0, 0]
-			})
-		);
-		grooves.push(rightGroove);
+			const backGroove = translate(
+				[wall + sideGrooveLength / 2, extDepth - wall / 2 - grooveDepth / 2, notchZ],
+				cuboid({
+					size: [sideGrooveLength, grooveDepth, grooveHeight],
+					center: [0, 0, 0]
+				})
+			);
+			grooves.push(backGroove);
+		} else {
+			// Lid slides along Y: grooves on left, right, and back (NOT front = entry)
+			// Back groove - runs full width along back inner wall (exit side)
+			const backGroove = translate(
+				[extWidth / 2, extDepth - wall / 2 - grooveDepth / 2, notchZ],
+				cuboid({
+					size: [innerWallWidth, grooveDepth, grooveHeight],
+					center: [0, 0, 0]
+				})
+			);
+			grooves.push(backGroove);
+
+			// Left and right grooves - run from entry to exit along Y
+			// Start at Y = wall (not wall/2) to avoid cutting into entry wall area
+			const sideGrooveLength = innerWallDepth - grooveDepth - wall / 2;
+			const leftGroove = translate(
+				[wall / 2 + grooveDepth / 2, wall + sideGrooveLength / 2, notchZ],
+				cuboid({
+					size: [grooveDepth, sideGrooveLength, grooveHeight],
+					center: [0, 0, 0]
+				})
+			);
+			grooves.push(leftGroove);
+
+			const rightGroove = translate(
+				[extWidth - wall / 2 - grooveDepth / 2, wall + sideGrooveLength / 2, notchZ],
+				cuboid({
+					size: [grooveDepth, sideGrooveLength, grooveHeight],
+					center: [0, 0, 0]
+				})
+			);
+			grooves.push(rightGroove);
+		}
 
 		result = subtract(result, ...grooves);
 
 		// Add supports to eliminate groove ceiling overhang (makes printing without supports possible)
-		//
-		// CHAMFER TECHNIQUE: Creating 45° chamfers for self-supporting overhangs
-		// ======================================================================
-		// 1. Create rectangular blocks that fill the areas needing chamfers
-		//    - Blocks can overlap at corners - union handles this cleanly
-		//    - Size the blocks to cover the full depth/height of the chamfer area
-		//
-		// 2. Subtract rotated cuboids to cut the 45° slopes
-		//    - Rotate the cutting cuboid 45° (Math.PI/4) around the appropriate axis:
-		//      * rotateX for chamfers facing -Y or +Y (back/front walls)
-		//      * rotateY for chamfers facing -X or +X (left/right walls)
-		//    - Size the cutter: chamferSize = depth * Math.sqrt(2) for the rotated dimensions
-		//    - Position the cutter at the edge where the slope should start
-		//
-		// This technique avoids complex triangular hull() geometry and handles corners
-		// automatically through the union of overlapping blocks.
-		// ======================================================================
+		// CHAMFER TECHNIQUE: Creates 45° chamfers for self-supporting overhangs
 		const grooveTopZ = notchZ + grooveHeight / 2;
-		const chamferSize = grooveDepth * Math.sqrt(2); // diagonal of the chamfer square
+		const chamferSize = grooveDepth * Math.sqrt(2);
 
-		// Rectangular support blocks (will overlap at corners - that's fine)
-		const backBlock = cuboid({
-			size: [innerWallWidth, grooveDepth, grooveDepth],
-			center: [extWidth / 2, extDepth - wall / 2 - grooveDepth / 2, grooveTopZ - grooveDepth / 2]
-		});
+		if (slidesAlongX) {
+			// Supports for grooves on front, back, right (slides along X)
+			const sideGrooveLength = innerWallWidth - grooveDepth - wall / 2;
 
-		const leftBlock = cuboid({
-			size: [grooveDepth, sideGrooveLength + grooveDepth, grooveDepth],
-			center: [wall / 2 + grooveDepth / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth / 2]
-		});
+			const rightBlock = cuboid({
+				size: [grooveDepth, innerWallDepth, grooveDepth],
+				center: [extWidth - wall / 2 - grooveDepth / 2, extDepth / 2, grooveTopZ - grooveDepth / 2]
+			});
+			const frontBlock = cuboid({
+				size: [sideGrooveLength + grooveDepth, grooveDepth, grooveDepth],
+				center: [wall + (sideGrooveLength + grooveDepth) / 2, wall / 2 + grooveDepth / 2, grooveTopZ - grooveDepth / 2]
+			});
+			const backBlock = cuboid({
+				size: [sideGrooveLength + grooveDepth, grooveDepth, grooveDepth],
+				center: [wall + (sideGrooveLength + grooveDepth) / 2, extDepth - wall / 2 - grooveDepth / 2, grooveTopZ - grooveDepth / 2]
+			});
 
-		const rightBlock = cuboid({
-			size: [grooveDepth, sideGrooveLength + grooveDepth, grooveDepth],
-			center: [extWidth - wall / 2 - grooveDepth / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth / 2]
-		});
+			let supportBlock = union(rightBlock, frontBlock, backBlock);
 
-		// Union the blocks
-		let supportBlock = union(backBlock, leftBlock, rightBlock);
+			const rightCut = translate(
+				[extWidth - wall / 2, extDepth / 2, grooveTopZ - grooveDepth],
+				rotateY(Math.PI / 4, cuboid({
+					size: [chamferSize, innerWallDepth + grooveDepth * 2, chamferSize],
+					center: [0, 0, 0]
+				}))
+			);
+			const frontCut = translate(
+				[wall + (sideGrooveLength + grooveDepth) / 2, wall / 2, grooveTopZ - grooveDepth],
+				rotateX(-Math.PI / 4, cuboid({
+					size: [sideGrooveLength + grooveDepth * 2, chamferSize, chamferSize],
+					center: [0, 0, 0]
+				}))
+			);
+			const backCut = translate(
+				[wall + (sideGrooveLength + grooveDepth) / 2, extDepth - wall / 2, grooveTopZ - grooveDepth],
+				rotateX(Math.PI / 4, cuboid({
+					size: [sideGrooveLength + grooveDepth * 2, chamferSize, chamferSize],
+					center: [0, 0, 0]
+				}))
+			);
 
-		// Cut 45° chamfers using rotated cuboids
-		// Back chamfer - rotated around X axis
-		const backCut = translate(
-			[extWidth / 2, extDepth - wall / 2, grooveTopZ - grooveDepth],
-			rotateX(Math.PI / 4, cuboid({
-				size: [innerWallWidth + grooveDepth * 2, chamferSize, chamferSize],
-				center: [0, 0, 0]
-			}))
-		);
+			supportBlock = subtract(supportBlock, rightCut, frontCut, backCut);
+			result = union(result, supportBlock);
+		} else {
+			// Supports for grooves on left, right, back (slides along Y)
+			const sideGrooveLength = innerWallDepth - grooveDepth - wall / 2;
 
-		// Left chamfer - rotated around Y axis
-		const leftCut = translate(
-			[wall / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth],
-			rotateY(-Math.PI / 4, cuboid({
-				size: [chamferSize, sideGrooveLength + grooveDepth * 2, chamferSize],
-				center: [0, 0, 0]
-			}))
-		);
+			const backBlock = cuboid({
+				size: [innerWallWidth, grooveDepth, grooveDepth],
+				center: [extWidth / 2, extDepth - wall / 2 - grooveDepth / 2, grooveTopZ - grooveDepth / 2]
+			});
+			const leftBlock = cuboid({
+				size: [grooveDepth, sideGrooveLength + grooveDepth, grooveDepth],
+				center: [wall / 2 + grooveDepth / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth / 2]
+			});
+			const rightBlock = cuboid({
+				size: [grooveDepth, sideGrooveLength + grooveDepth, grooveDepth],
+				center: [extWidth - wall / 2 - grooveDepth / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth / 2]
+			});
 
-		// Right chamfer - rotated around Y axis
-		const rightCut = translate(
-			[extWidth - wall / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth],
-			rotateY(Math.PI / 4, cuboid({
-				size: [chamferSize, sideGrooveLength + grooveDepth * 2, chamferSize],
-				center: [0, 0, 0]
-			}))
-		);
+			let supportBlock = union(backBlock, leftBlock, rightBlock);
 
-		supportBlock = subtract(supportBlock, backCut, leftCut, rightCut);
-		result = union(result, supportBlock);
+			const backCut = translate(
+				[extWidth / 2, extDepth - wall / 2, grooveTopZ - grooveDepth],
+				rotateX(Math.PI / 4, cuboid({
+					size: [innerWallWidth + grooveDepth * 2, chamferSize, chamferSize],
+					center: [0, 0, 0]
+				}))
+			);
+			const leftCut = translate(
+				[wall / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth],
+				rotateY(-Math.PI / 4, cuboid({
+					size: [chamferSize, sideGrooveLength + grooveDepth * 2, chamferSize],
+					center: [0, 0, 0]
+				}))
+			);
+			const rightCut = translate(
+				[extWidth - wall / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth],
+				rotateY(Math.PI / 4, cuboid({
+					size: [chamferSize, sideGrooveLength + grooveDepth * 2, chamferSize],
+					center: [0, 0, 0]
+				}))
+			);
 
-		// Add detent notch on top of flush front wall - lid bump clicks into this
-		// Half-cylinder groove running along X axis for smooth sliding engagement
-		const detentRadius = snapBumpHeight + 0.1; // Slightly larger than bump for clearance
-		const detentLength = snapBumpWidth * 2; // Wider for stability
-		const detentNotch = translate(
-			[extWidth / 2, wall / 2, extHeight],
-			rotateY(Math.PI / 2, cylinder({
-				radius: detentRadius,
-				height: detentLength,
-				segments: 32,
-				center: [0, 0, 0]
-			}))
-		);
+			supportBlock = subtract(supportBlock, backCut, leftCut, rightCut);
+			result = union(result, supportBlock);
+		}
+
+		// Add detent notch on entry wall - lid bump clicks into this
+		const detentRadius = snapBumpHeight + 0.1;
+		const detentLength = snapBumpWidth * 2;
+		const detentNotch = slidesAlongX
+			? translate(
+				[wall / 2, extDepth / 2, extHeight],
+				rotateX(Math.PI / 2, cylinder({
+					radius: detentRadius,
+					height: detentLength,
+					segments: 32,
+					center: [0, 0, 0]
+				}))
+			)
+			: translate(
+				[extWidth / 2, wall / 2, extHeight],
+				rotateY(Math.PI / 2, cylinder({
+					radius: detentRadius,
+					height: detentLength,
+					segments: 32,
+					center: [0, 0, 0]
+				}))
+			);
 		result = subtract(result, detentNotch);
 
-		// Add grip lines on back of side walls to match lid grip lines
-		// These create a continuous tactile feature when lid is attached
-		const gripLineDepth = 0.3; // Same as lid
-		const gripLineWidth = 0.8; // Same as lid
-		const gripLineSpacing = 2.5; // Same as lid
+		// Add grip lines near exit side (opposite entry)
+		const gripLineDepth = 0.3;
+		const gripLineWidth = 0.8;
+		const gripLineSpacing = 2.5;
 		const numGripLines = 5;
 		const totalGripWidth = (numGripLines - 1) * gripLineSpacing;
-		const gripStartY = extDepth - wall - 1 - totalGripWidth; // Same positioning as lid
 
-		for (let i = 0; i < numGripLines; i++) {
-			const lineY = gripStartY + i * gripLineSpacing;
-
-			// Left side grip lines (on outer X surface) - full box height
-			const leftGrip = cuboid({
-				size: [gripLineDepth, gripLineWidth, extHeight + 1],
-				center: [gripLineDepth / 2, lineY, extHeight / 2]
-			});
-
-			// Right side grip lines (on outer X surface) - full box height
-			const rightGrip = cuboid({
-				size: [gripLineDepth, gripLineWidth, extHeight + 1],
-				center: [extWidth - gripLineDepth / 2, lineY, extHeight / 2]
-			});
-
-			result = subtract(result, leftGrip, rightGrip);
+		if (slidesAlongX) {
+			// Grip lines on front/back walls near exit (high X)
+			const gripStartX = extWidth - wall - 1 - totalGripWidth;
+			for (let i = 0; i < numGripLines; i++) {
+				const lineX = gripStartX + i * gripLineSpacing;
+				const frontGrip = cuboid({
+					size: [gripLineWidth, gripLineDepth, extHeight + 1],
+					center: [lineX, gripLineDepth / 2, extHeight / 2]
+				});
+				const backGrip = cuboid({
+					size: [gripLineWidth, gripLineDepth, extHeight + 1],
+					center: [lineX, extDepth - gripLineDepth / 2, extHeight / 2]
+				});
+				result = subtract(result, frontGrip, backGrip);
+			}
+		} else {
+			// Grip lines on left/right walls near exit (high Y)
+			const gripStartY = extDepth - wall - 1 - totalGripWidth;
+			for (let i = 0; i < numGripLines; i++) {
+				const lineY = gripStartY + i * gripLineSpacing;
+				const leftGrip = cuboid({
+					size: [gripLineDepth, gripLineWidth, extHeight + 1],
+					center: [gripLineDepth / 2, lineY, extHeight / 2]
+				});
+				const rightGrip = cuboid({
+					size: [gripLineDepth, gripLineWidth, extHeight + 1],
+					center: [extWidth - gripLineDepth / 2, lineY, extHeight / 2]
+				});
+				result = subtract(result, leftGrip, rightGrip);
+			}
 		}
 	}
 
@@ -443,158 +526,241 @@ export function createLid(box: Box): Geom3 | null {
 
 	let lid = subtract(solid, cavity);
 
-	// Remove front lip for sliding entry (if snap enabled)
+	// Lid slides along the LONGEST dimension for better ergonomics
+	const slidesAlongX = extWidth > extDepth;
+
+	// Remove entry lip for sliding entry (if snap enabled)
 	if (snapEnabled) {
-		const frontLipCutout = cuboid({
-			size: [cavityWidth, wall, lipHeight + 1],
-			center: [extWidth / 2, wall / 2, lidHeight - lipHeight / 2 + 0.5]
-		});
-		lid = subtract(lid, frontLipCutout);
-
-		// Cut notches from front corners of left/right walls
-		// These would otherwise overlap with the box's full-height front wall
-		const cornerCutoutLeft = cuboid({
-			size: [wall, wall, lipHeight + 1],
-			center: [wall / 2, wall / 2, lidHeight - lipHeight / 2 + 0.5]
-		});
-		const cornerCutoutRight = cuboid({
-			size: [wall, wall, lipHeight + 1],
-			center: [extWidth - wall / 2, wall / 2, lidHeight - lipHeight / 2 + 0.5]
-		});
-		lid = subtract(lid, cornerCutoutLeft, cornerCutoutRight);
-
-		// Add grip lines on back of side walls to indicate pull direction
-		const gripLineDepth = 0.3; // How deep the groove is
-		const gripLineWidth = 0.8; // Width of each groove
-		const gripLineSpacing = 2.5; // Space between grooves
-		const numGripLines = 5;
-		const totalGripWidth = (numGripLines - 1) * gripLineSpacing;
-		const gripStartY = extDepth - wall - 1 - totalGripWidth; // Start from back
-
-		for (let i = 0; i < numGripLines; i++) {
-			const lineY = gripStartY + i * gripLineSpacing;
-
-			// Left side grip lines (on outer X surface) - full height
-			const leftGrip = cuboid({
-				size: [gripLineDepth, gripLineWidth, lidHeight + 1],
-				center: [gripLineDepth / 2, lineY, lidHeight / 2]
+		if (slidesAlongX) {
+			// Entry at low X (left side)
+			const entryLipCutout = cuboid({
+				size: [wall, cavityDepth, lipHeight + 1],
+				center: [wall / 2, extDepth / 2, lidHeight - lipHeight / 2 + 0.5]
 			});
+			lid = subtract(lid, entryLipCutout);
 
-			// Right side grip lines (on outer X surface) - full height
-			const rightGrip = cuboid({
-				size: [gripLineDepth, gripLineWidth, lidHeight + 1],
-				center: [extWidth - gripLineDepth / 2, lineY, lidHeight / 2]
+			// Cut notches from entry corners of front/back walls
+			const cornerCutoutFront = cuboid({
+				size: [wall, wall, lipHeight + 1],
+				center: [wall / 2, wall / 2, lidHeight - lipHeight / 2 + 0.5]
 			});
+			const cornerCutoutBack = cuboid({
+				size: [wall, wall, lipHeight + 1],
+				center: [wall / 2, extDepth - wall / 2, lidHeight - lipHeight / 2 + 0.5]
+			});
+			lid = subtract(lid, cornerCutoutFront, cornerCutoutBack);
 
-			lid = subtract(lid, leftGrip, rightGrip);
+			// Grip lines on front/back walls near exit (high X)
+			const gripLineDepth = 0.3;
+			const gripLineWidth = 0.8;
+			const gripLineSpacing = 2.5;
+			const numGripLines = 5;
+			const totalGripWidth = (numGripLines - 1) * gripLineSpacing;
+			const gripStartX = extWidth - wall - 1 - totalGripWidth;
+
+			for (let i = 0; i < numGripLines; i++) {
+				const lineX = gripStartX + i * gripLineSpacing;
+				const frontGrip = cuboid({
+					size: [gripLineWidth, gripLineDepth, lidHeight + 1],
+					center: [lineX, gripLineDepth / 2, lidHeight / 2]
+				});
+				const backGrip = cuboid({
+					size: [gripLineWidth, gripLineDepth, lidHeight + 1],
+					center: [lineX, extDepth - gripLineDepth / 2, lidHeight / 2]
+				});
+				lid = subtract(lid, frontGrip, backGrip);
+			}
+		} else {
+			// Entry at low Y (front side)
+			const entryLipCutout = cuboid({
+				size: [cavityWidth, wall, lipHeight + 1],
+				center: [extWidth / 2, wall / 2, lidHeight - lipHeight / 2 + 0.5]
+			});
+			lid = subtract(lid, entryLipCutout);
+
+			// Cut notches from entry corners of left/right walls
+			const cornerCutoutLeft = cuboid({
+				size: [wall, wall, lipHeight + 1],
+				center: [wall / 2, wall / 2, lidHeight - lipHeight / 2 + 0.5]
+			});
+			const cornerCutoutRight = cuboid({
+				size: [wall, wall, lipHeight + 1],
+				center: [extWidth - wall / 2, wall / 2, lidHeight - lipHeight / 2 + 0.5]
+			});
+			lid = subtract(lid, cornerCutoutLeft, cornerCutoutRight);
+
+			// Grip lines on left/right walls near exit (high Y)
+			const gripLineDepth = 0.3;
+			const gripLineWidth = 0.8;
+			const gripLineSpacing = 2.5;
+			const numGripLines = 5;
+			const totalGripWidth = (numGripLines - 1) * gripLineSpacing;
+			const gripStartY = extDepth - wall - 1 - totalGripWidth;
+
+			for (let i = 0; i < numGripLines; i++) {
+				const lineY = gripStartY + i * gripLineSpacing;
+				const leftGrip = cuboid({
+					size: [gripLineDepth, gripLineWidth, lidHeight + 1],
+					center: [gripLineDepth / 2, lineY, lidHeight / 2]
+				});
+				const rightGrip = cuboid({
+					size: [gripLineDepth, gripLineWidth, lidHeight + 1],
+					center: [extWidth - gripLineDepth / 2, lineY, lidHeight / 2]
+				});
+				lid = subtract(lid, leftGrip, rightGrip);
+			}
 		}
 	}
 
-	// 3. Add continuous U-shaped rail on 3 sides for sliding fit (not front/entry side)
+	// 3. Add continuous U-shaped rail on 3 sides for sliding fit (not entry side)
 	// Rails are designed with 45° chamfered bottoms to be self-supporting when printing
-	//
-	// CHAMFER TECHNIQUE: Same as box groove supports - rectangular blocks + rotated cuboid cuts
-	// See createBoxWithLidGrooves() for detailed documentation of this technique.
 	if (snapEnabled && snapBumpHeight > 0) {
-		// Rail height uses railEngagement fraction of lip height for stronger hold
 		const railHeight = lipHeight * railEngagement;
-		// Position rail at BOTTOM of lip (opening edge) - more material above for strength
-		const topZ = lidHeight; // Top of rail (flush with lip top)
-		const bottomZ = lidHeight - railHeight; // Bottom of rail
-
-		// Rail thickness must bridge the clearance gap AND extend into the groove
-		// Extra protrusion needed because chamfer reduces effective engagement at bottom
+		const topZ = lidHeight;
+		const bottomZ = lidHeight - railHeight;
 		const railThickness = clearance + snapBumpHeight * 1.5;
-		const chamferSize = railThickness * Math.sqrt(2); // diagonal for rotated cut
+		const chamferSize = railThickness * Math.sqrt(2);
 
-		// Wall positions (inner surface of lid cavity)
-		const lipThickness = (extWidth - cavityWidth) / 2; // thickness of lid lip walls
-		const innerLeftX = lipThickness;
-		const innerRightX = extWidth - lipThickness;
-		const innerBackY = extDepth - lipThickness;
+		const lipThicknessX = (extWidth - cavityWidth) / 2;
+		const lipThicknessY = (extDepth - cavityDepth) / 2;
+		const innerLeftX = lipThicknessX;
+		const innerRightX = extWidth - lipThicknessX;
+		const innerFrontY = lipThicknessY;
+		const innerBackY = extDepth - lipThicknessY;
 
-		// Left/right rail positioning
-		const railStartY = lipThickness + wall; // after corner cutout
-		const totalRailLength = cavityDepth - railThickness - wall;
-		const taperLength = Math.min(5, totalRailLength / 3);
+		if (slidesAlongX) {
+			// Rails on front, back, and right (NOT left = entry)
+			const railStartX = lipThicknessX + wall; // after corner cutout
+			const totalRailLength = cavityWidth - railThickness - wall;
+			const sideRailLength = totalRailLength + railThickness;
+			const sideRailCenterX = railStartX + sideRailLength / 2;
 
-		// Rectangular rail blocks - full length including taper area, overlap at corners
-		const sideRailLength = totalRailLength + railThickness; // full length to back
-		const sideRailCenterY = railStartY + sideRailLength / 2;
+			// Right rail (exit side) - full depth
+			const rightRailBlock = cuboid({
+				size: [railThickness, innerBackY - innerFrontY + railThickness * 2, railHeight],
+				center: [innerRightX - railThickness / 2, extDepth / 2, topZ - railHeight / 2]
+			});
 
-		// Back rail extends full width including past side rail positions
-		const backRailBlock = cuboid({
-			size: [innerRightX - innerLeftX + railThickness * 2, railThickness, railHeight],
-			center: [extWidth / 2, innerBackY - railThickness / 2, topZ - railHeight / 2]
-		});
+			// Front and back rails - from entry to exit
+			const frontRailBlock = cuboid({
+				size: [sideRailLength, railThickness, railHeight],
+				center: [sideRailCenterX, innerFrontY + railThickness / 2, topZ - railHeight / 2]
+			});
+			const backRailBlock = cuboid({
+				size: [sideRailLength, railThickness, railHeight],
+				center: [sideRailCenterX, innerBackY - railThickness / 2, topZ - railHeight / 2]
+			});
 
-		// Side rails - full length from railStartY to back, overlapping with back rail
-		const leftRailBlock = cuboid({
-			size: [railThickness, sideRailLength, railHeight],
-			center: [innerLeftX + railThickness / 2, sideRailCenterY, topZ - railHeight / 2]
-		});
+			// Chamfer cuts
+			const rightCut = translate(
+				[innerRightX - railThickness, extDepth / 2, bottomZ],
+				rotateY(Math.PI / 4, cuboid({
+					size: [chamferSize, innerBackY - innerFrontY + railThickness * 4, chamferSize],
+					center: [0, 0, 0]
+				}))
+			);
+			const frontCut = translate(
+				[sideRailCenterX, innerFrontY + railThickness, bottomZ],
+				rotateX(-Math.PI / 4, cuboid({
+					size: [sideRailLength + railThickness * 2, chamferSize, chamferSize],
+					center: [0, 0, 0]
+				}))
+			);
+			const backCut = translate(
+				[sideRailCenterX, innerBackY - railThickness, bottomZ],
+				rotateX(Math.PI / 4, cuboid({
+					size: [sideRailLength + railThickness * 2, chamferSize, chamferSize],
+					center: [0, 0, 0]
+				}))
+			);
 
-		const rightRailBlock = cuboid({
-			size: [railThickness, sideRailLength, railHeight],
-			center: [innerRightX - railThickness / 2, sideRailCenterY, topZ - railHeight / 2]
-		});
+			const rightRailChamfered = subtract(rightRailBlock, rightCut);
+			const frontRailChamfered = subtract(frontRailBlock, frontCut);
+			const backRailChamfered = subtract(backRailBlock, backCut);
 
-		// Cut 45° chamfers on each rail piece BEFORE unioning
-		// IMPORTANT: Apply cuts to separate pieces first, then union - this prevents
-		// manifold errors that occur when overlapping rotated cuts intersect
+			lid = union(lid, union(rightRailChamfered, frontRailChamfered, backRailChamfered));
 
-		// Back chamfer - applied to back rail only
-		const backCut = translate(
-			[extWidth / 2, innerBackY - railThickness, bottomZ],
-			rotateX(Math.PI / 4, cuboid({
-				size: [innerRightX - innerLeftX + railThickness * 4, chamferSize, chamferSize],
-				center: [0, 0, 0]
-			}))
-		);
-		const backRailChamfered = subtract(backRailBlock, backCut);
+			// Detent bump at entry (low X)
+			const detentRadius = snapBumpHeight;
+			const detentLength = snapBumpWidth * 2;
+			const topPlateInnerZ = lidHeight - lipHeight;
+			const detentBump = translate(
+				[wall / 2, extDepth / 2, topPlateInnerZ],
+				rotateX(Math.PI / 2, cylinder({
+					radius: detentRadius,
+					height: detentLength,
+					segments: 32,
+					center: [0, 0, 0]
+				}))
+			);
+			lid = union(lid, detentBump);
+		} else {
+			// Rails on left, right, and back (NOT front = entry)
+			const railStartY = lipThicknessY + wall;
+			const totalRailLength = cavityDepth - railThickness - wall;
+			const sideRailLength = totalRailLength + railThickness;
+			const sideRailCenterY = railStartY + sideRailLength / 2;
 
-		// Left chamfer - applied to left rail only
-		const leftCut = translate(
-			[innerLeftX + railThickness, sideRailCenterY, bottomZ],
-			rotateY(-Math.PI / 4, cuboid({
-				size: [chamferSize, sideRailLength + railThickness * 2, chamferSize],
-				center: [0, 0, 0]
-			}))
-		);
-		const leftRailChamfered = subtract(leftRailBlock, leftCut);
+			// Back rail (exit side) - full width
+			const backRailBlock = cuboid({
+				size: [innerRightX - innerLeftX + railThickness * 2, railThickness, railHeight],
+				center: [extWidth / 2, innerBackY - railThickness / 2, topZ - railHeight / 2]
+			});
 
-		// Right chamfer - applied to right rail only
-		const rightCut = translate(
-			[innerRightX - railThickness, sideRailCenterY, bottomZ],
-			rotateY(Math.PI / 4, cuboid({
-				size: [chamferSize, sideRailLength + railThickness * 2, chamferSize],
-				center: [0, 0, 0]
-			}))
-		);
-		const rightRailChamfered = subtract(rightRailBlock, rightCut);
+			// Left and right rails - from entry to exit
+			const leftRailBlock = cuboid({
+				size: [railThickness, sideRailLength, railHeight],
+				center: [innerLeftX + railThickness / 2, sideRailCenterY, topZ - railHeight / 2]
+			});
+			const rightRailBlock = cuboid({
+				size: [railThickness, sideRailLength, railHeight],
+				center: [innerRightX - railThickness / 2, sideRailCenterY, topZ - railHeight / 2]
+			});
 
-		// Union the chamfered pieces
-		const railBlock = union(backRailChamfered, leftRailChamfered, rightRailChamfered);
+			// Chamfer cuts
+			const backCut = translate(
+				[extWidth / 2, innerBackY - railThickness, bottomZ],
+				rotateX(Math.PI / 4, cuboid({
+					size: [innerRightX - innerLeftX + railThickness * 4, chamferSize, chamferSize],
+					center: [0, 0, 0]
+				}))
+			);
+			const leftCut = translate(
+				[innerLeftX + railThickness, sideRailCenterY, bottomZ],
+				rotateY(-Math.PI / 4, cuboid({
+					size: [chamferSize, sideRailLength + railThickness * 2, chamferSize],
+					center: [0, 0, 0]
+				}))
+			);
+			const rightCut = translate(
+				[innerRightX - railThickness, sideRailCenterY, bottomZ],
+				rotateY(Math.PI / 4, cuboid({
+					size: [chamferSize, sideRailLength + railThickness * 2, chamferSize],
+					center: [0, 0, 0]
+				}))
+			);
 
-		lid = union(lid, railBlock);
+			const backRailChamfered = subtract(backRailBlock, backCut);
+			const leftRailChamfered = subtract(leftRailBlock, leftCut);
+			const rightRailChamfered = subtract(rightRailBlock, rightCut);
 
-		// Add detent bump on underside of lid - clicks into notch on box's front wall
-		// Half-cylinder ridge running along X axis for smooth sliding engagement
-		// Center at surface level so only half protrudes
-		const detentRadius = snapBumpHeight;
-		const detentLength = snapBumpWidth * 2; // Match notch width for stability
-		const topPlateInnerZ = lidHeight - lipHeight; // Inner surface of top plate
+			lid = union(lid, union(backRailChamfered, leftRailChamfered, rightRailChamfered));
 
-		const detentBump = translate(
-			[extWidth / 2, wall / 2, topPlateInnerZ],
-			rotateY(Math.PI / 2, cylinder({
-				radius: detentRadius,
-				height: detentLength,
-				segments: 32,
-				center: [0, 0, 0]
-			}))
-		);
-		lid = union(lid, detentBump);
+			// Detent bump at entry (low Y)
+			const detentRadius = snapBumpHeight;
+			const detentLength = snapBumpWidth * 2;
+			const topPlateInnerZ = lidHeight - lipHeight;
+			const detentBump = translate(
+				[extWidth / 2, wall / 2, topPlateInnerZ],
+				rotateY(Math.PI / 2, cylinder({
+					radius: detentRadius,
+					height: detentLength,
+					segments: 32,
+					center: [0, 0, 0]
+				}))
+			);
+			lid = union(lid, detentBump);
+		}
 	}
 
 	// 4. Emboss box name on lid top if enabled
