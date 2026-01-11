@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
+	import type { CounterTrayParams, EdgeOrientation, CustomShape } from '$lib/models/counterTray';
 
 	interface Props {
 		params: CounterTrayParams;
@@ -8,11 +8,80 @@
 
 	let { params, onchange }: Props = $props();
 
-	const shapeOptions = ['square', 'hex', 'circle'] as const;
+	// Shape options: built-in + custom shapes
+	const builtinShapes = ['square', 'hex', 'circle'] as const;
+	let shapeOptions = $derived([
+		...builtinShapes,
+		...params.customShapes.map(s => `custom:${s.name}`)
+	]);
+
 	const orientationOptions: EdgeOrientation[] = ['auto', 'lengthwise', 'crosswise'];
+
+	// Get display name for a shape reference
+	function getShapeDisplayName(shapeRef: string): string {
+		if (shapeRef.startsWith('custom:')) {
+			return shapeRef.substring(7);
+		}
+		return shapeRef;
+	}
 
 	function updateParam<K extends keyof CounterTrayParams>(key: K, value: CounterTrayParams[K]) {
 		onchange({ ...params, [key]: value });
+	}
+
+	// Custom shape handlers
+	function addCustomShape() {
+		const newName = `Custom ${params.customShapes.length + 1}`;
+		onchange({
+			...params,
+			customShapes: [...params.customShapes, { name: newName, width: 20, length: 30 }]
+		});
+	}
+
+	function updateCustomShape(index: number, field: keyof CustomShape, value: string | number) {
+		const newShapes = [...params.customShapes];
+		if (field === 'name') {
+			const newName = value as string;
+			// Validate uniqueness
+			if (newShapes.some((s, i) => i !== index && s.name === newName)) {
+				return; // Reject duplicate names
+			}
+			// Update stack references if name changed
+			const oldName = newShapes[index].name;
+			if (oldName !== newName) {
+				newShapes[index] = { ...newShapes[index], name: newName };
+				onchange({
+					...params,
+					customShapes: newShapes,
+					topLoadedStacks: params.topLoadedStacks.map(([shape, count]) =>
+						shape === `custom:${oldName}` ? [`custom:${newName}`, count] : [shape, count]
+					),
+					edgeLoadedStacks: params.edgeLoadedStacks.map(([shape, count, orient]) =>
+						shape === `custom:${oldName}` ? [`custom:${newName}`, count, orient] : [shape, count, orient]
+					)
+				});
+				return;
+			}
+		}
+		newShapes[index] = { ...newShapes[index], [field]: value };
+		onchange({ ...params, customShapes: newShapes });
+	}
+
+	function removeCustomShape(index: number) {
+		const shapeName = params.customShapes[index].name;
+		const shapeRef = `custom:${shapeName}`;
+
+		// Convert stacks using this shape to 'square' fallback
+		onchange({
+			...params,
+			customShapes: params.customShapes.filter((_, i) => i !== index),
+			topLoadedStacks: params.topLoadedStacks.map(([shape, count]) =>
+				shape === shapeRef ? ['square', count] : [shape, count]
+			),
+			edgeLoadedStacks: params.edgeLoadedStacks.map(([shape, count, orient]) =>
+				shape === shapeRef ? ['square', count, orient] : [shape, count, orient]
+			)
+		});
 	}
 
 	// Top-loaded stack handlers
@@ -124,6 +193,65 @@
 				/>
 				<span class="text-xs text-gray-400">Hex Pointy Top</span>
 			</label>
+		</div>
+	</section>
+
+	<section>
+		<h3 class="mb-3 border-b border-gray-700 pb-1 text-sm font-semibold text-gray-300">
+			Custom Shapes
+		</h3>
+		<p class="mb-2 text-xs text-gray-500">Define custom rectangular counter sizes</p>
+		<div class="space-y-2">
+			{#each params.customShapes as shape, index}
+				<div class="rounded bg-gray-750 p-2">
+					<div class="mb-2 flex items-center gap-2">
+						<input
+							type="text"
+							value={shape.name}
+							onchange={(e) => updateCustomShape(index, 'name', e.currentTarget.value)}
+							placeholder="Shape name"
+							class="flex-1 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+						/>
+						<button
+							onclick={() => removeCustomShape(index)}
+							class="rounded px-2 py-1 text-red-400 hover:bg-red-900/30"
+							title="Remove shape"
+						>
+							&times;
+						</button>
+					</div>
+					<div class="grid grid-cols-2 gap-2">
+						<label class="block">
+							<span class="text-xs text-gray-400">Width (mm)</span>
+							<input
+								type="number"
+								step="0.1"
+								min="1"
+								value={shape.width}
+								onchange={(e) => updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+								class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+							/>
+						</label>
+						<label class="block">
+							<span class="text-xs text-gray-400">Length (mm)</span>
+							<input
+								type="number"
+								step="0.1"
+								min="1"
+								value={shape.length}
+								onchange={(e) => updateCustomShape(index, 'length', parseFloat(e.currentTarget.value))}
+								class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+							/>
+						</label>
+					</div>
+				</div>
+			{/each}
+			<button
+				onclick={addCustomShape}
+				class="w-full rounded border border-dashed border-gray-600 px-2 py-1 text-sm text-gray-400 hover:border-gray-500 hover:text-gray-300"
+			>
+				+ Add Custom Shape
+			</button>
 		</div>
 	</section>
 
@@ -269,8 +397,8 @@
 						onchange={(e) => updateTopLoadedStack(index, 'shape', e.currentTarget.value)}
 						class="flex-1 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
 					>
-						{#each shapeOptions as shape}
-							<option value={shape}>{shape}</option>
+						{#each shapeOptions as shapeOpt}
+							<option value={shapeOpt}>{getShapeDisplayName(shapeOpt)}</option>
 						{/each}
 					</select>
 					<input
@@ -311,8 +439,8 @@
 						onchange={(e) => updateEdgeLoadedStack(index, 'shape', e.currentTarget.value)}
 						class="flex-1 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
 					>
-						{#each shapeOptions as shape}
-							<option value={shape}>{shape}</option>
+						{#each shapeOptions as shapeOpt}
+							<option value={shapeOpt}>{getShapeDisplayName(shapeOpt)}</option>
 						{/each}
 					</select>
 					<input

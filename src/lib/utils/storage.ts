@@ -35,6 +35,32 @@ function migrateTrayParams(params: CounterTrayParams & { stacks?: [string, numbe
 		migrated.edgeLoadedStacks = [];
 	}
 
+	// Ensure customShapes exists
+	if (!migrated.customShapes) {
+		migrated.customShapes = [];
+	}
+
+	// Validate stack references - if custom:X references missing shape, fallback to 'square'
+	migrated.topLoadedStacks = migrated.topLoadedStacks.map(([shape, count]) => {
+		if (shape.startsWith('custom:')) {
+			const name = shape.substring(7);
+			if (!migrated.customShapes.some(s => s.name === name)) {
+				return ['square', count] as [string, number];
+			}
+		}
+		return [shape, count] as [string, number];
+	});
+
+	migrated.edgeLoadedStacks = migrated.edgeLoadedStacks.map(([shape, count, orient]) => {
+		if (shape.startsWith('custom:')) {
+			const name = shape.substring(7);
+			if (!migrated.customShapes.some(s => s.name === name)) {
+				return ['square', count, orient] as [string, number, typeof orient];
+			}
+		}
+		return [shape, count, orient] as [string, number, typeof orient];
+	});
+
 	return migrated;
 }
 

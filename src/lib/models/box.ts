@@ -36,7 +36,8 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		rimHeight,
 		trayLengthOverride,
 		topLoadedStacks,
-		edgeLoadedStacks
+		edgeLoadedStacks,
+		customShapes
 	} = params;
 
 	// Use topLoadedStacks (renamed from stacks)
@@ -55,16 +56,66 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const circlePocketWidth = circleDiameter;
 	const circlePocketLength = circleDiameter;
 
+	// Helper to get custom shape by name from 'custom:ShapeName' reference
+	const getCustomShape = (shapeRef: string) => {
+		if (!shapeRef.startsWith('custom:')) return null;
+		const name = shapeRef.substring(7);
+		return customShapes?.find(s => s.name === name) || null;
+	};
+
+	// For top-loaded/crosswise custom shapes: LONGER side = width (X), SHORTER side = length (Y)
 	const getPocketWidth = (shape: string): number => {
 		if (shape === 'square') return squarePocketWidth;
 		if (shape === 'hex') return hexPocketWidth;
+		const custom = getCustomShape(shape);
+		if (custom) {
+			const w = custom.width + clearance * 2;
+			const l = custom.length + clearance * 2;
+			return Math.max(w, l);  // Longer side along X (parallel to tray length)
+		}
 		return circlePocketWidth;
 	};
 
 	const getPocketLength = (shape: string): number => {
 		if (shape === 'square') return squarePocketLength;
 		if (shape === 'hex') return hexPocketLength;
+		const custom = getCustomShape(shape);
+		if (custom) {
+			const w = custom.width + clearance * 2;
+			const l = custom.length + clearance * 2;
+			return Math.min(w, l);  // Shorter side along Y
+		}
 		return circlePocketLength;
+	};
+
+	// For lengthwise edge-loaded: longest dimension runs perpendicular to tray (along Y)
+	// This prevents the slot from receding too far into the tray depth
+	const getPocketLengthLengthwise = (shape: string): number => {
+		const custom = getCustomShape(shape);
+		if (custom) {
+			const w = custom.width + clearance * 2;
+			const l = custom.length + clearance * 2;
+			return Math.max(w, l);  // Longer side along Y (perpendicular to tray length)
+		}
+		return getPocketLength(shape);
+	};
+
+	// For lengthwise custom shapes: shorter dimension is height (longer runs along Y)
+	const getStandingHeightLengthwise = (shape: string): number => {
+		const custom = getCustomShape(shape);
+		if (custom) {
+			return Math.min(custom.width, custom.length);  // Shorter side is height
+		}
+		return getCounterStandingHeight(shape);
+	};
+
+	// For crosswise custom shapes: shorter dimension is height (longer runs along X)
+	const getStandingHeightCrosswise = (shape: string): number => {
+		const custom = getCustomShape(shape);
+		if (custom) {
+			return Math.min(custom.width, custom.length);  // Shorter side is height
+		}
+		return getCounterStandingHeight(shape);
 	};
 
 	const getMaxPocketDim = (shape: string): number =>
@@ -74,12 +125,20 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const getCounterWidth = (shape: string): number => {
 		if (shape === 'square') return squareWidth;
 		if (shape === 'hex') return hexPointyTop ? hexFlatToFlatBase : hexFlatToFlatBase / Math.cos(Math.PI / 6);
+		const custom = getCustomShape(shape);
+		if (custom) {
+			return Math.max(custom.width, custom.length);  // Longer side along X
+		}
 		return circleDiameterBase;
 	};
 
 	const getCounterLength = (shape: string): number => {
 		if (shape === 'square') return squareLength;
 		if (shape === 'hex') return hexPointyTop ? hexFlatToFlatBase / Math.cos(Math.PI / 6) : hexFlatToFlatBase;
+		const custom = getCustomShape(shape);
+		if (custom) {
+			return Math.min(custom.width, custom.length);  // Shorter side along Y
+		}
 		return circleDiameterBase;
 	};
 
@@ -87,52 +146,31 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const getCounterStandingHeight = (shape: string): number =>
 		Math.max(getCounterWidth(shape), getCounterLength(shape));
 
-	// Sort stacks by pocket size
-	const sortedStacks = [...stacks].sort((a, b) => {
-		const keyA = getMaxPocketDim(a[0]) * 10000 + a[1];
-		const keyB = getMaxPocketDim(b[0]) * 10000 + b[1];
-		return keyA - keyB;
-	});
-
-	// Always use 2 rows for top-loaded stacks
-	const numColumns = Math.ceil(sortedStacks.length / 2);
-
-	const getCount = (idx: number): number =>
-		idx < sortedStacks.length ? sortedStacks[idx][1] : 0;
-	const getPw = (idx: number): number =>
-		idx < sortedStacks.length ? getPocketWidth(sortedStacks[idx][0]) : 0;
-	const getPl = (idx: number): number =>
-		idx < sortedStacks.length ? getPocketLength(sortedStacks[idx][0]) : 0;
-
-	// Column widths (always 2 rows)
-	const columnWidths: number[] = [];
-	for (let col = 0; col < numColumns; col++) {
-		const idx1 = col * 2;
-		const idx2 = col * 2 + 1;
-		columnWidths.push(Math.max(getPw(idx1), getPw(idx2)));
+	// === TOP-LOADED STACK PLACEMENTS (greedy bin-packing) ===
+	interface TopLoadedPlacement {
+		shapeRef: string;
+		count: number;
+		pocketWidth: number;
+		pocketLength: number;
+		rowAssignment: 'front' | 'back';
+		xPosition: number;
 	}
 
-	// Row depths for top-loaded (always 2 rows)
-	let frontRowDepth = 0;
-	let backRowDepth = 0;
-	for (let col = 0; col < numColumns; col++) {
-		frontRowDepth = Math.max(frontRowDepth, getPl(col * 2));
-		const idx2 = col * 2 + 1;
-		if (idx2 < sortedStacks.length) {
-			backRowDepth = Math.max(backRowDepth, getPl(idx2));
-		}
-	}
+	// Sort top-loaded stacks by area (largest first for better packing)
+	const sortedStacks = [...stacks].map((s, i) => ({ stack: s, originalIndex: i }))
+		.sort((a, b) => {
+			const areaA = getPocketWidth(a.stack[0]) * getPocketLength(a.stack[0]);
+			const areaB = getPocketWidth(b.stack[0]) * getPocketLength(b.stack[0]);
+			return areaB - areaA; // Largest first
+		});
 
-	// Column heights (always 2 rows)
-	const columnHeight = (col: number): number => {
-		const idx1 = col * 2;
-		const idx2 = col * 2 + 1;
-		return Math.max(getCount(idx1), getCount(idx2)) * counterThickness;
-	};
+	const topLoadedPlacements: TopLoadedPlacement[] = [];
 
+	// Track max top-loaded stack height
 	let maxStackHeight = 0;
-	for (let col = 0; col < numColumns; col++) {
-		maxStackHeight = Math.max(maxStackHeight, columnHeight(col));
+	for (const { stack } of sortedStacks) {
+		const stackHeight = stack[1] * counterThickness;
+		maxStackHeight = Math.max(maxStackHeight, stackHeight);
 	}
 
 	// Edge-loaded stack calculations
@@ -159,19 +197,23 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 
 	if (edgeLoadedStacks && edgeLoadedStacks.length > 0) {
 		for (const stack of edgeLoadedStacks) {
-			const standingHeight = getCounterStandingHeight(stack[0]);
-			maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);
-
-			const pocketLength = getPocketLength(stack[0]);
 			const counterSpan = stack[1] * counterThickness + (stack[1] - 1) * clearance;
 			const orientation = stack[2] || 'auto';
 			const isLengthwise = orientation === 'lengthwise' || orientation === 'auto';
 
 			if (isLengthwise) {
-				lengthwiseSlots.push({ slotDepth: pocketLength, slotWidth: counterSpan });
+				// For custom shapes: longer side along Y (perpendicular to tray), shorter side is height
+				const standingHeight = getStandingHeightLengthwise(stack[0]);
+				maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);
+				const slotDepthDim = getPocketLengthLengthwise(stack[0]);
+				lengthwiseSlots.push({ slotDepth: slotDepthDim, slotWidth: counterSpan });
 			} else {
+				// For custom shapes: longer side along X (parallel to tray length), shorter side is height
+				const standingHeight = getStandingHeightCrosswise(stack[0]);
+				maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);
+				const slotWidthDim = getPocketWidth(stack[0]);  // Longer side along X
 				crosswiseMaxDepth = Math.max(crosswiseMaxDepth, counterSpan);
-				crosswiseSlots.push({ slotWidth: pocketLength, slotDepth: counterSpan });
+				crosswiseSlots.push({ slotWidth: slotWidthDim, slotDepth: counterSpan });
 			}
 		}
 	}
@@ -194,8 +236,8 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	}
 
 	// Calculate effective row depths (including lengthwise) - needed before crosswise bin-packing
-	let effectiveFrontRowDepth = frontRowDepth;
-	let effectiveBackRowDepth = backRowDepth;
+	let effectiveFrontRowDepth = 0;
+	let effectiveBackRowDepth = 0;
 	for (const slot of lengthwiseSlots) {
 		if (slot.rowAssignment === 'front') {
 			effectiveFrontRowDepth = Math.max(effectiveFrontRowDepth, slot.slotDepth);
@@ -256,21 +298,54 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	// Use the maximum of top-loaded and edge-loaded heights
 	const finalMaxStackHeight = Math.max(maxStackHeight, maxEdgeLoadedHeight);
 
-	// Tray dimensions
-	const sumTo = (arr: number[], idx: number): number =>
-		arr.slice(0, idx + 1).reduce((a, b) => a + b, 0);
-
 	// X offset where top-loaded stacks begin (after all edge-loaded)
 	const edgeLoadedEndX = crosswiseSlots.length > 0 ? crosswiseX : Math.max(frontRowX, backRowX);
 	const hasEdgeLoaded = (edgeLoadedStacks && edgeLoadedStacks.length > 0);
-	const topLoadedXStart = hasEdgeLoaded ? edgeLoadedEndX : wallThickness;
+	let topLoadedFrontX = hasEdgeLoaded ? edgeLoadedEndX : wallThickness;
+	let topLoadedBackX = hasEdgeLoaded ? edgeLoadedEndX : wallThickness;
+
+	// Greedy bin-packing for top-loaded stacks
+	for (const { stack } of sortedStacks) {
+		const [shapeRef, count] = stack;
+		const pw = getPocketWidth(shapeRef);
+		const pl = getPocketLength(shapeRef);
+
+		// Assign to row with less current X (greedy approach)
+		if (topLoadedFrontX <= topLoadedBackX) {
+			topLoadedPlacements.push({
+				shapeRef,
+				count,
+				pocketWidth: pw,
+				pocketLength: pl,
+				rowAssignment: 'front',
+				xPosition: topLoadedFrontX
+			});
+			topLoadedFrontX += pw + wallThickness;
+		} else {
+			topLoadedPlacements.push({
+				shapeRef,
+				count,
+				pocketWidth: pw,
+				pocketLength: pl,
+				rowAssignment: 'back',
+				xPosition: topLoadedBackX
+			});
+			topLoadedBackX += pw + wallThickness;
+		}
+	}
+
+	// Update effective row depths to include top-loaded stacks
+	for (const placement of topLoadedPlacements) {
+		if (placement.rowAssignment === 'front') {
+			effectiveFrontRowDepth = Math.max(effectiveFrontRowDepth, placement.pocketLength);
+		} else {
+			effectiveBackRowDepth = Math.max(effectiveBackRowDepth, placement.pocketLength);
+		}
+	}
 
 	// Tray length (X dimension)
-	// Top-loaded X span (columns + internal walls + right wall)
-	const topLoadedXSpan = numColumns > 0
-		? sumTo(columnWidths, numColumns - 1) + numColumns * wallThickness
-		: 0;
-	const trayLengthAuto = topLoadedXStart + topLoadedXSpan;
+	const topLoadedEndX = Math.max(topLoadedFrontX, topLoadedBackX);
+	const trayLengthAuto = topLoadedPlacements.length > 0 ? topLoadedEndX : edgeLoadedEndX;
 	const trayLength = trayLengthOverride > 0 ? trayLengthOverride : trayLengthAuto;
 
 	// Tray width (Y dimension) - always 2 rows
