@@ -198,10 +198,9 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	if (edgeLoadedStacks && edgeLoadedStacks.length > 0) {
 		for (const stack of edgeLoadedStacks) {
 			const counterSpan = stack[1] * counterThickness + (stack[1] - 1) * clearance;
-			const orientation = stack[2] || 'auto';
-			const isLengthwise = orientation === 'lengthwise' || orientation === 'auto';
+			const orientation = stack[2] || 'lengthwise';
 
-			if (isLengthwise) {
+			if (orientation === 'lengthwise') {
 				// For custom shapes: longer side along Y (perpendicular to tray), shorter side is height
 				const standingHeight = getStandingHeightLengthwise(stack[0]);
 				maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);

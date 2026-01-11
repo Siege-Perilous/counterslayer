@@ -5,7 +5,7 @@ const { subtract, union, intersect } = jscad.booleans;
 const { translate, rotateY, rotateZ, rotateX } = jscad.transforms;
 
 // Edge-loaded stack orientation
-export type EdgeOrientation = 'lengthwise' | 'crosswise' | 'auto';
+export type EdgeOrientation = 'lengthwise' | 'crosswise';
 
 // Edge-loaded stack definition: [shape, count, orientation?]
 export type EdgeLoadedStackDef = [string, number, EdgeOrientation?];
@@ -276,14 +276,8 @@ export function getCounterPositions(params: CounterTrayParams, targetHeight?: nu
 			const [shape, count, orientationPref] = edgeLoadedStacks[i];
 			const counterSpan = count * counterThickness + (count - 1) * clearance;
 
-			// Auto-determine orientation if needed
-			let orientation: 'lengthwise' | 'crosswise';
-			if (orientationPref === 'auto' || !orientationPref) {
-				// Prefer lengthwise for most cases
-				orientation = 'lengthwise';
-			} else {
-				orientation = orientationPref;
-			}
+			// Default to lengthwise if not specified
+			const orientation: 'lengthwise' | 'crosswise' = orientationPref || 'lengthwise';
 
 			if (orientation === 'lengthwise') {
 				// Lengthwise: counters stack along X (left to right), takes a row at front
@@ -792,13 +786,8 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 			const [shape, count, orientationPref] = edgeLoadedStacks[i];
 			const counterSpan = count * counterThickness + (count - 1) * clearance;
 
-			// Auto-determine orientation if needed
-			let orientation: 'lengthwise' | 'crosswise';
-			if (orientationPref === 'auto' || !orientationPref) {
-				orientation = 'lengthwise';
-			} else {
-				orientation = orientationPref;
-			}
+			// Default to lengthwise if not specified
+			const orientation: 'lengthwise' | 'crosswise' = orientationPref || 'lengthwise';
 
 			if (orientation === 'lengthwise') {
 				// Lengthwise: counters stack along X (left to right), takes a row at front

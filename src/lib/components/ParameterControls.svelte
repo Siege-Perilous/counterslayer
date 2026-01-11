@@ -15,7 +15,7 @@
 		...params.customShapes.map(s => `custom:${s.name}`)
 	]);
 
-	const orientationOptions: EdgeOrientation[] = ['auto', 'lengthwise', 'crosswise'];
+	const orientationOptions: EdgeOrientation[] = ['lengthwise', 'crosswise'];
 
 	// Get display name for a shape reference
 	function getShapeDisplayName(shapeRef: string): string {
@@ -119,7 +119,7 @@
 	}
 
 	function addEdgeLoadedStack() {
-		onchange({ ...params, edgeLoadedStacks: [...params.edgeLoadedStacks, ['square', 10, 'auto']] });
+		onchange({ ...params, edgeLoadedStacks: [...params.edgeLoadedStacks, ['square', 10, 'lengthwise']] });
 	}
 
 	function removeEdgeLoadedStack(index: number) {
@@ -451,7 +451,7 @@
 						class="w-16 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
 					/>
 					<select
-						value={stack[2] ?? 'auto'}
+						value={stack[2] ?? 'lengthwise'}
 						onchange={(e) => updateEdgeLoadedStack(index, 'orientation', e.currentTarget.value)}
 						class="w-24 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
 						title="Orientation"
