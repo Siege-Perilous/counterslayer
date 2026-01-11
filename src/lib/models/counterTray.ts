@@ -277,23 +277,7 @@ export function getCounterPositions(params: CounterTrayParams, targetHeight?: nu
 		}
 	}
 
-	// Crosswise slots start at max of both row X positions
-	let crosswiseX = Math.max(frontRowX, backRowX);
-	for (const slot of crosswiseSlots) {
-		(slot as EdgeLoadedSlot & { xPosition: number }).xPosition = crosswiseX;
-		crosswiseX += slot.slotWidth + wallThickness;
-	}
-
-	// Top-loaded stacks start after all edge-loaded
-	const edgeLoadedEndX = crosswiseSlots.length > 0 ? crosswiseX : Math.max(frontRowX, backRowX);
-	const topLoadedXStart = edgeLoadedSlots.length > 0 ? edgeLoadedEndX : wallThickness;
-
-	const columnXOffset = (col: number): number => {
-		if (col === 0) return topLoadedXStart;
-		return topLoadedXStart + sumTo(columnWidths, col - 1) + col * wallThickness;
-	};
-
-	// Calculate effective row depths (including lengthwise slots)
+	// Calculate effective row depths (including lengthwise slots) - needed before crosswise bin-packing
 	let effectiveFrontRowDepth = frontRowDepth;
 	let effectiveBackRowDepth = backRowDepth;
 	for (const slot of lengthwiseSlots) {
@@ -304,6 +288,73 @@ export function getCounterPositions(params: CounterTrayParams, targetHeight?: nu
 			effectiveBackRowDepth = Math.max(effectiveBackRowDepth, slot.slotDepth);
 		}
 	}
+
+	// === CROSSWISE SLOT BIN-PACKING ===
+	// Try to pair crosswise slots into columns (one at front, one at back) when they fit
+	interface CrosswiseColumnPreview {
+		frontSlot: EdgeLoadedSlot | null;
+		backSlot: EdgeLoadedSlot | null;
+		xPosition: number;
+		columnWidth: number;
+	}
+	const crosswiseColumnsPreview: CrosswiseColumnPreview[] = [];
+
+	// Sort crosswise by slotDepth (largest first) to improve packing
+	const sortedCrosswiseSlotsPreview = [...crosswiseSlots].sort((a, b) => b.slotDepth - a.slotDepth);
+
+	// Assign each crosswise slot to a column
+	for (const slot of sortedCrosswiseSlotsPreview) {
+		let placed = false;
+
+		// Try to fit in an existing column's back position
+		for (const col of crosswiseColumnsPreview) {
+			if (col.backSlot === null && col.frontSlot) {
+				// Check if combined depth fits
+				const combinedDepth = col.frontSlot.slotDepth + wallThickness + slot.slotDepth;
+				const availableDepth = effectiveFrontRowDepth + wallThickness + effectiveBackRowDepth;
+
+				if (combinedDepth <= availableDepth || availableDepth === 0) {
+					col.backSlot = slot;
+					col.columnWidth = Math.max(col.columnWidth, slot.slotWidth);
+					(slot as EdgeLoadedSlot & { rowAssignment: string }).rowAssignment = 'back';
+					placed = true;
+					break;
+				}
+			}
+		}
+
+		if (!placed) {
+			crosswiseColumnsPreview.push({
+				frontSlot: slot,
+				backSlot: null,
+				xPosition: 0,
+				columnWidth: slot.slotWidth
+			});
+			(slot as EdgeLoadedSlot & { rowAssignment: string }).rowAssignment = 'front';
+		}
+	}
+
+	// Assign X positions to crosswise columns
+	let crosswiseX = Math.max(frontRowX, backRowX);
+	for (const col of crosswiseColumnsPreview) {
+		col.xPosition = crosswiseX;
+		if (col.frontSlot) {
+			(col.frontSlot as EdgeLoadedSlot & { xPosition: number }).xPosition = crosswiseX;
+		}
+		if (col.backSlot) {
+			(col.backSlot as EdgeLoadedSlot & { xPosition: number }).xPosition = crosswiseX;
+		}
+		crosswiseX += col.columnWidth + wallThickness;
+	}
+
+	// Top-loaded stacks start after all edge-loaded
+	const edgeLoadedEndX = crosswiseSlots.length > 0 ? crosswiseX : Math.max(frontRowX, backRowX);
+	const topLoadedXStart = edgeLoadedSlots.length > 0 ? edgeLoadedEndX : wallThickness;
+
+	const columnXOffset = (col: number): number => {
+		if (col === 0) return topLoadedXStart;
+		return topLoadedXStart + sumTo(columnWidths, col - 1) + col * wallThickness;
+	};
 
 	// Calculate tray height from top-loaded stacks (always 2 rows)
 	const columnHeight = (col: number): number => {
@@ -365,17 +416,32 @@ export function getCounterPositions(params: CounterTrayParams, targetHeight?: nu
 		});
 	}
 
-	// Add crosswise edge-loaded stacks (using pre-calculated positions)
+	// Calculate tray width for back position calculation
+	const topLoadedTotalDepthPreview = effectiveFrontRowDepth + (effectiveBackRowDepth > 0 ? wallThickness + effectiveBackRowDepth : 0);
+	const trayWidthPreview = wallThickness + topLoadedTotalDepthPreview + wallThickness;
+
+	// Add crosswise edge-loaded stacks (using pre-calculated positions and row assignments)
 	for (let i = 0; i < crosswiseSlots.length; i++) {
 		const slot = crosswiseSlots[i];
 		const shape = slot.shape as 'square' | 'hex' | 'circle';
 		const pocketFloorZ = trayHeight - rimHeight - slot.standingHeight;
 		const slotXStart = (slot as EdgeLoadedSlot & { xPosition: number }).xPosition;
+		const rowAssignment = (slot as EdgeLoadedSlot & { rowAssignment: string }).rowAssignment;
+
+		// Calculate Y position based on row assignment
+		let slotYStart: number;
+		if (rowAssignment === 'back') {
+			// Back position: align to back of tray
+			slotYStart = trayWidthPreview - wallThickness - slot.slotDepth;
+		} else {
+			// Front position: start at front wall
+			slotYStart = wallThickness;
+		}
 
 		counterStacks.push({
 			shape,
 			x: slotXStart,
-			y: wallThickness,
+			y: slotYStart,
 			z: pocketFloorZ,
 			width: getCounterWidth(shape),
 			length: getCounterLength(shape),
@@ -519,9 +585,22 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 	const getMaxPocketDim = (shape: string): number =>
 		Math.max(getPocketWidth(shape), getPocketLength(shape));
 
-	// Standing height for edge-loaded counters
+	// Get actual counter dimensions (without clearance) for pocket depth calculations
+	const getCounterWidth = (shape: string): number => {
+		if (shape === 'square') return squareWidth;
+		if (shape === 'hex') return hexPointyTop ? hexFlatToFlatBase : hexFlatToFlatBase / Math.cos(Math.PI / 6);
+		return circleDiameterBase;
+	};
+
+	const getCounterLength = (shape: string): number => {
+		if (shape === 'square') return squareLength;
+		if (shape === 'hex') return hexPointyTop ? hexFlatToFlatBase / Math.cos(Math.PI / 6) : hexFlatToFlatBase;
+		return circleDiameterBase;
+	};
+
+	// Standing height for edge-loaded counters (actual counter size, not pocket size)
 	const getStandingHeight = (shape: string): number =>
-		Math.max(getPocketWidth(shape), getPocketLength(shape));
+		Math.max(getCounterWidth(shape), getCounterLength(shape));
 
 	// Calculate edge-loaded slot dimensions
 	interface EdgeLoadedSlot {
@@ -676,22 +755,85 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 		}
 	}
 
+	// Calculate the maximum depth needed for each row (including lengthwise) - needed before crosswise bin-packing
+	let effectiveFrontRowDepth = frontRowDepth;
+	let effectiveBackRowDepth = backRowDepth;
+	for (const slot of lengthwiseSlots) {
+		const assignment = (slot as EdgeLoadedSlot & { rowAssignment: string }).rowAssignment;
+		if (assignment === 'front') {
+			effectiveFrontRowDepth = Math.max(effectiveFrontRowDepth, slot.slotDepth);
+		} else {
+			effectiveBackRowDepth = Math.max(effectiveBackRowDepth, slot.slotDepth);
+		}
+	}
+
 	// After lengthwise, crosswise slots start at the max of both row X positions
 	let crosswiseXStart = Math.max(frontRowX, backRowX);
 
-	// Calculate crosswise total width and max depth
-	let crosswiseTotalWidth = 0;
-	let crosswiseMaxDepth = 0;
-	for (const slot of crosswiseSlots) {
-		crosswiseTotalWidth += slot.slotWidth + wallThickness;
-		crosswiseMaxDepth = Math.max(crosswiseMaxDepth, slot.slotDepth);
+	// === CROSSWISE SLOT BIN-PACKING ===
+	// Try to pair crosswise slots into columns (one at front, one at back) when they fit
+	// Track columns: each column has a front slot, optional back slot, and X position
+	interface CrosswiseColumn {
+		frontSlot: EdgeLoadedSlot | null;
+		backSlot: EdgeLoadedSlot | null;
+		xPosition: number;
+		columnWidth: number;  // Max slotWidth of front/back
+	}
+	const crosswiseColumns: CrosswiseColumn[] = [];
+
+	// Sort crosswise by slotDepth (largest first) to improve packing
+	const sortedCrosswiseSlots = [...crosswiseSlots].sort((a, b) => b.slotDepth - a.slotDepth);
+
+	// Assign each crosswise slot to a column
+	for (const slot of sortedCrosswiseSlots) {
+		let placed = false;
+
+		// Try to fit in an existing column's back position
+		for (const col of crosswiseColumns) {
+			if (col.backSlot === null && col.frontSlot) {
+				// Check if combined depth fits (front + wall + back ≤ available depth)
+				const combinedDepth = col.frontSlot.slotDepth + wallThickness + slot.slotDepth;
+				const availableDepth = effectiveFrontRowDepth + wallThickness + effectiveBackRowDepth;
+
+				if (combinedDepth <= availableDepth || availableDepth === 0) {
+					col.backSlot = slot;
+					col.columnWidth = Math.max(col.columnWidth, slot.slotWidth);
+					(slot as EdgeLoadedSlot & { rowAssignment: string }).rowAssignment = 'back';
+					placed = true;
+					break;
+				}
+			}
+		}
+
+		if (!placed) {
+			// Create new column with this slot at front
+			crosswiseColumns.push({
+				frontSlot: slot,
+				backSlot: null,
+				xPosition: 0,  // Will be assigned below
+				columnWidth: slot.slotWidth
+			});
+			(slot as EdgeLoadedSlot & { rowAssignment: string }).rowAssignment = 'front';
+		}
 	}
 
-	// Assign X positions to crosswise slots
+	// Assign X positions to crosswise columns
 	let crosswiseX = crosswiseXStart;
+	for (const col of crosswiseColumns) {
+		col.xPosition = crosswiseX;
+		if (col.frontSlot) {
+			(col.frontSlot as EdgeLoadedSlot & { xPosition: number }).xPosition = crosswiseX;
+		}
+		if (col.backSlot) {
+			(col.backSlot as EdgeLoadedSlot & { xPosition: number }).xPosition = crosswiseX;
+		}
+		crosswiseX += col.columnWidth + wallThickness;
+	}
+
+	// Calculate crosswise max depth (for validation)
+	let crosswiseMaxDepth = 0;
 	for (const slot of crosswiseSlots) {
-		(slot as EdgeLoadedSlot & { xPosition: number }).xPosition = crosswiseX;
-		crosswiseX += slot.slotWidth + wallThickness;
+		crosswiseMaxDepth = Math.max(crosswiseMaxDepth, slot.slotDepth);
 	}
 
 	// Top-loaded stacks start after all edge-loaded
@@ -712,18 +854,6 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 	// Tray length = edge-loaded width + top-loaded span
 	const trayLengthAuto = topLoadedXStart + topLoadedXSpan;
 	const trayLength = trayLengthOverride > 0 ? trayLengthOverride : trayLengthAuto;
-
-	// Calculate the maximum depth needed for each row (including lengthwise)
-	let effectiveFrontRowDepth = frontRowDepth;
-	let effectiveBackRowDepth = backRowDepth;
-	for (const slot of lengthwiseSlots) {
-		const assignment = (slot as EdgeLoadedSlot & { rowAssignment: string }).rowAssignment;
-		if (assignment === 'front') {
-			effectiveFrontRowDepth = Math.max(effectiveFrontRowDepth, slot.slotDepth);
-		} else {
-			effectiveBackRowDepth = Math.max(effectiveBackRowDepth, slot.slotDepth);
-		}
-	}
 
 	// Y positions for front and back rows
 	const frontRowYStart = wallThickness;
@@ -950,26 +1080,42 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 		);
 	}
 
-	// Process crosswise slots (using pre-calculated positions)
+	// Process crosswise slots (using pre-calculated positions and row assignments)
 	for (const slot of crosswiseSlots) {
 		const slotXStart = (slot as EdgeLoadedSlot & { xPosition: number }).xPosition;
+		const rowAssignment = (slot as EdgeLoadedSlot & { rowAssignment: string }).rowAssignment;
 
-		pocketCuts.push(createEdgeLoadedPocket(slot, slotXStart, wallThickness));
+		// Position based on row assignment
+		let slotYStart: number;
+		if (rowAssignment === 'back') {
+			// Back position: align to back of tray (end at trayWidth - wallThickness)
+			slotYStart = trayWidth - wallThickness - slot.slotDepth;
+		} else {
+			// Front position: start at front wall
+			slotYStart = wallThickness;
+		}
 
-		// Finger cutouts at front AND back tray edges
+		pocketCuts.push(createEdgeLoadedPocket(slot, slotXStart, slotYStart));
+
+		// Finger cutout at the tray edge nearest to this slot
 		const cutoutRadius = Math.min(cutoutMax, slot.slotWidth * cutoutRatio);
-		fingerCuts.push(
-			translate(
-				[slotXStart + slot.slotWidth / 2, 0, 0],
-				createFingerCutout(cutoutRadius)
-			)
-		);
-		fingerCuts.push(
-			translate(
-				[slotXStart + slot.slotWidth / 2, trayWidth, 0],
-				createFingerCutout(cutoutRadius)
-			)
-		);
+		if (rowAssignment === 'back') {
+			// Back slot: cutout at back edge
+			fingerCuts.push(
+				translate(
+					[slotXStart + slot.slotWidth / 2, trayWidth, 0],
+					createFingerCutout(cutoutRadius)
+				)
+			);
+		} else {
+			// Front slot: cutout at front edge
+			fingerCuts.push(
+				translate(
+					[slotXStart + slot.slotWidth / 2, 0, 0],
+					createFingerCutout(cutoutRadius)
+				)
+			);
+		}
 	}
 
 	// Top-loaded pockets (always 2 rows)

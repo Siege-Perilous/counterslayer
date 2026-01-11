@@ -70,9 +70,22 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const getMaxPocketDim = (shape: string): number =>
 		Math.max(getPocketWidth(shape), getPocketLength(shape));
 
-	// Get counter standing height (for edge-loaded stacks)
+	// Get actual counter dimensions (without clearance) for standing height
+	const getCounterWidth = (shape: string): number => {
+		if (shape === 'square') return squareWidth;
+		if (shape === 'hex') return hexPointyTop ? hexFlatToFlatBase : hexFlatToFlatBase / Math.cos(Math.PI / 6);
+		return circleDiameterBase;
+	};
+
+	const getCounterLength = (shape: string): number => {
+		if (shape === 'square') return squareLength;
+		if (shape === 'hex') return hexPointyTop ? hexFlatToFlatBase / Math.cos(Math.PI / 6) : hexFlatToFlatBase;
+		return circleDiameterBase;
+	};
+
+	// Get counter standing height (for edge-loaded stacks) - uses actual counter size, not pocket size
 	const getCounterStandingHeight = (shape: string): number =>
-		Math.max(getPocketWidth(shape), getPocketLength(shape));
+		Math.max(getCounterWidth(shape), getCounterLength(shape));
 
 	// Sort stacks by pocket size
 	const sortedStacks = [...stacks].sort((a, b) => {
@@ -136,8 +149,13 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		slotWidth: number;
 		rowAssignment?: 'front' | 'back';
 	}
+	interface CrosswiseSlot {
+		slotWidth: number;
+		slotDepth: number;
+		rowAssignment?: 'front' | 'back';
+	}
 	const lengthwiseSlots: LengthwiseSlot[] = [];
-	const crosswiseSlots: { slotWidth: number }[] = [];
+	const crosswiseSlots: CrosswiseSlot[] = [];
 
 	if (edgeLoadedStacks && edgeLoadedStacks.length > 0) {
 		for (const stack of edgeLoadedStacks) {
@@ -153,7 +171,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 				lengthwiseSlots.push({ slotDepth: pocketLength, slotWidth: counterSpan });
 			} else {
 				crosswiseMaxDepth = Math.max(crosswiseMaxDepth, counterSpan);
-				crosswiseSlots.push({ slotWidth: pocketLength });
+				crosswiseSlots.push({ slotWidth: pocketLength, slotDepth: counterSpan });
 			}
 		}
 	}
@@ -175,13 +193,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		}
 	}
 
-	// Crosswise slots start at max of both row X positions
-	let crosswiseX = Math.max(frontRowX, backRowX);
-	for (const slot of crosswiseSlots) {
-		crosswiseX += slot.slotWidth + wallThickness;
-	}
-
-	// Calculate effective row depths (including lengthwise)
+	// Calculate effective row depths (including lengthwise) - needed before crosswise bin-packing
 	let effectiveFrontRowDepth = frontRowDepth;
 	let effectiveBackRowDepth = backRowDepth;
 	for (const slot of lengthwiseSlots) {
@@ -190,6 +202,55 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		} else {
 			effectiveBackRowDepth = Math.max(effectiveBackRowDepth, slot.slotDepth);
 		}
+	}
+
+	// === CROSSWISE SLOT BIN-PACKING ===
+	// Try to pair crosswise slots into columns (one at front, one at back) when they fit
+	interface CrosswiseColumn {
+		frontSlot: CrosswiseSlot | null;
+		backSlot: CrosswiseSlot | null;
+		columnWidth: number;
+	}
+	const crosswiseColumns: CrosswiseColumn[] = [];
+
+	// Sort crosswise by slotDepth (largest first) to improve packing
+	const sortedCrosswiseSlots = [...crosswiseSlots].sort((a, b) => b.slotDepth - a.slotDepth);
+
+	// Assign each crosswise slot to a column
+	for (const slot of sortedCrosswiseSlots) {
+		let placed = false;
+
+		// Try to fit in an existing column's back position
+		for (const col of crosswiseColumns) {
+			if (col.backSlot === null && col.frontSlot) {
+				// Check if combined depth fits
+				const combinedDepth = col.frontSlot.slotDepth + wallThickness + slot.slotDepth;
+				const availableDepth = effectiveFrontRowDepth + wallThickness + effectiveBackRowDepth;
+
+				if (combinedDepth <= availableDepth || availableDepth === 0) {
+					col.backSlot = slot;
+					col.columnWidth = Math.max(col.columnWidth, slot.slotWidth);
+					slot.rowAssignment = 'back';
+					placed = true;
+					break;
+				}
+			}
+		}
+
+		if (!placed) {
+			crosswiseColumns.push({
+				frontSlot: slot,
+				backSlot: null,
+				columnWidth: slot.slotWidth
+			});
+			slot.rowAssignment = 'front';
+		}
+	}
+
+	// Calculate crosswise total width from columns
+	let crosswiseX = Math.max(frontRowX, backRowX);
+	for (const col of crosswiseColumns) {
+		crosswiseX += col.columnWidth + wallThickness;
 	}
 
 	// Use the maximum of top-loaded and edge-loaded heights
