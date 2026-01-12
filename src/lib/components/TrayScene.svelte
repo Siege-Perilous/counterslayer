@@ -207,7 +207,7 @@
 	// Exploded view offsets - lid slides out first, then trays lift
 	// Lid slides along longest dimension of box
 	let explodedOffset = $derived.by(() => {
-		if (!exploded) return { box: 0, trays: 0, lidY: 0, lidSlideX: 0, lidSlideZ: 0, slidesAlongX: false };
+		if (!exploded) return { box: 0, trays: 0, lidY: 0, lidSlideX: 0, lidSlideZ: 0, maxSlideX: 0, maxSlideZ: 0, slidesAlongX: false };
 		// Get box dimensions for positioning
 		const boxHeight = boxBounds ? (boxBounds.max.z - boxBounds.min.z) : 0;
 		const boxWidth = boxBounds ? (boxBounds.max.x - boxBounds.min.x) : 0;
@@ -226,7 +226,8 @@
 
 		// Lid slides out along longest dimension
 		const slideLength = slidesAlongX ? boxWidth : boxDepth;
-		const lidSlideDistance = (slideLength + boxHeight * 0.5) * slidePhase;
+		const maxSlideDistance = slideLength + boxHeight * 0.5;
+		const lidSlideDistance = maxSlideDistance * slidePhase;
 		const trayLiftDistance = boxHeight * liftPhase;
 
 		return {
@@ -235,6 +236,8 @@
 			lidY: boxHeight - lipHeight,
 			lidSlideX: slidesAlongX ? lidSlideDistance : 0,
 			lidSlideZ: slidesAlongX ? 0 : lidSlideDistance,
+			maxSlideX: slidesAlongX ? maxSlideDistance : 0,
+			maxSlideZ: slidesAlongX ? 0 : maxSlideDistance,
 			slidesAlongX
 		};
 	});
@@ -273,12 +276,22 @@
 			const lw = lidBounds.max.x - lidBounds.min.x;
 			const ld = lidBounds.max.y - lidBounds.min.y;
 			const slidesX = bw > bd;
+			const boundsOffsetX = boxBounds.min.x - lidBounds.min.x;
+			const boundsOffsetY = boxBounds.min.y - lidBounds.min.y;
 			console.log('=== Lid Debug ===');
-			console.log('boxWidth:', bw, 'boxDepth:', bd);
-			console.log('lidWidth:', lw, 'lidDepth:', ld);
+			console.log('boxBounds:', { min: { x: boxBounds.min.x.toFixed(2), y: boxBounds.min.y.toFixed(2) }, max: { x: boxBounds.max.x.toFixed(2), y: boxBounds.max.y.toFixed(2) } });
+			console.log('lidBounds:', { min: { x: lidBounds.min.x.toFixed(2), y: lidBounds.min.y.toFixed(2) }, max: { x: lidBounds.max.x.toFixed(2), y: lidBounds.max.y.toFixed(2) } });
+			console.log('boxWidth:', bw.toFixed(2), 'boxDepth:', bd.toFixed(2));
+			console.log('lidWidth:', lw.toFixed(2), 'lidDepth:', ld.toFixed(2));
+			console.log('boundsOffsetX:', boundsOffsetX.toFixed(2), 'boundsOffsetY:', boundsOffsetY.toFixed(2));
 			console.log('slidesAlongX:', slidesX);
-			console.log('meshOffset:', meshOffset);
-			console.log('explodedOffset:', explodedOffset);
+			console.log('meshOffset:', { x: meshOffset.x.toFixed(2), z: meshOffset.z.toFixed(2) });
+			console.log('explodedOffset:', {
+				lidSlideX: explodedOffset.lidSlideX.toFixed(2),
+				maxSlideX: explodedOffset.maxSlideX.toFixed(2),
+				lidSlideZ: explodedOffset.lidSlideZ.toFixed(2),
+				maxSlideZ: explodedOffset.maxSlideZ.toFixed(2)
+			});
 		}
 	});
 </script>
@@ -356,24 +369,30 @@
 	{@const lidWidth = lidBounds ? (lidBounds.max.x - lidBounds.min.x) : 0}
 	{@const lidHeight = lidBounds ? (lidBounds.max.z - lidBounds.min.z) : 0}
 	{@const lidDepth = lidBounds ? (lidBounds.max.y - lidBounds.min.y) : 0}
+	{@const lidMinX = lidBounds?.min.x ?? 0}
+	{@const lidMinY = lidBounds?.min.y ?? 0}
 	{@const boxWidth = boxBounds ? (boxBounds.max.x - boxBounds.min.x) : lidWidth}
 	{@const boxDepth = boxBounds ? (boxBounds.max.y - boxBounds.min.y) : lidDepth}
+	{@const boxMinX = boxBounds?.min.x ?? 0}
+	{@const boxMinY = boxBounds?.min.y ?? 0}
 	{@const slidesX = explodedOffset.slidesAlongX}
 	<!-- When exploded: position lid on top of box, then slide it off toward exit -->
-	<!-- After +90° X rotation, lid extends in +Z instead of -Z, so offset by -lidDepth -->
+	<!-- Account for geometry bounds offset (min.x/min.y may not be 0) -->
+	{@const boundsOffsetX = boxMinX - lidMinX}
+	{@const boundsOffsetY = boxMinY - lidMinY}
 	{@const lidPosX = showAllTrays && !exploded
 		? sidePositions.lid.x - lidWidth / 2
 		: (exploded
 			? (slidesX
-				? meshOffset.x + explodedOffset.lidSlideX
-				: meshOffset.x + lidWidth)  // After 180° Z rot, lid extends in -X, so add lidWidth
+				? meshOffset.x + explodedOffset.lidSlideX  // Start aligned, slide out in +X
+				: meshOffset.x + lidWidth)  // After 180° Z rot, lid extends in -X, so add lidWidth to align
 			: meshOffset.x)}
 	{@const lidPosZ = showAllTrays && !exploded
 		? sidePositions.lid.z
 		: (exploded
 			? (slidesX
-				? meshOffset.z - lidDepth  // +90° X rot flips Z direction
-				: meshOffset.z - lidDepth + explodedOffset.lidSlideZ)  // Slide in +Z direction
+				? meshOffset.z - lidDepth  // After +90° X rot, lid extends in +Z, so subtract lidDepth to align
+				: meshOffset.z - explodedOffset.lidSlideZ)  // After rotations, slide in -Z direction
 			: meshOffset.z)}
 	{@const lidRotZ = exploded
 		? (slidesX ? 0 : Math.PI)
