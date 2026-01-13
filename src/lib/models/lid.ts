@@ -158,16 +158,17 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	const trayAreaHeight = interior.height;
 
 	if (fillSolid) {
-		// SOLID FILL MODE: Fill all gaps with solid material
+		// SOLID FILL MODE: Fill width/depth gaps with solid material
+		// Height gaps are handled by floor spacers in trays, not ceiling fills
 
 		// East gap (width gap at high X)
 		if (widthGap > 0) {
 			const eastFill = cuboid({
-				size: [widthGap, extDepth - wall * 2, trayAreaHeight + heightGap],
+				size: [widthGap, extDepth - wall * 2, actualInteriorHeight],
 				center: [
 					trayAreaEndX + widthGap / 2,
 					extDepth / 2,
-					floor + (trayAreaHeight + heightGap) / 2
+					floor + actualInteriorHeight / 2
 				]
 			});
 			gapFills.push(eastFill);
@@ -176,27 +177,14 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		// North gap (depth gap at high Y) - don't overlap with east fill
 		if (depthGap > 0) {
 			const northFill = cuboid({
-				size: [minimums.minWidth - wall * 2, depthGap, trayAreaHeight + heightGap],
+				size: [minimums.minWidth - wall * 2, depthGap, actualInteriorHeight],
 				center: [
 					(minimums.minWidth - wall * 2) / 2 + wall,
 					trayAreaEndY + depthGap / 2,
-					floor + (trayAreaHeight + heightGap) / 2
+					floor + actualInteriorHeight / 2
 				]
 			});
 			gapFills.push(northFill);
-		}
-
-		// Ceiling above trays (height gap) - only over tray area, not already filled by east/north
-		if (heightGap > 0) {
-			const ceiling = cuboid({
-				size: [minimums.minWidth - wall * 2, minimums.minDepth - wall * 2, heightGap],
-				center: [
-					(minimums.minWidth - wall * 2) / 2 + wall,
-					(minimums.minDepth - wall * 2) / 2 + wall,
-					floor + trayAreaHeight + heightGap / 2
-				]
-			});
-			gapFills.push(ceiling);
 		}
 	} else {
 		// MINIMAL WALLS MODE: Just add thin walls to keep trays snug
@@ -275,7 +263,10 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		recess = subtract(outerRecess, innerWallKeep);
 	}
 
-	let result = subtract(outerBox, ...trayCavities, ...fillCells, recess);
+	// When fillSolid is true, don't subtract fillCells - leave them as solid material
+	let result = fillSolid
+		? subtract(outerBox, ...trayCavities, recess)
+		: subtract(outerBox, ...trayCavities, ...fillCells, recess);
 
 	// Add gap fills (solid pieces for custom box dimensions)
 	if (gapFills.length > 0) {
