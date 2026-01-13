@@ -1,7 +1,7 @@
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { Box, LidParams } from '$lib/types/project';
-import { arrangeTrays, getBoxInteriorDimensions } from './box';
+import { arrangeTrays, getBoxInteriorDimensions, calculateMinimumBoxDimensions } from './box';
 
 const { cuboid, roundedCuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
@@ -59,10 +59,21 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	const tolerance = box.tolerance;
 	const recessDepth = wall; // How deep the lid lip goes
 
-	// Box exterior at the base
-	const extWidth = interior.width + wall * 2;
-	const extDepth = interior.depth + wall * 2;
-	const extHeight = interior.height + floor; // No extra height - interior = tray height
+	// Calculate minimum (auto) dimensions
+	const minimums = calculateMinimumBoxDimensions(box);
+
+	// Box exterior dimensions (use custom if set, otherwise auto)
+	const extWidth = box.customWidth ?? minimums.minWidth;
+	const extDepth = box.customDepth ?? minimums.minDepth;
+	const extHeight = box.customHeight ?? minimums.minHeight;
+
+	// Calculate gaps for fill logic
+	const widthGap = extWidth - minimums.minWidth;  // Extra space at east (high X)
+	const depthGap = extDepth - minimums.minDepth;  // Extra space at north (high Y)
+	const heightGap = extHeight - minimums.minHeight;  // Extra space above trays
+
+	// Whether to fill gaps with solid material
+	const fillSolid = box.fillSolidEmpty ?? false;
 
 	// Inner wall dimensions (thinner wall that goes full height)
 	const innerWallThickness = wall / 2;
@@ -81,11 +92,14 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	// Find the widest tray to calculate fill areas
 	const maxTrayWidth = Math.max(...placements.map((p) => p.dimensions.width));
 
+	// Actual interior height (accounts for custom height)
+	const actualInteriorHeight = extHeight - floor;
+
 	for (const placement of placements) {
 		const pocketWidth = placement.dimensions.width + tolerance * 2;
 		const pocketDepth = placement.dimensions.depth + tolerance * 2;
 		// All pockets go to full interior height so trays sit flush at top
-		const pocketHeight = interior.height + 1;
+		const pocketHeight = actualInteriorHeight + 1;
 
 		// Position pocket: wall offset plus the tray's position
 		// Note: tolerance is already included in interior.width/depth, don't add it again here
@@ -121,7 +135,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			// Inset Y to leave wall between fill cell and adjacent tray pocket
 			const fillY = pocketY + wall;
 			const fillDepth = pocketDepth - wall;
-			const fillHeight = interior.height + 1;
+			const fillHeight = actualInteriorHeight + 1;
 
 			const fillCell = translate(
 				[fillX, fillY, floor],
@@ -131,6 +145,86 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 				})
 			);
 			fillCells.push(fillCell);
+		}
+	}
+
+	// 2c. Create gap fills for custom box dimensions
+	// Trays are anchored to origin corner - gaps appear at east (high X) and north (high Y)
+	const gapFills: Geom3[] = [];
+
+	// The tray area ends at the auto-calculated box interior + wall
+	const trayAreaEndX = minimums.minWidth - wall;  // Inner edge of east wall for auto-sized box
+	const trayAreaEndY = minimums.minDepth - wall;  // Inner edge of north wall for auto-sized box
+	const trayAreaHeight = interior.height;
+
+	if (fillSolid) {
+		// SOLID FILL MODE: Fill all gaps with solid material
+
+		// East gap (width gap at high X)
+		if (widthGap > 0) {
+			const eastFill = cuboid({
+				size: [widthGap, extDepth - wall * 2, trayAreaHeight + heightGap],
+				center: [
+					trayAreaEndX + widthGap / 2,
+					extDepth / 2,
+					floor + (trayAreaHeight + heightGap) / 2
+				]
+			});
+			gapFills.push(eastFill);
+		}
+
+		// North gap (depth gap at high Y) - don't overlap with east fill
+		if (depthGap > 0) {
+			const northFill = cuboid({
+				size: [minimums.minWidth - wall * 2, depthGap, trayAreaHeight + heightGap],
+				center: [
+					(minimums.minWidth - wall * 2) / 2 + wall,
+					trayAreaEndY + depthGap / 2,
+					floor + (trayAreaHeight + heightGap) / 2
+				]
+			});
+			gapFills.push(northFill);
+		}
+
+		// Ceiling above trays (height gap) - only over tray area, not already filled by east/north
+		if (heightGap > 0) {
+			const ceiling = cuboid({
+				size: [minimums.minWidth - wall * 2, minimums.minDepth - wall * 2, heightGap],
+				center: [
+					(minimums.minWidth - wall * 2) / 2 + wall,
+					(minimums.minDepth - wall * 2) / 2 + wall,
+					floor + trayAreaHeight + heightGap / 2
+				]
+			});
+			gapFills.push(ceiling);
+		}
+	} else {
+		// MINIMAL WALLS MODE: Just add thin walls to keep trays snug
+
+		// East wall (keeps trays from sliding toward high X)
+		if (widthGap > wall) {
+			const eastWall = cuboid({
+				size: [wall, interior.depth, actualInteriorHeight],
+				center: [
+					wall + interior.width + wall / 2,  // Just past tray area
+					wall + interior.depth / 2,
+					floor + actualInteriorHeight / 2
+				]
+			});
+			gapFills.push(eastWall);
+		}
+
+		// North wall (keeps trays from sliding toward high Y)
+		if (depthGap > wall) {
+			const northWall = cuboid({
+				size: [interior.width, wall, actualInteriorHeight],
+				center: [
+					wall + interior.width / 2,
+					wall + interior.depth + wall / 2,  // Just past tray area
+					floor + actualInteriorHeight / 2
+				]
+			});
+			gapFills.push(northWall);
 		}
 	}
 
@@ -146,9 +240,16 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	});
 
 	// Keep the inner wall portion (don't cut this part)
+	// Position at origin corner where trays are anchored
+	const innerWallKeepWidth = interior.width + innerWallThickness * 2;
+	const innerWallKeepDepth = interior.depth + innerWallThickness * 2;
 	const innerWallKeep = cuboid({
-		size: [interior.width + innerWallThickness * 2, interior.depth + innerWallThickness * 2, recessHeight + 1],
-		center: [extWidth / 2, extDepth / 2, extHeight - recessHeight / 2]
+		size: [innerWallKeepWidth, innerWallKeepDepth, recessHeight + 1],
+		center: [
+			wall - innerWallThickness + innerWallKeepWidth / 2,
+			wall - innerWallThickness + innerWallKeepDepth / 2,
+			extHeight - recessHeight / 2
+		]
 	});
 
 	// For sliding lid, extend the entry wall to full height (no recess on entry side)
@@ -175,6 +276,11 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	}
 
 	let result = subtract(outerBox, ...trayCavities, ...fillCells, recess);
+
+	// Add gap fills (solid pieces for custom box dimensions)
+	if (gapFills.length > 0) {
+		result = union(result, ...gapFills);
+	}
 
 	// 4. Add snap grooves if enabled
 	// These are grooves cut into the outer surface of the inner wall
@@ -499,9 +605,12 @@ export function createLid(box: Box): Geom3 | null {
 	const snapBumpWidth = box.lidParams?.snapBumpWidth ?? 4.0;
 	const railEngagement = box.lidParams?.railEngagement ?? 0.5;
 
-	// Lid exterior matches box exterior
-	const extWidth = interior.width + wall * 2;
-	const extDepth = interior.depth + wall * 2;
+	// Calculate minimum (auto) dimensions
+	const minimums = calculateMinimumBoxDimensions(box);
+
+	// Lid exterior matches box exterior (uses custom dimensions if set)
+	const extWidth = box.customWidth ?? minimums.minWidth;
+	const extDepth = box.customDepth ?? minimums.minDepth;
 
 	// Total lid height = 2× wall thickness
 	const lidHeight = wall * 2;
@@ -519,9 +628,13 @@ export function createLid(box: Box): Geom3 | null {
 	const cavityWidth = interior.width + innerWallThickness * 2 + clearance * 2;
 	const cavityDepth = interior.depth + innerWallThickness * 2 + clearance * 2;
 
+	// Position cavity at origin corner to match box's inner wall
+	const cavityCenterX = wall - innerWallThickness - clearance + cavityWidth / 2;
+	const cavityCenterY = wall - innerWallThickness - clearance + cavityDepth / 2;
+
 	const cavity = cuboid({
 		size: [cavityWidth, cavityDepth, lipHeight + 1],
-		center: [extWidth / 2, extDepth / 2, lidHeight - lipHeight / 2 + 0.5]
+		center: [cavityCenterX, cavityCenterY, lidHeight - lipHeight / 2 + 0.5]
 	});
 
 	let lid = subtract(solid, cavity);

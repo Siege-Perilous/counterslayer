@@ -99,7 +99,8 @@ function generateStackColor(index: number): string {
 }
 
 // Calculate counter positions for preview rendering
-export function getCounterPositions(params: CounterTrayParams, targetHeight?: number): CounterStack[] {
+export function getCounterPositions(params: CounterTrayParams, targetHeight?: number, floorSpacerHeight?: number): CounterStack[] {
+	const spacerOffset = floorSpacerHeight ?? 0;
 	const {
 		squareWidth,
 		squareLength,
@@ -526,7 +527,7 @@ export function getCounterPositions(params: CounterTrayParams, targetHeight?: nu
 			customShapeName: customName,
 			x: slotXStart,
 			y: slotYStart,
-			z: pocketFloorZ,
+			z: pocketFloorZ + spacerOffset,
 			width: getCounterWidthLengthwise(slot.shape),
 			length: getCounterLengthLengthwise(slot.shape),
 			thickness: counterThickness,
@@ -572,7 +573,7 @@ export function getCounterPositions(params: CounterTrayParams, targetHeight?: nu
 			customShapeName: customName,
 			x: slotXStart,
 			y: slotYStart,
-			z: pocketFloorZ,
+			z: pocketFloorZ + spacerOffset,
 			width: counterWidth,
 			length: counterLength,
 			thickness: counterThickness,
@@ -610,7 +611,7 @@ export function getCounterPositions(params: CounterTrayParams, targetHeight?: nu
 			customShapeName: customName,
 			x: xCenter,
 			y: yCenter,
-			z: pocketFloorZ,
+			z: pocketFloorZ + spacerOffset,
 			width: getCounterWidth(placement.shapeRef),
 			length: getCounterLength(placement.shapeRef),
 			thickness: counterThickness,
@@ -623,7 +624,7 @@ export function getCounterPositions(params: CounterTrayParams, targetHeight?: nu
 	return counterStacks;
 }
 
-export function createCounterTray(params: CounterTrayParams, trayName?: string, targetHeight?: number) {
+export function createCounterTray(params: CounterTrayParams, trayName?: string, targetHeight?: number, floorSpacerHeight?: number) {
 	const {
 		squareWidth,
 		squareLength,
@@ -1062,16 +1063,20 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 	// Base tray height from this tray's stacks
 	const baseTrayHeight = floorThickness + maxStackHeight + rimHeight;
 	// If targetHeight provided, use it (increases rim to match tallest tray in box)
-	const trayHeight = targetHeight && targetHeight > baseTrayHeight ? targetHeight : baseTrayHeight;
+	const trayHeightWithoutSpacer = targetHeight && targetHeight > baseTrayHeight ? targetHeight : baseTrayHeight;
+	// Total tray height including floor spacer (if any)
+	const spacerHeight = floorSpacerHeight ?? 0;
+	const trayHeight = trayHeightWithoutSpacer + spacerHeight;
 	// Effective rim height may be taller to reach target
-	const effectiveRimHeight = trayHeight - floorThickness - maxStackHeight;
+	const effectiveRimHeight = trayHeightWithoutSpacer - floorThickness - maxStackHeight;
 
 	// Extra tray area
 	const extraTrayLength = trayLength > trayLengthAuto ? trayLength - trayLengthAuto : 0;
 	const extraTrayStartX = trayLengthAuto;
 	const extraTrayInnerWidth = trayWidth - 2 * wallThickness;
 	const extraTrayInnerLength = extraTrayLength - wallThickness;
-	const extraTrayDepth = trayHeight - floorThickness;
+	// Extra tray depth should not include the spacer - it's the usable depth from the tray surface
+	const extraTrayDepth = trayHeightWithoutSpacer - floorThickness;
 
 	// Cutout radius for a shape
 	const getCutoutRadius = (shape: string): number =>
@@ -1236,7 +1241,7 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 				const yPos = wallThickness + row * (cellLength + wallThickness);
 
 				cells.push(
-					translate([xPos, yPos, floorThickness], createScoopableCell(cellWidth, cellLength, extraTrayDepth))
+					translate([xPos, yPos, spacerHeight + floorThickness], createScoopableCell(cellWidth, cellLength, extraTrayDepth))
 				);
 			}
 		}
@@ -1403,5 +1408,6 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 
 	const extraCells = createExtraTrayArea();
 
+	// The tray body now includes the spacer height, and pockets are cut at the correct Z positions
 	return subtract(trayBody, ...pocketCuts, ...fingerCuts, ...extraCells);
 }

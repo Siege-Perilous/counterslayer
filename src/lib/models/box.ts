@@ -21,6 +21,24 @@ export interface TrayPlacement {
 	y: number;
 }
 
+export interface BoxMinimumDimensions {
+	minWidth: number;   // Minimum exterior X
+	minDepth: number;   // Minimum exterior Y
+	minHeight: number;  // Minimum exterior Z
+}
+
+export interface ValidationResult {
+	valid: boolean;
+	errors: string[];
+	minimums: BoxMinimumDimensions;
+}
+
+export interface TraySpacerInfo {
+	trayId: string;
+	placement: TrayPlacement;
+	floorSpacerHeight: number;  // Additional solid material under tray floor
+}
+
 // Calculate tray dimensions from params (same logic as counterTray.ts)
 export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const {
@@ -541,16 +559,72 @@ export function createBox(box: Box): Geom3 | null {
 	return result;
 }
 
-// Get box exterior dimensions
-export function getBoxDimensions(box: Box): TrayDimensions | null {
-	if (box.trays.length === 0) return null;
+// Calculate minimum required exterior dimensions for a box
+export function calculateMinimumBoxDimensions(box: Box): BoxMinimumDimensions {
+	if (box.trays.length === 0) {
+		return { minWidth: 0, minDepth: 0, minHeight: 0 };
+	}
 
 	const placements = arrangeTrays(box.trays);
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
 	return {
-		width: interior.width + box.wallThickness * 2,
-		depth: interior.depth + box.wallThickness * 2,
-		height: interior.height + box.floorThickness
+		minWidth: interior.width + box.wallThickness * 2,
+		minDepth: interior.depth + box.wallThickness * 2,
+		minHeight: interior.height + box.floorThickness
+	};
+}
+
+// Validate custom dimensions against minimum requirements
+export function validateCustomDimensions(box: Box): ValidationResult {
+	const minimums = calculateMinimumBoxDimensions(box);
+	const errors: string[] = [];
+
+	if (box.customWidth !== undefined && box.customWidth < minimums.minWidth) {
+		errors.push(`Custom width (${box.customWidth.toFixed(1)}mm) is smaller than minimum required (${minimums.minWidth.toFixed(1)}mm)`);
+	}
+	if (box.customDepth !== undefined && box.customDepth < minimums.minDepth) {
+		errors.push(`Custom depth (${box.customDepth.toFixed(1)}mm) is smaller than minimum required (${minimums.minDepth.toFixed(1)}mm)`);
+	}
+	if (box.customHeight !== undefined && box.customHeight < minimums.minHeight) {
+		errors.push(`Custom height (${box.customHeight.toFixed(1)}mm) is smaller than minimum required (${minimums.minHeight.toFixed(1)}mm)`);
+	}
+
+	return {
+		valid: errors.length === 0,
+		errors,
+		minimums
+	};
+}
+
+// Calculate floor spacer heights for each tray to fill height gaps
+export function calculateTraySpacers(box: Box): TraySpacerInfo[] {
+	if (box.trays.length === 0) return [];
+
+	const placements = arrangeTrays(box.trays);
+	const minimums = calculateMinimumBoxDimensions(box);
+
+	// Target exterior height (custom or auto)
+	const targetExteriorHeight = box.customHeight ?? minimums.minHeight;
+	const extraHeight = Math.max(0, targetExteriorHeight - minimums.minHeight);
+
+	// Each tray gets the same floor spacer (keeps all trays flush at top)
+	return placements.map(placement => ({
+		trayId: placement.tray.id,
+		placement,
+		floorSpacerHeight: extraHeight
+	}));
+}
+
+// Get box exterior dimensions (uses custom dimensions when set)
+export function getBoxDimensions(box: Box): TrayDimensions | null {
+	if (box.trays.length === 0) return null;
+
+	const minimums = calculateMinimumBoxDimensions(box);
+
+	return {
+		width: box.customWidth ?? minimums.minWidth,
+		depth: box.customDepth ?? minimums.minDepth,
+		height: box.customHeight ?? minimums.minHeight
 	};
 }

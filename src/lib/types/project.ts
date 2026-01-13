@@ -31,6 +31,12 @@ export interface Box {
 	wallThickness: number;
 	floorThickness: number;
 	lidParams: LidParams;
+	// Custom exterior dimensions (undefined = auto-size)
+	customWidth?: number;      // Exterior X dimension
+	customDepth?: number;      // Exterior Y dimension
+	customHeight?: number;     // Exterior Z dimension
+	// Gap-filling behavior
+	fillSolidEmpty?: boolean;  // false = walls only (default), true = solid fill
 }
 
 export interface Project {

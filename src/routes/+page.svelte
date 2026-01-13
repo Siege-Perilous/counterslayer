@@ -3,7 +3,7 @@
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { createCounterTray, getCounterPositions, type CounterStack } from '$lib/models/counterTray';
 	import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
-	import { arrangeTrays, type TrayPlacement } from '$lib/models/box';
+	import { arrangeTrays, validateCustomDimensions, calculateTraySpacers, type TrayPlacement } from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 	import { exportStl } from '$lib/utils/exportStl';
 	import { initProject, getSelectedTray, getSelectedBox, getProject, importProject } from '$lib/stores/project.svelte';
@@ -110,27 +110,44 @@ import type { Project } from '$lib/types/project';
 		await new Promise((resolve) => setTimeout(resolve, 10));
 
 		try {
+			// Validate custom dimensions before generation
+			const validation = validateCustomDimensions(box);
+			if (!validation.valid) {
+				error = validation.errors.join('; ');
+				generating = false;
+				return;
+			}
+
 			// Generate all trays with their placements
 			const placements = arrangeTrays(box.trays);
+
+			// Calculate floor spacers for each tray (for custom box height)
+			const spacerInfo = calculateTraySpacers(box);
 
 			// Calculate max height so all trays are normalized to box interior height
 			const maxHeight = Math.max(...placements.map((p) => p.dimensions.height));
 
-			// Generate selected tray at box height (all trays in a box share the same height)
-			jscadSelectedTray = createCounterTray(tray.params, tray.name, maxHeight);
-			selectedTrayGeometry = jscadToBufferGeometry(jscadSelectedTray);
-			selectedTrayCounters = getCounterPositions(tray.params, maxHeight);
+			// Find spacer for selected tray
+			const selectedSpacer = spacerInfo.find(s => s.trayId === tray.id);
+			const selectedSpacerHeight = selectedSpacer?.floorSpacerHeight ?? 0;
 
-			// Generate all trays at box height
+			// Generate selected tray at box height (all trays in a box share the same height)
+			jscadSelectedTray = createCounterTray(tray.params, tray.name, maxHeight, selectedSpacerHeight);
+			selectedTrayGeometry = jscadToBufferGeometry(jscadSelectedTray);
+			selectedTrayCounters = getCounterPositions(tray.params, maxHeight, selectedSpacerHeight);
+
+			// Generate all trays at box height with floor spacers
 			allTrayGeometries = placements.map((placement) => {
-				const jscadGeom = createCounterTray(placement.tray.params, placement.tray.name, maxHeight);
+				const spacer = spacerInfo.find(s => s.trayId === placement.tray.id);
+				const spacerHeight = spacer?.floorSpacerHeight ?? 0;
+				const jscadGeom = createCounterTray(placement.tray.params, placement.tray.name, maxHeight, spacerHeight);
 				return {
 					trayId: placement.tray.id,
 					name: placement.tray.name,
 					geometry: jscadToBufferGeometry(jscadGeom),
 					jscadGeom,
 					placement,
-					counterStacks: getCounterPositions(placement.tray.params, maxHeight)
+					counterStacks: getCounterPositions(placement.tray.params, maxHeight, spacerHeight)
 				};
 			});
 
