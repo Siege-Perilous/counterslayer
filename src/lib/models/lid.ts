@@ -228,9 +228,11 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	});
 
 	// Keep the inner wall portion (don't cut this part)
-	// Position at origin corner where trays are anchored
-	const innerWallKeepWidth = interior.width + innerWallThickness * 2;
-	const innerWallKeepDepth = interior.depth + innerWallThickness * 2;
+	// Use actual box interior (custom exterior minus walls), not just tray area
+	const actualInteriorWidth = extWidth - wall * 2;
+	const actualInteriorDepth = extDepth - wall * 2;
+	const innerWallKeepWidth = actualInteriorWidth + innerWallThickness * 2;
+	const innerWallKeepDepth = actualInteriorDepth + innerWallThickness * 2;
 	const innerWallKeep = cuboid({
 		size: [innerWallKeepWidth, innerWallKeepDepth, recessHeight + 1],
 		center: [
@@ -292,9 +294,9 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		// Position groove at BOTTOM of recess area (more material above for strength)
 		const notchZ = extHeight - wall + grooveHeight / 2;
 
-		// Inner wall dimensions (same as innerWallKeep)
-		const innerWallWidth = interior.width + innerWallThickness * 2;
-		const innerWallDepth = interior.depth + innerWallThickness * 2;
+		// Inner wall dimensions - use actual box interior, not just tray area
+		const innerWallWidth = actualInteriorWidth + innerWallThickness * 2;
+		const innerWallDepth = actualInteriorDepth + innerWallThickness * 2;
 
 		const grooves: Geom3[] = [];
 
@@ -616,8 +618,11 @@ export function createLid(box: Box): Geom3 | null {
 
 	// 2. Subtract cavity from TOP (matches box's inner wall size + clearance)
 	// This leaves the flat plate at bottom and short walls around the edges
-	const cavityWidth = interior.width + innerWallThickness * 2 + clearance * 2;
-	const cavityDepth = interior.depth + innerWallThickness * 2 + clearance * 2;
+	// Use actual box interior (custom exterior minus walls), not just tray area
+	const actualInteriorWidth = extWidth - wall * 2;
+	const actualInteriorDepth = extDepth - wall * 2;
+	const cavityWidth = actualInteriorWidth + innerWallThickness * 2 + clearance * 2;
+	const cavityDepth = actualInteriorDepth + innerWallThickness * 2 + clearance * 2;
 
 	// Position cavity at origin corner to match box's inner wall
 	const cavityCenterX = wall - innerWallThickness - clearance + cavityWidth / 2;
