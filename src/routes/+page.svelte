@@ -7,7 +7,7 @@
 	import { arrangeTrays, validateCustomDimensions, calculateTraySpacers, type TrayPlacement } from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 	import { exportStl } from '$lib/utils/exportStl';
-	import { initProject, getSelectedTray, getSelectedBox, getProject, importProject } from '$lib/stores/project.svelte';
+	import { initProject, getSelectedTray, getSelectedBox, getProject, importProject, resetProject } from '$lib/stores/project.svelte';
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
 	import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -253,6 +253,12 @@
 		}
 	});
 
+	function handleReset() {
+		if (confirm('Reset project to defaults? This will delete all boxes and trays.')) {
+			resetProject();
+		}
+	}
+
 	const viewModes: { mode: ViewMode; label: string }[] = [
 		{ mode: 'tray', label: 'Tray' },
 		{ mode: 'box', label: 'Box' },
@@ -336,6 +342,19 @@
 				<!-- Bottom toolbar -->
 				<div class="absolute bottom-4 left-4 right-4 flex items-center justify-between">
 					<div class="flex gap-2">
+						<button
+							onclick={regenerate}
+							disabled={generating}
+							class="rounded bg-blue-600 px-3 py-2 text-sm font-medium transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{generating ? 'Generating...' : 'Regenerate'}
+						</button>
+						<button
+							onclick={handleReset}
+							class="rounded bg-gray-700 px-3 py-2 text-sm hover:bg-gray-600"
+						>
+							Reset
+						</button>
 						<input
 							bind:this={jsonFileInput}
 							type="file"
@@ -347,13 +366,13 @@
 							onclick={() => jsonFileInput.click()}
 							class="rounded bg-gray-700 px-3 py-2 text-sm hover:bg-gray-600"
 						>
-							Import JSON
+							Import
 						</button>
 						<button
 							onclick={handleExportJson}
 							class="rounded bg-gray-700 px-3 py-2 text-sm hover:bg-gray-600"
 						>
-							Export JSON
+							Export
 						</button>
 					</div>
 

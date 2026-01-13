@@ -242,8 +242,8 @@
 		};
 	});
 
-	// Tray colors for visual distinction
-	const trayColors = ['#4a9eff', '#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8'];
+	// Tray colors for visual distinction - varied hues for easier differentiation
+	const trayColors = ['#f97316', '#06b6d4', '#ec4899', '#eab308', '#8b5cf6', '#10b981'];
 
 	// Debug logging
 	$effect(() => {
@@ -360,7 +360,7 @@
 		position.y={0}
 		position.z={meshOffset.z}
 	>
-		<T.MeshStandardMaterial color="#4a9eff" roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
+		<T.MeshStandardMaterial color="#f97316" roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
 	</T.Mesh>
 {/if}
 
