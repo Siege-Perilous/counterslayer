@@ -24,10 +24,10 @@
 		"@jscad/stl-serializer": "^2.1.17",
 		"@threlte/core": "^8.0.0",
 		"@threlte/extras": "^9.0.0",
+		"paneforge": "^1.0.2",
 		"three": "^0.170.0"
 	},
 	"devDependencies": {
-		"@types/three": "^0.170.0",
 		"@eslint/compat": "^1.4.0",
 		"@eslint/js": "^9.39.1",
 		"@libsql/client": "^0.15.15",
@@ -39,6 +39,7 @@
 		"@tailwindcss/typography": "^0.5.19",
 		"@tailwindcss/vite": "^4.1.17",
 		"@types/node": "^22",
+		"@types/three": "^0.170.0",
 		"drizzle-kit": "^0.31.8",
 		"drizzle-orm": "^0.45.0",
 		"eslint": "^9.39.1",

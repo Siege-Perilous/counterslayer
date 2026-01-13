@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { PaneGroup, Pane, PaneResizer } from 'paneforge';
 	import {
 		getProject,
 		getSelectedBox,
@@ -12,20 +13,13 @@
 		updateBox,
 		updateTray,
 		updateTrayParams,
-		resetProject,
 		type Box,
 		type Tray
 	} from '$lib/stores/project.svelte';
-	import ParameterControls from './ParameterControls.svelte';
-	import BoxControls from './BoxControls.svelte';
+	import GlobalsPanel from './GlobalsPanel.svelte';
+	import BoxesPanel from './BoxesPanel.svelte';
+	import TraysPanel from './TraysPanel.svelte';
 	import type { CounterTrayParams } from '$lib/models/counterTray';
-
-	interface Props {
-		onRegenerate: () => void;
-		generating: boolean;
-	}
-
-	let { onRegenerate, generating }: Props = $props();
 
 	let project = $derived(getProject());
 	let selectedBox = $derived(getSelectedBox());
@@ -65,141 +59,88 @@
 		}
 	}
 
+	function handleTrayUpdate(updates: Partial<Omit<Tray, 'id'>>) {
+		if (selectedTray) {
+			updateTray(selectedTray.id, updates);
+		}
+	}
+
 	function handleParamsChange(newParams: CounterTrayParams) {
 		if (selectedTray) {
 			updateTrayParams(selectedTray.id, newParams);
 		}
 	}
-
-	function handleTrayNameChange(e: Event) {
-		const input = e.target as HTMLInputElement;
-		if (selectedTray) {
-			updateTray(selectedTray.id, { name: input.value });
-		}
-	}
-
-	function handleReset() {
-		if (confirm('Reset project to defaults? This will delete all boxes and trays.')) {
-			resetProject();
-		}
-	}
 </script>
 
-<aside class="flex w-80 flex-col border-r border-gray-700 bg-gray-800">
-	<header class="border-b border-gray-700 p-4">
-		<h1 class="text-lg font-bold">Counter Tray Generator</h1>
-		<p class="text-xs text-gray-400">Parametric wargame counter trays</p>
-	</header>
-
-	<!-- Box/Tray Navigation -->
-	<div class="border-b border-gray-700 p-2">
-		<div class="mb-2 flex items-center justify-between px-2">
-			<span class="text-xs font-medium uppercase text-gray-400">Boxes</span>
-			<button
-				onclick={handleAddBox}
-				class="rounded bg-gray-700 px-2 py-1 text-xs hover:bg-gray-600"
-			>
-				+ New Box
-			</button>
-		</div>
-
-		<div class="max-h-48 space-y-1 overflow-y-auto">
-			{#each project.boxes as box (box.id)}
-				<div class="rounded bg-gray-750">
-					<!-- Box header -->
-					<div
-						class="flex cursor-pointer items-center justify-between rounded px-2 py-1.5 {selectedBox?.id === box.id ? 'bg-blue-600' : 'hover:bg-gray-700'}"
-						onclick={() => handleSelectBox(box)}
-						role="button"
-						tabindex="0"
-						onkeydown={(e) => e.key === 'Enter' && handleSelectBox(box)}
-					>
-						<span class="text-sm font-medium">{box.name}</span>
-						<div class="flex gap-1">
-							<button
-								onclick={(e) => { e.stopPropagation(); handleAddTray(box.id); }}
-								class="rounded px-1.5 text-xs text-gray-400 hover:bg-gray-600 hover:text-white"
-								title="Add tray"
-							>
-								+
-							</button>
-							{#if project.boxes.length > 1}
-								<button
-									onclick={(e) => { e.stopPropagation(); handleDeleteBox(box.id); }}
-									class="rounded px-1.5 text-xs text-gray-400 hover:bg-red-600 hover:text-white"
-									title="Delete box"
-								>
-									&times;
-								</button>
-							{/if}
-						</div>
+<aside class="h-full w-full bg-gray-800">
+	<!-- Resizable Panels -->
+	<div class="h-full w-full overflow-hidden">
+		<PaneGroup direction="horizontal" class="h-full">
+			<!-- Globals Panel -->
+			<Pane defaultSize={30} minSize={20} class="h-full overflow-hidden">
+				<div class="flex h-full flex-col border-r border-gray-700">
+					<div class="flex items-center justify-between border-b border-gray-600 bg-gray-750 px-3 py-1.5">
+						<span class="text-xs font-semibold uppercase tracking-wide text-gray-300">Globals</span>
 					</div>
-
-					<!-- Trays list -->
-					{#if selectedBox?.id === box.id}
-						<div class="border-t border-gray-700 py-1 pl-4">
-							{#each box.trays as tray (tray.id)}
-								<div
-									class="flex cursor-pointer items-center justify-between rounded px-2 py-1 text-sm {selectedTray?.id === tray.id ? 'bg-gray-600' : 'hover:bg-gray-700'}"
-									onclick={() => handleSelectTray(tray)}
-									role="button"
-									tabindex="0"
-									onkeydown={(e) => e.key === 'Enter' && handleSelectTray(tray)}
-								>
-									<span>{tray.name}</span>
-									{#if box.trays.length > 1}
-										<button
-											onclick={(e) => { e.stopPropagation(); handleDeleteTray(box.id, tray.id); }}
-											class="rounded px-1.5 text-xs text-gray-400 hover:bg-red-600 hover:text-white"
-											title="Delete tray"
-										>
-											&times;
-										</button>
-									{/if}
-								</div>
-							{/each}
-						</div>
-					{/if}
+					<div class="flex-1 overflow-y-auto">
+						{#if selectedTray}
+							<GlobalsPanel params={selectedTray.params} onchange={handleParamsChange} />
+						{:else}
+							<div class="p-3 text-center text-xs text-gray-500">Select a tray to edit globals</div>
+						{/if}
+					</div>
 				</div>
-			{/each}
-		</div>
+			</Pane>
+
+			<PaneResizer class="group relative flex w-1.5 items-center justify-center bg-gray-700 hover:bg-gray-600">
+				<div class="h-8 w-0.5 rounded-full bg-gray-500 group-hover:bg-gray-400"></div>
+			</PaneResizer>
+
+			<!-- Boxes Panel -->
+			<Pane defaultSize={35} minSize={20} class="h-full overflow-hidden">
+				<div class="flex h-full flex-col border-r border-gray-700">
+					<div class="flex items-center justify-between border-b border-gray-600 bg-gray-750 px-3 py-1.5">
+						<span class="text-xs font-semibold uppercase tracking-wide text-gray-300">Boxes</span>
+					</div>
+					<div class="flex-1 overflow-hidden">
+						<BoxesPanel
+							{project}
+							{selectedBox}
+							onSelectBox={handleSelectBox}
+							onAddBox={handleAddBox}
+							onDeleteBox={handleDeleteBox}
+							onUpdateBox={handleBoxUpdate}
+						/>
+					</div>
+				</div>
+			</Pane>
+
+			<PaneResizer class="group relative flex w-1.5 items-center justify-center bg-gray-700 hover:bg-gray-600">
+				<div class="h-8 w-0.5 rounded-full bg-gray-500 group-hover:bg-gray-400"></div>
+			</PaneResizer>
+
+			<!-- Trays Panel -->
+			<Pane defaultSize={35} minSize={20} class="h-full overflow-hidden">
+				<div class="flex h-full flex-col">
+					<div class="flex items-center justify-between border-b border-gray-600 bg-gray-750 px-3 py-1.5">
+						<span class="text-xs font-semibold uppercase tracking-wide text-gray-300">
+							Trays {#if selectedBox}within {selectedBox.name}{/if}
+						</span>
+					</div>
+					<div class="flex-1 overflow-hidden">
+						<TraysPanel
+							{selectedBox}
+							{selectedTray}
+							onSelectTray={handleSelectTray}
+							onAddTray={handleAddTray}
+							onDeleteTray={handleDeleteTray}
+							onUpdateTray={handleTrayUpdate}
+							onUpdateParams={handleParamsChange}
+						/>
+					</div>
+				</div>
+			</Pane>
+		</PaneGroup>
 	</div>
 
-	<!-- Box/Tray Settings -->
-	<div class="flex-1 overflow-y-auto">
-		{#if selectedBox && selectedTray}
-			<div class="border-b border-gray-700">
-				<BoxControls box={selectedBox} onchange={handleBoxUpdate} />
-			</div>
-			<ParameterControls
-				params={selectedTray.params}
-				onchange={handleParamsChange}
-				trayName={selectedTray.name}
-				onTrayNameChange={(name) => updateTray(selectedTray.id, { name })}
-			/>
-		{:else if selectedBox}
-			<BoxControls box={selectedBox} onchange={handleBoxUpdate} />
-		{:else}
-			<div class="p-4 text-center text-gray-400">
-				<p>No box selected</p>
-			</div>
-		{/if}
-	</div>
-
-	<!-- Action buttons -->
-	<footer class="space-y-2 border-t border-gray-700 p-4">
-		<button
-			onclick={onRegenerate}
-			disabled={generating}
-			class="w-full rounded bg-blue-600 px-4 py-2 font-medium transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-		>
-			{generating ? 'Generating...' : 'Regenerate'}
-		</button>
-		<button
-			onclick={handleReset}
-			class="w-full rounded bg-gray-700 px-4 py-2 text-sm text-gray-300 transition hover:bg-gray-600"
-		>
-			Reset Project
-		</button>
-	</footer>
 </aside>

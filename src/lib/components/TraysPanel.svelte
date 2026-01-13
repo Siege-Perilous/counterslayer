@@ -1,0 +1,340 @@
+<script lang="ts">
+	import type { Box, Tray } from '$lib/types/project';
+	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
+
+	interface Props {
+		selectedBox: Box | null;
+		selectedTray: Tray | null;
+		onSelectTray: (tray: Tray) => void;
+		onAddTray: (boxId: string) => void;
+		onDeleteTray: (boxId: string, trayId: string) => void;
+		onUpdateTray: (updates: Partial<Omit<Tray, 'id'>>) => void;
+		onUpdateParams: (params: CounterTrayParams) => void;
+	}
+
+	let { selectedBox, selectedTray, onSelectTray, onAddTray, onDeleteTray, onUpdateTray, onUpdateParams }: Props = $props();
+
+	const builtinShapes = ['square', 'hex', 'circle'] as const;
+	let shapeOptions = $derived([
+		...builtinShapes,
+		...(selectedTray?.params.customShapes.map(s => `custom:${s.name}`) ?? [])
+	]);
+
+	const orientationOptions: EdgeOrientation[] = ['lengthwise', 'crosswise'];
+
+	function getShapeDisplayName(shapeRef: string): string {
+		if (shapeRef.startsWith('custom:')) {
+			return shapeRef.substring(7);
+		}
+		return shapeRef;
+	}
+
+	function updateParam<K extends keyof CounterTrayParams>(key: K, value: CounterTrayParams[K]) {
+		if (selectedTray) {
+			onUpdateParams({ ...selectedTray.params, [key]: value });
+		}
+	}
+
+	// Top-loaded stack handlers
+	function updateTopLoadedStack(index: number, field: 'shape' | 'count', value: string | number) {
+		if (!selectedTray) return;
+		const newStacks = [...selectedTray.params.topLoadedStacks];
+		if (field === 'shape') {
+			newStacks[index] = [value as string, newStacks[index][1]];
+		} else {
+			newStacks[index] = [newStacks[index][0], value as number];
+		}
+		onUpdateParams({ ...selectedTray.params, topLoadedStacks: newStacks });
+	}
+
+	function addTopLoadedStack() {
+		if (!selectedTray) return;
+		onUpdateParams({ ...selectedTray.params, topLoadedStacks: [...selectedTray.params.topLoadedStacks, ['square', 10]] });
+	}
+
+	function removeTopLoadedStack(index: number) {
+		if (!selectedTray) return;
+		const newStacks = selectedTray.params.topLoadedStacks.filter((_, i) => i !== index);
+		onUpdateParams({ ...selectedTray.params, topLoadedStacks: newStacks });
+	}
+
+	// Edge-loaded stack handlers
+	function updateEdgeLoadedStack(index: number, field: 'shape' | 'count' | 'orientation', value: string | number) {
+		if (!selectedTray) return;
+		const newStacks = [...selectedTray.params.edgeLoadedStacks];
+		const current = newStacks[index];
+		if (field === 'shape') {
+			newStacks[index] = [value as string, current[1], current[2]];
+		} else if (field === 'count') {
+			newStacks[index] = [current[0], value as number, current[2]];
+		} else {
+			newStacks[index] = [current[0], current[1], value as EdgeOrientation];
+		}
+		onUpdateParams({ ...selectedTray.params, edgeLoadedStacks: newStacks });
+	}
+
+	function addEdgeLoadedStack() {
+		if (!selectedTray) return;
+		onUpdateParams({ ...selectedTray.params, edgeLoadedStacks: [...selectedTray.params.edgeLoadedStacks, ['square', 10, 'lengthwise']] });
+	}
+
+	function removeEdgeLoadedStack(index: number) {
+		if (!selectedTray) return;
+		const newStacks = selectedTray.params.edgeLoadedStacks.filter((_, i) => i !== index);
+		onUpdateParams({ ...selectedTray.params, edgeLoadedStacks: newStacks });
+	}
+</script>
+
+<div class="flex h-full flex-col overflow-hidden">
+	<!-- Tray List -->
+	{#if selectedBox}
+		<div class="border-b border-gray-700 p-2">
+			<div class="mb-2 flex items-center justify-between px-1">
+				<span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Trays</span>
+				<button
+					onclick={() => onAddTray(selectedBox.id)}
+					class="rounded bg-gray-700 px-2 py-0.5 text-xs hover:bg-gray-600"
+				>
+					+ New
+				</button>
+			</div>
+			<div class="max-h-24 space-y-1 overflow-y-auto">
+				{#each selectedBox.trays as tray (tray.id)}
+					<div
+						class="flex cursor-pointer items-center justify-between rounded px-2 py-1 text-sm {selectedTray?.id === tray.id ? 'bg-blue-600' : 'hover:bg-gray-700'}"
+						onclick={() => onSelectTray(tray)}
+						role="button"
+						tabindex="0"
+						onkeydown={(e) => e.key === 'Enter' && onSelectTray(tray)}
+					>
+						<span class="truncate">{tray.name}</span>
+						{#if selectedBox.trays.length > 1}
+							<button
+								onclick={(e) => { e.stopPropagation(); onDeleteTray(selectedBox.id, tray.id); }}
+								class="ml-2 rounded px-1 text-xs text-gray-400 hover:bg-red-600 hover:text-white"
+								title="Delete tray"
+							>
+								&times;
+							</button>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
+
+	<!-- Tray Settings -->
+	{#if selectedTray}
+		<div class="flex-1 space-y-4 overflow-y-auto p-3">
+			<!-- Name -->
+			<label class="block">
+				<span class="mb-1 block text-xs text-gray-400">Name</span>
+				<input
+					type="text"
+					value={selectedTray.name}
+					onchange={(e) => onUpdateTray({ name: (e.currentTarget as HTMLInputElement).value })}
+					class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+				/>
+			</label>
+
+			<!-- Tray Settings -->
+			<section>
+				<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Settings</h3>
+				<div class="grid grid-cols-2 gap-2">
+					<label class="block">
+						<span class="text-xs text-gray-400">Clearance</span>
+						<input
+							type="number"
+							step="0.1"
+							value={selectedTray.params.clearance}
+							onchange={(e) => updateParam('clearance', parseFloat(e.currentTarget.value))}
+							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+						/>
+					</label>
+					<label class="block">
+						<span class="text-xs text-gray-400">Wall</span>
+						<input
+							type="number"
+							step="0.1"
+							value={selectedTray.params.wallThickness}
+							onchange={(e) => updateParam('wallThickness', parseFloat(e.currentTarget.value))}
+							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+						/>
+					</label>
+					<label class="block">
+						<span class="text-xs text-gray-400">Floor</span>
+						<input
+							type="number"
+							step="0.1"
+							value={selectedTray.params.floorThickness}
+							onchange={(e) => updateParam('floorThickness', parseFloat(e.currentTarget.value))}
+							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+						/>
+					</label>
+					<label class="block">
+						<span class="text-xs text-gray-400">Rim</span>
+						<input
+							type="number"
+							step="0.1"
+							value={selectedTray.params.rimHeight}
+							onchange={(e) => updateParam('rimHeight', parseFloat(e.currentTarget.value))}
+							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+						/>
+					</label>
+					<label class="block">
+						<span class="text-xs text-gray-400">Cutout %</span>
+						<input
+							type="number"
+							step="0.05"
+							min="0"
+							max="1"
+							value={selectedTray.params.cutoutRatio}
+							onchange={(e) => updateParam('cutoutRatio', parseFloat(e.currentTarget.value))}
+							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+						/>
+					</label>
+					<label class="block">
+						<span class="text-xs text-gray-400">Cutout Max</span>
+						<input
+							type="number"
+							step="1"
+							value={selectedTray.params.cutoutMax}
+							onchange={(e) => updateParam('cutoutMax', parseFloat(e.currentTarget.value))}
+							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+						/>
+					</label>
+				</div>
+			</section>
+
+			<!-- Tray Override -->
+			<section>
+				<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Override</h3>
+				<div class="grid grid-cols-2 gap-2">
+					<label class="col-span-2 block">
+						<span class="text-xs text-gray-400">Length (0 = auto)</span>
+						<input
+							type="number"
+							step="1"
+							value={selectedTray.params.trayLengthOverride}
+							onchange={(e) => updateParam('trayLengthOverride', parseFloat(e.currentTarget.value))}
+							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+						/>
+					</label>
+					<label class="block">
+						<span class="text-xs text-gray-400">Extra Cols</span>
+						<input
+							type="number"
+							step="1"
+							min="1"
+							value={selectedTray.params.extraTrayCols}
+							onchange={(e) => updateParam('extraTrayCols', parseInt(e.currentTarget.value))}
+							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+						/>
+					</label>
+					<label class="block">
+						<span class="text-xs text-gray-400">Extra Rows</span>
+						<input
+							type="number"
+							step="1"
+							min="1"
+							value={selectedTray.params.extraTrayRows}
+							onchange={(e) => updateParam('extraTrayRows', parseInt(e.currentTarget.value))}
+							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+						/>
+					</label>
+				</div>
+			</section>
+
+			<!-- Top-Loaded Stacks -->
+			<section>
+				<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Top-Loaded Stacks</h3>
+				<div class="space-y-1">
+					{#each selectedTray.params.topLoadedStacks as stack, index}
+						<div class="flex items-center gap-1">
+							<select
+								value={stack[0]}
+								onchange={(e) => updateTopLoadedStack(index, 'shape', e.currentTarget.value)}
+								class="flex-1 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+							>
+								{#each shapeOptions as shapeOpt}
+									<option value={shapeOpt}>{getShapeDisplayName(shapeOpt)}</option>
+								{/each}
+							</select>
+							<input
+								type="number"
+								min="1"
+								value={stack[1]}
+								onchange={(e) => updateTopLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
+								class="w-14 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+							/>
+							<button
+								onclick={() => removeTopLoadedStack(index)}
+								class="rounded px-1.5 py-1 text-red-400 hover:bg-red-900/30"
+							>
+								&times;
+							</button>
+						</div>
+					{/each}
+					<button
+						onclick={addTopLoadedStack}
+						class="w-full rounded border border-dashed border-gray-600 px-2 py-1 text-xs text-gray-400 hover:border-gray-500 hover:text-gray-300"
+					>
+						+ Add Stack
+					</button>
+				</div>
+			</section>
+
+			<!-- Edge-Loaded Stacks -->
+			<section>
+				<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Edge-Loaded Stacks</h3>
+				<div class="space-y-1">
+					{#each selectedTray.params.edgeLoadedStacks as stack, index}
+						<div class="flex items-center gap-1">
+							<select
+								value={stack[0]}
+								onchange={(e) => updateEdgeLoadedStack(index, 'shape', e.currentTarget.value)}
+								class="flex-1 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+							>
+								{#each shapeOptions as shapeOpt}
+									<option value={shapeOpt}>{getShapeDisplayName(shapeOpt)}</option>
+								{/each}
+							</select>
+							<input
+								type="number"
+								min="1"
+								value={stack[1]}
+								onchange={(e) => updateEdgeLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
+								class="w-12 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+							/>
+							<select
+								value={stack[2] ?? 'lengthwise'}
+								onchange={(e) => updateEdgeLoadedStack(index, 'orientation', e.currentTarget.value)}
+								class="w-20 rounded border-gray-600 bg-gray-700 px-1 py-1 text-xs"
+							>
+								{#each orientationOptions as orientation}
+									<option value={orientation}>{orientation.slice(0, 6)}</option>
+								{/each}
+							</select>
+							<button
+								onclick={() => removeEdgeLoadedStack(index)}
+								class="rounded px-1.5 py-1 text-red-400 hover:bg-red-900/30"
+							>
+								&times;
+							</button>
+						</div>
+					{/each}
+					<button
+						onclick={addEdgeLoadedStack}
+						class="w-full rounded border border-dashed border-gray-600 px-2 py-1 text-xs text-gray-400 hover:border-gray-500 hover:text-gray-300"
+					>
+						+ Add Stack
+					</button>
+				</div>
+			</section>
+		</div>
+	{:else}
+		<div class="flex flex-1 items-center justify-center p-4 text-gray-500">
+			<p class="text-sm">No tray selected</p>
+		</div>
+	{/if}
+</div>
