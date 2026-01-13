@@ -4,9 +4,11 @@
 	interface Props {
 		params: CounterTrayParams;
 		onchange: (params: CounterTrayParams) => void;
+		trayName?: string;
+		onTrayNameChange?: (name: string) => void;
 	}
 
-	let { params, onchange }: Props = $props();
+	let { params, onchange, trayName, onTrayNameChange }: Props = $props();
 
 	// Shape options: built-in + custom shapes
 	const builtinShapes = ['square', 'hex', 'circle'] as const;
@@ -129,6 +131,23 @@
 </script>
 
 <div class="space-y-6 overflow-y-auto p-4">
+	{#if trayName !== undefined && onTrayNameChange}
+		<section>
+			<h3 class="mb-3 border-b border-gray-700 pb-1 text-sm font-semibold text-gray-300">
+				Tray Name
+			</h3>
+			<label class="block">
+				<span class="text-xs text-gray-400">Name (shown on tray bottom and box floor)</span>
+				<input
+					type="text"
+					value={trayName}
+					onchange={(e) => onTrayNameChange(e.currentTarget.value)}
+					class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+				/>
+			</label>
+		</section>
+	{/if}
+
 	<section>
 		<h3 class="mb-3 border-b border-gray-700 pb-1 text-sm font-semibold text-gray-300">
 			Counter Dimensions

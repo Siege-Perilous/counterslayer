@@ -2,7 +2,11 @@ import jscad from '@jscad/modeling';
 
 const { cuboid, cylinder, roundedCuboid, sphere } = jscad.primitives;
 const { subtract, union, intersect } = jscad.booleans;
-const { translate, rotateY, rotateZ, rotateX } = jscad.transforms;
+const { translate, rotateY, rotateZ, rotateX, scale, mirrorY } = jscad.transforms;
+const { vectorText } = jscad.text;
+const { path2 } = jscad.geometries;
+const { expand } = jscad.expansions;
+const { extrudeLinear } = jscad.extrusions;
 
 // Edge-loaded stack orientation
 export type EdgeOrientation = 'lengthwise' | 'crosswise';
@@ -1409,5 +1413,66 @@ export function createCounterTray(params: CounterTrayParams, trayName?: string, 
 	const extraCells = createExtraTrayArea();
 
 	// The tray body now includes the spacer height, and pockets are cut at the correct Z positions
-	return subtract(trayBody, ...pocketCuts, ...fingerCuts, ...extraCells);
+	let result = subtract(trayBody, ...pocketCuts, ...fingerCuts, ...extraCells);
+
+	// Emboss tray name on bottom (Z=0 face)
+	if (trayName && trayName.trim().length > 0) {
+		const textDepth = 0.6;
+		const strokeWidth = 1.2;
+		const textHeightParam = 6;
+		const margin = wallThickness * 2;
+
+		const textSegments = vectorText({ height: textHeightParam, align: 'center' }, trayName.trim().toUpperCase());
+
+		if (textSegments.length > 0) {
+			const textShapes: ReturnType<typeof extrudeLinear>[] = [];
+			for (const segment of textSegments) {
+				if (segment.length >= 2) {
+					const pathObj = path2.fromPoints({ closed: false }, segment);
+					const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 32 }, pathObj);
+					const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
+					textShapes.push(extruded);
+				}
+			}
+
+			if (textShapes.length > 0) {
+				let minX = Infinity, maxX = -Infinity;
+				let minY = Infinity, maxY = -Infinity;
+				for (const segment of textSegments) {
+					for (const point of segment) {
+						minX = Math.min(minX, point[0]);
+						maxX = Math.max(maxX, point[0]);
+						minY = Math.min(minY, point[1]);
+						maxY = Math.max(maxY, point[1]);
+					}
+				}
+				const textWidthCalc = maxX - minX + strokeWidth;
+				const textHeightY = maxY - minY + strokeWidth;
+
+				// Fit text along tray length (X axis)
+				const availableWidth = trayLength - margin * 2;
+				const availableDepth = trayWidth - margin * 2;
+				const scaleX = Math.min(1, availableWidth / textWidthCalc);
+				const scaleY = Math.min(1, availableDepth / textHeightY);
+				const textScale = Math.min(scaleX, scaleY);
+
+				const centerX = trayLength / 2;
+				const centerY = trayWidth / 2;
+				const textCenterX = (minX + maxX) / 2;
+				const textCenterY = (minY + maxY) / 2;
+
+				let combinedText = union(...textShapes);
+				// Mirror Y so text reads correctly when tray is flipped
+				combinedText = mirrorY(combinedText);
+
+				const positionedText = translate(
+					[centerX - textCenterX * textScale, centerY + textCenterY * textScale, -0.1],
+					scale([textScale, textScale, 1], combinedText)
+				);
+				result = subtract(result, positionedText);
+			}
+		}
+	}
+
+	return result;
 }

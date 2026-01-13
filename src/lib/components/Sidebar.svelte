@@ -10,6 +10,7 @@
 		addTray,
 		deleteTray,
 		updateBox,
+		updateTray,
 		updateTrayParams,
 		resetProject,
 		type Box,
@@ -67,6 +68,13 @@
 	function handleParamsChange(newParams: CounterTrayParams) {
 		if (selectedTray) {
 			updateTrayParams(selectedTray.id, newParams);
+		}
+	}
+
+	function handleTrayNameChange(e: Event) {
+		const input = e.target as HTMLInputElement;
+		if (selectedTray) {
+			updateTray(selectedTray.id, { name: input.value });
 		}
 	}
 
@@ -163,7 +171,12 @@
 			<div class="border-b border-gray-700">
 				<BoxControls box={selectedBox} onchange={handleBoxUpdate} />
 			</div>
-			<ParameterControls params={selectedTray.params} onchange={handleParamsChange} />
+			<ParameterControls
+				params={selectedTray.params}
+				onchange={handleParamsChange}
+				trayName={selectedTray.name}
+				onTrayNameChange={(name) => updateTray(selectedTray.id, { name })}
+			/>
 		{:else if selectedBox}
 			<BoxControls box={selectedBox} onchange={handleBoxUpdate} />
 		{:else}

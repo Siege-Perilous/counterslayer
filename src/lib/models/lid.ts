@@ -526,7 +526,12 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	}
 
 	// 5. Add poke holes at the center of each tray position for easy removal
+	// Also add tray name labels to the left of each hole
 	const POKE_HOLE_DIAMETER = 20;
+	const labelTextDepth = 0.6;
+	const labelStrokeWidth = 1.0;
+	const labelTextHeight = 5;
+
 	for (const p of placements) {
 		// Calculate center of tray in box coordinates
 		const centerX = wall + tolerance + p.x + p.dimensions.width / 2;
@@ -541,6 +546,63 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			})
 		);
 		result = subtract(result, hole);
+
+		// Add tray name label to the left of the hole
+		if (p.tray.name && p.tray.name.trim().length > 0) {
+			const textSegments = vectorText({ height: labelTextHeight, align: 'center' }, p.tray.name.trim().toUpperCase());
+
+			if (textSegments.length > 0) {
+				const textShapes: Geom3[] = [];
+				for (const segment of textSegments) {
+					if (segment.length >= 2) {
+						const pathObj = path2.fromPoints({ closed: false }, segment);
+						const expanded = expand({ delta: labelStrokeWidth / 2, corners: 'round', segments: 32 }, pathObj);
+						const extruded = extrudeLinear({ height: labelTextDepth + 0.1 }, expanded);
+						textShapes.push(extruded);
+					}
+				}
+
+				if (textShapes.length > 0) {
+					let minX = Infinity, maxX = -Infinity;
+					let minY = Infinity, maxY = -Infinity;
+					for (const segment of textSegments) {
+						for (const point of segment) {
+							minX = Math.min(minX, point[0]);
+							maxX = Math.max(maxX, point[0]);
+							minY = Math.min(minY, point[1]);
+							maxY = Math.max(maxY, point[1]);
+						}
+					}
+					const textWidthCalc = maxX - minX + labelStrokeWidth;
+					const textHeightY = maxY - minY + labelStrokeWidth;
+
+					// Available space to the left of the hole
+					const holeLeftEdge = centerX - POKE_HOLE_DIAMETER / 2;
+					const trayLeftEdge = wall + tolerance + p.x;
+					const availableWidth = holeLeftEdge - trayLeftEdge - wall;
+
+					if (availableWidth > 10) {
+						// Scale text to fit
+						const textScale = Math.min(1, Math.min(availableWidth / textWidthCalc, (p.dimensions.depth - wall * 2) / textHeightY));
+						const textCenterX = (minX + maxX) / 2;
+						const textCenterY = (minY + maxY) / 2;
+
+						// Position text centered in the space left of the hole
+						const labelX = trayLeftEdge + availableWidth / 2;
+						const labelY = centerY;
+
+						let combinedText: Geom3 = union(...textShapes);
+
+						// Position on inner floor surface (Z = floor), cutting down into the floor
+						const positionedText = translate(
+							[labelX - textCenterX * textScale, labelY - textCenterY * textScale, floor - labelTextDepth],
+							scale([textScale, textScale, 1], combinedText)
+						);
+						result = subtract(result, positionedText);
+					}
+				}
+			}
+		}
 	}
 
 	return result;
