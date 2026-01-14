@@ -88,12 +88,26 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	// Each tray gets its own form-fitting pocket with tolerance
 	const trayCavities: Geom3[] = [];
 	const fillCells: Geom3[] = [];
+	const backWalls: Geom3[] = [];  // Walls at back of shorter trays in mixed-depth rows
 
 	// Find the widest tray to calculate fill areas
 	const maxTrayWidth = Math.max(...placements.map((p) => p.dimensions.width));
 
 	// Actual interior height (accounts for custom height)
 	const actualInteriorHeight = extHeight - floor;
+
+	console.log('=== BOX CAVITY DEBUG ===');
+	console.log('Wall thickness:', wall, 'Tolerance:', tolerance);
+	console.log('Max tray width:', maxTrayWidth);
+
+	// Group placements by row (same Y position)
+	const rowMap = new Map<number, typeof placements>();
+	for (const p of placements) {
+		const row = rowMap.get(p.y) || [];
+		row.push(p);
+		rowMap.set(p.y, row);
+	}
+	console.log('Rows:', Array.from(rowMap.keys()).sort((a, b) => a - b));
 
 	for (const placement of placements) {
 		const pocketWidth = placement.dimensions.width + tolerance * 2;
@@ -105,6 +119,8 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		// Note: tolerance is already included in interior.width/depth, don't add it again here
 		const pocketX = wall + placement.x;
 		const pocketY = wall + placement.y;
+
+		console.log(`Tray "${placement.tray.name}": pos=(${placement.x.toFixed(1)}, ${placement.y.toFixed(1)}) dim=(${placement.dimensions.width.toFixed(1)} x ${placement.dimensions.depth.toFixed(1)}) pocket=(${pocketX.toFixed(1)}, ${pocketY.toFixed(1)}) size=(${pocketWidth.toFixed(1)} x ${pocketDepth.toFixed(1)}) Y:[${pocketY.toFixed(1)}-${(pocketY + pocketDepth).toFixed(1)}]`);
 
 		const cavity = cuboid({
 			size: [pocketWidth, pocketDepth, pocketHeight],
@@ -128,23 +144,32 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			other.x >= trayEndX  // To the right of this tray
 		);
 
+		console.log(`  spaceRemaining=${spaceRemaining.toFixed(1)}, hasNeighborToRight=${hasNeighborToRight}`);
+
 		if (spaceRemaining > wall && !hasNeighborToRight) {
 			// Fill cell: X from (tray pocket end + wall) to (where widest pocket ends)
 			const fillWidth = spaceRemaining - wall;
 			const fillX = pocketX + pocketWidth + wall;
 			// Inset Y to leave wall between fill cell and adjacent tray pocket
 			const fillY = pocketY + wall;
-			const fillDepth = pocketDepth - wall;
+			// Fill depth should leave room for wall at both front AND back
+			// Front wall: between tray pocket and fill cell (fillY = pocketY + wall)
+			// Back wall: between fill cell and next row's trays
+			const fillDepth = placement.dimensions.depth - wall * 2;
 			const fillHeight = actualInteriorHeight + 1;
 
-			const fillCell = translate(
-				[fillX, fillY, floor],
-				cuboid({
-					size: [fillWidth, fillDepth, fillHeight],
-					center: [fillWidth / 2, fillDepth / 2, fillHeight / 2]
-				})
-			);
-			fillCells.push(fillCell);
+			console.log(`  -> Fill cell: pos=(${fillX.toFixed(1)}, ${fillY.toFixed(1)}) size=(${fillWidth.toFixed(1)} x ${fillDepth.toFixed(1)}) Y:[${fillY.toFixed(1)}-${(fillY + fillDepth).toFixed(1)}]`);
+
+			if (fillDepth > 0) {
+				const fillCell = translate(
+					[fillX, fillY, floor],
+					cuboid({
+						size: [fillWidth, fillDepth, fillHeight],
+						center: [fillWidth / 2, fillDepth / 2, fillHeight / 2]
+					})
+				);
+				fillCells.push(fillCell);
+			}
 		}
 	}
 
@@ -273,6 +298,11 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	// Add gap fills (solid pieces for custom box dimensions)
 	if (gapFills.length > 0) {
 		result = union(result, ...gapFills);
+	}
+
+	// Add back walls for shorter trays in mixed-depth rows
+	if (backWalls.length > 0) {
+		result = union(result, ...backWalls);
 	}
 
 	// 4. Add snap grooves if enabled
