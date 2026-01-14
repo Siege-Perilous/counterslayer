@@ -100,6 +100,9 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	console.log('Wall thickness:', wall, 'Tolerance:', tolerance);
 	console.log('Max tray width:', maxTrayWidth);
 
+	// Track all cavities for summary
+	const allCavities: { name: string; xStart: number; xEnd: number; yStart: number; yEnd: number }[] = [];
+
 	// Group placements by row (same Y position)
 	const rowMap = new Map<number, typeof placements>();
 	for (const p of placements) {
@@ -149,6 +152,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			]
 		});
 		trayCavities.push(cavity);
+		allCavities.push({ name: `pocket:${placement.tray.name}`, xStart: pocketX, xEnd: pocketX + pocketWidth, yStart: pocketY, yEnd: pocketEnd });
 
 		// 2b. Create fill cell only if this tray ends the row AND there's space remaining
 		// With bin-packing, we need to check if space to the right is actually empty
@@ -169,15 +173,27 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			const fillWidth = spaceRemaining - wall;
 			const fillX = pocketX + pocketWidth + wall;
 			const fillXEnd = fillX + fillWidth;
-			// Inset Y to leave wall between fill cell and adjacent tray pocket
-			const fillY = pocketY + wall;
 			const fillHeight = actualInteriorHeight + 1;
 
-			// Find next row and check if it has pockets in this fill cell's X range
+			// Check if previous row has POCKETS at this fill cell's X range
+			const prevRowY = sortedRowYs.filter(y => y < placement.y).pop();
+			const prevRowTrays = prevRowY !== undefined ? rowMap.get(prevRowY) || [] : [];
+			const prevRowPocketOverlap = prevRowTrays.some(t => {
+				const trayXStart = wall + t.x;
+				const trayXEnd = trayXStart + t.dimensions.width + tolerance * 2;
+				return trayXEnd > fillX && trayXStart < fillXEnd;
+			});
+
+			// Fill cell Y position:
+			// - If prev row has POCKET at this X range: front offset (pocket extends into this row)
+			// - If prev row has only FILL at this X range: no front offset (start at same Y as pocket)
+			const fillY = prevRowPocketOverlap
+				? pocketY + tolerance * 2 + wall  // Front offset: wall from prev pocket
+				: pocketY;                         // No front offset: wall from prev fill's back offset
+
+			// Find next row boundary and check if it has pockets at this X range
 			const nextRowY = sortedRowYs.find(y => y > placement.y);
 			const nextRowStart = nextRowY !== undefined ? wall + nextRowY : null;
-
-			// Check if any tray in the next row overlaps with this fill cell's X range
 			const nextRowTrays = nextRowY !== undefined ? rowMap.get(nextRowY) || [] : [];
 			const nextRowPocketOverlap = nextRowTrays.some(t => {
 				const trayXStart = wall + t.x;
@@ -185,15 +201,55 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 				return trayXEnd > fillX && trayXStart < fillXEnd;
 			});
 
-			// If next row has pockets in our X range, stop short to leave wall
-			// If next row has no pockets here, extend to match pocket overlap
-			const fillDepth = nextRowPocketOverlap
-				? placement.dimensions.depth - wall * 2  // Stop short, leave wall
-				: placement.dimensions.depth - wall + tolerance * 2;  // Extend to pocket end
+			// Fill cell depth calculation:
+			// - If next row has POCKET at this X range: need back offset (leave wall before pocket)
+			// - If next row has only FILL at this X range: extend to pocketEnd (avoid step with next fill)
+			let targetFillEnd: number;
+			if (nextRowPocketOverlap && nextRowStart !== null) {
+				// Back offset: leave wall before next row's pocket
+				targetFillEnd = nextRowStart - wall;
+
+				// When fill has partial pocket overlap, add bridge for the non-overlapping region
+				// to avoid steps between fill-to-fill boundaries
+				let maxPocketXEnd = fillX;
+				for (const t of nextRowTrays) {
+					const trayXStart = wall + t.x;
+					const trayXEnd = trayXStart + t.dimensions.width + tolerance * 2;
+					if (trayXEnd > fillX && trayXStart < fillXEnd) {
+						maxPocketXEnd = Math.max(maxPocketXEnd, trayXEnd);
+					}
+				}
+
+				// If there's a region at the end not covered by next pockets, add bridge
+				if (maxPocketXEnd < fillXEnd) {
+					const bridgeXStart = maxPocketXEnd;
+					const bridgeWidth = fillXEnd - bridgeXStart;
+					const bridgeY = fillY;
+					const bridgeEnd = targetFillEnd;  // Same Y as main fill (with back offset) for consistent wall
+					const bridgeDepth = bridgeEnd - bridgeY;
+
+					if (bridgeWidth > 0 && bridgeDepth > 0) {
+						console.log(`  -> Bridge: X:[${bridgeXStart.toFixed(1)}-${fillXEnd.toFixed(1)}] Y:[${bridgeY.toFixed(1)}-${bridgeEnd.toFixed(1)}]`);
+						const bridge = translate(
+							[bridgeXStart, bridgeY, floor],
+							cuboid({
+								size: [bridgeWidth, bridgeDepth, fillHeight],
+								center: [bridgeWidth / 2, bridgeDepth / 2, fillHeight / 2]
+							})
+						);
+						fillCells.push(bridge);
+						allCavities.push({ name: `bridge:${placement.tray.name}`, xStart: bridgeXStart, xEnd: fillXEnd, yStart: bridgeY, yEnd: bridgeEnd });
+					}
+				}
+			} else {
+				// No back offset: extend to match pocket (next row's fill will have front offset)
+				targetFillEnd = pocketY + pocketDepth;
+			}
+			const fillDepth = targetFillEnd - fillY;
 
 			const fillEnd = fillY + fillDepth;
 			const gapToNextRow = nextRowStart !== null ? nextRowStart - fillEnd : null;
-			console.log(`  -> Fill cell: pos=(${fillX.toFixed(1)}, ${fillY.toFixed(1)}) size=(${fillWidth.toFixed(1)} x ${fillDepth.toFixed(1)}) Y:[${fillY.toFixed(1)}-${fillEnd.toFixed(1)}] gapToNextRow=${gapToNextRow?.toFixed(1) ?? 'N/A'} nextRowPocketOverlap=${nextRowPocketOverlap}`);
+			console.log(`  -> Fill cell: X:[${fillX.toFixed(1)}-${fillXEnd.toFixed(1)}] Y:[${fillY.toFixed(1)}-${fillEnd.toFixed(1)}] gapToNextRow=${gapToNextRow?.toFixed(1) ?? 'N/A'}`);
 
 			if (fillDepth > 0) {
 				const fillCell = translate(
@@ -204,9 +260,45 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 					})
 				);
 				fillCells.push(fillCell);
+				allCavities.push({ name: `fill:${placement.tray.name}`, xStart: fillX, xEnd: fillXEnd, yStart: fillY, yEnd: fillEnd });
 			}
 		}
 	}
+
+	// Summary: Show all cavities sorted by Y to identify gaps
+	console.log('\n=== CAVITY SUMMARY (sorted by Y) ===');
+	allCavities.sort((a, b) => a.yStart - b.yStart);
+	for (const c of allCavities) {
+		console.log(`${c.name}: X:[${c.xStart.toFixed(1)}-${c.xEnd.toFixed(1)}] Y:[${c.yStart.toFixed(1)}-${c.yEnd.toFixed(1)}]`);
+	}
+
+	// Identify potential gaps at row boundaries
+	console.log('\n=== ROW BOUNDARY ANALYSIS ===');
+	for (let i = 0; i < sortedRowYs.length - 1; i++) {
+		const thisRowY = sortedRowYs[i];
+		const nextRowY = sortedRowYs[i + 1];
+		const boundaryY = wall + nextRowY;  // Where next row starts
+		console.log(`\nBoundary between Row ${i} (Y=${thisRowY}) and Row ${i + 1} (Y=${nextRowY}) at Y=${boundaryY.toFixed(1)}:`);
+
+		// Find cavities from this row that end near the boundary
+		const thisRowCavities = allCavities.filter(c => c.yStart < boundaryY && c.yEnd >= boundaryY - 5);
+		// Find cavities from next row that start near the boundary
+		const nextRowCavities = allCavities.filter(c => c.yStart >= boundaryY - 2 && c.yStart <= boundaryY + 5);
+
+		for (const thisC of thisRowCavities) {
+			for (const nextC of nextRowCavities) {
+				// Check if they overlap in X
+				if (thisC.xEnd > nextC.xStart && thisC.xStart < nextC.xEnd) {
+					const gap = nextC.yStart - thisC.yEnd;
+					const overlapX = `X:[${Math.max(thisC.xStart, nextC.xStart).toFixed(1)}-${Math.min(thisC.xEnd, nextC.xEnd).toFixed(1)}]`;
+					if (Math.abs(gap) > 0.1) {
+						console.log(`  ${thisC.name} ends Y=${thisC.yEnd.toFixed(1)}, ${nextC.name} starts Y=${nextC.yStart.toFixed(1)} -> gap=${gap.toFixed(1)} at ${overlapX}`);
+					}
+				}
+			}
+		}
+	}
+	console.log('\n=== END DEBUG ===\n');
 
 	// 2c. Create gap fills for custom box dimensions
 	// Trays are anchored to origin corner - gaps appear at east (high X) and north (high Y)
