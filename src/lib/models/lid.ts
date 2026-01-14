@@ -107,7 +107,20 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		row.push(p);
 		rowMap.set(p.y, row);
 	}
-	console.log('Rows:', Array.from(rowMap.keys()).sort((a, b) => a - b));
+	const sortedRowYs = Array.from(rowMap.keys()).sort((a, b) => a - b);
+	console.log('Rows (Y positions):', sortedRowYs);
+
+	// Log row boundaries
+	for (let i = 0; i < sortedRowYs.length; i++) {
+		const rowY = sortedRowYs[i];
+		const rowTrays = rowMap.get(rowY)!;
+		const rowMaxDepth = Math.max(...rowTrays.map(t => t.dimensions.depth));
+		const rowStart = wall + rowY;
+		const rowEnd = wall + rowY + rowMaxDepth;
+		const pocketEnd = rowEnd + tolerance * 2;
+		const nextRowStart = i < sortedRowYs.length - 1 ? wall + sortedRowYs[i + 1] : null;
+		console.log(`Row ${i} (Y=${rowY}): rowStart=${rowStart.toFixed(1)}, rowEnd=${rowEnd.toFixed(1)}, pocketEnd=${pocketEnd.toFixed(1)}, nextRowStart=${nextRowStart?.toFixed(1) ?? 'N/A'}`);
+	}
 
 	for (const placement of placements) {
 		const pocketWidth = placement.dimensions.width + tolerance * 2;
@@ -120,7 +133,12 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		const pocketX = wall + placement.x;
 		const pocketY = wall + placement.y;
 
-		console.log(`Tray "${placement.tray.name}": pos=(${placement.x.toFixed(1)}, ${placement.y.toFixed(1)}) dim=(${placement.dimensions.width.toFixed(1)} x ${placement.dimensions.depth.toFixed(1)}) pocket=(${pocketX.toFixed(1)}, ${pocketY.toFixed(1)}) size=(${pocketWidth.toFixed(1)} x ${pocketDepth.toFixed(1)}) Y:[${pocketY.toFixed(1)}-${(pocketY + pocketDepth).toFixed(1)}]`);
+		const pocketEnd = pocketY + pocketDepth;
+		// Find next row to show overlap/gap
+		const nextRowY = sortedRowYs.find(y => y > placement.y);
+		const nextRowStart = nextRowY !== undefined ? wall + nextRowY : null;
+		const overlapWithNextRow = nextRowStart !== null ? pocketEnd - nextRowStart : null;
+		console.log(`Tray "${placement.tray.name}": pos=(${placement.x.toFixed(1)}, ${placement.y.toFixed(1)}) dim=(${placement.dimensions.width.toFixed(1)} x ${placement.dimensions.depth.toFixed(1)}) pocket=(${pocketX.toFixed(1)}, ${pocketY.toFixed(1)}) size=(${pocketWidth.toFixed(1)} x ${pocketDepth.toFixed(1)}) Y:[${pocketY.toFixed(1)}-${pocketEnd.toFixed(1)}] overlapNextRow=${overlapWithNextRow?.toFixed(1) ?? 'N/A'}`);
 
 		const cavity = cuboid({
 			size: [pocketWidth, pocketDepth, pocketHeight],
@@ -150,15 +168,32 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			// Fill cell: X from (tray pocket end + wall) to (where widest pocket ends)
 			const fillWidth = spaceRemaining - wall;
 			const fillX = pocketX + pocketWidth + wall;
+			const fillXEnd = fillX + fillWidth;
 			// Inset Y to leave wall between fill cell and adjacent tray pocket
 			const fillY = pocketY + wall;
-			// Fill depth should leave room for wall at both front AND back
-			// Front wall: between tray pocket and fill cell (fillY = pocketY + wall)
-			// Back wall: between fill cell and next row's trays
-			const fillDepth = placement.dimensions.depth - wall * 2;
 			const fillHeight = actualInteriorHeight + 1;
 
-			console.log(`  -> Fill cell: pos=(${fillX.toFixed(1)}, ${fillY.toFixed(1)}) size=(${fillWidth.toFixed(1)} x ${fillDepth.toFixed(1)}) Y:[${fillY.toFixed(1)}-${(fillY + fillDepth).toFixed(1)}]`);
+			// Find next row and check if it has pockets in this fill cell's X range
+			const nextRowY = sortedRowYs.find(y => y > placement.y);
+			const nextRowStart = nextRowY !== undefined ? wall + nextRowY : null;
+
+			// Check if any tray in the next row overlaps with this fill cell's X range
+			const nextRowTrays = nextRowY !== undefined ? rowMap.get(nextRowY) || [] : [];
+			const nextRowPocketOverlap = nextRowTrays.some(t => {
+				const trayXStart = wall + t.x;
+				const trayXEnd = trayXStart + t.dimensions.width + tolerance * 2;
+				return trayXEnd > fillX && trayXStart < fillXEnd;
+			});
+
+			// If next row has pockets in our X range, stop short to leave wall
+			// If next row has no pockets here, extend to match pocket overlap
+			const fillDepth = nextRowPocketOverlap
+				? placement.dimensions.depth - wall * 2  // Stop short, leave wall
+				: placement.dimensions.depth - wall + tolerance * 2;  // Extend to pocket end
+
+			const fillEnd = fillY + fillDepth;
+			const gapToNextRow = nextRowStart !== null ? nextRowStart - fillEnd : null;
+			console.log(`  -> Fill cell: pos=(${fillX.toFixed(1)}, ${fillY.toFixed(1)}) size=(${fillWidth.toFixed(1)} x ${fillDepth.toFixed(1)}) Y:[${fillY.toFixed(1)}-${fillEnd.toFixed(1)}] gapToNextRow=${gapToNextRow?.toFixed(1) ?? 'N/A'} nextRowPocketOverlap=${nextRowPocketOverlap}`);
 
 			if (fillDepth > 0) {
 				const fillCell = translate(
