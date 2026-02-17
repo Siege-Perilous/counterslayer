@@ -5,7 +5,7 @@ import { arrangeTrays, getBoxInteriorDimensions, calculateMinimumBoxDimensions }
 
 const { cuboid, roundedCuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
-const { translate, rotateX, rotateY, rotateZ, scale, mirrorX } = jscad.transforms;
+const { translate, rotateX, rotateY, rotateZ, scale, mirrorX, mirrorY } = jscad.transforms;
 const { hull } = jscad.hulls;
 const { vectorText } = jscad.text;
 const { path2 } = jscad.geometries;
@@ -1153,22 +1153,22 @@ export function createLid(box: Box): Geom3 | null {
 				const textCenterY = (minY + maxY) / 2;
 
 				// Combine all text shapes and position them
-				// Mirror in X because lid top is at Z=0 (print surface faces up when in use)
+				// Match the same orientation as the poke hole tray labels inside the box
 				let combinedText: Geom3 = union(...textShapes);
-				combinedText = mirrorX(combinedText); // Mirror horizontally
+				combinedText = mirrorY(combinedText); // Flip letters right-side up
 
 				// If lid is longer in Y, rotate text 90° to read along Y axis
 				if (rotateText) {
 					combinedText = rotateZ(Math.PI / 2, combinedText);
 					// After rotation: old X becomes Y, old Y becomes -X
 					const positionedText = translate(
-						[centerX + textCenterY * textScale, centerY + textCenterX * textScale, -0.1],
+						[centerX - textCenterY * textScale, centerY + textCenterX * textScale, -0.1],
 						scale([textScale, textScale, 1], combinedText)
 					);
 					lid = subtract(lid, positionedText);
 				} else {
 					const positionedText = translate(
-						[centerX + textCenterX * textScale, centerY - textCenterY * textScale, -0.1],
+						[centerX - textCenterX * textScale, centerY + textCenterY * textScale, -0.1],
 						scale([textScale, textScale, 1], combinedText)
 					);
 					lid = subtract(lid, positionedText);
