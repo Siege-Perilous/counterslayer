@@ -14,6 +14,52 @@
 
 	let { selectedBox, selectedTray, onSelectTray, onAddTray, onDeleteTray, onUpdateTray, onUpdateParams }: Props = $props();
 
+	// Drag and drop state
+	let draggedIndex: number | null = $state(null);
+	let draggedType: 'top' | 'edge' | null = $state(null);
+	let dragOverIndex: number | null = $state(null);
+
+	function handleDragStart(e: DragEvent, index: number, type: 'top' | 'edge') {
+		draggedIndex = index;
+		draggedType = type;
+		if (e.dataTransfer) {
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', index.toString());
+		}
+	}
+
+	function handleDragOver(e: DragEvent, index: number, type: 'top' | 'edge') {
+		e.preventDefault();
+		if (draggedType === type) {
+			dragOverIndex = index;
+		}
+	}
+
+	function handleDragEnd() {
+		draggedIndex = null;
+		draggedType = null;
+		dragOverIndex = null;
+	}
+
+	function handleDrop(e: DragEvent, targetIndex: number, type: 'top' | 'edge') {
+		e.preventDefault();
+		if (draggedIndex === null || draggedType !== type || !selectedTray) return;
+
+		if (type === 'top') {
+			const newStacks = [...selectedTray.params.topLoadedStacks];
+			const [removed] = newStacks.splice(draggedIndex, 1);
+			newStacks.splice(targetIndex, 0, removed);
+			onUpdateParams({ ...selectedTray.params, topLoadedStacks: newStacks });
+		} else {
+			const newStacks = [...selectedTray.params.edgeLoadedStacks];
+			const [removed] = newStacks.splice(draggedIndex, 1);
+			newStacks.splice(targetIndex, 0, removed);
+			onUpdateParams({ ...selectedTray.params, edgeLoadedStacks: newStacks });
+		}
+
+		handleDragEnd();
+	}
+
 	const builtinShapes = ['square', 'hex', 'circle'] as const;
 	let shapeOptions = $derived([
 		...builtinShapes,
@@ -250,7 +296,21 @@
 				<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Top-Loaded Stacks</h3>
 				<div class="space-y-1">
 					{#each selectedTray.params.topLoadedStacks as stack, index}
-						<div class="flex items-center gap-1">
+						<div
+							class="flex items-center gap-1 rounded {dragOverIndex === index && draggedType === 'top' ? 'bg-blue-900/30' : ''}"
+							draggable="true"
+							role="listitem"
+							ondragstart={(e) => handleDragStart(e, index, 'top')}
+							ondragover={(e) => handleDragOver(e, index, 'top')}
+							ondragend={handleDragEnd}
+							ondrop={(e) => handleDrop(e, index, 'top')}
+						>
+							<span
+								class="cursor-grab px-1 text-gray-500 hover:text-gray-300"
+								title="Drag to reorder"
+							>
+								&#x2630;
+							</span>
 							<select
 								value={stack[0]}
 								onchange={(e) => updateTopLoadedStack(index, 'shape', e.currentTarget.value)}
@@ -289,7 +349,21 @@
 				<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Edge-Loaded Stacks</h3>
 				<div class="space-y-1">
 					{#each selectedTray.params.edgeLoadedStacks as stack, index}
-						<div class="flex items-center gap-1">
+						<div
+							class="flex items-center gap-1 rounded {dragOverIndex === index && draggedType === 'edge' ? 'bg-blue-900/30' : ''}"
+							draggable="true"
+							role="listitem"
+							ondragstart={(e) => handleDragStart(e, index, 'edge')}
+							ondragover={(e) => handleDragOver(e, index, 'edge')}
+							ondragend={handleDragEnd}
+							ondrop={(e) => handleDrop(e, index, 'edge')}
+						>
+							<span
+								class="cursor-grab px-1 text-gray-500 hover:text-gray-300"
+								title="Drag to reorder"
+							>
+								&#x2630;
+							</span>
 							<select
 								value={stack[0]}
 								onchange={(e) => updateEdgeLoadedStack(index, 'shape', e.currentTarget.value)}
