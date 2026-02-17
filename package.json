@@ -24,7 +24,9 @@
 		"@jscad/stl-serializer": "^2.1.17",
 		"@threlte/core": "^8.0.0",
 		"@threlte/extras": "^9.0.0",
+		"jspdf": "^4.1.0",
 		"paneforge": "^1.0.2",
+		"svg2pdf.js": "^2.7.0",
 		"three": "^0.170.0"
 	},
 	"devDependencies": {

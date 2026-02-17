@@ -303,16 +303,18 @@
 					{#each selectedTray.params.topLoadedStacks as stack, index}
 						<div
 							class="flex items-center gap-1 rounded {dragOverIndex === index && draggedType === 'top' ? 'bg-blue-900/30' : ''}"
-							draggable="true"
 							role="listitem"
-							ondragstart={(e) => handleDragStart(e, index, 'top')}
 							ondragover={(e) => handleDragOver(e, index, 'top')}
-							ondragend={handleDragEnd}
 							ondrop={(e) => handleDrop(e, index, 'top')}
 						>
 							<span
 								class="cursor-grab px-1 text-gray-500 hover:text-gray-300"
 								title="Drag to reorder"
+								draggable="true"
+								ondragstart={(e) => handleDragStart(e, index, 'top')}
+								ondragend={handleDragEnd}
+								role="button"
+								tabindex="0"
 							>
 								&#x2630;
 							</span>
@@ -364,16 +366,18 @@
 					{#each selectedTray.params.edgeLoadedStacks as stack, index}
 						<div
 							class="flex items-center gap-1 rounded {dragOverIndex === index && draggedType === 'edge' ? 'bg-blue-900/30' : ''}"
-							draggable="true"
 							role="listitem"
-							ondragstart={(e) => handleDragStart(e, index, 'edge')}
 							ondragover={(e) => handleDragOver(e, index, 'edge')}
-							ondragend={handleDragEnd}
 							ondrop={(e) => handleDrop(e, index, 'edge')}
 						>
 							<span
 								class="cursor-grab px-1 text-gray-500 hover:text-gray-300"
 								title="Drag to reorder"
+								draggable="true"
+								ondragstart={(e) => handleDragStart(e, index, 'edge')}
+								ondragend={handleDragEnd}
+								role="button"
+								tabindex="0"
 							>
 								&#x2630;
 							</span>

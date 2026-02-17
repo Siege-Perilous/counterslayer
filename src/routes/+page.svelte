@@ -7,6 +7,7 @@
 	import { arrangeTrays, validateCustomDimensions, calculateTraySpacers, type TrayPlacement } from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 	import { exportStl } from '$lib/utils/exportStl';
+	import { exportPdfReference } from '$lib/utils/pdfGenerator';
 	import { initProject, getSelectedTray, getSelectedBox, getProject, importProject, resetProject } from '$lib/stores/project.svelte';
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
@@ -216,6 +217,12 @@
 		}
 	}
 
+	async function handleExportPdf() {
+		const project = getProject();
+		if (project.boxes.length === 0) return;
+		await exportPdfReference(project);
+	}
+
 	function handleExportJson() {
 		const project = getProject();
 		const json = JSON.stringify(project, null, 2);
@@ -390,6 +397,13 @@
 							class="rounded bg-purple-600 px-4 py-2 font-medium transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							Export All
+						</button>
+						<button
+							onclick={handleExportPdf}
+							disabled={getProject().boxes.length === 0}
+							class="rounded bg-amber-600 px-4 py-2 font-medium transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							Export PDF
 						</button>
 					</div>
 				</div>
