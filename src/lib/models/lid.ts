@@ -306,10 +306,23 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			gapFills.push(northFill);
 		}
 	} else {
-		// MINIMAL WALLS MODE: Just add thin walls to keep trays snug
+		// MINIMAL WALLS MODE: Carve out gap areas and add thin walls to keep trays snug
+		// The outer box is full custom size, so we need to carve cavities for the gap areas
 
-		// East wall (keeps trays from sliding toward high X)
+		// East gap cavity (carve out the space beyond tray area at high X)
 		if (widthGap > wall) {
+			// Cavity starts after the thin wall, extends to inner edge of outer wall
+			const eastCavity = cuboid({
+				size: [widthGap - wall, extDepth - wall * 2, actualInteriorHeight + 1],
+				center: [
+					wall + interior.width + wall + (widthGap - wall) / 2,
+					extDepth / 2,
+					floor + actualInteriorHeight / 2
+				]
+			});
+			fillCells.push(eastCavity);
+
+			// East wall (keeps trays from sliding toward high X)
 			const eastWall = cuboid({
 				size: [wall, interior.depth, actualInteriorHeight],
 				center: [
@@ -321,8 +334,20 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			gapFills.push(eastWall);
 		}
 
-		// North wall (keeps trays from sliding toward high Y)
+		// North gap cavity (carve out the space beyond tray area at high Y)
 		if (depthGap > wall) {
+			// Cavity starts after the thin wall, extends to inner edge of outer wall
+			const northCavity = cuboid({
+				size: [minimums.minWidth - wall * 2, depthGap - wall, actualInteriorHeight + 1],
+				center: [
+					(minimums.minWidth - wall * 2) / 2 + wall,
+					wall + interior.depth + wall + (depthGap - wall) / 2,
+					floor + actualInteriorHeight / 2
+				]
+			});
+			fillCells.push(northCavity);
+
+			// North wall (keeps trays from sliding toward high Y)
 			const northWall = cuboid({
 				size: [interior.width, wall, actualInteriorHeight],
 				center: [
@@ -332,6 +357,19 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 				]
 			});
 			gapFills.push(northWall);
+		}
+
+		// Corner cavity (where east and north gaps meet)
+		if (widthGap > wall && depthGap > wall) {
+			const cornerCavity = cuboid({
+				size: [widthGap - wall, depthGap - wall, actualInteriorHeight + 1],
+				center: [
+					wall + interior.width + wall + (widthGap - wall) / 2,
+					wall + interior.depth + wall + (depthGap - wall) / 2,
+					floor + actualInteriorHeight / 2
+				]
+			});
+			fillCells.push(cornerCavity);
 		}
 	}
 
