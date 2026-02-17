@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Box, Tray } from '$lib/types/project';
-	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
+	import type { CounterTrayParams, EdgeOrientation, TopLoadedStackDef, EdgeLoadedStackDef } from '$lib/models/counterTray';
 
 	interface Props {
 		selectedBox: Box | null;
@@ -82,20 +82,23 @@
 	}
 
 	// Top-loaded stack handlers
-	function updateTopLoadedStack(index: number, field: 'shape' | 'count', value: string | number) {
+	function updateTopLoadedStack(index: number, field: 'shape' | 'count' | 'label', value: string | number) {
 		if (!selectedTray) return;
 		const newStacks = [...selectedTray.params.topLoadedStacks];
+		const current = newStacks[index];
 		if (field === 'shape') {
-			newStacks[index] = [value as string, newStacks[index][1]];
+			newStacks[index] = [value as string, current[1], current[2]];
+		} else if (field === 'count') {
+			newStacks[index] = [current[0], value as number, current[2]];
 		} else {
-			newStacks[index] = [newStacks[index][0], value as number];
+			newStacks[index] = [current[0], current[1], value as string || undefined];
 		}
 		onUpdateParams({ ...selectedTray.params, topLoadedStacks: newStacks });
 	}
 
 	function addTopLoadedStack() {
 		if (!selectedTray) return;
-		onUpdateParams({ ...selectedTray.params, topLoadedStacks: [...selectedTray.params.topLoadedStacks, ['square', 10]] });
+		onUpdateParams({ ...selectedTray.params, topLoadedStacks: [...selectedTray.params.topLoadedStacks, ['square', 10, undefined]] });
 	}
 
 	function removeTopLoadedStack(index: number) {
@@ -105,23 +108,25 @@
 	}
 
 	// Edge-loaded stack handlers
-	function updateEdgeLoadedStack(index: number, field: 'shape' | 'count' | 'orientation', value: string | number) {
+	function updateEdgeLoadedStack(index: number, field: 'shape' | 'count' | 'orientation' | 'label', value: string | number) {
 		if (!selectedTray) return;
 		const newStacks = [...selectedTray.params.edgeLoadedStacks];
 		const current = newStacks[index];
 		if (field === 'shape') {
-			newStacks[index] = [value as string, current[1], current[2]];
+			newStacks[index] = [value as string, current[1], current[2], current[3]];
 		} else if (field === 'count') {
-			newStacks[index] = [current[0], value as number, current[2]];
+			newStacks[index] = [current[0], value as number, current[2], current[3]];
+		} else if (field === 'orientation') {
+			newStacks[index] = [current[0], current[1], value as EdgeOrientation, current[3]];
 		} else {
-			newStacks[index] = [current[0], current[1], value as EdgeOrientation];
+			newStacks[index] = [current[0], current[1], current[2], value as string || undefined];
 		}
 		onUpdateParams({ ...selectedTray.params, edgeLoadedStacks: newStacks });
 	}
 
 	function addEdgeLoadedStack() {
 		if (!selectedTray) return;
-		onUpdateParams({ ...selectedTray.params, edgeLoadedStacks: [...selectedTray.params.edgeLoadedStacks, ['square', 10, 'lengthwise']] });
+		onUpdateParams({ ...selectedTray.params, edgeLoadedStacks: [...selectedTray.params.edgeLoadedStacks, ['square', 10, 'lengthwise', undefined]] });
 	}
 
 	function removeEdgeLoadedStack(index: number) {
@@ -311,10 +316,18 @@
 							>
 								&#x2630;
 							</span>
+							<input
+								type="text"
+								placeholder="Label"
+								value={stack[2] ?? ''}
+								onchange={(e) => updateTopLoadedStack(index, 'label', e.currentTarget.value)}
+								class="flex-1 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+								title="Optional label for organization"
+							/>
 							<select
 								value={stack[0]}
 								onchange={(e) => updateTopLoadedStack(index, 'shape', e.currentTarget.value)}
-								class="flex-1 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+								class="w-16 rounded border-gray-600 bg-gray-700 px-1 py-1 text-sm"
 							>
 								{#each shapeOptions as shapeOpt}
 									<option value={shapeOpt}>{getShapeDisplayName(shapeOpt)}</option>
@@ -364,10 +377,18 @@
 							>
 								&#x2630;
 							</span>
+							<input
+								type="text"
+								placeholder="Label"
+								value={stack[3] ?? ''}
+								onchange={(e) => updateEdgeLoadedStack(index, 'label', e.currentTarget.value)}
+								class="flex-1 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+								title="Optional label for organization"
+							/>
 							<select
 								value={stack[0]}
 								onchange={(e) => updateEdgeLoadedStack(index, 'shape', e.currentTarget.value)}
-								class="flex-1 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+								class="w-16 rounded border-gray-600 bg-gray-700 px-1 py-1 text-sm"
 							>
 								{#each shapeOptions as shapeOpt}
 									<option value={shapeOpt}>{getShapeDisplayName(shapeOpt)}</option>

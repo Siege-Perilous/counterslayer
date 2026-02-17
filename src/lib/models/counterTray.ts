@@ -11,8 +11,11 @@ const { extrudeLinear } = jscad.extrusions;
 // Edge-loaded stack orientation
 export type EdgeOrientation = 'lengthwise' | 'crosswise';
 
-// Edge-loaded stack definition: [shape, count, orientation?]
-export type EdgeLoadedStackDef = [string, number, EdgeOrientation?];
+// Top-loaded stack definition: [shape, count, label?]
+export type TopLoadedStackDef = [string, number, string?];
+
+// Edge-loaded stack definition: [shape, count, orientation?, label?]
+export type EdgeLoadedStackDef = [string, number, EdgeOrientation?, string?];
 
 // Custom shape definition
 export interface CustomShape {
@@ -37,7 +40,7 @@ export interface CounterTrayParams {
 	trayLengthOverride: number;
 	extraTrayCols: number;
 	extraTrayRows: number;
-	topLoadedStacks: [string, number][];
+	topLoadedStacks: TopLoadedStackDef[];
 	edgeLoadedStacks: EdgeLoadedStackDef[];
 	customShapes: CustomShape[];
 	printBedSize: number;

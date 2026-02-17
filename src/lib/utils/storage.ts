@@ -1,6 +1,6 @@
 import type { Project, Box, LidParams, Tray } from '$lib/types/project';
 import { defaultLidParams } from '$lib/models/lid';
-import { defaultParams, type CounterTrayParams } from '$lib/models/counterTray';
+import { defaultParams, type CounterTrayParams, type TopLoadedStackDef, type EdgeLoadedStackDef } from '$lib/models/counterTray';
 
 const STORAGE_KEY = 'counter-tray-project';
 
@@ -41,24 +41,25 @@ function migrateTrayParams(params: CounterTrayParams & { stacks?: [string, numbe
 	}
 
 	// Validate stack references - if custom:X references missing shape, fallback to 'square'
-	migrated.topLoadedStacks = migrated.topLoadedStacks.map(([shape, count]) => {
+	// Also preserve optional label field
+	migrated.topLoadedStacks = migrated.topLoadedStacks.map(([shape, count, label]) => {
 		if (shape.startsWith('custom:')) {
 			const name = shape.substring(7);
 			if (!migrated.customShapes.some(s => s.name === name)) {
-				return ['square', count] as [string, number];
+				return ['square', count, label] as TopLoadedStackDef;
 			}
 		}
-		return [shape, count] as [string, number];
+		return [shape, count, label] as TopLoadedStackDef;
 	});
 
-	migrated.edgeLoadedStacks = migrated.edgeLoadedStacks.map(([shape, count, orient]) => {
+	migrated.edgeLoadedStacks = migrated.edgeLoadedStacks.map(([shape, count, orient, label]) => {
 		if (shape.startsWith('custom:')) {
 			const name = shape.substring(7);
 			if (!migrated.customShapes.some(s => s.name === name)) {
-				return ['square', count, orient] as [string, number, typeof orient];
+				return ['square', count, orient, label] as EdgeLoadedStackDef;
 			}
 		}
-		return [shape, count, orient] as [string, number, typeof orient];
+		return [shape, count, orient, label] as EdgeLoadedStackDef;
 	});
 
 	return migrated;
