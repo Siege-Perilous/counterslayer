@@ -3,14 +3,14 @@ import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { Box, Tray } from '$lib/types/project';
 import type { CounterTrayParams } from './counterTray';
 
-const { cuboid, cylinder, roundedCuboid } = jscad.primitives;
-const { subtract, union, intersect } = jscad.booleans;
-const { translate, rotateX } = jscad.transforms;
+const { cylinder } = jscad.primitives;
+const { subtract } = jscad.booleans;
+const { translate } = jscad.transforms;
 const { hull } = jscad.hulls;
 
 export interface TrayDimensions {
-	width: number;  // X dimension
-	depth: number;  // Y dimension
+	width: number; // X dimension
+	depth: number; // Y dimension
 	height: number; // Z dimension
 }
 
@@ -22,9 +22,9 @@ export interface TrayPlacement {
 }
 
 export interface BoxMinimumDimensions {
-	minWidth: number;   // Minimum exterior X
-	minDepth: number;   // Minimum exterior Y
-	minHeight: number;  // Minimum exterior Z
+	minWidth: number; // Minimum exterior X
+	minDepth: number; // Minimum exterior Y
+	minHeight: number; // Minimum exterior Z
 }
 
 export interface ValidationResult {
@@ -36,7 +36,7 @@ export interface ValidationResult {
 export interface TraySpacerInfo {
 	trayId: string;
 	placement: TrayPlacement;
-	floorSpacerHeight: number;  // Additional solid material under tray floor
+	floorSpacerHeight: number; // Additional solid material under tray floor
 }
 
 // Calculate tray dimensions from params (same logic as counterTray.ts)
@@ -78,7 +78,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const getCustomShape = (shapeRef: string) => {
 		if (!shapeRef.startsWith('custom:')) return null;
 		const name = shapeRef.substring(7);
-		return customShapes?.find(s => s.name === name) || null;
+		return customShapes?.find((s) => s.name === name) || null;
 	};
 
 	// For top-loaded/crosswise custom shapes: LONGER side = width (X), SHORTER side = length (Y)
@@ -89,7 +89,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		if (custom) {
 			const w = custom.width + clearance * 2;
 			const l = custom.length + clearance * 2;
-			return Math.max(w, l);  // Longer side along X (parallel to tray length)
+			return Math.max(w, l); // Longer side along X (parallel to tray length)
 		}
 		return circlePocketWidth;
 	};
@@ -101,7 +101,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		if (custom) {
 			const w = custom.width + clearance * 2;
 			const l = custom.length + clearance * 2;
-			return Math.min(w, l);  // Shorter side along Y
+			return Math.min(w, l); // Shorter side along Y
 		}
 		return circlePocketLength;
 	};
@@ -113,7 +113,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		if (custom) {
 			const w = custom.width + clearance * 2;
 			const l = custom.length + clearance * 2;
-			return Math.max(w, l);  // Longer side along Y (perpendicular to tray length)
+			return Math.max(w, l); // Longer side along Y (perpendicular to tray length)
 		}
 		return getPocketLength(shape);
 	};
@@ -122,7 +122,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const getStandingHeightLengthwise = (shape: string): number => {
 		const custom = getCustomShape(shape);
 		if (custom) {
-			return Math.min(custom.width, custom.length);  // Shorter side is height
+			return Math.min(custom.width, custom.length); // Shorter side is height
 		}
 		return getCounterStandingHeight(shape);
 	};
@@ -131,31 +131,30 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const getStandingHeightCrosswise = (shape: string): number => {
 		const custom = getCustomShape(shape);
 		if (custom) {
-			return Math.min(custom.width, custom.length);  // Shorter side is height
+			return Math.min(custom.width, custom.length); // Shorter side is height
 		}
 		return getCounterStandingHeight(shape);
 	};
 
-	const getMaxPocketDim = (shape: string): number =>
-		Math.max(getPocketWidth(shape), getPocketLength(shape));
-
 	// Get actual counter dimensions (without clearance) for standing height
 	const getCounterWidth = (shape: string): number => {
 		if (shape === 'square') return squareWidth;
-		if (shape === 'hex') return hexPointyTop ? hexFlatToFlatBase : hexFlatToFlatBase / Math.cos(Math.PI / 6);
+		if (shape === 'hex')
+			return hexPointyTop ? hexFlatToFlatBase : hexFlatToFlatBase / Math.cos(Math.PI / 6);
 		const custom = getCustomShape(shape);
 		if (custom) {
-			return Math.max(custom.width, custom.length);  // Longer side along X
+			return Math.max(custom.width, custom.length); // Longer side along X
 		}
 		return circleDiameterBase;
 	};
 
 	const getCounterLength = (shape: string): number => {
 		if (shape === 'square') return squareLength;
-		if (shape === 'hex') return hexPointyTop ? hexFlatToFlatBase / Math.cos(Math.PI / 6) : hexFlatToFlatBase;
+		if (shape === 'hex')
+			return hexPointyTop ? hexFlatToFlatBase / Math.cos(Math.PI / 6) : hexFlatToFlatBase;
 		const custom = getCustomShape(shape);
 		if (custom) {
-			return Math.min(custom.width, custom.length);  // Shorter side along Y
+			return Math.min(custom.width, custom.length); // Shorter side along Y
 		}
 		return circleDiameterBase;
 	};
@@ -175,7 +174,8 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	}
 
 	// Sort top-loaded stacks by area (largest first for better packing)
-	const sortedStacks = [...stacks].map((s, i) => ({ stack: s, originalIndex: i }))
+	const sortedStacks = [...stacks]
+		.map((s, i) => ({ stack: s, originalIndex: i }))
 		.sort((a, b) => {
 			const areaA = getPocketWidth(a.stack[0]) * getPocketLength(a.stack[0]);
 			const areaB = getPocketWidth(b.stack[0]) * getPocketLength(b.stack[0]);
@@ -228,7 +228,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 				// For custom shapes: longer side along X (parallel to tray length), shorter side is height
 				const standingHeight = getStandingHeightCrosswise(stack[0]);
 				maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);
-				const slotWidthDim = getPocketWidth(stack[0]);  // Longer side along X
+				const slotWidthDim = getPocketWidth(stack[0]); // Longer side along X
 				crosswiseMaxDepth = Math.max(crosswiseMaxDepth, counterSpan);
 				crosswiseSlots.push({ slotWidth: slotWidthDim, slotDepth: counterSpan });
 			}
@@ -317,7 +317,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 
 	// X offset where top-loaded stacks begin (after all edge-loaded)
 	const edgeLoadedEndX = crosswiseSlots.length > 0 ? crosswiseX : Math.max(frontRowX, backRowX);
-	const hasEdgeLoaded = (edgeLoadedStacks && edgeLoadedStacks.length > 0);
+	const hasEdgeLoaded = edgeLoadedStacks && edgeLoadedStacks.length > 0;
 	let topLoadedFrontX = hasEdgeLoaded ? edgeLoadedEndX : wallThickness;
 	let topLoadedBackX = hasEdgeLoaded ? edgeLoadedEndX : wallThickness;
 
@@ -366,16 +366,18 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const trayLength = trayLengthOverride > 0 ? trayLengthOverride : trayLengthAuto;
 
 	// Tray width (Y dimension) - always 2 rows
-	const topLoadedTotalDepth = effectiveFrontRowDepth + (effectiveBackRowDepth > 0 ? wallThickness + effectiveBackRowDepth : 0);
+	const topLoadedTotalDepth =
+		effectiveFrontRowDepth +
+		(effectiveBackRowDepth > 0 ? wallThickness + effectiveBackRowDepth : 0);
 	const trayWidthAuto = topLoadedTotalDepth > 0 ? topLoadedTotalDepth : crosswiseMaxDepth;
 	const trayWidth = wallThickness + trayWidthAuto + wallThickness;
 
 	const trayHeight = floorThickness + finalMaxStackHeight + rimHeight;
 
 	return {
-		width: trayLength,  // X
-		depth: trayWidth,   // Y
-		height: trayHeight  // Z
+		width: trayLength, // X
+		depth: trayWidth, // Y
+		height: trayHeight // Z
 	};
 }
 
@@ -385,7 +387,7 @@ export function arrangeTrays(trays: Tray[]): TrayPlacement[] {
 	if (trays.length === 0) return [];
 
 	// Calculate dimensions for all trays
-	const trayDims = trays.map(tray => ({
+	const trayDims = trays.map((tray) => ({
 		tray,
 		dimensions: getTrayDimensions(tray.params)
 	}));
@@ -446,7 +448,10 @@ export function arrangeTrays(trays: Tray[]): TrayPlacement[] {
 }
 
 // Calculate box interior dimensions from tray placements
-export function getBoxInteriorDimensions(placements: TrayPlacement[], tolerance: number): TrayDimensions {
+export function getBoxInteriorDimensions(
+	placements: TrayPlacement[],
+	tolerance: number
+): TrayDimensions {
 	if (placements.length === 0) {
 		return { width: 0, depth: 0, height: 0 };
 	}
@@ -488,10 +493,22 @@ function createRoundedBox(
 
 	// Create cylinders at 4 corners and hull them
 	const corners = [
-		translate([cx - width / 2 + r, cy - depth / 2 + r, cz], cylinder({ radius: r, height, segments: CORNER_SEGMENTS })),
-		translate([cx + width / 2 - r, cy - depth / 2 + r, cz], cylinder({ radius: r, height, segments: CORNER_SEGMENTS })),
-		translate([cx - width / 2 + r, cy + depth / 2 - r, cz], cylinder({ radius: r, height, segments: CORNER_SEGMENTS })),
-		translate([cx + width / 2 - r, cy + depth / 2 - r, cz], cylinder({ radius: r, height, segments: CORNER_SEGMENTS })),
+		translate(
+			[cx - width / 2 + r, cy - depth / 2 + r, cz],
+			cylinder({ radius: r, height, segments: CORNER_SEGMENTS })
+		),
+		translate(
+			[cx + width / 2 - r, cy - depth / 2 + r, cz],
+			cylinder({ radius: r, height, segments: CORNER_SEGMENTS })
+		),
+		translate(
+			[cx - width / 2 + r, cy + depth / 2 - r, cz],
+			cylinder({ radius: r, height, segments: CORNER_SEGMENTS })
+		),
+		translate(
+			[cx + width / 2 - r, cy + depth / 2 - r, cz],
+			cylinder({ radius: r, height, segments: CORNER_SEGMENTS })
+		)
 	];
 
 	return hull(...corners);
@@ -516,24 +533,20 @@ export function createBox(box: Box): Geom3 | null {
 	const innerCornerRadius = Math.max(cornerRadius - box.wallThickness, 1);
 
 	// Create outer shell with rounded corners
-	const outer = createRoundedBox(
-		exteriorWidth,
-		exteriorDepth,
-		exteriorHeight,
-		cornerRadius,
-		[exteriorWidth / 2, exteriorDepth / 2, exteriorHeight / 2]
-	);
+	const outer = createRoundedBox(exteriorWidth, exteriorDepth, exteriorHeight, cornerRadius, [
+		exteriorWidth / 2,
+		exteriorDepth / 2,
+		exteriorHeight / 2
+	]);
 
 	// Create interior cavity with rounded corners
 	const inner = translate(
 		[box.wallThickness, box.wallThickness, box.floorThickness],
-		createRoundedBox(
-			interior.width,
-			interior.depth,
-			interior.height + 1,
-			innerCornerRadius,
-			[interior.width / 2, interior.depth / 2, (interior.height + 1) / 2]
-		)
+		createRoundedBox(interior.width, interior.depth, interior.height + 1, innerCornerRadius, [
+			interior.width / 2,
+			interior.depth / 2,
+			(interior.height + 1) / 2
+		])
 	);
 
 	let result = subtract(outer, inner);
@@ -581,13 +594,19 @@ export function validateCustomDimensions(box: Box): ValidationResult {
 	const errors: string[] = [];
 
 	if (box.customWidth !== undefined && box.customWidth < minimums.minWidth) {
-		errors.push(`Custom width (${box.customWidth.toFixed(1)}mm) is smaller than minimum required (${minimums.minWidth.toFixed(1)}mm)`);
+		errors.push(
+			`Custom width (${box.customWidth.toFixed(1)}mm) is smaller than minimum required (${minimums.minWidth.toFixed(1)}mm)`
+		);
 	}
 	if (box.customDepth !== undefined && box.customDepth < minimums.minDepth) {
-		errors.push(`Custom depth (${box.customDepth.toFixed(1)}mm) is smaller than minimum required (${minimums.minDepth.toFixed(1)}mm)`);
+		errors.push(
+			`Custom depth (${box.customDepth.toFixed(1)}mm) is smaller than minimum required (${minimums.minDepth.toFixed(1)}mm)`
+		);
 	}
 	if (box.customHeight !== undefined && box.customHeight < minimums.minHeight) {
-		errors.push(`Custom height (${box.customHeight.toFixed(1)}mm) is smaller than minimum required (${minimums.minHeight.toFixed(1)}mm)`);
+		errors.push(
+			`Custom height (${box.customHeight.toFixed(1)}mm) is smaller than minimum required (${minimums.minHeight.toFixed(1)}mm)`
+		);
 	}
 
 	return {
@@ -609,7 +628,7 @@ export function calculateTraySpacers(box: Box): TraySpacerInfo[] {
 	const extraHeight = Math.max(0, targetExteriorHeight - minimums.minHeight);
 
 	// Each tray gets the same floor spacer (keeps all trays flush at top)
-	return placements.map(placement => ({
+	return placements.map((placement) => ({
 		trayId: placement.tray.id,
 		placement,
 		floorSpacerHeight: extraHeight

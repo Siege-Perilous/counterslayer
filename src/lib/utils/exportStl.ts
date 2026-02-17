@@ -3,7 +3,9 @@ import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
 export function exportStl(geometry: Geom3, filename: string = 'counter-tray.stl') {
 	// Serialize to binary STL (handle both ESM and CommonJS module formats)
-	const serialize = stlSerializer.serialize || (stlSerializer as unknown as { default: typeof stlSerializer }).default?.serialize;
+	const serialize =
+		stlSerializer.serialize ||
+		(stlSerializer as unknown as { default: typeof stlSerializer }).default?.serialize;
 	const rawData = serialize({ binary: true }, geometry);
 
 	// Convert to blob

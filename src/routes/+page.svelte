@@ -2,13 +2,29 @@
 	import { browser } from '$app/environment';
 	import { PaneGroup, Pane, PaneResizer } from 'paneforge';
 	import Sidebar from '$lib/components/Sidebar.svelte';
-	import { createCounterTray, getCounterPositions, type CounterStack } from '$lib/models/counterTray';
+	import {
+		createCounterTray,
+		getCounterPositions,
+		type CounterStack
+	} from '$lib/models/counterTray';
 	import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
-	import { arrangeTrays, validateCustomDimensions, calculateTraySpacers, type TrayPlacement } from '$lib/models/box';
+	import {
+		arrangeTrays,
+		validateCustomDimensions,
+		calculateTraySpacers,
+		type TrayPlacement
+	} from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 	import { exportStl } from '$lib/utils/exportStl';
 	import { exportPdfReference } from '$lib/utils/pdfGenerator';
-	import { initProject, getSelectedTray, getSelectedBox, getProject, importProject, resetProject } from '$lib/stores/project.svelte';
+	import {
+		initProject,
+		getSelectedTray,
+		getSelectedBox,
+		getProject,
+		importProject,
+		resetProject
+	} from '$lib/stores/project.svelte';
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
 	import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -130,19 +146,29 @@
 			const maxHeight = Math.max(...placements.map((p) => p.dimensions.height));
 
 			// Find spacer for selected tray
-			const selectedSpacer = spacerInfo.find(s => s.trayId === tray.id);
+			const selectedSpacer = spacerInfo.find((s) => s.trayId === tray.id);
 			const selectedSpacerHeight = selectedSpacer?.floorSpacerHeight ?? 0;
 
 			// Generate selected tray at box height (all trays in a box share the same height)
-			jscadSelectedTray = createCounterTray(tray.params, tray.name, maxHeight, selectedSpacerHeight);
+			jscadSelectedTray = createCounterTray(
+				tray.params,
+				tray.name,
+				maxHeight,
+				selectedSpacerHeight
+			);
 			selectedTrayGeometry = jscadToBufferGeometry(jscadSelectedTray);
 			selectedTrayCounters = getCounterPositions(tray.params, maxHeight, selectedSpacerHeight);
 
 			// Generate all trays at box height with floor spacers
 			allTrayGeometries = placements.map((placement) => {
-				const spacer = spacerInfo.find(s => s.trayId === placement.tray.id);
+				const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
 				const spacerHeight = spacer?.floorSpacerHeight ?? 0;
-				const jscadGeom = createCounterTray(placement.tray.params, placement.tray.name, maxHeight, spacerHeight);
+				const jscadGeom = createCounterTray(
+					placement.tray.params,
+					placement.tray.name,
+					maxHeight,
+					spacerHeight
+				);
 				return {
 					trayId: placement.tray.id,
 					name: placement.tray.name,
@@ -299,7 +325,7 @@
 							boxFloorThickness={selectedBox?.floorThickness ?? 2}
 							{explosionAmount}
 							{showCounters}
-							selectedTrayCounters={selectedTrayCounters}
+							{selectedTrayCounters}
 						/>
 					{/await}
 				{/if}
@@ -311,9 +337,9 @@
 				{/if}
 
 				<!-- View mode buttons -->
-				<div class="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-4">
+				<div class="absolute top-4 left-1/2 flex -translate-x-1/2 items-center gap-4">
 					<div class="flex gap-1 rounded bg-gray-800 p-1">
-						{#each viewModes as { mode, label }}
+						{#each viewModes as { mode, label } (mode)}
 							<button
 								onclick={() => (viewMode = mode)}
 								class="rounded px-3 py-1.5 text-sm font-medium transition {viewMode === mode
@@ -336,7 +362,7 @@
 							/>
 						</div>
 					{/if}
-					<label class="flex items-center gap-2 rounded bg-gray-800 px-3 py-1.5 cursor-pointer">
+					<label class="flex cursor-pointer items-center gap-2 rounded bg-gray-800 px-3 py-1.5">
 						<input
 							type="checkbox"
 							bind:checked={showCounters}
@@ -347,7 +373,7 @@
 				</div>
 
 				<!-- Bottom toolbar -->
-				<div class="absolute bottom-4 left-4 right-4 flex items-center justify-between">
+				<div class="absolute right-4 bottom-4 left-4 flex items-center justify-between">
 					<div class="flex gap-2">
 						<button
 							onclick={regenerate}
@@ -386,7 +412,12 @@
 					<div class="flex gap-2">
 						<button
 							onclick={handleExport}
-							disabled={generating || (viewMode === 'box' ? !jscadBox : viewMode === 'lid' ? !jscadLid : !jscadSelectedTray)}
+							disabled={generating ||
+								(viewMode === 'box'
+									? !jscadBox
+									: viewMode === 'lid'
+										? !jscadLid
+										: !jscadSelectedTray)}
 							class="rounded bg-green-600 px-4 py-2 font-medium transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							Export {viewMode === 'box' ? 'Box' : viewMode === 'lid' ? 'Lid' : 'Tray'} STL
@@ -409,14 +440,18 @@
 				</div>
 
 				{#if error}
-					<div class="absolute top-16 left-1/2 -translate-x-1/2 rounded bg-red-900 px-4 py-2 text-sm text-red-200">
+					<div
+						class="absolute top-16 left-1/2 -translate-x-1/2 rounded bg-red-900 px-4 py-2 text-sm text-red-200"
+					>
 						{error}
 					</div>
 				{/if}
 			</main>
 		</Pane>
 
-		<PaneResizer class="group relative flex h-1.5 items-center justify-center bg-gray-700 hover:bg-gray-600">
+		<PaneResizer
+			class="group relative flex h-1.5 items-center justify-center bg-gray-700 hover:bg-gray-600"
+		>
 			<div class="h-0.5 w-12 rounded-full bg-gray-500 group-hover:bg-gray-400"></div>
 		</PaneResizer>
 

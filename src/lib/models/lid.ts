@@ -3,10 +3,9 @@ import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { Box, LidParams } from '$lib/types/project';
 import { arrangeTrays, getBoxInteriorDimensions, calculateMinimumBoxDimensions } from './box';
 
-const { cuboid, roundedCuboid, cylinder } = jscad.primitives;
+const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
-const { translate, rotateX, rotateY, rotateZ, scale, mirrorX, mirrorY } = jscad.transforms;
-const { hull } = jscad.hulls;
+const { translate, rotateX, rotateY, rotateZ, scale, mirrorY } = jscad.transforms;
 const { vectorText } = jscad.text;
 const { path2 } = jscad.geometries;
 const { expand } = jscad.expansions;
@@ -49,9 +48,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
 	if (interior.width <= 0 || interior.depth <= 0 || interior.height <= 0) {
-		throw new Error(
-			`Box "${box.name}": Invalid dimensions. Add counter stacks to trays.`
-		);
+		throw new Error(`Box "${box.name}": Invalid dimensions. Add counter stacks to trays.`);
 	}
 
 	const wall = box.wallThickness;
@@ -68,9 +65,8 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	const extHeight = box.customHeight ?? minimums.minHeight;
 
 	// Calculate gaps for fill logic
-	const widthGap = extWidth - minimums.minWidth;  // Extra space at east (high X)
-	const depthGap = extDepth - minimums.minDepth;  // Extra space at north (high Y)
-	const heightGap = extHeight - minimums.minHeight;  // Extra space above trays
+	const widthGap = extWidth - minimums.minWidth; // Extra space at east (high X)
+	const depthGap = extDepth - minimums.minDepth; // Extra space at north (high Y)
 
 	// Whether to fill gaps with solid material
 	const fillSolid = box.fillSolidEmpty ?? false;
@@ -88,7 +84,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	// Each tray gets its own form-fitting pocket with tolerance
 	const trayCavities: Geom3[] = [];
 	const fillCells: Geom3[] = [];
-	const backWalls: Geom3[] = [];  // Walls at back of shorter trays in mixed-depth rows
+	const backWalls: Geom3[] = []; // Walls at back of shorter trays in mixed-depth rows
 
 	// Find the widest tray to calculate fill areas
 	const maxTrayWidth = Math.max(...placements.map((p) => p.dimensions.width));
@@ -118,11 +114,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 
 		const cavity = cuboid({
 			size: [pocketWidth, pocketDepth, pocketHeight],
-			center: [
-				pocketX + pocketWidth / 2,
-				pocketY + pocketDepth / 2,
-				floor + pocketHeight / 2
-			]
+			center: [pocketX + pocketWidth / 2, pocketY + pocketDepth / 2, floor + pocketHeight / 2]
 		});
 		trayCavities.push(cavity);
 
@@ -132,12 +124,12 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		const spaceRemaining = maxTrayWidth - trayEndX;
 
 		// Check if any other tray occupies space to the right in the same row
-		const hasNeighborToRight = placements.some(other =>
-			other !== placement &&
-			other.y === placement.y &&  // Same row (same Y position)
-			other.x >= trayEndX  // To the right of this tray
+		const hasNeighborToRight = placements.some(
+			(other) =>
+				other !== placement &&
+				other.y === placement.y && // Same row (same Y position)
+				other.x >= trayEndX // To the right of this tray
 		);
-
 
 		if (spaceRemaining > wall && !hasNeighborToRight) {
 			/*
@@ -185,9 +177,9 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			const fillHeight = actualInteriorHeight + 1;
 
 			// Check if previous row has POCKETS at this fill cell's X range
-			const prevRowY = sortedRowYs.filter(y => y < placement.y).pop();
+			const prevRowY = sortedRowYs.filter((y) => y < placement.y).pop();
 			const prevRowTrays = prevRowY !== undefined ? rowMap.get(prevRowY) || [] : [];
-			const prevRowPocketOverlap = prevRowTrays.some(t => {
+			const prevRowPocketOverlap = prevRowTrays.some((t) => {
 				const trayXStart = wall + t.x;
 				const trayXEnd = trayXStart + t.dimensions.width + tolerance * 2;
 				return trayXEnd > fillX && trayXStart < fillXEnd;
@@ -197,14 +189,14 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			// - If prev row has POCKET at this X range: front offset (pocket extends into this row)
 			// - If prev row has only FILL at this X range: no front offset (start at same Y as pocket)
 			const fillY = prevRowPocketOverlap
-				? pocketY + tolerance * 2 + wall  // Front offset: wall from prev pocket
-				: pocketY;                         // No front offset: wall from prev fill's back offset
+				? pocketY + tolerance * 2 + wall // Front offset: wall from prev pocket
+				: pocketY; // No front offset: wall from prev fill's back offset
 
 			// Find next row boundary and check if it has pockets at this X range
-			const nextRowY = sortedRowYs.find(y => y > placement.y);
+			const nextRowY = sortedRowYs.find((y) => y > placement.y);
 			const nextRowStart = nextRowY !== undefined ? wall + nextRowY : null;
 			const nextRowTrays = nextRowY !== undefined ? rowMap.get(nextRowY) || [] : [];
-			const nextRowPocketOverlap = nextRowTrays.some(t => {
+			const nextRowPocketOverlap = nextRowTrays.some((t) => {
 				const trayXStart = wall + t.x;
 				const trayXEnd = trayXStart + t.dimensions.width + tolerance * 2;
 				return trayXEnd > fillX && trayXStart < fillXEnd;
@@ -234,7 +226,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 					const bridgeXStart = maxPocketXEnd;
 					const bridgeWidth = fillXEnd - bridgeXStart;
 					const bridgeY = fillY;
-					const bridgeEnd = targetFillEnd;  // Same Y as main fill (with back offset) for consistent wall
+					const bridgeEnd = targetFillEnd; // Same Y as main fill (with back offset) for consistent wall
 					const bridgeDepth = bridgeEnd - bridgeY;
 
 					if (bridgeWidth > 0 && bridgeDepth > 0) {
@@ -272,9 +264,8 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	const gapFills: Geom3[] = [];
 
 	// The tray area ends at the auto-calculated box interior + wall
-	const trayAreaEndX = minimums.minWidth - wall;  // Inner edge of east wall for auto-sized box
-	const trayAreaEndY = minimums.minDepth - wall;  // Inner edge of north wall for auto-sized box
-	const trayAreaHeight = interior.height;
+	const trayAreaEndX = minimums.minWidth - wall; // Inner edge of east wall for auto-sized box
+	const trayAreaEndY = minimums.minDepth - wall; // Inner edge of north wall for auto-sized box
 
 	if (fillSolid) {
 		// SOLID FILL MODE: Fill width/depth gaps with solid material
@@ -284,11 +275,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		if (widthGap > 0) {
 			const eastFill = cuboid({
 				size: [widthGap, extDepth - wall * 2, actualInteriorHeight],
-				center: [
-					trayAreaEndX + widthGap / 2,
-					extDepth / 2,
-					floor + actualInteriorHeight / 2
-				]
+				center: [trayAreaEndX + widthGap / 2, extDepth / 2, floor + actualInteriorHeight / 2]
 			});
 			gapFills.push(eastFill);
 		}
@@ -326,7 +313,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			const eastWall = cuboid({
 				size: [wall, interior.depth, actualInteriorHeight],
 				center: [
-					wall + interior.width + wall / 2,  // Just past tray area
+					wall + interior.width + wall / 2, // Just past tray area
 					wall + interior.depth / 2,
 					floor + actualInteriorHeight / 2
 				]
@@ -352,7 +339,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 				size: [interior.width, wall, actualInteriorHeight],
 				center: [
 					wall + interior.width / 2,
-					wall + interior.depth + wall / 2,  // Just past tray area
+					wall + interior.depth + wall / 2, // Just past tray area
 					floor + actualInteriorHeight / 2
 				]
 			});
@@ -410,13 +397,13 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		// Entry is at low X if sliding along X, low Y if sliding along Y
 		const entryWallKeep = slidesAlongX
 			? cuboid({
-				size: [wall, extDepth + 1, recessHeight + 1],
-				center: [wall / 2, extDepth / 2, extHeight - recessHeight / 2]
-			})
+					size: [wall, extDepth + 1, recessHeight + 1],
+					center: [wall / 2, extDepth / 2, extHeight - recessHeight / 2]
+				})
 			: cuboid({
-				size: [extWidth + 1, wall, recessHeight + 1],
-				center: [extWidth / 2, wall / 2, extHeight - recessHeight / 2]
-			});
+					size: [extWidth + 1, wall, recessHeight + 1],
+					center: [extWidth / 2, wall / 2, extHeight - recessHeight / 2]
+				});
 		recess = subtract(outerRecess, innerWallKeep, entryWallKeep);
 	} else {
 		recess = subtract(outerRecess, innerWallKeep);
@@ -545,35 +532,56 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			});
 			const frontBlock = cuboid({
 				size: [sideGrooveLength + grooveDepth, grooveDepth, grooveDepth],
-				center: [wall + (sideGrooveLength + grooveDepth) / 2, wall / 2 + grooveDepth / 2, grooveTopZ - grooveDepth / 2]
+				center: [
+					wall + (sideGrooveLength + grooveDepth) / 2,
+					wall / 2 + grooveDepth / 2,
+					grooveTopZ - grooveDepth / 2
+				]
 			});
 			const backBlock = cuboid({
 				size: [sideGrooveLength + grooveDepth, grooveDepth, grooveDepth],
-				center: [wall + (sideGrooveLength + grooveDepth) / 2, extDepth - wall / 2 - grooveDepth / 2, grooveTopZ - grooveDepth / 2]
+				center: [
+					wall + (sideGrooveLength + grooveDepth) / 2,
+					extDepth - wall / 2 - grooveDepth / 2,
+					grooveTopZ - grooveDepth / 2
+				]
 			});
 
 			let supportBlock = union(rightBlock, frontBlock, backBlock);
 
 			const rightCut = translate(
 				[extWidth - wall / 2, extDepth / 2, grooveTopZ - grooveDepth],
-				rotateY(Math.PI / 4, cuboid({
-					size: [chamferSize, innerWallDepth + grooveDepth * 2, chamferSize],
-					center: [0, 0, 0]
-				}))
+				rotateY(
+					Math.PI / 4,
+					cuboid({
+						size: [chamferSize, innerWallDepth + grooveDepth * 2, chamferSize],
+						center: [0, 0, 0]
+					})
+				)
 			);
 			const frontCut = translate(
 				[wall + (sideGrooveLength + grooveDepth) / 2, wall / 2, grooveTopZ - grooveDepth],
-				rotateX(-Math.PI / 4, cuboid({
-					size: [sideGrooveLength + grooveDepth * 2, chamferSize, chamferSize],
-					center: [0, 0, 0]
-				}))
+				rotateX(
+					-Math.PI / 4,
+					cuboid({
+						size: [sideGrooveLength + grooveDepth * 2, chamferSize, chamferSize],
+						center: [0, 0, 0]
+					})
+				)
 			);
 			const backCut = translate(
-				[wall + (sideGrooveLength + grooveDepth) / 2, extDepth - wall / 2, grooveTopZ - grooveDepth],
-				rotateX(Math.PI / 4, cuboid({
-					size: [sideGrooveLength + grooveDepth * 2, chamferSize, chamferSize],
-					center: [0, 0, 0]
-				}))
+				[
+					wall + (sideGrooveLength + grooveDepth) / 2,
+					extDepth - wall / 2,
+					grooveTopZ - grooveDepth
+				],
+				rotateX(
+					Math.PI / 4,
+					cuboid({
+						size: [sideGrooveLength + grooveDepth * 2, chamferSize, chamferSize],
+						center: [0, 0, 0]
+					})
+				)
 			);
 
 			supportBlock = subtract(supportBlock, rightCut, frontCut, backCut);
@@ -588,35 +596,56 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			});
 			const leftBlock = cuboid({
 				size: [grooveDepth, sideGrooveLength + grooveDepth, grooveDepth],
-				center: [wall / 2 + grooveDepth / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth / 2]
+				center: [
+					wall / 2 + grooveDepth / 2,
+					wall + (sideGrooveLength + grooveDepth) / 2,
+					grooveTopZ - grooveDepth / 2
+				]
 			});
 			const rightBlock = cuboid({
 				size: [grooveDepth, sideGrooveLength + grooveDepth, grooveDepth],
-				center: [extWidth - wall / 2 - grooveDepth / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth / 2]
+				center: [
+					extWidth - wall / 2 - grooveDepth / 2,
+					wall + (sideGrooveLength + grooveDepth) / 2,
+					grooveTopZ - grooveDepth / 2
+				]
 			});
 
 			let supportBlock = union(backBlock, leftBlock, rightBlock);
 
 			const backCut = translate(
 				[extWidth / 2, extDepth - wall / 2, grooveTopZ - grooveDepth],
-				rotateX(Math.PI / 4, cuboid({
-					size: [innerWallWidth + grooveDepth * 2, chamferSize, chamferSize],
-					center: [0, 0, 0]
-				}))
+				rotateX(
+					Math.PI / 4,
+					cuboid({
+						size: [innerWallWidth + grooveDepth * 2, chamferSize, chamferSize],
+						center: [0, 0, 0]
+					})
+				)
 			);
 			const leftCut = translate(
 				[wall / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth],
-				rotateY(-Math.PI / 4, cuboid({
-					size: [chamferSize, sideGrooveLength + grooveDepth * 2, chamferSize],
-					center: [0, 0, 0]
-				}))
+				rotateY(
+					-Math.PI / 4,
+					cuboid({
+						size: [chamferSize, sideGrooveLength + grooveDepth * 2, chamferSize],
+						center: [0, 0, 0]
+					})
+				)
 			);
 			const rightCut = translate(
-				[extWidth - wall / 2, wall + (sideGrooveLength + grooveDepth) / 2, grooveTopZ - grooveDepth],
-				rotateY(Math.PI / 4, cuboid({
-					size: [chamferSize, sideGrooveLength + grooveDepth * 2, chamferSize],
-					center: [0, 0, 0]
-				}))
+				[
+					extWidth - wall / 2,
+					wall + (sideGrooveLength + grooveDepth) / 2,
+					grooveTopZ - grooveDepth
+				],
+				rotateY(
+					Math.PI / 4,
+					cuboid({
+						size: [chamferSize, sideGrooveLength + grooveDepth * 2, chamferSize],
+						center: [0, 0, 0]
+					})
+				)
 			);
 
 			supportBlock = subtract(supportBlock, backCut, leftCut, rightCut);
@@ -628,23 +657,29 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 		const detentLength = snapBumpWidth * 2;
 		const detentNotch = slidesAlongX
 			? translate(
-				[wall / 2, extDepth / 2, extHeight],
-				rotateX(Math.PI / 2, cylinder({
-					radius: detentRadius,
-					height: detentLength,
-					segments: 32,
-					center: [0, 0, 0]
-				}))
-			)
+					[wall / 2, extDepth / 2, extHeight],
+					rotateX(
+						Math.PI / 2,
+						cylinder({
+							radius: detentRadius,
+							height: detentLength,
+							segments: 32,
+							center: [0, 0, 0]
+						})
+					)
+				)
 			: translate(
-				[extWidth / 2, wall / 2, extHeight],
-				rotateY(Math.PI / 2, cylinder({
-					radius: detentRadius,
-					height: detentLength,
-					segments: 32,
-					center: [0, 0, 0]
-				}))
-			);
+					[extWidth / 2, wall / 2, extHeight],
+					rotateY(
+						Math.PI / 2,
+						cylinder({
+							radius: detentRadius,
+							height: detentLength,
+							segments: 32,
+							center: [0, 0, 0]
+						})
+					)
+				);
 		result = subtract(result, detentNotch);
 
 		// Add grip lines near exit side (opposite entry)
@@ -711,22 +746,30 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 
 		// Add tray name label to the left of the hole
 		if (p.tray.name && p.tray.name.trim().length > 0) {
-			const textSegments = vectorText({ height: labelTextHeight, align: 'center' }, p.tray.name.trim().toUpperCase());
+			const textSegments = vectorText(
+				{ height: labelTextHeight, align: 'center' },
+				p.tray.name.trim().toUpperCase()
+			);
 
 			if (textSegments.length > 0) {
 				const textShapes: Geom3[] = [];
 				for (const segment of textSegments) {
 					if (segment.length >= 2) {
 						const pathObj = path2.fromPoints({ closed: false }, segment);
-						const expanded = expand({ delta: labelStrokeWidth / 2, corners: 'round', segments: 32 }, pathObj);
+						const expanded = expand(
+							{ delta: labelStrokeWidth / 2, corners: 'round', segments: 32 },
+							pathObj
+						);
 						const extruded = extrudeLinear({ height: labelTextDepth + 0.1 }, expanded);
 						textShapes.push(extruded);
 					}
 				}
 
 				if (textShapes.length > 0) {
-					let minX = Infinity, maxX = -Infinity;
-					let minY = Infinity, maxY = -Infinity;
+					let minX = Infinity,
+						maxX = -Infinity;
+					let minY = Infinity,
+						maxY = -Infinity;
 					for (const segment of textSegments) {
 						for (const point of segment) {
 							minX = Math.min(minX, point[0]);
@@ -745,7 +788,13 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 
 					if (availableWidth > 10) {
 						// Scale text to fit
-						const textScale = Math.min(1, Math.min(availableWidth / textWidthCalc, (p.dimensions.depth - wall * 2) / textHeightY));
+						const textScale = Math.min(
+							1,
+							Math.min(
+								availableWidth / textWidthCalc,
+								(p.dimensions.depth - wall * 2) / textHeightY
+							)
+						);
 						const textCenterX = (minX + maxX) / 2;
 						const textCenterY = (minY + maxY) / 2;
 
@@ -753,11 +802,15 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 						const labelX = trayLeftEdge + availableWidth / 2;
 						const labelY = centerY;
 
-						let combinedText: Geom3 = union(...textShapes);
+						const combinedText: Geom3 = union(...textShapes);
 
 						// Position on inner floor surface (Z = floor), cutting down into the floor
 						const positionedText = translate(
-							[labelX - textCenterX * textScale, labelY - textCenterY * textScale, floor - labelTextDepth],
+							[
+								labelX - textCenterX * textScale,
+								labelY - textCenterY * textScale,
+								floor - labelTextDepth
+							],
 							scale([textScale, textScale, 1], combinedText)
 						);
 						result = subtract(result, positionedText);
@@ -768,26 +821,6 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	}
 
 	return result;
-}
-
-/**
- * Create a snap bump - a half-cylinder that protrudes from the lid wall.
- * The bump has a gentle ramp on entry side for easier snapping.
- */
-function createSnapBump(
-	bumpHeight: number,
-	bumpWidth: number,
-	lipHeight: number
-): Geom3 {
-	// Half-cylinder bump rotated to lie along the wall
-	// Height of cylinder = width of bump along the wall
-	const bump = cylinder({
-		radius: bumpHeight,
-		height: bumpWidth,
-		segments: 16
-	});
-	// Rotate so cylinder axis is along X (bump protrudes in Y)
-	return rotateY(Math.PI / 2, bump);
 }
 
 /**
@@ -987,24 +1020,33 @@ export function createLid(box: Box): Geom3 | null {
 			// Chamfer cuts
 			const rightCut = translate(
 				[innerRightX - railThickness, extDepth / 2, bottomZ],
-				rotateY(Math.PI / 4, cuboid({
-					size: [chamferSize, innerBackY - innerFrontY + railThickness * 4, chamferSize],
-					center: [0, 0, 0]
-				}))
+				rotateY(
+					Math.PI / 4,
+					cuboid({
+						size: [chamferSize, innerBackY - innerFrontY + railThickness * 4, chamferSize],
+						center: [0, 0, 0]
+					})
+				)
 			);
 			const frontCut = translate(
 				[sideRailCenterX, innerFrontY + railThickness, bottomZ],
-				rotateX(-Math.PI / 4, cuboid({
-					size: [sideRailLength + railThickness * 2, chamferSize, chamferSize],
-					center: [0, 0, 0]
-				}))
+				rotateX(
+					-Math.PI / 4,
+					cuboid({
+						size: [sideRailLength + railThickness * 2, chamferSize, chamferSize],
+						center: [0, 0, 0]
+					})
+				)
 			);
 			const backCut = translate(
 				[sideRailCenterX, innerBackY - railThickness, bottomZ],
-				rotateX(Math.PI / 4, cuboid({
-					size: [sideRailLength + railThickness * 2, chamferSize, chamferSize],
-					center: [0, 0, 0]
-				}))
+				rotateX(
+					Math.PI / 4,
+					cuboid({
+						size: [sideRailLength + railThickness * 2, chamferSize, chamferSize],
+						center: [0, 0, 0]
+					})
+				)
 			);
 
 			const rightRailChamfered = subtract(rightRailBlock, rightCut);
@@ -1019,12 +1061,15 @@ export function createLid(box: Box): Geom3 | null {
 			const topPlateInnerZ = lidHeight - lipHeight;
 			const detentBump = translate(
 				[wall / 2, extDepth / 2, topPlateInnerZ],
-				rotateX(Math.PI / 2, cylinder({
-					radius: detentRadius,
-					height: detentLength,
-					segments: 32,
-					center: [0, 0, 0]
-				}))
+				rotateX(
+					Math.PI / 2,
+					cylinder({
+						radius: detentRadius,
+						height: detentLength,
+						segments: 32,
+						center: [0, 0, 0]
+					})
+				)
 			);
 			lid = union(lid, detentBump);
 		} else {
@@ -1053,24 +1098,33 @@ export function createLid(box: Box): Geom3 | null {
 			// Chamfer cuts
 			const backCut = translate(
 				[extWidth / 2, innerBackY - railThickness, bottomZ],
-				rotateX(Math.PI / 4, cuboid({
-					size: [innerRightX - innerLeftX + railThickness * 4, chamferSize, chamferSize],
-					center: [0, 0, 0]
-				}))
+				rotateX(
+					Math.PI / 4,
+					cuboid({
+						size: [innerRightX - innerLeftX + railThickness * 4, chamferSize, chamferSize],
+						center: [0, 0, 0]
+					})
+				)
 			);
 			const leftCut = translate(
 				[innerLeftX + railThickness, sideRailCenterY, bottomZ],
-				rotateY(-Math.PI / 4, cuboid({
-					size: [chamferSize, sideRailLength + railThickness * 2, chamferSize],
-					center: [0, 0, 0]
-				}))
+				rotateY(
+					-Math.PI / 4,
+					cuboid({
+						size: [chamferSize, sideRailLength + railThickness * 2, chamferSize],
+						center: [0, 0, 0]
+					})
+				)
 			);
 			const rightCut = translate(
 				[innerRightX - railThickness, sideRailCenterY, bottomZ],
-				rotateY(Math.PI / 4, cuboid({
-					size: [chamferSize, sideRailLength + railThickness * 2, chamferSize],
-					center: [0, 0, 0]
-				}))
+				rotateY(
+					Math.PI / 4,
+					cuboid({
+						size: [chamferSize, sideRailLength + railThickness * 2, chamferSize],
+						center: [0, 0, 0]
+					})
+				)
 			);
 
 			const backRailChamfered = subtract(backRailBlock, backCut);
@@ -1085,12 +1139,15 @@ export function createLid(box: Box): Geom3 | null {
 			const topPlateInnerZ = lidHeight - lipHeight;
 			const detentBump = translate(
 				[extWidth / 2, wall / 2, topPlateInnerZ],
-				rotateY(Math.PI / 2, cylinder({
-					radius: detentRadius,
-					height: detentLength,
-					segments: 32,
-					center: [0, 0, 0]
-				}))
+				rotateY(
+					Math.PI / 2,
+					cylinder({
+						radius: detentRadius,
+						height: detentLength,
+						segments: 32,
+						center: [0, 0, 0]
+					})
+				)
 			);
 			lid = union(lid, detentBump);
 		}
@@ -1108,7 +1165,10 @@ export function createLid(box: Box): Geom3 | null {
 		const rotateText = extDepth > extWidth;
 
 		// Get text outlines (uppercase renders better with vector font)
-		const textSegments = vectorText({ height: textHeight, align: 'center' }, box.name.trim().toUpperCase());
+		const textSegments = vectorText(
+			{ height: textHeight, align: 'center' },
+			box.name.trim().toUpperCase()
+		);
 
 		if (textSegments.length > 0) {
 			// Convert segments to path2, expand to give stroke width, and extrude
@@ -1116,7 +1176,10 @@ export function createLid(box: Box): Geom3 | null {
 			for (const segment of textSegments) {
 				if (segment.length >= 2) {
 					const pathObj = path2.fromPoints({ closed: false }, segment);
-					const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 64 }, pathObj);
+					const expanded = expand(
+						{ delta: strokeWidth / 2, corners: 'round', segments: 64 },
+						pathObj
+					);
 					const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
 					textShapes.push(extruded);
 				}
@@ -1124,8 +1187,10 @@ export function createLid(box: Box): Geom3 | null {
 
 			if (textShapes.length > 0) {
 				// Calculate text bounds to center it
-				let minX = Infinity, maxX = -Infinity;
-				let minY = Infinity, maxY = -Infinity;
+				let minX = Infinity,
+					maxX = -Infinity;
+				let minY = Infinity,
+					maxY = -Infinity;
 				for (const segment of textSegments) {
 					for (const point of segment) {
 						minX = Math.min(minX, point[0]);

@@ -1,7 +1,12 @@
 import { jsPDF } from 'jspdf';
-import { arrangeTrays, type TrayPlacement } from '$lib/models/box';
-import { getCounterPositions, type CounterStack, type TopLoadedStackDef, type EdgeLoadedStackDef } from '$lib/models/counterTray';
-import type { Box, Project, Tray } from '$lib/types/project';
+import { arrangeTrays } from '$lib/models/box';
+import {
+	getCounterPositions,
+	type CounterStack,
+	type TopLoadedStackDef,
+	type EdgeLoadedStackDef
+} from '$lib/models/counterTray';
+import type { Project } from '$lib/types/project';
 import { generateBoxDiagramSvg, getBoxDiagramDimensions } from './svgDiagramGenerator';
 
 // PDF data interfaces
@@ -10,16 +15,16 @@ export interface PdfStackData {
 	label: string;
 	count: number;
 	shape: 'square' | 'hex' | 'circle' | 'custom';
-	x: number;  // Center X position in tray
-	y: number;  // Center Y position in tray
-	width: number;  // X dimension of the counter
+	x: number; // Center X position in tray
+	y: number; // Center Y position in tray
+	width: number; // X dimension of the counter
 	length: number; // Y dimension of the counter
 }
 
 export interface PdfTrayData {
-	letter: string;  // Tray letter prefix (A, B, C...)
+	letter: string; // Tray letter prefix (A, B, C...)
 	name: string;
-	x: number;  // Position in box
+	x: number; // Position in box
 	y: number;
 	width: number;
 	depth: number;
@@ -40,17 +45,11 @@ export interface PdfData {
 }
 
 // Generate stack label from definition
-function generateStackLabel(
-	shapeRef: string,
-	count: number,
-	customLabel?: string
-): string {
+function generateStackLabel(shapeRef: string, count: number, customLabel?: string): string {
 	if (customLabel) return customLabel;
 
 	// Generate default label from shape and count
-	const shapeName = shapeRef.startsWith('custom:')
-		? shapeRef.substring(7)
-		: shapeRef;
+	const shapeName = shapeRef.startsWith('custom:') ? shapeRef.substring(7) : shapeRef;
 	return `${shapeName} x${count}`;
 }
 
@@ -62,9 +61,8 @@ function findStackLabel(
 	usedTopIndices: Set<number>,
 	usedEdgeIndices: Set<number>
 ): { label: string; usedIndex: number; isEdge: boolean } {
-	const shapeRef = counterStack.shape === 'custom'
-		? `custom:${counterStack.customShapeName}`
-		: counterStack.shape;
+	const shapeRef =
+		counterStack.shape === 'custom' ? `custom:${counterStack.customShapeName}` : counterStack.shape;
 
 	if (counterStack.isEdgeLoaded) {
 		// Match against edge-loaded stacks
@@ -227,10 +225,7 @@ export async function generatePdf(data: PdfData): Promise<void> {
 		// Calculate diagram scale to fit available width
 		const maxDiagramWidth = USABLE_WIDTH;
 		const maxDiagramHeight = 70;
-		const scale = Math.min(
-			maxDiagramWidth / box.width,
-			maxDiagramHeight / box.depth
-		);
+		const scale = Math.min(maxDiagramWidth / box.width, maxDiagramHeight / box.depth);
 
 		// Get actual SVG dimensions (which account for normalization and label space)
 		const diagramDims = getBoxDiagramDimensions(box, scale);
@@ -277,16 +272,17 @@ export async function generatePdf(data: PdfData): Promise<void> {
 		currentY += diagramHeight + diagramMargin;
 
 		// Table column positions: Ref, Count, Stack Name
-		const colRefEnd = MARGIN_LEFT + 15;   // Right edge for Ref column
+		const colRefEnd = MARGIN_LEFT + 15; // Right edge for Ref column
 		const colCountEnd = MARGIN_LEFT + 35; // Right edge for Count column
-		const colStack = MARGIN_LEFT + 40;    // Left edge for Stack Name
+		const colStack = MARGIN_LEFT + 40; // Left edge for Stack Name
 		const tableWidth = 165;
 		const trayTitleHeight = 8;
 
 		// Draw a table for each tray
 		for (const tray of box.trays) {
 			// Check if we need a new page for this tray's table
-			const trayTableHeight = trayTitleHeight + tableHeaderHeight + tray.stacks.length * tableRowHeight;
+			const trayTableHeight =
+				trayTitleHeight + tableHeaderHeight + tray.stacks.length * tableRowHeight;
 			if (currentY + trayTableHeight > PAGE_HEIGHT - MARGIN_BOTTOM) {
 				doc.addPage();
 				currentY = MARGIN_TOP;

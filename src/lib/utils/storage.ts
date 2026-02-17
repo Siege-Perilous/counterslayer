@@ -1,6 +1,11 @@
 import type { Project, Box, LidParams, Tray } from '$lib/types/project';
 import { defaultLidParams } from '$lib/models/lid';
-import { defaultParams, type CounterTrayParams, type TopLoadedStackDef, type EdgeLoadedStackDef } from '$lib/models/counterTray';
+import {
+	defaultParams,
+	type CounterTrayParams,
+	type TopLoadedStackDef,
+	type EdgeLoadedStackDef
+} from '$lib/models/counterTray';
 
 const STORAGE_KEY = 'counter-tray-project';
 
@@ -21,7 +26,9 @@ function migrateLidParams(stored: Partial<LidParams> | undefined): LidParams {
 }
 
 // Migrate tray params to handle stacks -> topLoadedStacks/edgeLoadedStacks rename
-function migrateTrayParams(params: CounterTrayParams & { stacks?: [string, number][] }): CounterTrayParams {
+function migrateTrayParams(
+	params: CounterTrayParams & { stacks?: [string, number][] }
+): CounterTrayParams {
 	const migrated = { ...defaultParams, ...params };
 
 	// Handle migration from old 'stacks' field to 'topLoadedStacks'
@@ -45,7 +52,7 @@ function migrateTrayParams(params: CounterTrayParams & { stacks?: [string, numbe
 	migrated.topLoadedStacks = migrated.topLoadedStacks.map(([shape, count, label]) => {
 		if (shape.startsWith('custom:')) {
 			const name = shape.substring(7);
-			if (!migrated.customShapes.some(s => s.name === name)) {
+			if (!migrated.customShapes.some((s) => s.name === name)) {
 				return ['square', count, label] as TopLoadedStackDef;
 			}
 		}
@@ -55,7 +62,7 @@ function migrateTrayParams(params: CounterTrayParams & { stacks?: [string, numbe
 	migrated.edgeLoadedStacks = migrated.edgeLoadedStacks.map(([shape, count, orient, label]) => {
 		if (shape.startsWith('custom:')) {
 			const name = shape.substring(7);
-			if (!migrated.customShapes.some(s => s.name === name)) {
+			if (!migrated.customShapes.some((s) => s.name === name)) {
 				return ['square', count, orient, label] as EdgeLoadedStackDef;
 			}
 		}

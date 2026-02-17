@@ -38,7 +38,9 @@
 						shape === `custom:${oldName}` ? [`custom:${newName}`, count] : [shape, count]
 					),
 					edgeLoadedStacks: params.edgeLoadedStacks.map(([shape, count, orient]) =>
-						shape === `custom:${oldName}` ? [`custom:${newName}`, count, orient] : [shape, count, orient]
+						shape === `custom:${oldName}`
+							? [`custom:${newName}`, count, orient]
+							: [shape, count, orient]
 					)
 				});
 				return;
@@ -66,9 +68,7 @@
 
 <div class="h-full space-y-4 overflow-y-auto p-3">
 	<section>
-		<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-			Print Bed
-		</h3>
+		<h3 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">Print Bed</h3>
 		<label class="block">
 			<span class="text-xs text-gray-400">Bed Size (mm)</span>
 			<input
@@ -83,7 +83,7 @@
 	</section>
 
 	<section>
-		<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+		<h3 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
 			Counter Dimensions
 		</h3>
 		<div class="grid grid-cols-2 gap-2">
@@ -150,12 +150,12 @@
 	</section>
 
 	<section>
-		<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+		<h3 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
 			Custom Counters
 		</h3>
 		<div class="space-y-2">
-			{#each params.customShapes as shape, index}
-				<div class="rounded bg-gray-750 p-2">
+			{#each params.customShapes as shape, index (shape.name)}
+				<div class="bg-gray-750 rounded p-2">
 					<div class="mb-2 flex items-center gap-2">
 						<input
 							type="text"
@@ -180,7 +180,8 @@
 								step="0.1"
 								min="1"
 								value={shape.width}
-								onchange={(e) => updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+								onchange={(e) =>
+									updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
 								class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
 							/>
 						</label>
@@ -191,7 +192,8 @@
 								step="0.1"
 								min="1"
 								value={shape.length}
-								onchange={(e) => updateCustomShape(index, 'length', parseFloat(e.currentTarget.value))}
+								onchange={(e) =>
+									updateCustomShape(index, 'length', parseFloat(e.currentTarget.value))}
 								class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
 							/>
 						</label>

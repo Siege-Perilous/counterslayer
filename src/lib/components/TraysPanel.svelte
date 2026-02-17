@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Box, Tray } from '$lib/types/project';
-	import type { CounterTrayParams, EdgeOrientation, TopLoadedStackDef, EdgeLoadedStackDef } from '$lib/models/counterTray';
+	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
 
 	interface Props {
 		selectedBox: Box | null;
@@ -12,7 +12,15 @@
 		onUpdateParams: (params: CounterTrayParams) => void;
 	}
 
-	let { selectedBox, selectedTray, onSelectTray, onAddTray, onDeleteTray, onUpdateTray, onUpdateParams }: Props = $props();
+	let {
+		selectedBox,
+		selectedTray,
+		onSelectTray,
+		onAddTray,
+		onDeleteTray,
+		onUpdateTray,
+		onUpdateParams
+	}: Props = $props();
 
 	// Drag and drop state
 	let draggedIndex: number | null = $state(null);
@@ -63,7 +71,7 @@
 	const builtinShapes = ['square', 'hex', 'circle'] as const;
 	let shapeOptions = $derived([
 		...builtinShapes,
-		...(selectedTray?.params.customShapes.map(s => `custom:${s.name}`) ?? [])
+		...(selectedTray?.params.customShapes.map((s) => `custom:${s.name}`) ?? [])
 	]);
 
 	const orientationOptions: EdgeOrientation[] = ['lengthwise', 'crosswise'];
@@ -91,7 +99,11 @@
 	}
 
 	// Top-loaded stack handlers
-	function updateTopLoadedStack(index: number, field: 'shape' | 'count' | 'label', value: string | number) {
+	function updateTopLoadedStack(
+		index: number,
+		field: 'shape' | 'count' | 'label',
+		value: string | number
+	) {
 		if (!selectedTray) return;
 		const newStacks = [...selectedTray.params.topLoadedStacks];
 		const current = newStacks[index];
@@ -100,14 +112,17 @@
 		} else if (field === 'count') {
 			newStacks[index] = [current[0], value as number, current[2]];
 		} else {
-			newStacks[index] = [current[0], current[1], value as string || undefined];
+			newStacks[index] = [current[0], current[1], (value as string) || undefined];
 		}
 		onUpdateParams({ ...selectedTray.params, topLoadedStacks: newStacks });
 	}
 
 	function addTopLoadedStack() {
 		if (!selectedTray) return;
-		onUpdateParams({ ...selectedTray.params, topLoadedStacks: [...selectedTray.params.topLoadedStacks, ['square', 10, undefined]] });
+		onUpdateParams({
+			...selectedTray.params,
+			topLoadedStacks: [...selectedTray.params.topLoadedStacks, ['square', 10, undefined]]
+		});
 	}
 
 	function removeTopLoadedStack(index: number) {
@@ -117,7 +132,11 @@
 	}
 
 	// Edge-loaded stack handlers
-	function updateEdgeLoadedStack(index: number, field: 'shape' | 'count' | 'orientation' | 'label', value: string | number) {
+	function updateEdgeLoadedStack(
+		index: number,
+		field: 'shape' | 'count' | 'orientation' | 'label',
+		value: string | number
+	) {
 		if (!selectedTray) return;
 		const newStacks = [...selectedTray.params.edgeLoadedStacks];
 		const current = newStacks[index];
@@ -128,14 +147,20 @@
 		} else if (field === 'orientation') {
 			newStacks[index] = [current[0], current[1], value as EdgeOrientation, current[3]];
 		} else {
-			newStacks[index] = [current[0], current[1], current[2], value as string || undefined];
+			newStacks[index] = [current[0], current[1], current[2], (value as string) || undefined];
 		}
 		onUpdateParams({ ...selectedTray.params, edgeLoadedStacks: newStacks });
 	}
 
 	function addEdgeLoadedStack() {
 		if (!selectedTray) return;
-		onUpdateParams({ ...selectedTray.params, edgeLoadedStacks: [...selectedTray.params.edgeLoadedStacks, ['square', 10, 'lengthwise', undefined]] });
+		onUpdateParams({
+			...selectedTray.params,
+			edgeLoadedStacks: [
+				...selectedTray.params.edgeLoadedStacks,
+				['square', 10, 'lengthwise', undefined]
+			]
+		});
 	}
 
 	function removeEdgeLoadedStack(index: number) {
@@ -150,7 +175,7 @@
 	{#if selectedBox}
 		<div class="border-b border-gray-700 p-2">
 			<div class="mb-2 flex items-center justify-between px-1">
-				<span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Trays</span>
+				<span class="text-xs font-semibold tracking-wide text-gray-400 uppercase">Trays</span>
 				<button
 					onclick={() => onAddTray(selectedBox.id)}
 					class="rounded bg-gray-700 px-2 py-0.5 text-xs hover:bg-gray-600"
@@ -162,7 +187,10 @@
 				{#each selectedBox.trays as tray (tray.id)}
 					{@const stats = getTrayStats(tray)}
 					<div
-						class="flex cursor-pointer items-center justify-between rounded px-2 py-1 text-sm {selectedTray?.id === tray.id ? 'bg-blue-600' : 'hover:bg-gray-700'}"
+						class="flex cursor-pointer items-center justify-between rounded px-2 py-1 text-sm {selectedTray?.id ===
+						tray.id
+							? 'bg-blue-600'
+							: 'hover:bg-gray-700'}"
 						onclick={() => onSelectTray(tray)}
 						role="button"
 						tabindex="0"
@@ -173,7 +201,10 @@
 							<span class="text-xs text-gray-400">{stats.counters} in {stats.stacks}</span>
 							{#if selectedBox.trays.length > 1}
 								<button
-									onclick={(e) => { e.stopPropagation(); onDeleteTray(selectedBox.id, tray.id); }}
+									onclick={(e) => {
+										e.stopPropagation();
+										onDeleteTray(selectedBox.id, tray.id);
+									}}
 									class="rounded px-1 text-xs text-gray-400 hover:bg-red-600 hover:text-white"
 									title="Delete tray"
 								>
@@ -197,13 +228,13 @@
 					type="text"
 					value={selectedTray.name}
 					onchange={(e) => onUpdateTray({ name: (e.currentTarget as HTMLInputElement).value })}
-					class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+					class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
 				/>
 			</label>
 
 			<!-- Tray Settings -->
 			<section>
-				<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Settings</h3>
+				<h3 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">Settings</h3>
 				<div class="grid grid-cols-2 gap-2">
 					<label class="block">
 						<span class="text-xs text-gray-400">Clearance</span>
@@ -272,7 +303,7 @@
 
 			<!-- Tray Override -->
 			<section>
-				<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Override</h3>
+				<h3 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">Override</h3>
 				<div class="grid grid-cols-2 gap-2">
 					<label class="col-span-2 block">
 						<span class="text-xs text-gray-400">Length (0 = auto)</span>
@@ -311,11 +342,16 @@
 
 			<!-- Top-Loaded Stacks -->
 			<section>
-				<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Top-Loaded Stacks</h3>
+				<h3 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
+					Top-Loaded Stacks
+				</h3>
 				<div class="space-y-1">
-					{#each selectedTray.params.topLoadedStacks as stack, index}
+					{#each selectedTray.params.topLoadedStacks as stack, index (index)}
 						<div
-							class="flex items-center gap-1 rounded {dragOverIndex === index && draggedType === 'top' ? 'bg-blue-900/30' : ''}"
+							class="flex items-center gap-1 rounded {dragOverIndex === index &&
+							draggedType === 'top'
+								? 'bg-blue-900/30'
+								: ''}"
 							role="listitem"
 							ondragover={(e) => handleDragOver(e, index, 'top')}
 							ondrop={(e) => handleDrop(e, index, 'top')}
@@ -344,7 +380,7 @@
 								onchange={(e) => updateTopLoadedStack(index, 'shape', e.currentTarget.value)}
 								class="w-16 rounded border-gray-600 bg-gray-700 px-1 py-1 text-sm"
 							>
-								{#each shapeOptions as shapeOpt}
+								{#each shapeOptions as shapeOpt (shapeOpt)}
 									<option value={shapeOpt}>{getShapeDisplayName(shapeOpt)}</option>
 								{/each}
 							</select>
@@ -352,7 +388,8 @@
 								type="number"
 								min="1"
 								value={stack[1]}
-								onchange={(e) => updateTopLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
+								onchange={(e) =>
+									updateTopLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
 								class="w-14 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
 							/>
 							<button
@@ -374,11 +411,16 @@
 
 			<!-- Edge-Loaded Stacks -->
 			<section>
-				<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Edge-Loaded Stacks</h3>
+				<h3 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
+					Edge-Loaded Stacks
+				</h3>
 				<div class="space-y-1">
-					{#each selectedTray.params.edgeLoadedStacks as stack, index}
+					{#each selectedTray.params.edgeLoadedStacks as stack, index (index)}
 						<div
-							class="flex items-center gap-1 rounded {dragOverIndex === index && draggedType === 'edge' ? 'bg-blue-900/30' : ''}"
+							class="flex items-center gap-1 rounded {dragOverIndex === index &&
+							draggedType === 'edge'
+								? 'bg-blue-900/30'
+								: ''}"
 							role="listitem"
 							ondragover={(e) => handleDragOver(e, index, 'edge')}
 							ondrop={(e) => handleDrop(e, index, 'edge')}
@@ -407,7 +449,7 @@
 								onchange={(e) => updateEdgeLoadedStack(index, 'shape', e.currentTarget.value)}
 								class="w-16 rounded border-gray-600 bg-gray-700 px-1 py-1 text-sm"
 							>
-								{#each shapeOptions as shapeOpt}
+								{#each shapeOptions as shapeOpt (shapeOpt)}
 									<option value={shapeOpt}>{getShapeDisplayName(shapeOpt)}</option>
 								{/each}
 							</select>
@@ -415,7 +457,8 @@
 								type="number"
 								min="1"
 								value={stack[1]}
-								onchange={(e) => updateEdgeLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
+								onchange={(e) =>
+									updateEdgeLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
 								class="w-12 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
 							/>
 							<select
@@ -423,7 +466,7 @@
 								onchange={(e) => updateEdgeLoadedStack(index, 'orientation', e.currentTarget.value)}
 								class="w-20 rounded border-gray-600 bg-gray-700 px-1 py-1 text-xs"
 							>
-								{#each orientationOptions as orientation}
+								{#each orientationOptions as orientation (orientation)}
 									<option value={orientation}>{orientation.slice(0, 6)}</option>
 								{/each}
 							</select>

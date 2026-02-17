@@ -13,25 +13,29 @@
 
 	let { project, selectedBox, onSelectBox, onAddBox, onDeleteBox, onUpdateBox }: Props = $props();
 
-	const minimums = $derived(selectedBox ? calculateMinimumBoxDimensions(selectedBox) : { minWidth: 0, minDepth: 0, minHeight: 0 });
+	const minimums = $derived(
+		selectedBox
+			? calculateMinimumBoxDimensions(selectedBox)
+			: { minWidth: 0, minDepth: 0, minHeight: 0 }
+	);
 </script>
 
 <div class="flex h-full flex-col overflow-hidden">
 	<!-- Box List -->
 	<div class="border-b border-gray-700 p-2">
 		<div class="mb-2 flex items-center justify-between px-1">
-			<span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Boxes</span>
-			<button
-				onclick={onAddBox}
-				class="rounded bg-gray-700 px-2 py-0.5 text-xs hover:bg-gray-600"
-			>
+			<span class="text-xs font-semibold tracking-wide text-gray-400 uppercase">Boxes</span>
+			<button onclick={onAddBox} class="rounded bg-gray-700 px-2 py-0.5 text-xs hover:bg-gray-600">
 				+ New
 			</button>
 		</div>
 		<div class="max-h-24 space-y-1 overflow-y-auto">
 			{#each project.boxes as box (box.id)}
 				<div
-					class="flex cursor-pointer items-center justify-between rounded px-2 py-1 text-sm {selectedBox?.id === box.id ? 'bg-blue-600' : 'hover:bg-gray-700'}"
+					class="flex cursor-pointer items-center justify-between rounded px-2 py-1 text-sm {selectedBox?.id ===
+					box.id
+						? 'bg-blue-600'
+						: 'hover:bg-gray-700'}"
 					onclick={() => onSelectBox(box)}
 					role="button"
 					tabindex="0"
@@ -40,7 +44,10 @@
 					<span class="truncate">{box.name}</span>
 					{#if project.boxes.length > 1}
 						<button
-							onclick={(e) => { e.stopPropagation(); onDeleteBox(box.id); }}
+							onclick={(e) => {
+								e.stopPropagation();
+								onDeleteBox(box.id);
+							}}
 							class="ml-2 rounded px-1 text-xs text-gray-400 hover:bg-red-600 hover:text-white"
 							title="Delete box"
 						>
@@ -62,7 +69,7 @@
 					type="text"
 					value={selectedBox.name}
 					onchange={(e) => onUpdateBox({ name: (e.target as HTMLInputElement).value })}
-					class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+					class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
 				/>
 			</div>
 
@@ -75,8 +82,9 @@
 						step="0.1"
 						min="0"
 						value={selectedBox.tolerance}
-						onchange={(e) => onUpdateBox({ tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5 })}
-						class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+						onchange={(e) =>
+							onUpdateBox({ tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5 })}
+						class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
 					/>
 				</div>
 				<div>
@@ -87,8 +95,11 @@
 						step="0.5"
 						min="1"
 						value={selectedBox.wallThickness}
-						onchange={(e) => onUpdateBox({ wallThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0 })}
-						class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+						onchange={(e) =>
+							onUpdateBox({
+								wallThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
+							})}
+						class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
 					/>
 				</div>
 				<div class="col-span-2">
@@ -99,15 +110,20 @@
 						step="0.5"
 						min="1"
 						value={selectedBox.floorThickness}
-						onchange={(e) => onUpdateBox({ floorThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0 })}
-						class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+						onchange={(e) =>
+							onUpdateBox({
+								floorThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
+							})}
+						class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
 					/>
 				</div>
 			</div>
 
 			<!-- Custom Size -->
 			<div class="border-t border-gray-700 pt-3">
-				<h4 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Custom Size</h4>
+				<h4 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
+					Custom Size
+				</h4>
 				<p class="mb-2 text-xs text-gray-500">Leave empty for auto-sizing.</p>
 				<div class="space-y-2">
 					<div>
@@ -125,7 +141,7 @@
 								onUpdateBox({ customWidth: v ? parseFloat(v) : undefined });
 							}}
 							placeholder="Auto"
-							class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+							class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
 						/>
 					</div>
 					<div>
@@ -143,7 +159,7 @@
 								onUpdateBox({ customDepth: v ? parseFloat(v) : undefined });
 							}}
 							placeholder="Auto"
-							class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+							class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
 						/>
 					</div>
 					<div>
@@ -161,7 +177,7 @@
 								onUpdateBox({ customHeight: v ? parseFloat(v) : undefined });
 							}}
 							placeholder="Auto"
-							class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+							class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
 						/>
 					</div>
 				</div>
@@ -170,7 +186,8 @@
 					<input
 						type="checkbox"
 						checked={selectedBox.fillSolidEmpty ?? false}
-						onchange={(e) => onUpdateBox({ fillSolidEmpty: (e.target as HTMLInputElement).checked })}
+						onchange={(e) =>
+							onUpdateBox({ fillSolidEmpty: (e.target as HTMLInputElement).checked })}
 						class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
 					/>
 					<span class="text-xs text-gray-400">Fill empty space solid</span>

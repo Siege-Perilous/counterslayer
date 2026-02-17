@@ -79,8 +79,10 @@
 			<!-- Globals Panel -->
 			<Pane defaultSize={30} minSize={20} class="h-full overflow-hidden">
 				<div class="flex h-full flex-col border-r border-gray-700">
-					<div class="flex items-center justify-between border-b border-gray-600 bg-gray-750 px-3 py-1.5">
-						<span class="text-xs font-semibold uppercase tracking-wide text-gray-300">Globals</span>
+					<div
+						class="bg-gray-750 flex items-center justify-between border-b border-gray-600 px-3 py-1.5"
+					>
+						<span class="text-xs font-semibold tracking-wide text-gray-300 uppercase">Globals</span>
 					</div>
 					<div class="flex-1 overflow-y-auto">
 						{#if selectedTray}
@@ -92,15 +94,19 @@
 				</div>
 			</Pane>
 
-			<PaneResizer class="group relative flex w-1.5 items-center justify-center bg-gray-700 hover:bg-gray-600">
+			<PaneResizer
+				class="group relative flex w-1.5 items-center justify-center bg-gray-700 hover:bg-gray-600"
+			>
 				<div class="h-8 w-0.5 rounded-full bg-gray-500 group-hover:bg-gray-400"></div>
 			</PaneResizer>
 
 			<!-- Boxes Panel -->
 			<Pane defaultSize={35} minSize={20} class="h-full overflow-hidden">
 				<div class="flex h-full flex-col border-r border-gray-700">
-					<div class="flex items-center justify-between border-b border-gray-600 bg-gray-750 px-3 py-1.5">
-						<span class="text-xs font-semibold uppercase tracking-wide text-gray-300">Boxes</span>
+					<div
+						class="bg-gray-750 flex items-center justify-between border-b border-gray-600 px-3 py-1.5"
+					>
+						<span class="text-xs font-semibold tracking-wide text-gray-300 uppercase">Boxes</span>
 					</div>
 					<div class="flex-1 overflow-hidden">
 						<BoxesPanel
@@ -115,15 +121,19 @@
 				</div>
 			</Pane>
 
-			<PaneResizer class="group relative flex w-1.5 items-center justify-center bg-gray-700 hover:bg-gray-600">
+			<PaneResizer
+				class="group relative flex w-1.5 items-center justify-center bg-gray-700 hover:bg-gray-600"
+			>
 				<div class="h-8 w-0.5 rounded-full bg-gray-500 group-hover:bg-gray-400"></div>
 			</PaneResizer>
 
 			<!-- Trays Panel -->
 			<Pane defaultSize={35} minSize={20} class="h-full overflow-hidden">
 				<div class="flex h-full flex-col">
-					<div class="flex items-center justify-between border-b border-gray-600 bg-gray-750 px-3 py-1.5">
-						<span class="text-xs font-semibold uppercase tracking-wide text-gray-300">
+					<div
+						class="bg-gray-750 flex items-center justify-between border-b border-gray-600 px-3 py-1.5"
+					>
+						<span class="text-xs font-semibold tracking-wide text-gray-300 uppercase">
 							Trays {#if selectedBox}within {selectedBox.name}{/if}
 						</span>
 					</div>
@@ -142,5 +152,4 @@
 			</Pane>
 		</PaneGroup>
 	</div>
-
 </aside>
