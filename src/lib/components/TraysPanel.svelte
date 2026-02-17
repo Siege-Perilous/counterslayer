@@ -68,6 +68,15 @@
 
 	const orientationOptions: EdgeOrientation[] = ['lengthwise', 'crosswise'];
 
+	function getTrayStats(tray: Tray): { stacks: number; counters: number } {
+		const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
+		const edgeCount = tray.params.edgeLoadedStacks.reduce((sum, s) => sum + s[1], 0);
+		return {
+			stacks: tray.params.topLoadedStacks.length + tray.params.edgeLoadedStacks.length,
+			counters: topCount + edgeCount
+		};
+	}
+
 	function getShapeDisplayName(shapeRef: string): string {
 		if (shapeRef.startsWith('custom:')) {
 			return shapeRef.substring(7);
@@ -151,6 +160,7 @@
 			</div>
 			<div class="max-h-24 space-y-1 overflow-y-auto">
 				{#each selectedBox.trays as tray (tray.id)}
+					{@const stats = getTrayStats(tray)}
 					<div
 						class="flex cursor-pointer items-center justify-between rounded px-2 py-1 text-sm {selectedTray?.id === tray.id ? 'bg-blue-600' : 'hover:bg-gray-700'}"
 						onclick={() => onSelectTray(tray)}
@@ -159,15 +169,18 @@
 						onkeydown={(e) => e.key === 'Enter' && onSelectTray(tray)}
 					>
 						<span class="truncate">{tray.name}</span>
-						{#if selectedBox.trays.length > 1}
-							<button
-								onclick={(e) => { e.stopPropagation(); onDeleteTray(selectedBox.id, tray.id); }}
-								class="ml-2 rounded px-1 text-xs text-gray-400 hover:bg-red-600 hover:text-white"
-								title="Delete tray"
-							>
-								&times;
-							</button>
-						{/if}
+						<span class="flex items-center gap-1">
+							<span class="text-xs text-gray-400">{stats.counters} in {stats.stacks}</span>
+							{#if selectedBox.trays.length > 1}
+								<button
+									onclick={(e) => { e.stopPropagation(); onDeleteTray(selectedBox.id, tray.id); }}
+									class="rounded px-1 text-xs text-gray-400 hover:bg-red-600 hover:text-white"
+									title="Delete tray"
+								>
+									&times;
+								</button>
+							{/if}
+						</span>
 					</div>
 				{/each}
 			</div>
