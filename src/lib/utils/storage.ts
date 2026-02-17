@@ -82,14 +82,21 @@ function migrateBox(box: Box): Box {
 	};
 }
 
+// Migrate a full project to ensure all fields have valid values
+export function migrateProjectData(project: Project): Project {
+	return {
+		...project,
+		boxes: project.boxes.map(migrateBox)
+	};
+}
+
 export function loadProject(): Project | null {
 	try {
 		const data = localStorage.getItem(STORAGE_KEY);
 		if (data) {
 			const project = JSON.parse(data) as Project;
 			// Migrate boxes to ensure new fields have defaults
-			project.boxes = project.boxes.map(migrateBox);
-			return project;
+			return migrateProjectData(project);
 		}
 	} catch (e) {
 		console.error('Failed to load project:', e);

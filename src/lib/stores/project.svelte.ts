@@ -1,6 +1,6 @@
 import { defaultParams, type CounterTrayParams } from '$lib/models/counterTray';
 import { defaultLidParams } from '$lib/models/lid';
-import { saveProject, loadProject } from '$lib/utils/storage';
+import { saveProject, loadProject, migrateProjectData } from '$lib/utils/storage';
 import type { Tray, Box, Project, LidParams } from '$lib/types/project';
 
 export type { Tray, Box, Project, LidParams };
@@ -180,15 +180,66 @@ export function updateTray(trayId: string, updates: Partial<Omit<Tray, 'id'>>): 
 	}
 }
 
+// Global params that should be shared across all trays when changed
+const GLOBAL_PARAM_KEYS: (keyof CounterTrayParams)[] = [
+	'printBedSize',
+	'squareWidth',
+	'squareLength',
+	'hexFlatToFlat',
+	'circleDiameter',
+	'counterThickness',
+	'hexPointyTop',
+	'customShapes'
+];
+
 export function updateTrayParams(trayId: string, params: CounterTrayParams): void {
+	// Find the tray being updated to get its old params
+	let oldParams: CounterTrayParams | null = null;
+	for (const box of project.boxes) {
+		const tray = box.trays.find((t) => t.id === trayId);
+		if (tray) {
+			oldParams = tray.params;
+			break;
+		}
+	}
+
+	if (!oldParams) return;
+
+	// Detect which global params changed
+	const changedGlobals: Partial<CounterTrayParams> = {};
+	for (const key of GLOBAL_PARAM_KEYS) {
+		const oldVal = oldParams[key];
+		const newVal = params[key];
+		// Deep compare for arrays (customShapes)
+		const changed = Array.isArray(oldVal)
+			? JSON.stringify(oldVal) !== JSON.stringify(newVal)
+			: oldVal !== newVal;
+		if (changed) {
+			(changedGlobals as Record<string, unknown>)[key] = newVal;
+		}
+	}
+
+	// Update the target tray with full new params
 	for (const box of project.boxes) {
 		const tray = box.trays.find((t) => t.id === trayId);
 		if (tray) {
 			tray.params = params;
-			autosave();
-			return;
+			break;
 		}
 	}
+
+	// Propagate changed global params to all other trays
+	if (Object.keys(changedGlobals).length > 0) {
+		for (const box of project.boxes) {
+			for (const tray of box.trays) {
+				if (tray.id !== trayId) {
+					tray.params = { ...tray.params, ...changedGlobals };
+				}
+			}
+		}
+	}
+
+	autosave();
 }
 
 // Reset project
@@ -199,7 +250,8 @@ export function resetProject(): void {
 
 // Import project from JSON data
 export function importProject(data: Project): void {
-	project = data;
+	// Run migrations to ensure all fields have proper defaults (handles older exported files)
+	project = migrateProjectData(data);
 	// Ensure selection is valid
 	if (project.boxes.length > 0) {
 		const selectedBox = project.boxes.find((b) => b.id === project.selectedBoxId);
