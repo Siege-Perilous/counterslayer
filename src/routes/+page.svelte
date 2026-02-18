@@ -318,12 +318,12 @@
 	<!-- Header -->
 	<div class="flex items-center justify-between border-b border-gray-700 px-3 py-2 text-sm text-gray-400">
 		<div class="flex items-center gap-1">
-			<h1 class="contents">Boardgame Slayer</h1> by
+			<h1 class="contents">Counter Slayer</h1> by
 			<a href="https://davesnider.com" target="_blank" rel="noopener noreferrer" class="cursor-pointer text-blue-400 hover:text-blue-300">Dave Snider</a>
 		</div>
 		<div class="flex items-center gap-3">
 			<a href="https://youtube.com" target="_blank" rel="noopener noreferrer" class="cursor-pointer text-blue-400 hover:text-blue-300">Tutorial</a>
-			<a href="https://github.com" target="_blank" rel="noopener noreferrer" class="cursor-pointer text-blue-400 hover:text-blue-300">GitHub</a>
+			<a href="https://github.com/Siege-Perilous/counterslayer" target="_blank" rel="noopener noreferrer" class="cursor-pointer text-blue-400 hover:text-blue-300">GitHub</a>
 		</div>
 	</div>
 	<PaneGroup direction="vertical" class="min-h-0 flex-1">
