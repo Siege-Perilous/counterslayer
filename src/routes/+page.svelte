@@ -284,8 +284,14 @@
 	<title>Counter Tray Generator</title>
 </svelte:head>
 
-<div class="h-screen bg-gray-900 text-white">
-	<PaneGroup direction="vertical" class="h-full">
+<div class="flex h-screen flex-col bg-gray-900 text-white">
+	<!-- Header -->
+	<div class="flex items-center gap-1 border-b border-gray-700 px-3 py-2 text-sm text-gray-400">
+		<h1 class="contents">Boardgame Slayer</h1> by
+		<a href="https://davesnider.com" target="_blank" rel="noopener noreferrer" class="cursor-pointer text-blue-400 hover:text-blue-300">Dave Snider</a>.
+		<a href="https://youtube.com" target="_blank" rel="noopener noreferrer" class="cursor-pointer text-blue-400 hover:text-blue-300">Tutorial</a>
+	</div>
+	<PaneGroup direction="vertical" class="min-h-0 flex-1">
 		<!-- Preview Pane -->
 		<Pane defaultSize={60} minSize={30} class="h-full overflow-hidden">
 			<main class="relative h-full">
@@ -321,7 +327,7 @@
 						{#each viewModes as { mode, label } (mode)}
 							<button
 								onclick={() => (viewMode = mode)}
-								class="rounded px-3 py-1.5 text-sm font-medium transition {viewMode === mode
+								class="cursor-pointer rounded px-3 py-1.5 text-sm font-medium transition {viewMode === mode
 									? 'bg-blue-600 text-white'
 									: 'text-gray-300 hover:bg-gray-700'}"
 							>
@@ -348,14 +354,14 @@
 					<button
 						onclick={regenerate}
 						disabled={generating}
-						class="rounded bg-blue-600 px-3 py-2 text-sm font-medium transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+						class="cursor-pointer rounded bg-blue-600 px-3 py-2 text-sm font-medium transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
 					>
 						{generating ? 'Generating...' : 'Regenerate'}
 					</button>
 					<div class="relative">
 						<button
 							onclick={() => (menuOpen = !menuOpen)}
-							class="flex items-center gap-2 rounded bg-green-600 px-3 py-2 text-sm font-medium transition hover:bg-green-700"
+							class="flex cursor-pointer items-center gap-2 rounded bg-green-600 px-3 py-2 text-sm font-medium transition hover:bg-green-700"
 						>
 							Import / Export
 							<svg class="h-4 w-4 transition-transform {menuOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -385,7 +391,7 @@
 											menuOpen = false;
 										}}
 										disabled={generating || !jscadSelectedTray}
-										class="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+										class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
 									>
 										Export tray STL
 									</button>
@@ -395,7 +401,7 @@
 											menuOpen = false;
 										}}
 										disabled={generating || (!jscadBox && !jscadLid && allTrayGeometries.length === 0)}
-										class="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+										class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
 									>
 										Export all STLs
 									</button>
@@ -405,7 +411,7 @@
 											menuOpen = false;
 										}}
 										disabled={getProject().boxes.length === 0}
-										class="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+										class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
 									>
 										PDF reference
 									</button>
@@ -422,7 +428,7 @@
 											jsonFileInput?.click();
 											menuOpen = false;
 										}}
-										class="w-full px-4 py-2 text-left text-sm hover:bg-gray-700"
+										class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700"
 									>
 										Import project JSON
 									</button>
@@ -431,7 +437,7 @@
 											handleExportJson();
 											menuOpen = false;
 										}}
-										class="w-full px-4 py-2 text-left text-sm hover:bg-gray-700"
+										class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700"
 									>
 										Export project JSON
 									</button>
@@ -441,7 +447,7 @@
 											handleReset();
 											menuOpen = false;
 										}}
-										class="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-gray-700"
+										class="w-full cursor-pointer px-4 py-2 text-left text-sm text-red-400 hover:bg-gray-700"
 									>
 										Clear current project
 									</button>
