@@ -316,14 +316,32 @@
 
 <div class="flex h-screen flex-col bg-gray-900 text-white">
 	<!-- Header -->
-	<div class="flex items-center justify-between border-b border-gray-700 px-3 py-2 text-sm text-gray-400">
+	<div
+		class="flex items-center justify-between border-b border-gray-700 px-3 py-2 text-sm text-gray-400"
+	>
 		<div class="flex items-center gap-1">
-			<h1 class="contents">Boardgame Slayer</h1> by
-			<a href="https://davesnider.com" target="_blank" rel="noopener noreferrer" class="cursor-pointer text-blue-400 hover:text-blue-300">Dave Snider</a>
+			<h1 class="contents">Counter Slayer</h1>
+			by
+			<a
+				href="https://davesnider.com"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="cursor-pointer text-blue-400 hover:text-blue-300">Dave Snider</a
+			>
 		</div>
 		<div class="flex items-center gap-3">
-			<a href="https://youtube.com" target="_blank" rel="noopener noreferrer" class="cursor-pointer text-blue-400 hover:text-blue-300">Tutorial</a>
-			<a href="https://github.com" target="_blank" rel="noopener noreferrer" class="cursor-pointer text-blue-400 hover:text-blue-300">GitHub</a>
+			<a
+				href="https://youtube.com"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="cursor-pointer text-blue-400 hover:text-blue-300">Tutorial</a
+			>
+			<a
+				href="https://github.com/Siege-Perilous/counterslayer"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="cursor-pointer text-blue-400 hover:text-blue-300">GitHub</a
+			>
 		</div>
 	</div>
 	<PaneGroup direction="vertical" class="min-h-0 flex-1">
@@ -362,7 +380,8 @@
 						{#each viewModes as { mode, label } (mode)}
 							<button
 								onclick={() => (viewMode = mode)}
-								class="cursor-pointer rounded px-3 py-1.5 text-sm font-medium transition {viewMode === mode
+								class="cursor-pointer rounded px-3 py-1.5 text-sm font-medium transition {viewMode ===
+								mode
 									? 'bg-blue-600 text-white'
 									: 'text-gray-300 hover:bg-gray-700'}"
 							>
@@ -394,7 +413,9 @@
 						>
 							{generating ? 'Generating...' : 'Regenerate'}
 						</button>
-						<label class="flex cursor-pointer items-center gap-2 rounded bg-gray-800 px-3 py-2 text-sm text-gray-300">
+						<label
+							class="flex cursor-pointer items-center gap-2 rounded bg-gray-800 px-3 py-2 text-sm text-gray-300"
+						>
 							<input
 								type="checkbox"
 								bind:checked={showCounters}
@@ -409,8 +430,18 @@
 							class="flex cursor-pointer items-center gap-2 rounded bg-green-600 px-3 py-2 text-sm font-medium transition hover:bg-green-700"
 						>
 							Import / Export
-							<svg class="h-4 w-4 transition-transform {menuOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+							<svg
+								class="h-4 w-4 transition-transform {menuOpen ? 'rotate-180' : ''}"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M19 9l-7 7-7-7"
+								/>
 							</svg>
 						</button>
 						{#if menuOpen}
@@ -420,96 +451,99 @@
 								onclick={() => (menuOpen = false)}
 								onkeydown={(e) => e.key === 'Escape' && (menuOpen = false)}
 							></div>
-							<div class="absolute bottom-full right-0 z-50 mb-2 w-52 rounded bg-gray-800 py-1 shadow-lg">
-									{#if communityProjects.length > 0}
-										<div class="px-4 py-2">
-											<label class="mb-1 block text-xs text-gray-400">Load community project</label>
-											<select
-												class="w-full cursor-pointer rounded border border-gray-600 bg-gray-700 px-2 py-1.5 text-sm text-white"
-												onchange={(e) => {
-													const select = e.target as HTMLSelectElement;
-													const project = communityProjects.find(p => p.id === select.value);
-													if (project) {
-														loadCommunityProject(project);
-													}
-													select.value = '';
-												}}
-											>
-												<option value="">Select a project...</option>
-												{#each communityProjects as project (project.id)}
-													<option value={project.id}>{project.name}</option>
-												{/each}
-											</select>
-										</div>
-									{/if}
-									<input
-										bind:this={jsonFileInput}
-										type="file"
-										accept=".json"
-										onchange={handleImportJson}
-										class="hidden"
-									/>
-									<button
-										onclick={() => {
-											jsonFileInput?.click();
-											menuOpen = false;
-										}}
-										class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700"
-									>
-										Import project JSON
-									</button>
-									<button
-										onclick={() => {
-											handleExportJson();
-											menuOpen = false;
-										}}
-										class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700"
-									>
-										Export project JSON
-									</button>
-									<div class="my-1 border-t border-gray-600"></div>
-									<button
-										onclick={() => {
-											handleExport();
-											menuOpen = false;
-										}}
-										disabled={generating || !jscadSelectedTray}
-										class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-									>
-										Export tray STL
-									</button>
-									<button
-										onclick={() => {
-											handleExportAll();
-											menuOpen = false;
-										}}
-										disabled={generating || (!jscadBox && !jscadLid && allTrayGeometries.length === 0)}
-										class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-									>
-										Export all STLs
-									</button>
-									<button
-										onclick={() => {
-											handleExportPdf();
-											menuOpen = false;
-										}}
-										disabled={getProject().boxes.length === 0}
-										class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-									>
-										PDF reference
-									</button>
-									<div class="my-1 border-t border-gray-600"></div>
-									<button
-										onclick={() => {
-											handleReset();
-											menuOpen = false;
-										}}
-										class="w-full cursor-pointer px-4 py-2 text-left text-sm text-red-400 hover:bg-gray-700"
-									>
-										Clear current project
-									</button>
-								</div>
-							{/if}
+							<div
+								class="absolute right-0 bottom-full z-50 mb-2 w-52 rounded bg-gray-800 py-1 shadow-lg"
+							>
+								{#if communityProjects.length > 0}
+									<div class="px-4 py-2">
+										<label class="mb-1 block text-xs text-gray-400">Load community project</label>
+										<select
+											class="w-full cursor-pointer rounded border border-gray-600 bg-gray-700 px-2 py-1.5 text-sm text-white"
+											onchange={(e) => {
+												const select = e.target as HTMLSelectElement;
+												const project = communityProjects.find((p) => p.id === select.value);
+												if (project) {
+													loadCommunityProject(project);
+												}
+												select.value = '';
+											}}
+										>
+											<option value="">Select a project...</option>
+											{#each communityProjects as project (project.id)}
+												<option value={project.id}>{project.name}</option>
+											{/each}
+										</select>
+									</div>
+								{/if}
+								<input
+									bind:this={jsonFileInput}
+									type="file"
+									accept=".json"
+									onchange={handleImportJson}
+									class="hidden"
+								/>
+								<button
+									onclick={() => {
+										jsonFileInput?.click();
+										menuOpen = false;
+									}}
+									class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700"
+								>
+									Import project JSON
+								</button>
+								<button
+									onclick={() => {
+										handleExportJson();
+										menuOpen = false;
+									}}
+									class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700"
+								>
+									Export project JSON
+								</button>
+								<div class="my-1 border-t border-gray-600"></div>
+								<button
+									onclick={() => {
+										handleExport();
+										menuOpen = false;
+									}}
+									disabled={generating || !jscadSelectedTray}
+									class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+								>
+									Export tray STL
+								</button>
+								<button
+									onclick={() => {
+										handleExportAll();
+										menuOpen = false;
+									}}
+									disabled={generating ||
+										(!jscadBox && !jscadLid && allTrayGeometries.length === 0)}
+									class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+								>
+									Export all STLs
+								</button>
+								<button
+									onclick={() => {
+										handleExportPdf();
+										menuOpen = false;
+									}}
+									disabled={getProject().boxes.length === 0}
+									class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+								>
+									PDF reference
+								</button>
+								<div class="my-1 border-t border-gray-600"></div>
+								<button
+									onclick={() => {
+										handleReset();
+										menuOpen = false;
+									}}
+									class="w-full cursor-pointer px-4 py-2 text-left text-sm text-red-400 hover:bg-gray-700"
+								>
+									Clear current project
+								</button>
+							</div>
+						{/if}
 					</div>
 				</div>
 
