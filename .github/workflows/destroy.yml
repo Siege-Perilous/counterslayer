@@ -1,0 +1,21 @@
+name: Destroy Preview
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Fly
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Destroy preview app
+        run: flyctl apps destroy pr-${{ github.event.pull_request.number }}-counterslayer --yes || echo "App not found or already deleted"
