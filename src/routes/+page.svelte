@@ -29,7 +29,7 @@
 	import type { BufferGeometry } from 'three';
 	import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
-	type ViewMode = 'tray' | 'box' | 'lid' | 'all' | 'exploded';
+	type ViewMode = 'tray' | 'all' | 'exploded';
 
 	interface TrayGeometryData {
 		trayId: string;
@@ -51,9 +51,10 @@
 	let jscadLid = $state<Geom3 | null>(null);
 	let generating = $state(false);
 	let error = $state('');
-	let jsonFileInput: HTMLInputElement;
+	let jsonFileInput = $state<HTMLInputElement | null>(null);
 	let explosionAmount = $state(0);
 	let showCounters = $state(false);
+	let menuOpen = $state(false);
 
 	// Initialize project from localStorage
 	$effect(() => {
@@ -87,12 +88,6 @@
 		switch (viewMode) {
 			case 'tray':
 				result.tray = selectedTrayGeometry;
-				break;
-			case 'box':
-				result.box = boxGeometry;
-				break;
-			case 'lid':
-				result.lid = lidGeometry;
 				break;
 			case 'all':
 				result.allTrays = allTrayGeometries;
@@ -195,26 +190,12 @@
 	}
 
 	function handleExport() {
-		const geom = viewMode === 'box' ? jscadBox : viewMode === 'lid' ? jscadLid : jscadSelectedTray;
-		if (!geom) return;
+		if (!jscadSelectedTray) return;
 
-		const box = getSelectedBox();
 		const tray = getSelectedTray();
-		const baseName = box?.name.toLowerCase().replace(/\s+/g, '-') ?? 'export';
+		const filename = `${tray?.name.toLowerCase().replace(/\s+/g, '-') ?? 'tray'}.stl`;
 
-		let filename: string;
-		switch (viewMode) {
-			case 'box':
-				filename = `${baseName}-box.stl`;
-				break;
-			case 'lid':
-				filename = `${baseName}-lid.stl`;
-				break;
-			default:
-				filename = `${tray?.name.toLowerCase().replace(/\s+/g, '-') ?? 'tray'}.stl`;
-		}
-
-		exportStl(geom, filename);
+		exportStl(jscadSelectedTray, filename);
 	}
 
 	async function handleExportAll() {
@@ -293,10 +274,8 @@
 	}
 
 	const viewModes: { mode: ViewMode; label: string }[] = [
-		{ mode: 'tray', label: 'Tray' },
-		{ mode: 'box', label: 'Box' },
-		{ mode: 'lid', label: 'Lid' },
-		{ mode: 'all', label: 'All' },
+		{ mode: 'tray', label: 'Current tray' },
+		{ mode: 'all', label: 'Boxed' },
 		{ mode: 'exploded', label: 'Exploded' }
 	];
 </script>
@@ -362,80 +341,112 @@
 							/>
 						</div>
 					{/if}
-					<label class="flex cursor-pointer items-center gap-2 rounded bg-gray-800 px-3 py-1.5">
-						<input
-							type="checkbox"
-							bind:checked={showCounters}
-							class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-blue-600"
-						/>
-						<span class="text-sm text-gray-300">Show Counters</span>
-					</label>
 				</div>
 
 				<!-- Bottom toolbar -->
 				<div class="absolute right-4 bottom-4 left-4 flex items-center justify-between">
-					<div class="flex gap-2">
+					<button
+						onclick={regenerate}
+						disabled={generating}
+						class="rounded bg-blue-600 px-3 py-2 text-sm font-medium transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+					>
+						{generating ? 'Generating...' : 'Regenerate'}
+					</button>
+					<div class="relative">
 						<button
-							onclick={regenerate}
-							disabled={generating}
-							class="rounded bg-blue-600 px-3 py-2 text-sm font-medium transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+							onclick={() => (menuOpen = !menuOpen)}
+							class="flex items-center gap-2 rounded bg-green-600 px-3 py-2 text-sm font-medium transition hover:bg-green-700"
 						>
-							{generating ? 'Generating...' : 'Regenerate'}
+							Import / Export
+							<svg class="h-4 w-4 transition-transform {menuOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+							</svg>
 						</button>
-						<button
-							onclick={handleReset}
-							class="rounded bg-gray-700 px-3 py-2 text-sm hover:bg-gray-600"
-						>
-							Reset
-						</button>
-						<input
-							bind:this={jsonFileInput}
-							type="file"
-							accept=".json"
-							onchange={handleImportJson}
-							class="hidden"
-						/>
-						<button
-							onclick={() => jsonFileInput.click()}
-							class="rounded bg-gray-700 px-3 py-2 text-sm hover:bg-gray-600"
-						>
-							Import
-						</button>
-						<button
-							onclick={handleExportJson}
-							class="rounded bg-gray-700 px-3 py-2 text-sm hover:bg-gray-600"
-						>
-							Export
-						</button>
-					</div>
-
-					<div class="flex gap-2">
-						<button
-							onclick={handleExport}
-							disabled={generating ||
-								(viewMode === 'box'
-									? !jscadBox
-									: viewMode === 'lid'
-										? !jscadLid
-										: !jscadSelectedTray)}
-							class="rounded bg-green-600 px-4 py-2 font-medium transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-						>
-							Export {viewMode === 'box' ? 'Box' : viewMode === 'lid' ? 'Lid' : 'Tray'} STL
-						</button>
-						<button
-							onclick={handleExportAll}
-							disabled={generating || (!jscadBox && !jscadLid && allTrayGeometries.length === 0)}
-							class="rounded bg-purple-600 px-4 py-2 font-medium transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
-						>
-							Export All
-						</button>
-						<button
-							onclick={handleExportPdf}
-							disabled={getProject().boxes.length === 0}
-							class="rounded bg-amber-600 px-4 py-2 font-medium transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
-						>
-							Export PDF
-						</button>
+						{#if menuOpen}
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<div
+								class="fixed inset-0 z-40"
+								onclick={() => (menuOpen = false)}
+								onkeydown={(e) => e.key === 'Escape' && (menuOpen = false)}
+							></div>
+							<div class="absolute bottom-full right-0 z-50 mb-2 w-52 rounded bg-gray-800 py-1 shadow-lg">
+									<label class="flex w-full cursor-pointer items-center gap-2 whitespace-nowrap px-4 py-2 text-sm hover:bg-gray-700">
+										<input
+											type="checkbox"
+											bind:checked={showCounters}
+											class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-blue-600"
+										/>
+										Show counter preview
+									</label>
+									<div class="my-1 border-t border-gray-600"></div>
+									<button
+										onclick={() => {
+											handleExport();
+											menuOpen = false;
+										}}
+										disabled={generating || !jscadSelectedTray}
+										class="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+									>
+										Export tray STL
+									</button>
+									<button
+										onclick={() => {
+											handleExportAll();
+											menuOpen = false;
+										}}
+										disabled={generating || (!jscadBox && !jscadLid && allTrayGeometries.length === 0)}
+										class="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+									>
+										Export all STLs
+									</button>
+									<button
+										onclick={() => {
+											handleExportPdf();
+											menuOpen = false;
+										}}
+										disabled={getProject().boxes.length === 0}
+										class="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+									>
+										PDF reference
+									</button>
+									<div class="my-1 border-t border-gray-600"></div>
+									<input
+										bind:this={jsonFileInput}
+										type="file"
+										accept=".json"
+										onchange={handleImportJson}
+										class="hidden"
+									/>
+									<button
+										onclick={() => {
+											jsonFileInput?.click();
+											menuOpen = false;
+										}}
+										class="w-full px-4 py-2 text-left text-sm hover:bg-gray-700"
+									>
+										Import project JSON
+									</button>
+									<button
+										onclick={() => {
+											handleExportJson();
+											menuOpen = false;
+										}}
+										class="w-full px-4 py-2 text-left text-sm hover:bg-gray-700"
+									>
+										Export project JSON
+									</button>
+									<div class="my-1 border-t border-gray-600"></div>
+									<button
+										onclick={() => {
+											handleReset();
+											menuOpen = false;
+										}}
+										class="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-gray-700"
+									>
+										Clear current project
+									</button>
+								</div>
+							{/if}
 					</div>
 				</div>
 
