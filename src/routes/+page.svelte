@@ -31,6 +31,13 @@
 
 	type ViewMode = 'tray' | 'all' | 'exploded';
 
+	interface CommunityProject {
+		id: string;
+		name: string;
+		author: string;
+		file: string;
+	}
+
 	interface TrayGeometryData {
 		trayId: string;
 		name: string;
@@ -55,13 +62,36 @@
 	let explosionAmount = $state(0);
 	let showCounters = $state(false);
 	let menuOpen = $state(false);
+	let communityProjects = $state<CommunityProject[]>([]);
 
-	// Initialize project from localStorage
+	// Initialize project from localStorage and fetch community projects
 	$effect(() => {
 		if (browser) {
 			initProject();
+			// Fetch community projects manifest
+			fetch('/projects/manifest.json')
+				.then((res) => res.json())
+				.then((data) => {
+					communityProjects = data.projects ?? [];
+				})
+				.catch((err) => {
+					console.error('Failed to load community projects:', err);
+				});
 		}
 	});
+
+	async function loadCommunityProject(project: CommunityProject) {
+		try {
+			const res = await fetch(`/projects/${project.file}`);
+			const data = (await res.json()) as Project;
+			importProject(data);
+			menuOpen = false;
+			error = '';
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load project';
+			console.error('Load community project error:', e);
+		}
+	}
 
 	let selectedTray = $derived(getSelectedTray());
 	let selectedBox = $derived(getSelectedBox());
@@ -286,10 +316,15 @@
 
 <div class="flex h-screen flex-col bg-gray-900 text-white">
 	<!-- Header -->
-	<div class="flex items-center gap-1 border-b border-gray-700 px-3 py-2 text-sm text-gray-400">
-		<h1 class="contents">Boardgame Slayer</h1> by
-		<a href="https://davesnider.com" target="_blank" rel="noopener noreferrer" class="cursor-pointer text-blue-400 hover:text-blue-300">Dave Snider</a>.
-		<a href="https://youtube.com" target="_blank" rel="noopener noreferrer" class="cursor-pointer text-blue-400 hover:text-blue-300">Tutorial</a>
+	<div class="flex items-center justify-between border-b border-gray-700 px-3 py-2 text-sm text-gray-400">
+		<div class="flex items-center gap-1">
+			<h1 class="contents">Boardgame Slayer</h1> by
+			<a href="https://davesnider.com" target="_blank" rel="noopener noreferrer" class="cursor-pointer text-blue-400 hover:text-blue-300">Dave Snider</a>
+		</div>
+		<div class="flex items-center gap-3">
+			<a href="https://youtube.com" target="_blank" rel="noopener noreferrer" class="cursor-pointer text-blue-400 hover:text-blue-300">Tutorial</a>
+			<a href="https://github.com" target="_blank" rel="noopener noreferrer" class="cursor-pointer text-blue-400 hover:text-blue-300">GitHub</a>
+		</div>
 	</div>
 	<PaneGroup direction="vertical" class="min-h-0 flex-1">
 		<!-- Preview Pane -->
@@ -351,13 +386,23 @@
 
 				<!-- Bottom toolbar -->
 				<div class="absolute right-4 bottom-4 left-4 flex items-center justify-between">
-					<button
-						onclick={regenerate}
-						disabled={generating}
-						class="cursor-pointer rounded bg-blue-600 px-3 py-2 text-sm font-medium transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-					>
-						{generating ? 'Generating...' : 'Regenerate'}
-					</button>
+					<div class="flex items-center gap-3">
+						<button
+							onclick={regenerate}
+							disabled={generating}
+							class="cursor-pointer rounded bg-blue-600 px-3 py-2 text-sm font-medium transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{generating ? 'Generating...' : 'Regenerate'}
+						</button>
+						<label class="flex cursor-pointer items-center gap-2 rounded bg-gray-800 px-3 py-2 text-sm text-gray-300">
+							<input
+								type="checkbox"
+								bind:checked={showCounters}
+								class="h-4 w-4 cursor-pointer rounded border-gray-600 bg-gray-700 text-blue-600"
+							/>
+							Show counters
+						</label>
+					</div>
 					<div class="relative">
 						<button
 							onclick={() => (menuOpen = !menuOpen)}
@@ -376,14 +421,52 @@
 								onkeydown={(e) => e.key === 'Escape' && (menuOpen = false)}
 							></div>
 							<div class="absolute bottom-full right-0 z-50 mb-2 w-52 rounded bg-gray-800 py-1 shadow-lg">
-									<label class="flex w-full cursor-pointer items-center gap-2 whitespace-nowrap px-4 py-2 text-sm hover:bg-gray-700">
-										<input
-											type="checkbox"
-											bind:checked={showCounters}
-											class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-blue-600"
-										/>
-										Show counter preview
-									</label>
+									{#if communityProjects.length > 0}
+										<div class="px-4 py-2">
+											<label class="mb-1 block text-xs text-gray-400">Load community project</label>
+											<select
+												class="w-full cursor-pointer rounded border border-gray-600 bg-gray-700 px-2 py-1.5 text-sm text-white"
+												onchange={(e) => {
+													const select = e.target as HTMLSelectElement;
+													const project = communityProjects.find(p => p.id === select.value);
+													if (project) {
+														loadCommunityProject(project);
+													}
+													select.value = '';
+												}}
+											>
+												<option value="">Select a project...</option>
+												{#each communityProjects as project (project.id)}
+													<option value={project.id}>{project.name}</option>
+												{/each}
+											</select>
+										</div>
+									{/if}
+									<input
+										bind:this={jsonFileInput}
+										type="file"
+										accept=".json"
+										onchange={handleImportJson}
+										class="hidden"
+									/>
+									<button
+										onclick={() => {
+											jsonFileInput?.click();
+											menuOpen = false;
+										}}
+										class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700"
+									>
+										Import project JSON
+									</button>
+									<button
+										onclick={() => {
+											handleExportJson();
+											menuOpen = false;
+										}}
+										class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700"
+									>
+										Export project JSON
+									</button>
 									<div class="my-1 border-t border-gray-600"></div>
 									<button
 										onclick={() => {
@@ -414,32 +497,6 @@
 										class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
 									>
 										PDF reference
-									</button>
-									<div class="my-1 border-t border-gray-600"></div>
-									<input
-										bind:this={jsonFileInput}
-										type="file"
-										accept=".json"
-										onchange={handleImportJson}
-										class="hidden"
-									/>
-									<button
-										onclick={() => {
-											jsonFileInput?.click();
-											menuOpen = false;
-										}}
-										class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700"
-									>
-										Import project JSON
-									</button>
-									<button
-										onclick={() => {
-											handleExportJson();
-											menuOpen = false;
-										}}
-										class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700"
-									>
-										Export project JSON
 									</button>
 									<div class="my-1 border-t border-gray-600"></div>
 									<button

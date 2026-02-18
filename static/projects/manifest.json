@@ -1,0 +1,10 @@
+{
+  "projects": [
+    {
+      "id": "omaha",
+      "name": "D-Day: Omaha Beach",
+      "author": "Dave Snider",
+      "file": "omaha.json"
+    }
+  ]
+}
