@@ -1,6 +1,6 @@
 # Content Slayer
 
-Content Slayer is a small application to help you build box and tray inserts for your war games.
+Content Slayer is a small Svelte / JSCad application to help you build box and tray inserts for your war games. Code quality isn't so hot, as it was mostly vibe-coded with Claude.
 
 ## Contributing
 
