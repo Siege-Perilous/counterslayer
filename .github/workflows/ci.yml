@@ -50,3 +50,4 @@ jobs:
         with:
           name: pr-${{ github.event.pull_request.number }}-counterslayer
           config: fly.dev.toml
+          org: siege-perilous
