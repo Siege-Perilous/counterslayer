@@ -331,7 +331,7 @@
 		</div>
 		<div class="flex items-center gap-3">
 			<a
-				href="https://youtube.com"
+				href="https://youtu.be/82d_-vjFpKw"
 				target="_blank"
 				rel="noopener noreferrer"
 				class="cursor-pointer text-blue-400 hover:text-blue-300">Tutorial</a
