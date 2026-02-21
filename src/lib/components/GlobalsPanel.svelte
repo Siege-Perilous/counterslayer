@@ -122,26 +122,19 @@
 
 	<section>
 		<h3 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
-			Counter Dimensions
+			Simple Counters
 		</h3>
 		<div class="grid grid-cols-2 gap-2">
 			<label class="block">
-				<span class="text-xs text-gray-400">Square Width</span>
+				<span class="text-xs text-gray-400">Square</span>
 				<input
 					type="number"
 					step="0.1"
 					value={params.squareWidth}
-					onchange={(e) => updateParam('squareWidth', parseFloat(e.currentTarget.value))}
-					class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-				/>
-			</label>
-			<label class="block">
-				<span class="text-xs text-gray-400">Square Length</span>
-				<input
-					type="number"
-					step="0.1"
-					value={params.squareLength}
-					onchange={(e) => updateParam('squareLength', parseFloat(e.currentTarget.value))}
+					onchange={(e) => {
+						const val = parseFloat(e.currentTarget.value);
+						onchange({ ...params, squareWidth: val, squareLength: val });
+					}}
 					class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
 				/>
 			</label>
