@@ -286,7 +286,11 @@ export function getCounterPositions(
 	// Parse shape reference to get shape type, custom name, and base shape
 	const parseShapeRef = (
 		shapeRef: string
-	): { shapeType: 'square' | 'hex' | 'circle' | 'custom'; customName?: string; customBaseShape?: CustomBaseShape } => {
+	): {
+		shapeType: 'square' | 'hex' | 'circle' | 'custom';
+		customName?: string;
+		customBaseShape?: CustomBaseShape;
+	} => {
 		if (shapeRef.startsWith('custom:')) {
 			const customName = shapeRef.substring(7);
 			const customShape = getCustomShape(shapeRef);

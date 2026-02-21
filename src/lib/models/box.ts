@@ -83,7 +83,9 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 
 	// Get effective dimensions for custom shapes based on their base shape
 	// Returns [width, length] accounting for hex point-to-point calculations
-	const getCustomEffectiveDims = (custom: NonNullable<ReturnType<typeof getCustomShape>>): [number, number] => {
+	const getCustomEffectiveDims = (
+		custom: NonNullable<ReturnType<typeof getCustomShape>>
+	): [number, number] => {
 		const baseShape = custom.baseShape ?? 'rectangle';
 		if (baseShape === 'hex') {
 			// width stores flat-to-flat, calculate point-to-point

@@ -445,7 +445,8 @@
 		{#if stack.isEdgeLoaded}
 			<!-- Edge-loaded: counters standing on edge like books -->
 			{#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
-				{@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
+				{@const effectiveShape =
+					stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 				{@const standingHeight =
 					stack.shape === 'custom'
 						? Math.min(stack.width, stack.length)
@@ -532,7 +533,8 @@
 				{@const posZ = meshOffset.z - stack.y}
 				{@const isAlt = counterIdx % 2 === 1}
 				{@const counterColor = isAlt ? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)` : stack.color}
-				{@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
+				{@const effectiveShape =
+					stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 				{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
 					<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
 						<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
@@ -581,7 +583,8 @@
 			{#if stack.isEdgeLoaded}
 				<!-- Edge-loaded: counters standing on edge like books -->
 				{#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
-					{@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
+					{@const effectiveShape =
+						stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 					{@const standingHeight =
 						stack.shape === 'custom'
 							? Math.min(stack.width, stack.length)
@@ -676,7 +679,8 @@
 					{@const counterColor = isAlt
 						? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)`
 						: stack.color}
-					{@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
+					{@const effectiveShape =
+						stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 					{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
 						<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
 							<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
