@@ -445,6 +445,7 @@
 		{#if stack.isEdgeLoaded}
 			<!-- Edge-loaded: counters standing on edge like books -->
 			{#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
+				{@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 				{@const standingHeight =
 					stack.shape === 'custom'
 						? Math.min(stack.width, stack.length)
@@ -457,13 +458,13 @@
 					{@const counterSpacing = (stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
 					{@const posX = meshOffset.x + stack.x + (counterIdx + 0.5) * counterSpacing}
 					{@const posZ = meshOffset.z - stack.y - (stack.slotDepth ?? stack.length) / 2}
-					{#if stack.shape === 'square' || stack.shape === 'custom'}
+					{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
 						<!-- Standing on edge: thickness along X (stacking), height along Y, length along Z -->
 						<T.Mesh position.x={posX} position.y={counterY} position.z={posZ}>
 							<T.BoxGeometry args={[stack.thickness, standingHeight, stack.length]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
-					{:else if stack.shape === 'circle'}
+					{:else if effectiveShape === 'circle'}
 						<!-- Cylinder standing on edge: rotate so axis is along X -->
 						<T.Mesh
 							position.x={posX}
@@ -492,12 +493,12 @@
 					{@const counterSpacing = (stack.slotDepth ?? stack.count * stack.thickness) / stack.count}
 					{@const posX = meshOffset.x + stack.x + (stack.slotWidth ?? stack.length) / 2}
 					{@const posZ = meshOffset.z - stack.y - (counterIdx + 0.5) * counterSpacing}
-					{#if stack.shape === 'square' || stack.shape === 'custom'}
+					{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
 						<T.Mesh position.x={posX} position.y={counterY} position.z={posZ}>
 							<T.BoxGeometry args={[stack.length, standingHeight, stack.thickness]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
-					{:else if stack.shape === 'circle'}
+					{:else if effectiveShape === 'circle'}
 						<T.Mesh
 							position.x={posX}
 							position.y={counterY}
@@ -531,12 +532,13 @@
 				{@const posZ = meshOffset.z - stack.y}
 				{@const isAlt = counterIdx % 2 === 1}
 				{@const counterColor = isAlt ? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)` : stack.color}
-				{#if stack.shape === 'square' || stack.shape === 'custom'}
+				{@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
+				{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
 					<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
 						<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
 						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 					</T.Mesh>
-				{:else if stack.shape === 'circle'}
+				{:else if effectiveShape === 'circle'}
 					<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
 						<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
 						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
@@ -579,6 +581,7 @@
 			{#if stack.isEdgeLoaded}
 				<!-- Edge-loaded: counters standing on edge like books -->
 				{#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
+					{@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 					{@const standingHeight =
 						stack.shape === 'custom'
 							? Math.min(stack.width, stack.length)
@@ -593,13 +596,13 @@
 							(stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
 						{@const posX = trayXOffset + stack.x + (counterIdx + 0.5) * counterSpacing}
 						{@const posZ = trayZOffset - stack.y - (stack.slotDepth ?? stack.length) / 2}
-						{#if stack.shape === 'square' || stack.shape === 'custom'}
+						{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
 							<!-- Standing on edge: thickness along X (stacking), height along Y, length along Z -->
 							<T.Mesh position.x={posX} position.y={counterY} position.z={posZ}>
 								<T.BoxGeometry args={[stack.thickness, standingHeight, stack.length]} />
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
-						{:else if stack.shape === 'circle'}
+						{:else if effectiveShape === 'circle'}
 							<!-- Cylinder standing on edge: rotate so axis is along X -->
 							<T.Mesh
 								position.x={posX}
@@ -631,12 +634,12 @@
 							(stack.slotDepth ?? stack.count * stack.thickness) / stack.count}
 						{@const posX = trayXOffset + stack.x + (stack.slotWidth ?? stack.length) / 2}
 						{@const posZ = trayZOffset - stack.y - (counterIdx + 0.5) * counterSpacing}
-						{#if stack.shape === 'square' || stack.shape === 'custom'}
+						{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
 							<T.Mesh position.x={posX} position.y={counterY} position.z={posZ}>
 								<T.BoxGeometry args={[stack.length, standingHeight, stack.thickness]} />
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
-						{:else if stack.shape === 'circle'}
+						{:else if effectiveShape === 'circle'}
 							<T.Mesh
 								position.x={posX}
 								position.y={counterY}
@@ -673,12 +676,13 @@
 					{@const counterColor = isAlt
 						? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)`
 						: stack.color}
-					{#if stack.shape === 'square' || stack.shape === 'custom'}
+					{@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
+					{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
 						<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
 							<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
-					{:else if stack.shape === 'circle'}
+					{:else if effectiveShape === 'circle'}
 						<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
 							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />

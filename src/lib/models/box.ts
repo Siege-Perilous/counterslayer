@@ -81,15 +81,35 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		return customShapes?.find((s) => s.name === name) || null;
 	};
 
+	// Get effective dimensions for custom shapes based on their base shape
+	// Returns [width, length] accounting for hex point-to-point calculations
+	const getCustomEffectiveDims = (custom: NonNullable<ReturnType<typeof getCustomShape>>): [number, number] => {
+		const baseShape = custom.baseShape ?? 'rectangle';
+		if (baseShape === 'hex') {
+			// width stores flat-to-flat, calculate point-to-point
+			const flatToFlat = custom.width;
+			const pointToPoint = flatToFlat / Math.cos(Math.PI / 6);
+			// Use global hexPointyTop to determine orientation
+			const w = hexPointyTop ? flatToFlat : pointToPoint;
+			const l = hexPointyTop ? pointToPoint : flatToFlat;
+			return [w, l];
+		}
+		if (baseShape === 'circle' || baseShape === 'square') {
+			// Both dimensions are equal (diameter or size)
+			return [custom.width, custom.width];
+		}
+		// Rectangle: use width and length directly
+		return [custom.width, custom.length];
+	};
+
 	// For top-loaded/crosswise custom shapes: LONGER side = width (X), SHORTER side = length (Y)
 	const getPocketWidth = (shape: string): number => {
 		if (shape === 'square') return squarePocketWidth;
 		if (shape === 'hex') return hexPocketWidth;
 		const custom = getCustomShape(shape);
 		if (custom) {
-			const w = custom.width + clearance * 2;
-			const l = custom.length + clearance * 2;
-			return Math.max(w, l); // Longer side along X (parallel to tray length)
+			const [w, l] = getCustomEffectiveDims(custom);
+			return Math.max(w, l) + clearance * 2; // Longer side along X (parallel to tray length)
 		}
 		return circlePocketWidth;
 	};
@@ -99,9 +119,8 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		if (shape === 'hex') return hexPocketLength;
 		const custom = getCustomShape(shape);
 		if (custom) {
-			const w = custom.width + clearance * 2;
-			const l = custom.length + clearance * 2;
-			return Math.min(w, l); // Shorter side along Y
+			const [w, l] = getCustomEffectiveDims(custom);
+			return Math.min(w, l) + clearance * 2; // Shorter side along Y
 		}
 		return circlePocketLength;
 	};
@@ -111,9 +130,8 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const getPocketLengthLengthwise = (shape: string): number => {
 		const custom = getCustomShape(shape);
 		if (custom) {
-			const w = custom.width + clearance * 2;
-			const l = custom.length + clearance * 2;
-			return Math.max(w, l); // Longer side along Y (perpendicular to tray length)
+			const [w, l] = getCustomEffectiveDims(custom);
+			return Math.max(w, l) + clearance * 2; // Longer side along Y (perpendicular to tray length)
 		}
 		return getPocketLength(shape);
 	};
@@ -122,7 +140,8 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const getStandingHeightLengthwise = (shape: string): number => {
 		const custom = getCustomShape(shape);
 		if (custom) {
-			return Math.min(custom.width, custom.length); // Shorter side is height
+			const [w, l] = getCustomEffectiveDims(custom);
+			return Math.min(w, l); // Shorter side is height
 		}
 		return getCounterStandingHeight(shape);
 	};
@@ -131,7 +150,8 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const getStandingHeightCrosswise = (shape: string): number => {
 		const custom = getCustomShape(shape);
 		if (custom) {
-			return Math.min(custom.width, custom.length); // Shorter side is height
+			const [w, l] = getCustomEffectiveDims(custom);
+			return Math.min(w, l); // Shorter side is height
 		}
 		return getCounterStandingHeight(shape);
 	};
@@ -143,7 +163,8 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 			return hexPointyTop ? hexFlatToFlatBase : hexFlatToFlatBase / Math.cos(Math.PI / 6);
 		const custom = getCustomShape(shape);
 		if (custom) {
-			return Math.max(custom.width, custom.length); // Longer side along X
+			const [w, l] = getCustomEffectiveDims(custom);
+			return Math.max(w, l); // Longer side along X
 		}
 		return circleDiameterBase;
 	};
@@ -154,7 +175,8 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 			return hexPointyTop ? hexFlatToFlatBase / Math.cos(Math.PI / 6) : hexFlatToFlatBase;
 		const custom = getCustomShape(shape);
 		if (custom) {
-			return Math.min(custom.width, custom.length); // Shorter side along Y
+			const [w, l] = getCustomEffectiveDims(custom);
+			return Math.min(w, l); // Shorter side along Y
 		}
 		return circleDiameterBase;
 	};

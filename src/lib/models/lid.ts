@@ -1225,9 +1225,9 @@ export function createLid(box: Box): Geom3 | null {
 				// If lid is longer in Y, rotate text 90° to read along Y axis
 				if (rotateText) {
 					combinedText = rotateZ(Math.PI / 2, combinedText);
-					// After rotation: old X becomes Y, old Y becomes -X
+					// After mirrorY + rotateZ: center at (textCenterY, textCenterX)
 					const positionedText = translate(
-						[centerX - textCenterY * textScale, centerY + textCenterX * textScale, -0.1],
+						[centerX - textCenterY * textScale, centerY - textCenterX * textScale, -0.1],
 						scale([textScale, textScale, 1], combinedText)
 					);
 					lid = subtract(lid, positionedText);
