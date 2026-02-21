@@ -456,23 +456,25 @@
 							>
 								{#if communityProjects.length > 0}
 									<div class="px-4 py-2">
-										<label class="mb-1 block text-xs text-gray-400">Load community project</label>
-										<select
-											class="w-full cursor-pointer rounded border border-gray-600 bg-gray-700 px-2 py-1.5 text-sm text-white"
-											onchange={(e) => {
-												const select = e.target as HTMLSelectElement;
-												const project = communityProjects.find((p) => p.id === select.value);
-												if (project) {
-													loadCommunityProject(project);
-												}
-												select.value = '';
-											}}
-										>
-											<option value="">Select a project...</option>
-											{#each communityProjects as project (project.id)}
-												<option value={project.id}>{project.name}</option>
-											{/each}
-										</select>
+										<label class="mb-1 block text-xs text-gray-400"
+											>Load community project
+											<select
+												class="mt-1 w-full cursor-pointer rounded border border-gray-600 bg-gray-700 px-2 py-1.5 text-sm text-white"
+												onchange={(e) => {
+													const select = e.target as HTMLSelectElement;
+													const project = communityProjects.find((p) => p.id === select.value);
+													if (project) {
+														loadCommunityProject(project);
+													}
+													select.value = '';
+												}}
+											>
+												<option value="">Select a project...</option>
+												{#each communityProjects as project (project.id)}
+													<option value={project.id}>{project.name}</option>
+												{/each}
+											</select>
+										</label>
 									</div>
 								{/if}
 								<input
