@@ -219,7 +219,7 @@
 								onchange={(e) => updateCustomShape(index, 'baseShape', e.currentTarget.value)}
 								class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
 							>
-								{#each baseShapeOptions as option}
+								{#each baseShapeOptions as option (option.value)}
 									<option value={option.value}>{option.label}</option>
 								{/each}
 							</select>
