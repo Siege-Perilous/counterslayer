@@ -1460,6 +1460,44 @@ export function createCounterTray(
 			);
 		}
 
+		// Check if this is a hex shape
+		const isHex = slot.shape === 'hex';
+		const isCustomHex = custom?.baseShape === 'hex';
+
+		if (isHex || isCustomHex) {
+			// Get the hex flat-to-flat dimension (with clearance)
+			const flatToFlat = isHex ? hexFlatToFlat : (custom?.width ?? 15) + clearance * 2;
+			const pointToPoint = flatToFlat / Math.cos(Math.PI / 6);
+			const radius = pointToPoint / 2;
+
+			// Create shape with hex bottom (flat side down) and flat top for easy loading
+			// 2D hex with 6 segments, rotated π/6 so flat edge is at bottom
+			const hex2D = rotateZ(Math.PI / 6, circle({ radius, segments: 6 }));
+			// Rectangle covers top half (from center to top)
+			// Width must match hex width at the flat edge (flatToFlat, not pointToPoint)
+			const rectHeight = flatToFlat / 2;
+			const rect2D = rectangle({ size: [flatToFlat, rectHeight], center: [0, rectHeight / 2] });
+			const combinedShape2D = union(hex2D, rect2D);
+
+			// Extrude along the slot width (counter stack direction)
+			const extruded = extrudeLinear({ height: slot.slotWidth }, combinedShape2D);
+
+			// Rotate so: hex bottom at -Z, flat top at +Z, extrusion along X
+			const rotated = rotateZ(
+				-Math.PI / 2,
+				rotateX(Math.PI / 2, translate([0, 0, -slot.slotWidth / 2], extruded))
+			);
+
+			// Position: flat top at tray surface + 1mm to ensure clean cut
+			// Hex with flat-down orientation: bottom at -flatToFlat/2, top at +flatToFlat/2
+			// Rectangle adds rectHeight on top, so total top is at flatToFlat/2
+			const shapeCenterZ = trayHeight + 1 - flatToFlat / 2;
+			return translate(
+				[xPos + slot.slotWidth / 2, yPos + slot.slotDepth / 2, shapeCenterZ],
+				rotated
+			);
+		}
+
 		// Default: rectangular slot
 		return translate(
 			[xPos, yPos, pocketFloorZ],
