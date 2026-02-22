@@ -448,9 +448,11 @@
 				{@const effectiveShape =
 					stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 				{@const standingHeight =
-					stack.shape === 'custom'
-						? Math.min(stack.width, stack.length)
-						: Math.max(stack.width, stack.length)}
+					effectiveShape === 'triangle'
+						? stack.length // Triangle geometric height (point down)
+						: stack.shape === 'custom'
+							? Math.min(stack.width, stack.length)
+							: Math.max(stack.width, stack.length)}
 				{@const counterY = stack.z + standingHeight / 2}
 				{@const isAlt = counterIdx % 2 === 1}
 				{@const counterColor = isAlt ? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)` : stack.color}
@@ -615,9 +617,11 @@
 					{@const effectiveShape =
 						stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 					{@const standingHeight =
-						stack.shape === 'custom'
-							? Math.min(stack.width, stack.length)
-							: Math.max(stack.width, stack.length)}
+						effectiveShape === 'triangle'
+							? stack.length // Triangle geometric height (point down)
+							: stack.shape === 'custom'
+								? Math.min(stack.width, stack.length)
+								: Math.max(stack.width, stack.length)}
 					{@const counterY = trayYOffset + stack.z + standingHeight / 2}
 					{@const isAlt = counterIdx % 2 === 1}
 					{@const counterColor = isAlt
