@@ -1,6 +1,6 @@
 import jscad from '@jscad/modeling';
 
-const { cuboid, cylinder, roundedCuboid, sphere, circle } = jscad.primitives;
+const { cuboid, cylinder, roundedCuboid, sphere, circle, rectangle } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
 const { translate, rotateX, rotateY, rotateZ, scale, mirrorY } = jscad.transforms;
 const { hull } = jscad.hulls;
@@ -1422,8 +1422,40 @@ export function createCounterTray(
 			// After rotation, triangle center is at Z=0, so top is at +triHeight/2
 			// We want top at trayHeight + 1, so center should be at trayHeight + 1 - triHeight/2
 			const triCenterZ = trayHeight + 1 - triHeight / 2;
+			return translate([xPos + slot.slotWidth / 2, yPos + slot.slotDepth / 2, triCenterZ], rotated);
+		}
+
+		// Check if this is a circle shape
+		const isCircle = slot.shape === 'circle';
+		const isCustomCircle = custom?.baseShape === 'circle';
+
+		if (isCircle || isCustomCircle) {
+			// Get the circle diameter (with clearance)
+			const diameter = isCircle ? circleDiameter : (custom?.width ?? 15) + clearance * 2;
+			const radius = diameter / 2;
+
+			// Create shape with semicircular bottom and flat top for easy loading
+			// Union of: circle (for bottom half) + rectangle (for top half with straight sides)
+			const circle2D = circle({ radius, segments: 64 });
+			const rect2D = rectangle({ size: [diameter, radius], center: [0, radius / 2] });
+			const combinedShape2D = union(circle2D, rect2D);
+
+			// Extrude along the slot width (counter stack direction)
+			const extruded = extrudeLinear({ height: slot.slotWidth }, combinedShape2D);
+
+			// Rotate so: semicircle at bottom (-Z), flat top at +Z, extrusion along X
+			const rotated = rotateZ(
+				-Math.PI / 2,
+				rotateX(Math.PI / 2, translate([0, 0, -slot.slotWidth / 2], extruded))
+			);
+
+			// Position: flat top at tray surface + 1mm to ensure clean cut
+			// Shape extends from -radius to +radius (diameter total), plus rectangle adds radius on top
+			// Total height = radius + radius = diameter, centered at radius/2 above circle center
+			// After rotation, top is at +radius (from rectangle top)
+			const shapeCenterZ = trayHeight + 1 - radius;
 			return translate(
-				[xPos + slot.slotWidth / 2, yPos + slot.slotDepth / 2, triCenterZ],
+				[xPos + slot.slotWidth / 2, yPos + slot.slotDepth / 2, shapeCenterZ],
 				rotated
 			);
 		}
