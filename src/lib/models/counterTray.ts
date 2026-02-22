@@ -1391,7 +1391,6 @@ export function createCounterTray(
 
 			// Create triangle with point facing DOWN (-Z) and flat side UP
 			// For edge-loaded: only round the bottom point, keep top corners sharp for clean cut
-			// slotDepth = triangle base (side length)
 
 			// Bottom point gets rounded, top corners are sharp (tiny radius for hull)
 			const tinyR = 0.01; // Essentially a point
@@ -1406,23 +1405,30 @@ export function createCounterTray(
 			];
 			const roundedTriangle2D = hull(...corners2D);
 
-			// Extrude along the slot width (counter stack direction)
-			const extruded = extrudeLinear({ height: slot.slotWidth }, roundedTriangle2D);
-
-			// The extruded triangle is in XY plane (point at -Y, base at +Y), extruded along Z
-			// We need: point at -Z (bottom), base at +Z (top), extrusion along X
-			// Transform: rotateX(PI/2) maps Y→Z (point -Y→-Z, base +Y→+Z), Z→-Y
-			// Then rotateZ(-PI/2) maps the extrusion from -Y to +X
-			const rotated = rotateZ(
-				-Math.PI / 2,
-				rotateX(Math.PI / 2, translate([0, 0, -slot.slotWidth / 2], extruded))
-			);
-
-			// Position: base (top of triangle) at tray surface + 1mm to ensure clean cut
-			// After rotation, triangle center is at Z=0, so top is at +triHeight/2
-			// We want top at trayHeight + 1, so center should be at trayHeight + 1 - triHeight/2
 			const triCenterZ = trayHeight + 1 - triHeight / 2;
-			return translate([xPos + slot.slotWidth / 2, yPos + slot.slotDepth / 2, triCenterZ], rotated);
+
+			if (slot.orientation === 'crosswise') {
+				// Crosswise: extrude along slotDepth (Y direction), counters stack front-to-back
+				const extruded = extrudeLinear({ height: slot.slotDepth }, roundedTriangle2D);
+				// Rotate so: point at -Z, base at +Z, extrusion along Y
+				const rotated = rotateX(Math.PI / 2, translate([0, 0, -slot.slotDepth / 2], extruded));
+				return translate(
+					[xPos + slot.slotWidth / 2, yPos + slot.slotDepth / 2, triCenterZ],
+					rotated
+				);
+			} else {
+				// Lengthwise: extrude along slotWidth (X direction), counters stack left-to-right
+				const extruded = extrudeLinear({ height: slot.slotWidth }, roundedTriangle2D);
+				// Rotate so: point at -Z, base at +Z, extrusion along X
+				const rotated = rotateZ(
+					-Math.PI / 2,
+					rotateX(Math.PI / 2, translate([0, 0, -slot.slotWidth / 2], extruded))
+				);
+				return translate(
+					[xPos + slot.slotWidth / 2, yPos + slot.slotDepth / 2, triCenterZ],
+					rotated
+				);
+			}
 		}
 
 		// Check if this is a circle shape
@@ -1440,24 +1446,30 @@ export function createCounterTray(
 			const rect2D = rectangle({ size: [diameter, radius], center: [0, radius / 2] });
 			const combinedShape2D = union(circle2D, rect2D);
 
-			// Extrude along the slot width (counter stack direction)
-			const extruded = extrudeLinear({ height: slot.slotWidth }, combinedShape2D);
-
-			// Rotate so: semicircle at bottom (-Z), flat top at +Z, extrusion along X
-			const rotated = rotateZ(
-				-Math.PI / 2,
-				rotateX(Math.PI / 2, translate([0, 0, -slot.slotWidth / 2], extruded))
-			);
-
-			// Position: flat top at tray surface + 1mm to ensure clean cut
-			// Shape extends from -radius to +radius (diameter total), plus rectangle adds radius on top
-			// Total height = radius + radius = diameter, centered at radius/2 above circle center
-			// After rotation, top is at +radius (from rectangle top)
 			const shapeCenterZ = trayHeight + 1 - radius;
-			return translate(
-				[xPos + slot.slotWidth / 2, yPos + slot.slotDepth / 2, shapeCenterZ],
-				rotated
-			);
+
+			if (slot.orientation === 'crosswise') {
+				// Crosswise: extrude along slotDepth (Y direction), counters stack front-to-back
+				const extruded = extrudeLinear({ height: slot.slotDepth }, combinedShape2D);
+				// Rotate so: semicircle at bottom (-Z), flat top at +Z, extrusion along Y
+				const rotated = rotateX(Math.PI / 2, translate([0, 0, -slot.slotDepth / 2], extruded));
+				return translate(
+					[xPos + slot.slotWidth / 2, yPos + slot.slotDepth / 2, shapeCenterZ],
+					rotated
+				);
+			} else {
+				// Lengthwise: extrude along slotWidth (X direction), counters stack left-to-right
+				const extruded = extrudeLinear({ height: slot.slotWidth }, combinedShape2D);
+				// Rotate so: semicircle at bottom (-Z), flat top at +Z, extrusion along X
+				const rotated = rotateZ(
+					-Math.PI / 2,
+					rotateX(Math.PI / 2, translate([0, 0, -slot.slotWidth / 2], extruded))
+				);
+				return translate(
+					[xPos + slot.slotWidth / 2, yPos + slot.slotDepth / 2, shapeCenterZ],
+					rotated
+				);
+			}
 		}
 
 		// Check if this is a hex shape
@@ -1479,23 +1491,30 @@ export function createCounterTray(
 			const rect2D = rectangle({ size: [flatToFlat, rectHeight], center: [0, rectHeight / 2] });
 			const combinedShape2D = union(hex2D, rect2D);
 
-			// Extrude along the slot width (counter stack direction)
-			const extruded = extrudeLinear({ height: slot.slotWidth }, combinedShape2D);
-
-			// Rotate so: hex bottom at -Z, flat top at +Z, extrusion along X
-			const rotated = rotateZ(
-				-Math.PI / 2,
-				rotateX(Math.PI / 2, translate([0, 0, -slot.slotWidth / 2], extruded))
-			);
-
-			// Position: flat top at tray surface + 1mm to ensure clean cut
-			// Hex with flat-down orientation: bottom at -flatToFlat/2, top at +flatToFlat/2
-			// Rectangle adds rectHeight on top, so total top is at flatToFlat/2
 			const shapeCenterZ = trayHeight + 1 - flatToFlat / 2;
-			return translate(
-				[xPos + slot.slotWidth / 2, yPos + slot.slotDepth / 2, shapeCenterZ],
-				rotated
-			);
+
+			if (slot.orientation === 'crosswise') {
+				// Crosswise: extrude along slotDepth (Y direction), counters stack front-to-back
+				const extruded = extrudeLinear({ height: slot.slotDepth }, combinedShape2D);
+				// Rotate so: hex bottom at -Z, flat top at +Z, extrusion along Y
+				const rotated = rotateX(Math.PI / 2, translate([0, 0, -slot.slotDepth / 2], extruded));
+				return translate(
+					[xPos + slot.slotWidth / 2, yPos + slot.slotDepth / 2, shapeCenterZ],
+					rotated
+				);
+			} else {
+				// Lengthwise: extrude along slotWidth (X direction), counters stack left-to-right
+				const extruded = extrudeLinear({ height: slot.slotWidth }, combinedShape2D);
+				// Rotate so: hex bottom at -Z, flat top at +Z, extrusion along X
+				const rotated = rotateZ(
+					-Math.PI / 2,
+					rotateX(Math.PI / 2, translate([0, 0, -slot.slotWidth / 2], extruded))
+				);
+				return translate(
+					[xPos + slot.slotWidth / 2, yPos + slot.slotDepth / 2, shapeCenterZ],
+					rotated
+				);
+			}
 		}
 
 		// Default: rectangular slot
