@@ -476,7 +476,7 @@
 							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
-					{:else}
+					{:else if effectiveShape === 'hex'}
 						<!-- hex: rotate so axis is along X -->
 						<T.Mesh
 							position.x={posX}
@@ -486,6 +486,18 @@
 							rotation.x={stack.hexPointyTop ? 0 : Math.PI / 6}
 						>
 							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
+							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+						</T.Mesh>
+					{:else}
+						<!-- triangle: rotate so axis is along X -->
+						<T.Mesh
+							position.x={posX}
+							position.y={counterY}
+							position.z={posZ}
+							rotation.z={Math.PI / 2}
+							rotation.x={Math.PI / 2}
+						>
+							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{/if}
@@ -509,7 +521,7 @@
 							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
-					{:else}
+					{:else if effectiveShape === 'hex'}
 						<!-- hex -->
 						<T.Mesh
 							position.x={posX}
@@ -519,6 +531,17 @@
 							rotation.y={stack.hexPointyTop ? Math.PI / 6 : 0}
 						>
 							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
+							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+						</T.Mesh>
+					{:else}
+						<!-- triangle -->
+						<T.Mesh
+							position.x={posX}
+							position.y={counterY}
+							position.z={posZ}
+							rotation.x={Math.PI / 2}
+						>
+							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{/if}
@@ -545,7 +568,7 @@
 						<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
 						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 					</T.Mesh>
-				{:else}
+				{:else if effectiveShape === 'hex'}
 					<!-- hex -->
 					<T.Mesh
 						position.x={posX}
@@ -554,6 +577,12 @@
 						rotation.y={stack.hexPointyTop ? 0 : Math.PI / 6}
 					>
 						<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
+						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+					</T.Mesh>
+				{:else}
+					<!-- triangle -->
+					<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
+						<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
 						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 					</T.Mesh>
 				{/if}
@@ -618,7 +647,7 @@
 								/>
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
-						{:else}
+						{:else if effectiveShape === 'hex'}
 							<!-- hex: rotate so axis is along X -->
 							<T.Mesh
 								position.x={posX}
@@ -628,6 +657,18 @@
 								rotation.x={stack.hexPointyTop ? 0 : Math.PI / 6}
 							>
 								<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
+								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+							</T.Mesh>
+						{:else}
+							<!-- triangle: rotate so axis is along X -->
+							<T.Mesh
+								position.x={posX}
+								position.y={counterY}
+								position.z={posZ}
+								rotation.z={Math.PI / 2}
+								rotation.x={Math.PI / 2}
+							>
+								<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
 						{/if}
@@ -654,7 +695,7 @@
 								/>
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
-						{:else}
+						{:else if effectiveShape === 'hex'}
 							<T.Mesh
 								position.x={posX}
 								position.y={counterY}
@@ -663,6 +704,17 @@
 								rotation.y={stack.hexPointyTop ? Math.PI / 6 : 0}
 							>
 								<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
+								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+							</T.Mesh>
+						{:else}
+							<!-- triangle -->
+							<T.Mesh
+								position.x={posX}
+								position.y={counterY}
+								position.z={posZ}
+								rotation.x={Math.PI / 2}
+							>
+								<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
 						{/if}
@@ -691,7 +743,7 @@
 							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
-					{:else}
+					{:else if effectiveShape === 'hex'}
 						<!-- hex -->
 						<T.Mesh
 							position.x={posX}
@@ -700,6 +752,12 @@
 							rotation.y={stack.hexPointyTop ? 0 : Math.PI / 6}
 						>
 							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
+							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+						</T.Mesh>
+					{:else}
+						<!-- triangle -->
+						<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
+							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{/if}

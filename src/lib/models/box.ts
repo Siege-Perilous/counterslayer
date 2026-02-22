@@ -46,6 +46,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		squareLength,
 		hexFlatToFlat: hexFlatToFlatBase,
 		circleDiameter: circleDiameterBase,
+		triangleSide: triangleSideBase,
 		counterThickness,
 		hexPointyTop,
 		clearance,
@@ -74,6 +75,12 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const circlePocketWidth = circleDiameter;
 	const circlePocketLength = circleDiameter;
 
+	// Triangle: equilateral, side length is the base (X), height is side * sqrt(3)/2 (Y)
+	const triangleSide = triangleSideBase + clearance * 2;
+	const triangleHeight = triangleSide * (Math.sqrt(3) / 2);
+	const trianglePocketWidth = triangleSide;
+	const trianglePocketLength = triangleHeight;
+
 	// Helper to get custom shape by name from 'custom:ShapeName' reference
 	const getCustomShape = (shapeRef: string) => {
 		if (!shapeRef.startsWith('custom:')) return null;
@@ -96,6 +103,12 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 			const l = hexPointyTop ? pointToPoint : flatToFlat;
 			return [w, l];
 		}
+		if (baseShape === 'triangle') {
+			// width stores side length, height = side * sqrt(3)/2
+			const side = custom.width;
+			const height = side * (Math.sqrt(3) / 2);
+			return [side, height]; // Base (X) x Height (Y)
+		}
 		if (baseShape === 'circle' || baseShape === 'square') {
 			// Both dimensions are equal (diameter or size)
 			return [custom.width, custom.width];
@@ -108,6 +121,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const getPocketWidth = (shape: string): number => {
 		if (shape === 'square') return squarePocketWidth;
 		if (shape === 'hex') return hexPocketWidth;
+		if (shape === 'triangle') return trianglePocketWidth;
 		const custom = getCustomShape(shape);
 		if (custom) {
 			const [w, l] = getCustomEffectiveDims(custom);
@@ -119,6 +133,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const getPocketLength = (shape: string): number => {
 		if (shape === 'square') return squarePocketLength;
 		if (shape === 'hex') return hexPocketLength;
+		if (shape === 'triangle') return trianglePocketLength;
 		const custom = getCustomShape(shape);
 		if (custom) {
 			const [w, l] = getCustomEffectiveDims(custom);
@@ -163,6 +178,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		if (shape === 'square') return squareWidth;
 		if (shape === 'hex')
 			return hexPointyTop ? hexFlatToFlatBase : hexFlatToFlatBase / Math.cos(Math.PI / 6);
+		if (shape === 'triangle') return triangleSideBase;
 		const custom = getCustomShape(shape);
 		if (custom) {
 			const [w, l] = getCustomEffectiveDims(custom);
@@ -175,6 +191,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		if (shape === 'square') return squareLength;
 		if (shape === 'hex')
 			return hexPointyTop ? hexFlatToFlatBase / Math.cos(Math.PI / 6) : hexFlatToFlatBase;
+		if (shape === 'triangle') return triangleSideBase * (Math.sqrt(3) / 2);
 		const custom = getCustomShape(shape);
 		if (custom) {
 			const [w, l] = getCustomEffectiveDims(custom);
