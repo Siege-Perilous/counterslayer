@@ -12,7 +12,8 @@
 		{ value: 'rectangle', label: 'Rectangle' },
 		{ value: 'square', label: 'Square' },
 		{ value: 'circle', label: 'Circle' },
-		{ value: 'hex', label: 'Hex' }
+		{ value: 'hex', label: 'Hex' },
+		{ value: 'triangle', label: 'Triangle' }
 	];
 
 	function updateParam<K extends keyof CounterTrayParams>(key: K, value: CounterTrayParams[K]) {
@@ -159,6 +160,27 @@
 				/>
 			</label>
 			<label class="block">
+				<span class="text-xs text-gray-400">Triangle (side)</span>
+				<input
+					type="number"
+					step="0.1"
+					value={params.triangleSide}
+					onchange={(e) => updateParam('triangleSide', parseFloat(e.currentTarget.value))}
+					class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+				/>
+			</label>
+			<label class="block">
+				<span class="text-xs text-gray-400">Triangle Radius</span>
+				<input
+					type="number"
+					step="0.1"
+					min="0"
+					value={params.triangleCornerRadius}
+					onchange={(e) => updateParam('triangleCornerRadius', parseFloat(e.currentTarget.value))}
+					class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+				/>
+			</label>
+			<label class="block">
 				<span class="text-xs text-gray-400">Thickness</span>
 				<input
 					type="number"
@@ -273,6 +295,19 @@
 						{:else if baseShape === 'hex'}
 							<label class="col-span-2 block">
 								<span class="text-xs text-gray-400">Flat-to-Flat</span>
+								<input
+									type="number"
+									step="0.1"
+									min="1"
+									value={shape.width}
+									onchange={(e) =>
+										updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+									class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+								/>
+							</label>
+						{:else if baseShape === 'triangle'}
+							<label class="col-span-2 block">
+								<span class="text-xs text-gray-400">Side</span>
 								<input
 									type="number"
 									step="0.1"

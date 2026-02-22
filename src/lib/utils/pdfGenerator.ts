@@ -14,7 +14,7 @@ export interface PdfStackData {
 	refCode: string;
 	label: string;
 	count: number;
-	shape: 'square' | 'hex' | 'circle' | 'custom';
+	shape: 'square' | 'hex' | 'circle' | 'triangle' | 'custom';
 	x: number; // Center X position in tray
 	y: number; // Center Y position in tray
 	width: number; // X dimension of the counter

@@ -68,7 +68,7 @@
 		handleDragEnd();
 	}
 
-	const builtinShapes = ['square', 'hex', 'circle'] as const;
+	const builtinShapes = ['square', 'hex', 'circle', 'triangle'] as const;
 	let shapeOptions = $derived([
 		...builtinShapes,
 		...(selectedTray?.params.customShapes.map((s) => `custom:${s.name}`) ?? [])

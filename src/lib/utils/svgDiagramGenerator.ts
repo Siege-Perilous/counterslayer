@@ -102,7 +102,7 @@ export function getBoxDiagramDimensions(
 }
 
 function drawShapeMarker(
-	shape: 'square' | 'hex' | 'circle' | 'custom',
+	shape: 'square' | 'hex' | 'circle' | 'triangle' | 'custom',
 	cx: number,
 	cy: number,
 	width: number,
@@ -124,6 +124,11 @@ function drawShapeMarker(
 			const hexRadius = Math.min(halfW, halfL);
 			return `<polygon points="${generateHexagonPoints(cx, cy, hexRadius)}" fill="#fff"/>`;
 		}
+		case 'triangle': {
+			// Equilateral triangle with base at bottom, point at top
+			const triPoints = generateTrianglePoints(cx, cy, paddedWidth, paddedLength);
+			return `<polygon points="${triPoints}" fill="#fff"/>`;
+		}
 		case 'circle':
 		default: {
 			const circleRadius = Math.min(halfW, halfL);
@@ -139,6 +144,14 @@ function generateHexagonPoints(cx: number, cy: number, size: number): string {
 		points.push(`${cx + size * Math.cos(angle)},${cy + size * Math.sin(angle)}`);
 	}
 	return points.join(' ');
+}
+
+function generateTrianglePoints(cx: number, cy: number, width: number, height: number): string {
+	// Equilateral triangle: base at bottom (along X), point at top (towards -Y in SVG coords)
+	const halfW = width / 2;
+	const halfH = height / 2;
+	// Bottom left, bottom right, top center
+	return `${cx - halfW},${cy + halfH} ${cx + halfW},${cy + halfH} ${cx},${cy - halfH}`;
 }
 
 function escapeXml(str: string): string {
