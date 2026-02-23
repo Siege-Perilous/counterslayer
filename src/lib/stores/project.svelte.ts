@@ -99,6 +99,9 @@ export function addBox(): Box {
 	const boxNumber = project.boxes.length + 1;
 	const box = createDefaultBox(`Box ${boxNumber}`);
 	const tray = createDefaultTray('Tray 1');
+	// Inherit global params (including customShapes) from existing trays
+	const globalParams = getGlobalParamsFromExisting();
+	tray.params = { ...tray.params, ...globalParams };
 	box.trays.push(tray);
 	project.boxes.push(box);
 	project.selectedBoxId = box.id;
@@ -135,6 +138,21 @@ export function updateBox(boxId: string, updates: Partial<Omit<Box, 'id' | 'tray
 	}
 }
 
+// Get current global params from any existing tray
+function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
+	for (const box of project.boxes) {
+		if (box.trays.length > 0) {
+			const existingParams = box.trays[0].params;
+			const globalParams: Partial<CounterTrayParams> = {};
+			for (const key of GLOBAL_PARAM_KEYS) {
+				(globalParams as Record<string, unknown>)[key] = existingParams[key];
+			}
+			return globalParams;
+		}
+	}
+	return {};
+}
+
 // Tray operations
 export function addTray(boxId: string): Tray | null {
 	const box = project.boxes.find((b) => b.id === boxId);
@@ -142,6 +160,9 @@ export function addTray(boxId: string): Tray | null {
 
 	const trayNumber = box.trays.length + 1;
 	const tray = createDefaultTray(`Tray ${trayNumber}`);
+	// Inherit global params (including customShapes) from existing trays
+	const globalParams = getGlobalParamsFromExisting();
+	tray.params = { ...tray.params, ...globalParams };
 	box.trays.push(tray);
 	project.selectedTrayId = tray.id;
 	autosave();
