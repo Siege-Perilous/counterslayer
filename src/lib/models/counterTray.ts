@@ -1415,11 +1415,18 @@ export function createCounterTray(
 			];
 			const roundedTriangle2D = hull(...corners2D);
 
-			const triCenterZ = trayHeight + 1 - triHeight / 2;
+			// Position cutout so bottom aligns with pocketFloorZ (where preview counter sits)
+			// Triangle 2D shape has bottom at (-triHeight/2 + r) relative to center
+			const triCenterZ = pocketFloorZ + triHeight / 2 - r;
+
+			// Add rectangle on top to extend through tray top surface (like circle and hex)
+			const topExtent = trayHeight + 1 - (triCenterZ + triHeight / 2);
+			const rect2D = rectangle({ size: [side, topExtent], center: [0, triHeight / 2 + topExtent / 2] });
+			const combinedTriangle2D = union(roundedTriangle2D, rect2D);
 
 			if (slot.orientation === 'crosswise') {
 				// Crosswise: extrude along slotDepth (Y direction), counters stack front-to-back
-				const extruded = extrudeLinear({ height: slot.slotDepth }, roundedTriangle2D);
+				const extruded = extrudeLinear({ height: slot.slotDepth }, combinedTriangle2D);
 				// Rotate so: point at -Z, base at +Z, extrusion along Y
 				const rotated = rotateX(Math.PI / 2, translate([0, 0, -slot.slotDepth / 2], extruded));
 				return translate(
@@ -1428,7 +1435,7 @@ export function createCounterTray(
 				);
 			} else {
 				// Lengthwise: extrude along slotWidth (X direction), counters stack left-to-right
-				const extruded = extrudeLinear({ height: slot.slotWidth }, roundedTriangle2D);
+				const extruded = extrudeLinear({ height: slot.slotWidth }, combinedTriangle2D);
 				// Rotate so: point at -Z, base at +Z, extrusion along X
 				const rotated = rotateZ(
 					-Math.PI / 2,

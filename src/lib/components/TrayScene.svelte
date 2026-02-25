@@ -563,8 +563,7 @@
 						: stack.shape === 'custom'
 							? Math.min(stack.width, stack.length)
 							: Math.max(stack.width, stack.length)}
-				<!-- For triangles, lift to align with slot cut from top surface (rimHeight ~2mm) -->
-				{@const triangleLift = effectiveShape === 'triangle' ? 2 : 0}
+				{@const triangleLift = 0}
 				{@const counterY = stack.z + standingHeight / 2 + triangleLift}
 				{@const isAlt = counterIdx % 2 === 1}
 				{@const counterColor = isAlt
@@ -747,8 +746,7 @@
 							: stack.shape === 'custom'
 								? Math.min(stack.width, stack.length)
 								: Math.max(stack.width, stack.length)}
-					<!-- For triangles, lift to align with slot cut from top surface (rimHeight ~2mm) -->
-					{@const triangleLift = effectiveShape === 'triangle' ? 2 : 0}
+					{@const triangleLift = 0}
 					{@const counterY = trayYOffset + stack.z + standingHeight / 2 + triangleLift}
 					{@const isAlt = counterIdx % 2 === 1}
 					{@const counterColor = isAlt
