@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Input, FormControl, Spacer, Hr, Select, Link, IconButton, Icon } from '@tableslayer/ui';
-	import { IconX, IconPlus } from '@tabler/icons-svelte';
+	import { IconX, IconPlus, IconMenu } from '@tabler/icons-svelte';
 	import type { Box, Tray } from '$lib/types/project';
 	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
 
@@ -310,7 +310,7 @@
 							/>
 						{/snippet}
 					</FormControl>
-					<FormControl label="Cutout Max" name="cutoutMax">
+					<FormControl label="Cutout max" name="cutoutMax">
 						{#snippet input({ inputProps })}
 							<Input
 								{...inputProps}
@@ -329,11 +329,11 @@
 
 			<!-- Tray Override -->
 			<section class="section">
-				<h3 class="sectionTitle">Override</h3>
+				<h3 class="sectionTitle">Custom length</h3>
 				<Spacer size="0.5rem" />
 				<div class="formGrid">
 					<FormControl
-						label="Length (0 = auto)"
+						label="Tray length (0 = auto)"
 						name="trayLengthOverride"
 						class="formGrid__spanTwo"
 					>
@@ -349,7 +349,7 @@
 						{/snippet}
 						{#snippet end()}mm{/snippet}
 					</FormControl>
-					<FormControl label="Extra Cols" name="extraTrayCols">
+					<FormControl label="Extra cols" name="extraTrayCols">
 						{#snippet input({ inputProps })}
 							<Input
 								{...inputProps}
@@ -361,7 +361,7 @@
 							/>
 						{/snippet}
 					</FormControl>
-					<FormControl label="Extra Rows" name="extraTrayRows">
+					<FormControl label="Extra rows" name="extraTrayRows">
 						{#snippet input({ inputProps })}
 							<Input
 								{...inputProps}
@@ -401,7 +401,7 @@
 								role="button"
 								tabindex="0"
 							>
-								&#x2630;
+								<Icon Icon={IconMenu} size="sm" color="var(--fgMuted)" />
 							</span>
 							<Input
 								type="text"
@@ -464,7 +464,7 @@
 								role="button"
 								tabindex="0"
 							>
-								&#x2630;
+								<Icon Icon={IconMenu2} size="sm" color="var(--fgMuted)" />
 							</span>
 							<Input
 								type="text"
@@ -609,29 +609,33 @@
 	.stackList {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
 	}
 
 	.stackRow {
 		display: flex;
 		align-items: center;
-		gap: 0.25rem;
-		padding: 0.25rem;
+		gap: 0.5rem;
+		padding: 0.25rem 0;
 		border-radius: var(--radius-2);
-	}
-
-	.stackRow--dragover {
-		background: color-mix(in srgb, var(--primary-900) 30%, transparent);
+		border: solid 1px transparent;
 	}
 
 	.dragHandle {
+		display: flex;
+		align-items: center;
 		cursor: grab;
-		padding: 0 0.25rem;
 		color: var(--fgMuted);
+		width: 2rem;
+		padding: 0 0.5rem;
+	}
+
+	.stackRow:has(.dragHandle:hover) {
+		border: dashed 1px var(--fgPrimary);
+		background: var(--contrastEmpty);
 	}
 
 	.dragHandle:hover {
-		color: var(--fgMuted);
+		color: var(--fg);
 	}
 
 	.stackSelect {

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Button, Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon } from '@tableslayer/ui';
-	import { IconX } from '@tabler/icons-svelte';
+	import { Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon } from '@tableslayer/ui';
+	import { IconX, IconPlus } from '@tabler/icons-svelte';
 	import type { Box, Project } from '$lib/types/project';
 	import { calculateMinimumBoxDimensions } from '$lib/models/box';
 
@@ -27,7 +27,14 @@
 	<div class="panelList">
 		<div class="panelListHeader">
 			<span class="panelListTitle">Boxes</span>
-			<Button variant="ghost" size="sm" onclick={onAddBox}>+ New</Button>
+			<IconButton
+				onclick={onAddBox}
+				title="Add new box"
+				size="sm"
+				variant="ghost"
+			>
+				<Icon Icon={IconPlus} />
+			</IconButton>
 		</div>
 		<div class="panelListItems">
 			{#each project.boxes as box (box.id)}
@@ -46,10 +53,10 @@
 								onDeleteBox(box.id);
 							}}
 							title="Delete box"
+							size="sm"
 							variant="ghost"
-							color="var(--fgMuted)"
 						>
-							<Icon Icon={IconX} color="var(--fgMuted)" />
+							<Icon color="var(--fgMuted)" Icon={IconX} />
 						</IconButton>
 					{/if}
 				</div>
@@ -210,6 +217,7 @@
 	.panelList {
 		padding: 0.5rem;
 		border-bottom: var(--borderThin);
+		background: var(--contrastLow);
 	}
 
 	.panelListHeader {
@@ -229,7 +237,7 @@
 	}
 
 	.panelListItems {
-		max-height: 6rem;
+		max-height: 10rem;
 		overflow-y: auto;
 		display: flex;
 		flex-direction: column;
@@ -241,17 +249,18 @@
 		cursor: pointer;
 		align-items: center;
 		justify-content: space-between;
-		padding: 0.25rem 0.5rem;
+		padding: 0.25rem;
 		border-radius: var(--radius-2);
 		font-size: 0.875rem;
 	}
 
 	.listItem:hover {
-		background: var(--contrastLow);
+		background: var(--contrastMedium);
 	}
 
 	.listItem--selected {
-		background: var(--primary-500);
+		color: var(--fgPrimary);
+		font-weight: 600;
 	}
 
 	.panelForm {

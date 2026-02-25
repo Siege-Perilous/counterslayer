@@ -121,7 +121,7 @@
 <div class="globalsPanel">
 	<section class="section">
 		<h3 class="sectionTitle">Print Bed</h3>
-		<FormControl label="Bed Size" name="printBedSize">
+		<FormControl label="Bed size" name="printBedSize">
 			{#snippet input({ inputProps })}
 				<Input
 					{...inputProps}
@@ -169,7 +169,7 @@
 				{/snippet}
 				{#snippet end()}mm{/snippet}
 			</FormControl>
-			<FormControl label="Circle Diameter" name="circleDiameter">
+			<FormControl label="Circle diameter" name="circleDiameter">
 				{#snippet input({ inputProps })}
 					<Input
 						{...inputProps}
@@ -193,7 +193,7 @@
 				{/snippet}
 				{#snippet end()}mm{/snippet}
 			</FormControl>
-			<FormControl label="Triangle Radius" name="triangleCornerRadius">
+			<FormControl label="Triangle radius" name="triangleCornerRadius">
 				{#snippet input({ inputProps })}
 					<Input
 						{...inputProps}
@@ -254,7 +254,7 @@
 						</IconButton>
 					</div>
 					<Spacer size="0.5rem" />
-					<FormControl label="Base Shape" name="baseShape-{index}">
+					<FormControl label="Base shape" name="baseShape-{index}">
 						{#snippet input({ inputProps })}
 							<Select
 								selected={[baseShape]}
@@ -326,7 +326,7 @@
 								{#snippet end()}mm{/snippet}
 							</FormControl>
 						{:else if baseShape === 'hex'}
-							<FormControl label="Flat-to-Flat" name="flatToFlat-{index}" class="formGrid__spanTwo">
+							<FormControl label="Flat-to-flat" name="flatToFlat-{index}" class="formGrid__spanTwo">
 								{#snippet input({ inputProps })}
 									<Input
 										{...inputProps}

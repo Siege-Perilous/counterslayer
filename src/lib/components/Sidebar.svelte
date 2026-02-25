@@ -101,9 +101,6 @@
 			<!-- Boxes Panel -->
 			<Pane defaultSize={35} minSize={20} style="height: 100%; overflow: hidden;">
 				<Panel class="sidebarPanel">
-					<div class="panelHeader">
-						<span class="sectionTitle" style="margin-bottom: 0;">Boxes</span>
-					</div>
 					<div class="panelContent">
 						<BoxesPanel
 							{project}
