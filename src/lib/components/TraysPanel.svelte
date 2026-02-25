@@ -464,7 +464,7 @@
 								role="button"
 								tabindex="0"
 							>
-								<Icon Icon={IconMenu2} size="sm" color="var(--fgMuted)" />
+								<Icon Icon={IconMenu} size="sm" color="var(--fgMuted)" />
 							</span>
 							<Input
 								type="text"

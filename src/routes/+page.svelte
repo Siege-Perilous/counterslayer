@@ -11,7 +11,8 @@
 		Popover,
 		Hr,
 		Link,
-		FormControl
+		FormControl,
+		Loader
 	} from '@tableslayer/ui';
 	import { IconSun, IconMoon, IconChevronDown } from '@tabler/icons-svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
@@ -404,6 +405,7 @@
 
 				{#if generating}
 					<div class="generatingOverlay">
+						<Loader />
 						<div class="generatingText">Generating geometry...</div>
 					</div>
 				{/if}
@@ -645,6 +647,7 @@
 		position: absolute;
 		inset: 0;
 		display: flex;
+		gap: 0.5rem;
 		align-items: center;
 		justify-content: center;
 		background: rgba(0, 0, 0, 0.5);

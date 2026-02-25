@@ -485,7 +485,9 @@
 						: stack.shape === 'custom'
 							? Math.min(stack.width, stack.length)
 							: Math.max(stack.width, stack.length)}
-				{@const counterY = stack.z + standingHeight / 2}
+				<!-- For triangles, lift to align with slot cut from top surface (rimHeight ~2mm) -->
+				{@const triangleLift = effectiveShape === 'triangle' ? 2 : 0}
+				{@const counterY = stack.z + standingHeight / 2 + triangleLift}
 				{@const isAlt = counterIdx % 2 === 1}
 				{@const counterColor = isAlt
 					? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
@@ -525,15 +527,15 @@
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{:else}
-						<!-- triangle: rotate so axis is along X -->
+						<!-- triangle: standing on edge lengthwise, axis=X, point down, flat up -->
 						<T.Mesh
 							position.x={posX}
 							position.y={counterY}
 							position.z={posZ}
-							rotation.z={Math.PI / 2}
 							rotation.x={Math.PI / 2}
+							rotation.z={-Math.PI / 2}
 						>
-							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
+							<T.CylinderGeometry args={[stack.width / Math.sqrt(3), stack.width / Math.sqrt(3), stack.thickness, 3]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{/if}
@@ -570,14 +572,15 @@
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{:else}
-						<!-- triangle -->
+						<!-- triangle: standing on edge crosswise, axis=Z, point down, flat up -->
 						<T.Mesh
 							position.x={posX}
 							position.y={counterY}
 							position.z={posZ}
-							rotation.x={Math.PI / 2}
+							rotation.x={-Math.PI / 2}
+							rotation.y={Math.PI}
 						>
-							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
+							<T.CylinderGeometry args={[stack.width / Math.sqrt(3), stack.width / Math.sqrt(3), stack.thickness, 3]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{/if}
@@ -618,9 +621,10 @@
 						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 					</T.Mesh>
 				{:else}
-					<!-- triangle -->
-					<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
-						<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
+					<!-- triangle: point toward cutout, offset for centroid vs bounding box center -->
+					{@const triCentroidOffset = stack.length / 6}
+					<T.Mesh position.x={posX} position.y={posY} position.z={posZ + triCentroidOffset} rotation.y={Math.PI}>
+						<T.CylinderGeometry args={[stack.width / Math.sqrt(3), stack.width / Math.sqrt(3), stack.thickness, 3]} />
 						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 					</T.Mesh>
 				{/if}
@@ -658,7 +662,9 @@
 							: stack.shape === 'custom'
 								? Math.min(stack.width, stack.length)
 								: Math.max(stack.width, stack.length)}
-					{@const counterY = trayYOffset + stack.z + standingHeight / 2}
+					<!-- For triangles, lift to align with slot cut from top surface (rimHeight ~2mm) -->
+					{@const triangleLift = effectiveShape === 'triangle' ? 2 : 0}
+					{@const counterY = trayYOffset + stack.z + standingHeight / 2 + triangleLift}
 					{@const isAlt = counterIdx % 2 === 1}
 					{@const counterColor = isAlt
 						? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
@@ -700,15 +706,15 @@
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
 						{:else}
-							<!-- triangle: rotate so axis is along X -->
+							<!-- triangle: standing on edge lengthwise, axis=X, point down, flat up -->
 							<T.Mesh
 								position.x={posX}
 								position.y={counterY}
 								position.z={posZ}
-								rotation.z={Math.PI / 2}
 								rotation.x={Math.PI / 2}
+								rotation.z={-Math.PI / 2}
 							>
-								<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
+								<T.CylinderGeometry args={[stack.width / Math.sqrt(3), stack.width / Math.sqrt(3), stack.thickness, 3]} />
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
 						{/if}
@@ -747,14 +753,15 @@
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
 						{:else}
-							<!-- triangle -->
+							<!-- triangle: standing on edge crosswise, axis=Z, point down, flat up -->
 							<T.Mesh
 								position.x={posX}
 								position.y={counterY}
 								position.z={posZ}
-								rotation.x={Math.PI / 2}
+								rotation.x={-Math.PI / 2}
+								rotation.y={Math.PI}
 							>
-								<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
+								<T.CylinderGeometry args={[stack.width / Math.sqrt(3), stack.width / Math.sqrt(3), stack.thickness, 3]} />
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
 						{/if}
@@ -795,9 +802,10 @@
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{:else}
-						<!-- triangle -->
-						<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
-							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
+						<!-- triangle: point toward cutout, offset for centroid vs bounding box center -->
+						{@const triCentroidOffset = stack.length / 6}
+						<T.Mesh position.x={posX} position.y={posY} position.z={posZ + triCentroidOffset} rotation.y={Math.PI}>
+							<T.CylinderGeometry args={[stack.width / Math.sqrt(3), stack.width / Math.sqrt(3), stack.thickness, 3]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{/if}
