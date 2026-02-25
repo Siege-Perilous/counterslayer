@@ -295,7 +295,12 @@ export async function generatePdfWithScreenshots(
 				doc.setFontSize(8);
 				doc.setFont('courier', 'normal');
 				doc.setTextColor(150, 150, 150);
-				doc.text('No preview', screenshotX + SCREENSHOT_WIDTH / 2, currentY + SCREENSHOT_HEIGHT / 2, { align: 'center' });
+				doc.text(
+					'No preview',
+					screenshotX + SCREENSHOT_WIDTH / 2,
+					currentY + SCREENSHOT_HEIGHT / 2,
+					{ align: 'center' }
+				);
 				doc.setTextColor(0, 0, 0);
 			}
 			currentY += SCREENSHOT_HEIGHT + screenshotMargin;

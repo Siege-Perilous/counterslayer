@@ -27,12 +27,7 @@
 	<div class="panelList">
 		<div class="panelListHeader">
 			<span class="panelListTitle">Boxes</span>
-			<IconButton
-				onclick={onAddBox}
-				title="Add new box"
-				size="sm"
-				variant="ghost"
-			>
+			<IconButton onclick={onAddBox} title="Add new box" size="sm" variant="ghost">
 				<Icon Icon={IconPlus} />
 			</IconButton>
 		</div>
@@ -48,7 +43,7 @@
 					<span style="overflow: hidden; text-overflow: ellipsis;">{box.name}</span>
 					{#if project.boxes.length > 1}
 						<IconButton
-							onclick={(e) => {
+							onclick={(e: MouseEvent) => {
 								e.stopPropagation();
 								onDeleteBox(box.id);
 							}}
@@ -173,7 +168,11 @@
 					{/snippet}
 					{#snippet end()}mm{/snippet}
 				</FormControl>
-				<FormControl label="Height (min: {minimums.minHeight.toFixed(1)})" name="customHeight" class="formGrid__spanTwo">
+				<FormControl
+					label="Height (min: {minimums.minHeight.toFixed(1)})"
+					name="customHeight"
+					class="formGrid__spanTwo"
+				>
 					{#snippet input({ inputProps })}
 						<Input
 							{...inputProps}

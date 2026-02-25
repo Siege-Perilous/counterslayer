@@ -84,11 +84,7 @@ export function calculateIsometricCameraPosition(
 
 	// Isometric-style angle: equal x and z, elevated y
 	return {
-		position: [
-			offset.x + distance * 0.7,
-			offset.y + distance * 0.5,
-			offset.z + distance * 0.7
-		],
+		position: [offset.x + distance * 0.7, offset.y + distance * 0.5, offset.z + distance * 0.7],
 		target: [offset.x, offset.y + bounds.height / 2, offset.z]
 	};
 }

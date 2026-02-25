@@ -94,6 +94,21 @@
 		return shapeRef;
 	}
 
+	// Get the tray letter (A, B, C...) based on position in box
+	let trayLetter = $derived.by(() => {
+		if (!selectedBox || !selectedTray) return 'A';
+		const idx = selectedBox.trays.findIndex((t) => t.id === selectedTray.id);
+		return String.fromCharCode(65 + (idx >= 0 ? idx : 0));
+	});
+
+	// Get combined stack reference (top-loaded first, then edge-loaded)
+	function getStackRef(type: 'top' | 'edge', index: number): string {
+		if (!selectedTray) return '';
+		const topCount = selectedTray.params.topLoadedStacks.length;
+		const stackNum = type === 'top' ? index + 1 : topCount + index + 1;
+		return `${trayLetter}${stackNum}`;
+	}
+
 	function updateParam<K extends keyof CounterTrayParams>(key: K, value: CounterTrayParams[K]) {
 		if (selectedTray) {
 			onUpdateParams({ ...selectedTray.params, [key]: value });
@@ -191,23 +206,23 @@
 				</IconButton>
 			</div>
 			<div class="panelListItems">
-				{#each selectedBox.trays as tray (tray.id)}
+				{#each selectedBox.trays as tray, trayIdx (tray.id)}
 					{@const stats = getTrayStats(tray)}
+					{@const letter = String.fromCharCode(65 + trayIdx)}
 					<div
 						class="listItem {selectedTray?.id === tray.id ? 'listItem--selected' : ''}"
 						onclick={() => onSelectTray(tray)}
 						role="button"
 						tabindex="0"
 						onkeydown={(e) => e.key === 'Enter' && onSelectTray(tray)}
+						title="{tray.name}, tray {letter}, {stats.counters} counters in {stats.stacks} stacks"
 					>
 						<span style="overflow: hidden; text-overflow: ellipsis;">{tray.name}</span>
 						<span style="display: flex; align-items: center; gap: 0.25rem;">
-							<span style="font-size: 0.75rem; color: var(--fgMuted);"
-								>{stats.counters} in {stats.stacks}</span
-							>
+							<span class="trayStats">{letter}: {stats.counters}c in {stats.stacks}s</span>
 							{#if selectedBox.trays.length > 1}
 								<IconButton
-									onclick={(e) => {
+									onclick={(e: MouseEvent) => {
 										e.stopPropagation();
 										onDeleteTray(selectedBox.id, tray.id);
 									}}
@@ -241,12 +256,151 @@
 			</FormControl>
 
 			<Spacer size="0.75rem" />
+
+			<!-- Top-Loaded Stacks -->
+			<section class="section">
+				<h3 class="sectionTitle">Top-Loaded Stacks</h3>
+				<Spacer size="0.5rem" />
+				<div class="stackList">
+					{#each selectedTray.params.topLoadedStacks as stack, index (index)}
+						<div
+							class="stackRow {dragOverIndex === index && draggedType === 'top'
+								? 'stackRow--dragover'
+								: ''}"
+							role="listitem"
+							ondragover={(e) => handleDragOver(e, index, 'top')}
+							ondrop={(e) => handleDrop(e, index, 'top')}
+						>
+							<span
+								class="dragHandle"
+								title="Drag to reorder"
+								draggable="true"
+								ondragstart={(e) => handleDragStart(e, index, 'top')}
+								ondragend={handleDragEnd}
+								role="button"
+								tabindex="0"
+							>
+								<Icon Icon={IconMenu} size="sm" color="var(--fgMuted)" />
+							</span>
+							<div class="stackLabelInput">
+								<span class="stackRef">{getStackRef('top', index)}</span>
+								<Input
+									type="text"
+									placeholder="Label"
+									value={stack[2] ?? ''}
+									onchange={(e) => updateTopLoadedStack(index, 'label', e.currentTarget.value)}
+								/>
+							</div>
+							<div class="stackSelect">
+								<Select
+									selected={[stack[0]]}
+									options={shapeOptions.map((s) => ({ value: s, label: getShapeDisplayName(s) }))}
+									onSelectedChange={(selected) => updateTopLoadedStack(index, 'shape', selected[0])}
+								/>
+							</div>
+							<Input
+								type="number"
+								min="1"
+								value={stack[1]}
+								onchange={(e) =>
+									updateTopLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
+								style="width: 3.5rem;"
+							/>
+							<IconButton
+								variant="ghost"
+								onclick={() => removeTopLoadedStack(index)}
+								title="Remove stack"
+								color="var(--fgMuted)"
+							>
+								<Icon Icon={IconX} color="var(--fgMuted)" />
+							</IconButton>
+						</div>
+					{/each}
+					<Spacer size="0.5rem" />
+					<Link as="button" onclick={addTopLoadedStack}>Add top-loaded stack</Link>
+				</div>
+			</section>
+
+			<Spacer size="0.5rem" />
+
+			<!-- Edge-Loaded Stacks -->
+			<section class="section">
+				<h3 class="sectionTitle">Edge-Loaded Stacks</h3>
+				<Spacer size="0.5rem" />
+				<div class="stackList">
+					{#each selectedTray.params.edgeLoadedStacks as stack, index (index)}
+						<div
+							class="stackRow {dragOverIndex === index && draggedType === 'edge'
+								? 'stackRow--dragover'
+								: ''}"
+							role="listitem"
+							ondragover={(e) => handleDragOver(e, index, 'edge')}
+							ondrop={(e) => handleDrop(e, index, 'edge')}
+						>
+							<span
+								class="dragHandle"
+								title="Drag to reorder"
+								draggable="true"
+								ondragstart={(e) => handleDragStart(e, index, 'edge')}
+								ondragend={handleDragEnd}
+								role="button"
+								tabindex="0"
+							>
+								<Icon Icon={IconMenu} size="sm" color="var(--fgMuted)" />
+							</span>
+							<div class="stackLabelInput">
+								<span class="stackRef">{getStackRef('edge', index)}</span>
+								<Input
+									type="text"
+									placeholder="Label"
+									value={stack[3] ?? ''}
+									onchange={(e) => updateEdgeLoadedStack(index, 'label', e.currentTarget.value)}
+								/>
+							</div>
+							<div class="stackSelect">
+								<Select
+									selected={[stack[0]]}
+									options={shapeOptions.map((s) => ({ value: s, label: getShapeDisplayName(s) }))}
+									onSelectedChange={(selected) =>
+										updateEdgeLoadedStack(index, 'shape', selected[0])}
+								/>
+							</div>
+							<Input
+								type="number"
+								min="1"
+								value={stack[1]}
+								onchange={(e) =>
+									updateEdgeLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
+								style="width: 3rem;"
+							/>
+							<div class="stackSelectSmall">
+								<Select
+									selected={[stack[2] ?? 'lengthwise']}
+									options={orientationOptions.map((o) => ({ value: o, label: o.slice(0, 6) }))}
+									onSelectedChange={(selected) =>
+										updateEdgeLoadedStack(index, 'orientation', selected[0])}
+								/>
+							</div>
+							<IconButton
+								onclick={() => removeEdgeLoadedStack(index)}
+								title="Remove stack"
+								variant="ghost"
+							>
+								<Icon Icon={IconX} color="var(--fgMuted)" />
+							</IconButton>
+						</div>
+					{/each}
+					<Spacer size="0.5rem" />
+					<Link as="button" onclick={addEdgeLoadedStack}>Add edge-loaded stack</Link>
+				</div>
+			</section>
+
 			<Hr />
-			<Spacer size="0.75rem" />
+			<Spacer size="0.5rem" />
 
 			<!-- Tray Settings -->
 			<section class="section">
-				<h3 class="sectionTitle">Settings</h3>
+				<h3 class="sectionTitle">Tray Settings</h3>
 				<Spacer size="0.5rem" />
 				<div class="formGrid">
 					<FormControl label="Clearance" name="clearance">
@@ -327,7 +481,7 @@
 
 			<Spacer size="0.5rem" />
 
-			<!-- Tray Override -->
+			<!-- Custom Length -->
 			<section class="section">
 				<h3 class="sectionTitle">Custom length</h3>
 				<Spacer size="0.5rem" />
@@ -373,142 +527,6 @@
 							/>
 						{/snippet}
 					</FormControl>
-				</div>
-			</section>
-
-			<Spacer size="0.5rem" />
-
-			<!-- Top-Loaded Stacks -->
-			<section class="section">
-				<h3 class="sectionTitle">Top-Loaded Stacks</h3>
-				<Spacer size="0.5rem" />
-				<div class="stackList">
-					{#each selectedTray.params.topLoadedStacks as stack, index (index)}
-						<div
-							class="stackRow {dragOverIndex === index && draggedType === 'top'
-								? 'stackRow--dragover'
-								: ''}"
-							role="listitem"
-							ondragover={(e) => handleDragOver(e, index, 'top')}
-							ondrop={(e) => handleDrop(e, index, 'top')}
-						>
-							<span
-								class="dragHandle"
-								title="Drag to reorder"
-								draggable="true"
-								ondragstart={(e) => handleDragStart(e, index, 'top')}
-								ondragend={handleDragEnd}
-								role="button"
-								tabindex="0"
-							>
-								<Icon Icon={IconMenu} size="sm" color="var(--fgMuted)" />
-							</span>
-							<Input
-								type="text"
-								placeholder="Label"
-								value={stack[2] ?? ''}
-								onchange={(e) => updateTopLoadedStack(index, 'label', e.currentTarget.value)}
-								style="flex: 1; min-width: 0;"
-							/>
-							<div class="stackSelect">
-								<Select
-									selected={[stack[0]]}
-									options={shapeOptions.map((s) => ({ value: s, label: getShapeDisplayName(s) }))}
-									onSelectedChange={(selected) => updateTopLoadedStack(index, 'shape', selected[0])}
-								/>
-							</div>
-							<Input
-								type="number"
-								min="1"
-								value={stack[1]}
-								onchange={(e) =>
-									updateTopLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
-								style="width: 3.5rem;"
-							/>
-							<IconButton
-								variant="ghost"
-								onclick={() => removeTopLoadedStack(index)}
-								title="Remove stack"
-								color="var(--fgMuted)"
-							>
-								<Icon Icon={IconX} color="var(--fgMuted)" />
-							</IconButton>
-						</div>
-					{/each}
-					<Spacer size="0.5rem" />
-					<Link as="button" onclick={addTopLoadedStack}>Add top-loaded stack</Link>
-				</div>
-			</section>
-
-			<Spacer size="0.5rem" />
-
-			<!-- Edge-Loaded Stacks -->
-			<section class="section">
-				<h3 class="sectionTitle">Edge-Loaded Stacks</h3>
-				<Spacer size="0.5rem" />
-				<div class="stackList">
-					{#each selectedTray.params.edgeLoadedStacks as stack, index (index)}
-						<div
-							class="stackRow {dragOverIndex === index && draggedType === 'edge'
-								? 'stackRow--dragover'
-								: ''}"
-							role="listitem"
-							ondragover={(e) => handleDragOver(e, index, 'edge')}
-							ondrop={(e) => handleDrop(e, index, 'edge')}
-						>
-							<span
-								class="dragHandle"
-								title="Drag to reorder"
-								draggable="true"
-								ondragstart={(e) => handleDragStart(e, index, 'edge')}
-								ondragend={handleDragEnd}
-								role="button"
-								tabindex="0"
-							>
-								<Icon Icon={IconMenu} size="sm" color="var(--fgMuted)" />
-							</span>
-							<Input
-								type="text"
-								placeholder="Label"
-								value={stack[3] ?? ''}
-								onchange={(e) => updateEdgeLoadedStack(index, 'label', e.currentTarget.value)}
-								style="flex: 1; min-width: 0;"
-							/>
-							<div class="stackSelect">
-								<Select
-									selected={[stack[0]]}
-									options={shapeOptions.map((s) => ({ value: s, label: getShapeDisplayName(s) }))}
-									onSelectedChange={(selected) =>
-										updateEdgeLoadedStack(index, 'shape', selected[0])}
-								/>
-							</div>
-							<Input
-								type="number"
-								min="1"
-								value={stack[1]}
-								onchange={(e) =>
-									updateEdgeLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
-								style="width: 3rem;"
-							/>
-							<div class="stackSelectSmall">
-								<Select
-									selected={[stack[2] ?? 'lengthwise']}
-									options={orientationOptions.map((o) => ({ value: o, label: o.slice(0, 6) }))}
-									onSelectedChange={(selected) =>
-										updateEdgeLoadedStack(index, 'orientation', selected[0])}
-								/>
-							</div>
-							<IconButton
-								onclick={() => removeEdgeLoadedStack(index)}
-								title="Remove stack"
-								variant="ghost"
-							>
-								<Icon Icon={IconX} color="var(--fgMuted)" />
-							</IconButton>
-						</div>
-					{/each}
-					<Spacer size="0.5rem" />
-					<Link as="button" onclick={addEdgeLoadedStack}>Add edge-loaded stack</Link>
 				</div>
 			</section>
 		</div>
@@ -624,10 +642,11 @@
 
 	.dragHandle {
 		display: flex;
-		align-items: center;
 		cursor: grab;
 		color: var(--fgMuted);
 		width: 2rem;
+		min-width: 2rem;
+		min-height: 2rem;
 		padding: 0 0.5rem;
 	}
 
@@ -661,5 +680,25 @@
 
 	.emptyStateText {
 		font-size: 0.875rem;
+	}
+
+	.stackLabelInput {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex: 1;
+		min-width: 0;
+	}
+
+	.stackRef {
+		font-family: var(--font-mono);
+		font-size: 0.625rem;
+		color: var(--fgMuted);
+	}
+
+	.trayStats {
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		color: var(--fgMuted);
 	}
 </style>

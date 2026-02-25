@@ -1437,7 +1437,10 @@ export function createCounterTray(
 
 			// Add rectangle on top to extend through tray top surface (like circle and hex)
 			const topExtent = trayHeight + 1 - (triCenterZ + triHeight / 2);
-			const rect2D = rectangle({ size: [side, topExtent], center: [0, triHeight / 2 + topExtent / 2] });
+			const rect2D = rectangle({
+				size: [side, topExtent],
+				center: [0, triHeight / 2 + topExtent / 2]
+			});
 			const combinedTriangle2D = union(roundedTriangle2D, rect2D);
 
 			if (slot.orientation === 'crosswise') {

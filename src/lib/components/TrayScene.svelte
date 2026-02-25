@@ -91,9 +91,7 @@
 			return `${stack.label} x${stack.count}`;
 		}
 		// Fall back to shape name
-		const shapeName = stack.shape === 'custom'
-			? (stack.customShapeName ?? 'custom')
-			: stack.shape;
+		const shapeName = stack.shape === 'custom' ? (stack.customShapeName ?? 'custom') : stack.shape;
 		return `${shapeName} x${stack.count}`;
 	}
 
@@ -109,7 +107,9 @@
 	// Expose capture function when Threlte is ready
 	$effect(() => {
 		if (onCaptureReady && renderer && scene && camera.current) {
-			const captureFunc = (options: CaptureOptions & { bounds?: { width: number; depth: number; height: number } }) => {
+			const captureFunc = (
+				options: CaptureOptions & { bounds?: { width: number; depth: number; height: number } }
+			) => {
 				const cam = camera.current as THREE.PerspectiveCamera;
 
 				// If bounds provided, temporarily reposition camera for optimal framing
@@ -129,8 +129,8 @@
 					const hFovRad = 2 * Math.atan(Math.tan(vFovRad / 2) * captureAspect);
 
 					// Calculate distance needed to fit width (using horizontal FOV) and depth (using vertical FOV)
-					const distanceForWidth = (trayWidth / 2) / Math.tan(hFovRad / 2);
-					const distanceForDepth = (trayDepth / 2) / Math.tan(vFovRad / 2);
+					const distanceForWidth = trayWidth / 2 / Math.tan(hFovRad / 2);
+					const distanceForDepth = trayDepth / 2 / Math.tan(vFovRad / 2);
 
 					// Use the larger distance with padding for labels
 					const distance = Math.max(distanceForWidth, distanceForDepth) * 1.4;
@@ -158,7 +158,9 @@
 
 			// Expose capture function and capture mode setter
 			const captureApi = Object.assign(captureFunc, {
-				setCaptureMode: (mode: boolean) => { captureMode = mode; }
+				setCaptureMode: (mode: boolean) => {
+					captureMode = mode;
+				}
 			});
 			onCaptureReady(captureApi);
 		}
@@ -166,7 +168,11 @@
 
 	// Create rounded triangle geometry for counter previews
 	// Matches the JSCAD hull-of-circles approach from counterTray.ts
-	function createRoundedTriangleGeometry(side: number, thickness: number, cornerRadius: number): BufferGeometry {
+	function createRoundedTriangleGeometry(
+		side: number,
+		thickness: number,
+		cornerRadius: number
+	): BufferGeometry {
 		const r = cornerRadius;
 		const triHeight = side * (Math.sqrt(3) / 2);
 
@@ -719,7 +725,11 @@
 						</T.Mesh>
 					{:else}
 						<!-- triangle: standing on edge lengthwise, axis=X, point down, flat up, rounded corners -->
-						{@const triGeom = createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)}
+						{@const triGeom = createRoundedTriangleGeometry(
+							stack.width,
+							stack.thickness,
+							triangleCornerRadius
+						)}
 						<T.Mesh
 							geometry={triGeom}
 							position.x={posX}
@@ -765,7 +775,11 @@
 						</T.Mesh>
 					{:else}
 						<!-- triangle: standing on edge crosswise, point down, flat up, rounded corners -->
-						{@const triGeom = createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)}
+						{@const triGeom = createRoundedTriangleGeometry(
+							stack.width,
+							stack.thickness,
+							triangleCornerRadius
+						)}
 						<T.Mesh
 							geometry={triGeom}
 							position.x={posX}
@@ -814,7 +828,11 @@
 					</T.Mesh>
 				{:else}
 					<!-- triangle: rounded corners, geometry is centered -->
-					{@const triGeom = createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)}
+					{@const triGeom = createRoundedTriangleGeometry(
+						stack.width,
+						stack.thickness,
+						triangleCornerRadius
+					)}
 					<T.Mesh
 						geometry={triGeom}
 						position.x={posX}
@@ -904,7 +922,11 @@
 							</T.Mesh>
 						{:else}
 							<!-- triangle: standing on edge lengthwise, axis=X, point down, flat up, rounded corners -->
-							{@const triGeom = createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)}
+							{@const triGeom = createRoundedTriangleGeometry(
+								stack.width,
+								stack.thickness,
+								triangleCornerRadius
+							)}
 							<T.Mesh
 								geometry={triGeom}
 								position.x={posX}
@@ -952,7 +974,11 @@
 							</T.Mesh>
 						{:else}
 							<!-- triangle: standing on edge crosswise, point down, flat up, rounded corners -->
-							{@const triGeom = createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)}
+							{@const triGeom = createRoundedTriangleGeometry(
+								stack.width,
+								stack.thickness,
+								triangleCornerRadius
+							)}
 							<T.Mesh
 								geometry={triGeom}
 								position.x={posX}
@@ -1001,7 +1027,11 @@
 						</T.Mesh>
 					{:else}
 						<!-- triangle: rounded corners, geometry is centered -->
-						{@const triGeom = createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)}
+						{@const triGeom = createRoundedTriangleGeometry(
+							stack.width,
+							stack.thickness,
+							triangleCornerRadius
+						)}
 						<T.Mesh
 							geometry={triGeom}
 							position.x={posX}
@@ -1048,12 +1078,23 @@
 		<T.BufferGeometry>
 			<T.BufferAttribute
 				attach="attributes-position"
-				args={[new Float32Array([
-					-printBedSize / 2, 0, -printBedSize / 2,
-					printBedSize / 2, 0, -printBedSize / 2,
-					printBedSize / 2, 0, printBedSize / 2,
-					-printBedSize / 2, 0, printBedSize / 2
-				]), 3]}
+				args={[
+					new Float32Array([
+						-printBedSize / 2,
+						0,
+						-printBedSize / 2,
+						printBedSize / 2,
+						0,
+						-printBedSize / 2,
+						printBedSize / 2,
+						0,
+						printBedSize / 2,
+						-printBedSize / 2,
+						0,
+						printBedSize / 2
+					]),
+					3
+				]}
 			/>
 		</T.BufferGeometry>
 		<T.LineBasicMaterial color="#c9503c" linewidth={2} />
@@ -1073,28 +1114,31 @@
 
 <!-- Reference labels for PDF capture - single tray view -->
 {#if showReferenceLabels && !showAllTrays && geometry && selectedTrayCounters.length > 0}
-	{@const maxStackHeight = Math.max(...selectedTrayCounters.map(stack => {
-		const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape;
-		return stack.isEdgeLoaded
-			? (effectiveShape === 'triangle'
-				? stack.length
-				: stack.shape === 'custom'
-					? Math.min(stack.width, stack.length)
-					: Math.max(stack.width, stack.length))
-			: stack.z + stack.count * stack.thickness;
-	}))}
+	{@const maxStackHeight = Math.max(
+		...selectedTrayCounters.map((stack) => {
+			const effectiveShape =
+				stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape;
+			return stack.isEdgeLoaded
+				? effectiveShape === 'triangle'
+					? stack.length
+					: stack.shape === 'custom'
+						? Math.min(stack.width, stack.length)
+						: Math.max(stack.width, stack.length)
+				: stack.z + stack.count * stack.thickness;
+		})
+	)}
 	{@const labelHeight = maxStackHeight + 5}
 	{#each selectedTrayCounters as stack, stackIdx (stackIdx)}
 		{@const refCode = `${selectedTrayLetter}${stackIdx + 1}`}
 		{@const posX = stack.isEdgeLoaded
-			? (stack.edgeOrientation === 'lengthwise'
+			? stack.edgeOrientation === 'lengthwise'
 				? meshOffset.x + stack.x + (stack.slotWidth ?? stack.count * stack.thickness) / 2
-				: meshOffset.x + stack.x + (stack.slotWidth ?? stack.length) / 2)
+				: meshOffset.x + stack.x + (stack.slotWidth ?? stack.length) / 2
 			: meshOffset.x + stack.x}
 		{@const posZ = stack.isEdgeLoaded
-			? (stack.edgeOrientation === 'lengthwise'
+			? stack.edgeOrientation === 'lengthwise'
 				? meshOffset.z - stack.y - (stack.slotDepth ?? stack.length) / 2
-				: meshOffset.z - stack.y - (stack.slotDepth ?? stack.count * stack.thickness) / 2)
+				: meshOffset.z - stack.y - (stack.slotDepth ?? stack.count * stack.thickness) / 2
 			: meshOffset.z - stack.y}
 		{@const stackLabel = getStackLabel(stack)}
 		{@const tooltipHeight = labelHeight + 6}
@@ -1106,11 +1150,11 @@
 			fontSize={4}
 			position={[posX, labelHeight, posZ]}
 			quaternion={captureMode ? topDownQuaternion : labelQuaternion}
-			color={isHovered ? "#ffffff" : "#000000"}
+			color={isHovered ? '#ffffff' : '#000000'}
 			anchorX="center"
 			anchorY="bottom"
 			outlineWidth="8%"
-			outlineColor={isHovered ? "#000000" : "#ffffff"}
+			outlineColor={isHovered ? '#000000' : '#ffffff'}
 			onpointerenter={() => {
 				hoveredLabel = { refCode, text: stackLabel, position: [posX, tooltipHeight, posZ] };
 			}}
@@ -1133,7 +1177,11 @@
 	{@const yOffset = tooltipFontSize + 3}
 	<!-- Background rectangle -->
 	<T.Mesh
-		position={[hoveredLabel.position[0], hoveredLabel.position[1] + yOffset, hoveredLabel.position[2]]}
+		position={[
+			hoveredLabel.position[0],
+			hoveredLabel.position[1] + yOffset,
+			hoveredLabel.position[2]
+		]}
 		quaternion={captureMode ? topDownQuaternion : labelQuaternion}
 	>
 		<T.PlaneGeometry args={[bgWidth, bgHeight]} />
@@ -1144,7 +1192,11 @@
 		text={hoveredLabel.text}
 		font={monoFont}
 		fontSize={tooltipFontSize}
-		position={[hoveredLabel.position[0], hoveredLabel.position[1] + yOffset, hoveredLabel.position[2] + 0.1]}
+		position={[
+			hoveredLabel.position[0],
+			hoveredLabel.position[1] + yOffset,
+			hoveredLabel.position[2] + 0.1
+		]}
 		quaternion={captureMode ? topDownQuaternion : labelQuaternion}
 		color="#ffffff"
 		anchorX="center"
@@ -1170,28 +1222,31 @@
 			? meshOffset.z - interiorStartOffset - placement.y
 			: traysGroupDepth - placement.y}
 		{@const trayLetter = trayData.trayLetter ?? String.fromCharCode(65 + trayIdx)}
-		{@const maxStackHeight = Math.max(...trayData.counterStacks.map(stack => {
-			const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape;
-			return stack.isEdgeLoaded
-				? (effectiveShape === 'triangle'
-					? stack.length
-					: stack.shape === 'custom'
-						? Math.min(stack.width, stack.length)
-						: Math.max(stack.width, stack.length))
-				: stack.z + stack.count * stack.thickness;
-		}))}
+		{@const maxStackHeight = Math.max(
+			...trayData.counterStacks.map((stack) => {
+				const effectiveShape =
+					stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape;
+				return stack.isEdgeLoaded
+					? effectiveShape === 'triangle'
+						? stack.length
+						: stack.shape === 'custom'
+							? Math.min(stack.width, stack.length)
+							: Math.max(stack.width, stack.length)
+					: stack.z + stack.count * stack.thickness;
+			})
+		)}
 		{@const labelHeight = trayYOffset + maxStackHeight + 5}
 		{#each trayData.counterStacks as stack, stackIdx (stackIdx)}
 			{@const refCode = `${trayLetter}${stackIdx + 1}`}
 			{@const posX = stack.isEdgeLoaded
-				? (stack.edgeOrientation === 'lengthwise'
+				? stack.edgeOrientation === 'lengthwise'
 					? trayXOffset + stack.x + (stack.slotWidth ?? stack.count * stack.thickness) / 2
-					: trayXOffset + stack.x + (stack.slotWidth ?? stack.length) / 2)
+					: trayXOffset + stack.x + (stack.slotWidth ?? stack.length) / 2
 				: trayXOffset + stack.x}
 			{@const posZ = stack.isEdgeLoaded
-				? (stack.edgeOrientation === 'lengthwise'
+				? stack.edgeOrientation === 'lengthwise'
 					? trayZOffset - stack.y - (stack.slotDepth ?? stack.length) / 2
-					: trayZOffset - stack.y - (stack.slotDepth ?? stack.count * stack.thickness) / 2)
+					: trayZOffset - stack.y - (stack.slotDepth ?? stack.count * stack.thickness) / 2
 				: trayZOffset - stack.y}
 			{@const stackLabel = getStackLabel(stack)}
 			{@const tooltipHeight = labelHeight + 6}
@@ -1203,11 +1258,11 @@
 				fontSize={4}
 				position={[posX, labelHeight, posZ]}
 				quaternion={captureMode ? topDownQuaternion : labelQuaternion}
-				color={isHovered ? "#ffffff" : "#000000"}
+				color={isHovered ? '#ffffff' : '#000000'}
 				anchorX="center"
 				anchorY="bottom"
 				outlineWidth="8%"
-				outlineColor={isHovered ? "#000000" : "#ffffff"}
+				outlineColor={isHovered ? '#000000' : '#ffffff'}
 				onpointerenter={() => {
 					hoveredLabel = { refCode, text: stackLabel, position: [posX, tooltipHeight, posZ] };
 				}}

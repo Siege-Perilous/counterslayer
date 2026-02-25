@@ -1,6 +1,5 @@
 <script lang="ts">
 	import {
-		Button,
 		Input,
 		InputCheckbox,
 		FormControl,

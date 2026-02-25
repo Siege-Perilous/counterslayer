@@ -47,7 +47,7 @@
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
 	import type { Geom3 } from '@jscad/modeling/src/geometries/types';
-	import { getContext, setContext } from 'svelte';
+	import { setContext } from 'svelte';
 
 	type ViewMode = 'tray' | 'all' | 'exploded';
 
@@ -113,7 +113,9 @@
 	let communityProjects = $state<CommunityProject[]>([]);
 	let showReferenceLabels = $state(false);
 	let hidePrintBed = $state(false);
-	let captureFunction = $state<((options: CaptureOptions) => string) & { setCaptureMode?: (mode: boolean) => void } | null>(null);
+	let captureFunction = $state<
+		(((options: CaptureOptions) => string) & { setCaptureMode?: (mode: boolean) => void }) | null
+	>(null);
 	let exportingPdf = $state(false);
 	let captureTrayLetter = $state<string | null>(null); // Override during PDF export
 
@@ -367,7 +369,11 @@
 
 					// Set up scene for this tray
 					selectedTrayGeometry = jscadToBufferGeometry(jscadGeom);
-					selectedTrayCounters = getCounterPositions(placement.tray.params, maxHeight, spacerHeight);
+					selectedTrayCounters = getCounterPositions(
+						placement.tray.params,
+						maxHeight,
+						spacerHeight
+					);
 					captureTrayLetter = trayLetter;
 
 					// Enable capture mode for fixed top-down label rotation
