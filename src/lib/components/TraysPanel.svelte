@@ -1,16 +1,6 @@
 <script lang="ts">
-	import {
-		Button,
-		Input,
-		FormControl,
-		Spacer,
-		Hr,
-		Select,
-		Link,
-		IconButton,
-		Icon
-	} from '@tableslayer/ui';
-	import { IconX } from '@tabler/icons-svelte';
+	import { Input, FormControl, Spacer, Hr, Select, Link, IconButton, Icon } from '@tableslayer/ui';
+	import { IconX, IconPlus } from '@tabler/icons-svelte';
 	import type { Box, Tray } from '$lib/types/project';
 	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
 
@@ -187,8 +177,18 @@
 	{#if selectedBox}
 		<div class="panelList">
 			<div class="panelListHeader">
-				<span class="panelListTitle">Trays</span>
-				<Button variant="ghost" size="sm" onclick={() => onAddTray(selectedBox.id)}>+ New</Button>
+				<span class="panelListTitle">
+					Trays {#if selectedBox}within {selectedBox.name}{/if}
+				</span>
+
+				<IconButton
+					onclick={() => onAddTray(selectedBox.id)}
+					title="Delete box and all its trays"
+					size="sm"
+					variant="ghost"
+				>
+					<Icon Icon={IconPlus} />
+				</IconButton>
 			</div>
 			<div class="panelListItems">
 				{#each selectedBox.trays as tray (tray.id)}
@@ -212,8 +212,10 @@
 										onDeleteTray(selectedBox.id, tray.id);
 									}}
 									title="Delete tray"
+									size="sm"
+									variant="ghost"
 								>
-									<Icon Icon={IconX} />
+									<Icon color="var(--fgMuted)" Icon={IconX} />
 								</IconButton>
 							{/if}
 						</span>
@@ -526,6 +528,7 @@
 	.panelList {
 		padding: 0.5rem;
 		border-bottom: var(--borderThin);
+		background: var(--contrastLow);
 	}
 
 	.panelListHeader {
@@ -545,7 +548,7 @@
 	}
 
 	.panelListItems {
-		max-height: 6rem;
+		max-height: 10rem;
 		overflow-y: auto;
 		display: flex;
 		flex-direction: column;
@@ -557,17 +560,18 @@
 		cursor: pointer;
 		align-items: center;
 		justify-content: space-between;
-		padding: 0.25rem 0.5rem;
+		padding: 0.25rem;
 		border-radius: var(--radius-2);
 		font-size: 0.875rem;
 	}
 
 	.listItem:hover {
-		background: var(--contrastLow);
+		background: var(--contrastMedium);
 	}
 
 	.listItem--selected {
-		background: var(--primary-500);
+		color: var(--fgPrimary);
+		font-weight: 600;
 	}
 
 	.panelForm {

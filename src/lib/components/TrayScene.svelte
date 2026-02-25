@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { T } from '@threlte/core';
-	import { OrbitControls, Grid } from '@threlte/extras';
+	import { OrbitControls, Grid, Text } from '@threlte/extras';
 	import type { BufferGeometry } from 'three';
 	import * as THREE from 'three';
 	import type { TrayPlacement } from '$lib/models/box';
@@ -254,6 +254,36 @@
 	// Tray colors - harmonious with tableslayer/ui primary red
 	const trayColors = ['#c9503c', '#3d7a6a', '#d4956a', '#7c5c4a', '#a36b5a', '#5a7c6a'];
 
+	// Create procedural texture for print bed
+	function createBedTexture(): THREE.CanvasTexture {
+		const canvas = document.createElement('canvas');
+		canvas.width = 256;
+		canvas.height = 256;
+		const ctx = canvas.getContext('2d')!;
+
+		// Dark base
+		ctx.fillStyle = '#0a0a0a';
+		ctx.fillRect(0, 0, 256, 256);
+
+		// Add some noise for texture
+		const imageData = ctx.getImageData(0, 0, 256, 256);
+		for (let i = 0; i < imageData.data.length; i += 4) {
+			const noise = (Math.random() - 0.5) * 10;
+			imageData.data[i] = Math.max(0, Math.min(255, imageData.data[i] + noise));
+			imageData.data[i + 1] = Math.max(0, Math.min(255, imageData.data[i + 1] + noise));
+			imageData.data[i + 2] = Math.max(0, Math.min(255, imageData.data[i + 2] + noise));
+		}
+		ctx.putImageData(imageData, 0, 0);
+
+		const texture = new THREE.CanvasTexture(canvas);
+		texture.wrapS = THREE.RepeatWrapping;
+		texture.wrapT = THREE.RepeatWrapping;
+		texture.repeat.set(printBedSize / 50, printBedSize / 50);
+		return texture;
+	}
+
+	let bedTexture = $derived(createBedTexture());
+
 	// Debug logging
 	$effect(() => {
 		if (showAllTrays && allTrays.length > 0) {
@@ -326,7 +356,10 @@
 
 <T.DirectionalLight position={[50, 100, 50]} intensity={1.5} />
 <T.DirectionalLight position={[-50, 50, -50]} intensity={0.5} />
-<T.DirectionalLight position={[0, 20, -80]} intensity={0.3} /><!-- Subtle backlight for rim definition -->
+<T.DirectionalLight
+	position={[0, 20, -80]}
+	intensity={0.3}
+/><!-- Subtle backlight for rim definition -->
 <T.AmbientLight intensity={0.4} />
 
 <!-- Box geometry -->
@@ -454,7 +487,9 @@
 							: Math.max(stack.width, stack.length)}
 				{@const counterY = stack.z + standingHeight / 2}
 				{@const isAlt = counterIdx % 2 === 1}
-				{@const counterColor = isAlt ? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)` : stack.color}
+				{@const counterColor = isAlt
+					? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
+					: stack.color}
 				{#if stack.edgeOrientation === 'lengthwise'}
 					<!-- Lengthwise: counters arranged along X axis, standing on edge -->
 					{@const counterSpacing = (stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
@@ -556,7 +591,9 @@
 				{@const posY = counterZ}
 				{@const posZ = meshOffset.z - stack.y}
 				{@const isAlt = counterIdx % 2 === 1}
-				{@const counterColor = isAlt ? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)` : stack.color}
+				{@const counterColor = isAlt
+					? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
+					: stack.color}
 				{@const effectiveShape =
 					stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 				{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
@@ -770,6 +807,7 @@
 	{/each}
 {/if}
 
+<!-- Infinite grid -->
 <Grid
 	position.y={-0.01}
 	cellColor="#5a5a5a"
@@ -777,6 +815,44 @@
 	sectionThickness={1.5}
 	cellSize={10}
 	sectionSize={50}
-	gridSize={[printBedSize, printBedSize]}
-	fadeDistance={printBedSize * 1.5}
+	gridSize={[2000, 2000]}
+	fadeDistance={500}
+/>
+
+<!-- Print bed indicator -->
+<T.Mesh position.y={-1} rotation.x={-Math.PI / 2}>
+	<T.PlaneGeometry args={[printBedSize, printBedSize]} />
+	<T.MeshStandardMaterial
+		map={bedTexture}
+		side={THREE.DoubleSide}
+		roughness={0.7}
+		metalness={0.1}
+	/>
+</T.Mesh>
+
+<!-- Print bed border -->
+<T.LineLoop position.y={-0.5}>
+	<T.BufferGeometry>
+		<T.BufferAttribute
+			attach="attributes-position"
+			args={[new Float32Array([
+				-printBedSize / 2, 0, -printBedSize / 2,
+				printBedSize / 2, 0, -printBedSize / 2,
+				printBedSize / 2, 0, printBedSize / 2,
+				-printBedSize / 2, 0, printBedSize / 2
+			]), 3]}
+		/>
+	</T.BufferGeometry>
+	<T.LineBasicMaterial color="#c9503c" linewidth={2} />
+</T.LineLoop>
+
+<!-- Print bed label -->
+<Text
+	text={`${printBedSize}mm bed`}
+	fontSize={8}
+	position={[-printBedSize / 2 + 5, 0.5, printBedSize / 2 - 5]}
+	rotation={[-Math.PI / 2, 0, 0]}
+	color="#c9503c"
+	anchorX="left"
+	anchorY="bottom"
 />

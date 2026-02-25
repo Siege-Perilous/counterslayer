@@ -124,11 +124,6 @@
 			<!-- Trays Panel -->
 			<Pane defaultSize={35} minSize={20}>
 				<Panel class="sidebarPanel">
-					<div class="panelHeader">
-						<span class="sectionTitle" style="margin-bottom: 0;">
-							Trays {#if selectedBox}within {selectedBox.name}{/if}
-						</span>
-					</div>
 					<div class="panelContent">
 						<TraysPanel
 							{selectedBox}
@@ -165,15 +160,13 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 0.25rem 0.75rem;
+		padding: 0.5rem 0.75rem;
 		background: var(--contrastLow);
-		border-bottom: var(--borderThin);
 	}
 
 	.panelContent {
 		flex: 1;
 		overflow-y: auto;
-		padding: 0.75rem;
 	}
 
 	.sectionTitle {

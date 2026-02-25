@@ -1,5 +1,16 @@
 <script lang="ts">
-	import { Button, Input, InputCheckbox, FormControl, Spacer, Hr, Select, Link, IconButton, Icon } from '@tableslayer/ui';
+	import {
+		Button,
+		Input,
+		InputCheckbox,
+		FormControl,
+		Spacer,
+		Hr,
+		Select,
+		Link,
+		IconButton,
+		Icon
+	} from '@tableslayer/ui';
 	import { IconX } from '@tabler/icons-svelte';
 	import type { CounterTrayParams, CustomShape, CustomBaseShape } from '$lib/models/counterTray';
 
@@ -360,6 +371,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
+		padding: 0.75rem;
 	}
 
 	.section {
@@ -403,5 +415,4 @@
 		gap: 0.5rem;
 		margin-bottom: 0.5rem;
 	}
-
 </style>
