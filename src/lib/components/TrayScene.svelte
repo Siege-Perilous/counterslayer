@@ -651,15 +651,14 @@
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{:else}
-						<!-- triangle: standing on edge crosswise, axis=Z, point down, flat up, rounded corners -->
+						<!-- triangle: standing on edge crosswise, point down, flat up, rounded corners -->
 						{@const triGeom = createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)}
 						<T.Mesh
 							geometry={triGeom}
 							position.x={posX}
 							position.y={counterY}
 							position.z={posZ}
-							rotation.z={Math.PI / 2}
-							rotation.y={Math.PI}
+							rotation.x={Math.PI}
 						>
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
@@ -840,15 +839,14 @@
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
 						{:else}
-							<!-- triangle: standing on edge crosswise, axis=Z, point down, flat up, rounded corners -->
+							<!-- triangle: standing on edge crosswise, point down, flat up, rounded corners -->
 							{@const triGeom = createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)}
 							<T.Mesh
 								geometry={triGeom}
 								position.x={posX}
 								position.y={counterY}
 								position.z={posZ}
-								rotation.z={Math.PI / 2}
-								rotation.y={Math.PI}
+								rotation.x={Math.PI}
 							>
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
