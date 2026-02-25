@@ -73,14 +73,20 @@ export const defaultParams: CounterTrayParams = {
 	extraTrayRows: 1,
 	topLoadedStacks: [
 		['square', 12],
-		['square', 8],
-		['hex', 15],
-		['square', 6],
 		['hex', 10],
-		['circle', 20],
-		['triangle', 10]
+		['circle', 8],
+		['triangle', 6]
 	],
-	edgeLoadedStacks: [['triangle', 5, 'lengthwise']],
+	edgeLoadedStacks: [
+		['triangle', 10, 'lengthwise'],
+		['triangle', 10, 'crosswise'],
+		['circle', 8, 'lengthwise'],
+		['circle', 8, 'crosswise'],
+		['hex', 6, 'lengthwise'],
+		['hex', 6, 'crosswise'],
+		['square', 4, 'lengthwise'],
+		['square', 4, 'crosswise']
+	],
 	customShapes: [],
 	printBedSize: 256
 };

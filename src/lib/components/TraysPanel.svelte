@@ -183,7 +183,7 @@
 
 				<IconButton
 					onclick={() => onAddTray(selectedBox.id)}
-					title="Delete box and all its trays"
+					title="Add new tray to box"
 					size="sm"
 					variant="ghost"
 				>
@@ -435,7 +435,8 @@
 							</IconButton>
 						</div>
 					{/each}
-					<Link as="button" onclick={addTopLoadedStack}>+ Add Stack</Link>
+					<Spacer size="0.5rem" />
+					<Link as="button" onclick={addTopLoadedStack}>Add top-loaded stack</Link>
 				</div>
 			</section>
 
@@ -506,7 +507,8 @@
 							</IconButton>
 						</div>
 					{/each}
-					<Link as="button" onclick={addEdgeLoadedStack}>+ Add Stack</Link>
+					<Spacer size="0.5rem" />
+					<Link as="button" onclick={addEdgeLoadedStack}>Add edge-loaded stack</Link>
 				</div>
 			</section>
 		</div>
