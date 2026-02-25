@@ -30,6 +30,7 @@
 		explosionAmount?: number;
 		showCounters?: boolean;
 		selectedTrayCounters?: CounterStack[];
+		triangleCornerRadius?: number;
 	}
 
 	let {
@@ -45,8 +46,85 @@
 		boxFloorThickness = 2,
 		explosionAmount = 0,
 		showCounters = false,
-		selectedTrayCounters = []
+		selectedTrayCounters = [],
+		triangleCornerRadius = 1.5
 	}: Props = $props();
+
+	// Create rounded triangle geometry for counter previews
+	// Matches the JSCAD hull-of-circles approach from counterTray.ts
+	function createRoundedTriangleGeometry(side: number, thickness: number, cornerRadius: number): BufferGeometry {
+		const r = cornerRadius;
+		const triHeight = side * (Math.sqrt(3) / 2);
+
+		// Circle centers matching JSCAD counterTray.ts createTrianglePrism
+		const insetX = side / 2 - r;
+		const insetYBottom = -triHeight / 2 + r;
+		const insetYTop = triHeight / 2 - r * 2;
+
+		const BL = { x: -insetX, y: insetYBottom };
+		const BR = { x: insetX, y: insetYBottom };
+		const T = { x: 0, y: insetYTop };
+
+		// Calculate direction vectors and perpendiculars for tangent points
+		// Left edge: BL to T
+		const BL_T_len = Math.sqrt((T.x - BL.x) ** 2 + (T.y - BL.y) ** 2);
+		const BL_T_dir = { x: (T.x - BL.x) / BL_T_len, y: (T.y - BL.y) / BL_T_len };
+		const BL_T_perp = { x: -BL_T_dir.y, y: BL_T_dir.x }; // perpendicular (outward)
+
+		// Right edge: T to BR
+		const T_BR_len = Math.sqrt((BR.x - T.x) ** 2 + (BR.y - T.y) ** 2);
+		const T_BR_dir = { x: (BR.x - T.x) / T_BR_len, y: (BR.y - T.y) / T_BR_len };
+		const T_BR_perp = { x: -T_BR_dir.y, y: T_BR_dir.x }; // perpendicular (outward)
+
+		// Tangent points
+		const BL_bottom = { x: BL.x, y: BL.y - r };
+		const BL_left = { x: BL.x + r * BL_T_perp.x, y: BL.y + r * BL_T_perp.y };
+		const T_left = { x: T.x + r * BL_T_perp.x, y: T.y + r * BL_T_perp.y };
+		const T_right = { x: T.x + r * T_BR_perp.x, y: T.y + r * T_BR_perp.y };
+		const BR_right = { x: BR.x + r * T_BR_perp.x, y: BR.y + r * T_BR_perp.y };
+		const BR_bottom = { x: BR.x, y: BR.y - r };
+
+		// Angles for arcs (from center to tangent point)
+		const angleBL_bottom = Math.atan2(BL_bottom.y - BL.y, BL_bottom.x - BL.x);
+		const angleBL_left = Math.atan2(BL_left.y - BL.y, BL_left.x - BL.x);
+		const angleT_left = Math.atan2(T_left.y - T.y, T_left.x - T.x);
+		const angleT_right = Math.atan2(T_right.y - T.y, T_right.x - T.x);
+		const angleBR_right = Math.atan2(BR_right.y - BR.y, BR_right.x - BR.x);
+		const angleBR_bottom = Math.atan2(BR_bottom.y - BR.y, BR_bottom.x - BR.x);
+
+		const shape = new THREE.Shape();
+
+		// Start at bottom-left tangent point
+		shape.moveTo(BL_bottom.x, BL_bottom.y);
+
+		// Bottom edge to BR
+		shape.lineTo(BR_bottom.x, BR_bottom.y);
+
+		// Arc around BR (clockwise from bottom to right-edge tangent)
+		shape.absarc(BR.x, BR.y, r, angleBR_bottom, angleBR_right, false);
+
+		// Right edge to T
+		shape.lineTo(T_right.x, T_right.y);
+
+		// Arc around T (clockwise from right to left)
+		shape.absarc(T.x, T.y, r, angleT_right, angleT_left, false);
+
+		// Left edge to BL
+		shape.lineTo(BL_left.x, BL_left.y);
+
+		// Arc around BL (clockwise from left to bottom)
+		shape.absarc(BL.x, BL.y, r, angleBL_left, angleBL_bottom, false);
+
+		const extrudeSettings = {
+			depth: thickness,
+			bevelEnabled: false
+		};
+
+		const geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+		// Center the geometry along extrusion axis, and adjust Y for asymmetric top inset
+		geom.translate(0, r / 2, -thickness / 2);
+		return geom;
+	}
 
 	// Interior offset from box origin (wall + tolerance)
 	let interiorStartOffset = $derived(boxWallThickness + boxTolerance);
@@ -527,15 +605,16 @@
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{:else}
-						<!-- triangle: standing on edge lengthwise, axis=X, point down, flat up -->
+						<!-- triangle: standing on edge lengthwise, axis=X, point down, flat up, rounded corners -->
+						{@const triGeom = createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)}
 						<T.Mesh
+							geometry={triGeom}
 							position.x={posX}
 							position.y={counterY}
 							position.z={posZ}
-							rotation.x={Math.PI / 2}
-							rotation.z={-Math.PI / 2}
+							rotation.y={Math.PI / 2}
+							rotation.x={Math.PI}
 						>
-							<T.CylinderGeometry args={[stack.width / Math.sqrt(3), stack.width / Math.sqrt(3), stack.thickness, 3]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{/if}
@@ -572,15 +651,16 @@
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{:else}
-						<!-- triangle: standing on edge crosswise, axis=Z, point down, flat up -->
+						<!-- triangle: standing on edge crosswise, axis=Z, point down, flat up, rounded corners -->
+						{@const triGeom = createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)}
 						<T.Mesh
+							geometry={triGeom}
 							position.x={posX}
 							position.y={counterY}
 							position.z={posZ}
-							rotation.x={-Math.PI / 2}
+							rotation.z={Math.PI / 2}
 							rotation.y={Math.PI}
 						>
-							<T.CylinderGeometry args={[stack.width / Math.sqrt(3), stack.width / Math.sqrt(3), stack.thickness, 3]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{/if}
@@ -621,10 +701,16 @@
 						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 					</T.Mesh>
 				{:else}
-					<!-- triangle: point toward cutout, offset for centroid vs bounding box center -->
-					{@const triCentroidOffset = stack.length / 6}
-					<T.Mesh position.x={posX} position.y={posY} position.z={posZ + triCentroidOffset} rotation.y={Math.PI}>
-						<T.CylinderGeometry args={[stack.width / Math.sqrt(3), stack.width / Math.sqrt(3), stack.thickness, 3]} />
+					<!-- triangle: rounded corners, geometry is centered -->
+					{@const triGeom = createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)}
+					<T.Mesh
+						geometry={triGeom}
+						position.x={posX}
+						position.y={posY}
+						position.z={posZ}
+						rotation.x={-Math.PI / 2}
+						rotation.y={Math.PI}
+					>
 						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 					</T.Mesh>
 				{/if}
@@ -706,15 +792,16 @@
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
 						{:else}
-							<!-- triangle: standing on edge lengthwise, axis=X, point down, flat up -->
+							<!-- triangle: standing on edge lengthwise, axis=X, point down, flat up, rounded corners -->
+							{@const triGeom = createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)}
 							<T.Mesh
+								geometry={triGeom}
 								position.x={posX}
 								position.y={counterY}
 								position.z={posZ}
-								rotation.x={Math.PI / 2}
-								rotation.z={-Math.PI / 2}
+								rotation.y={Math.PI / 2}
+								rotation.x={Math.PI}
 							>
-								<T.CylinderGeometry args={[stack.width / Math.sqrt(3), stack.width / Math.sqrt(3), stack.thickness, 3]} />
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
 						{/if}
@@ -753,15 +840,16 @@
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
 						{:else}
-							<!-- triangle: standing on edge crosswise, axis=Z, point down, flat up -->
+							<!-- triangle: standing on edge crosswise, axis=Z, point down, flat up, rounded corners -->
+							{@const triGeom = createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)}
 							<T.Mesh
+								geometry={triGeom}
 								position.x={posX}
 								position.y={counterY}
 								position.z={posZ}
-								rotation.x={-Math.PI / 2}
+								rotation.z={Math.PI / 2}
 								rotation.y={Math.PI}
 							>
-								<T.CylinderGeometry args={[stack.width / Math.sqrt(3), stack.width / Math.sqrt(3), stack.thickness, 3]} />
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
 						{/if}
@@ -802,10 +890,16 @@
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{:else}
-						<!-- triangle: point toward cutout, offset for centroid vs bounding box center -->
-						{@const triCentroidOffset = stack.length / 6}
-						<T.Mesh position.x={posX} position.y={posY} position.z={posZ + triCentroidOffset} rotation.y={Math.PI}>
-							<T.CylinderGeometry args={[stack.width / Math.sqrt(3), stack.width / Math.sqrt(3), stack.thickness, 3]} />
+						<!-- triangle: rounded corners, geometry is centered -->
+						{@const triGeom = createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)}
+						<T.Mesh
+							geometry={triGeom}
+							position.x={posX}
+							position.y={posY}
+							position.z={posZ}
+							rotation.x={-Math.PI / 2}
+							rotation.y={Math.PI}
+						>
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{/if}

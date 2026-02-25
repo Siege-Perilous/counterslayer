@@ -399,6 +399,7 @@
 							{explosionAmount}
 							{showCounters}
 							{selectedTrayCounters}
+							triangleCornerRadius={selectedTray?.params.triangleCornerRadius ?? 1.5}
 						/>
 					{/await}
 				{/if}

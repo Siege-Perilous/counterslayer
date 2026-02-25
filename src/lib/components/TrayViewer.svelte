@@ -29,6 +29,7 @@
 		explosionAmount?: number;
 		showCounters?: boolean;
 		selectedTrayCounters?: CounterStack[];
+		triangleCornerRadius?: number;
 	}
 
 	let {
@@ -44,7 +45,8 @@
 		boxFloorThickness = 2,
 		explosionAmount = 0,
 		showCounters = false,
-		selectedTrayCounters = []
+		selectedTrayCounters = [],
+		triangleCornerRadius = 1.5
 	}: Props = $props();
 </script>
 
@@ -64,6 +66,7 @@
 			{explosionAmount}
 			{showCounters}
 			{selectedTrayCounters}
+			{triangleCornerRadius}
 		/>
 	</Canvas>
 </div>
