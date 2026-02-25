@@ -502,7 +502,7 @@
 				target="_blank"
 				rel="noopener noreferrer">GitHub</Link
 			>
-			<IconButton onclick={toggleTheme} size="sm">
+			<IconButton variant="ghost" onclick={toggleTheme} size="sm">
 				<Icon Icon={mode === 'dark' ? IconSun : IconMoon} />
 			</IconButton>
 		</div>
