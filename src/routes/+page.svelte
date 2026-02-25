@@ -1,6 +1,20 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { PaneGroup, Pane, PaneResizer } from 'paneforge';
+	import {
+		Button,
+		IconButton,
+		Icon,
+		InputCheckbox,
+		Select,
+		RadioButton,
+		Popover,
+		Hr,
+		Link,
+		FormControl,
+		Loader
+	} from '@tableslayer/ui';
+	import { IconSun, IconMoon, IconChevronDown } from '@tabler/icons-svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import {
 		createCounterTray,
@@ -16,7 +30,12 @@
 	} from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 	import { exportStl } from '$lib/utils/exportStl';
-	import { exportPdfReference } from '$lib/utils/pdfGenerator';
+	import {
+		exportPdfReference,
+		exportPdfWithScreenshots,
+		type TrayScreenshot
+	} from '$lib/utils/pdfGenerator';
+	import type { CaptureOptions } from '$lib/utils/screenshotCapture';
 	import {
 		initProject,
 		getSelectedTray,
@@ -28,6 +47,7 @@
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
 	import type { Geom3 } from '@jscad/modeling/src/geometries/types';
+	import { setContext } from 'svelte';
 
 	type ViewMode = 'tray' | 'all' | 'exploded';
 
@@ -45,7 +65,36 @@
 		jscadGeom: Geom3;
 		placement: TrayPlacement;
 		counterStacks: CounterStack[];
+		trayLetter: string;
 	}
+
+	// Theme state - get from context if available, otherwise use local state
+	let mode = $state<'light' | 'dark'>('dark');
+
+	// Initialize mode from localStorage
+	$effect(() => {
+		if (browser) {
+			const saved = localStorage.getItem('counterslayer-theme');
+			if (saved === 'light' || saved === 'dark') {
+				mode = saved;
+			}
+		}
+	});
+
+	function toggleTheme() {
+		mode = mode === 'dark' ? 'light' : 'dark';
+		if (browser) {
+			localStorage.setItem('counterslayer-theme', mode);
+		}
+	}
+
+	// Set context for child components
+	setContext('theme', {
+		get mode() {
+			return mode;
+		},
+		toggle: toggleTheme
+	});
 
 	let viewMode = $state<ViewMode>('tray');
 	let selectedTrayGeometry = $state<BufferGeometry | null>(null);
@@ -61,8 +110,14 @@
 	let jsonFileInput = $state<HTMLInputElement | null>(null);
 	let explosionAmount = $state(0);
 	let showCounters = $state(false);
-	let menuOpen = $state(false);
 	let communityProjects = $state<CommunityProject[]>([]);
+	let showReferenceLabels = $state(false);
+	let hidePrintBed = $state(false);
+	let captureFunction = $state<
+		(((options: CaptureOptions) => string) & { setCaptureMode?: (mode: boolean) => void }) | null
+	>(null);
+	let exportingPdf = $state(false);
+	let captureTrayLetter = $state<string | null>(null); // Override during PDF export
 
 	// Initialize project from localStorage and fetch community projects
 	$effect(() => {
@@ -85,7 +140,6 @@
 			const res = await fetch(`/projects/${project.file}`);
 			const data = (await res.json()) as Project;
 			importProject(data);
-			menuOpen = false;
 			error = '';
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load project';
@@ -96,6 +150,13 @@
 	let selectedTray = $derived(getSelectedTray());
 	let selectedBox = $derived(getSelectedBox());
 	let printBedSize = $derived(selectedTray?.params.printBedSize ?? 256);
+	let selectedTrayLetter = $derived.by(() => {
+		// Use override during PDF capture
+		if (captureTrayLetter) return captureTrayLetter;
+		if (!selectedBox || !selectedTray) return 'A';
+		const idx = selectedBox.trays.findIndex((t) => t.id === selectedTray.id);
+		return String.fromCharCode(65 + (idx >= 0 ? idx : 0));
+	});
 
 	// Compute which geometries to show based on view mode
 	let visibleGeometries = $derived.by(() => {
@@ -185,7 +246,7 @@
 			selectedTrayCounters = getCounterPositions(tray.params, maxHeight, selectedSpacerHeight);
 
 			// Generate all trays at box height with floor spacers
-			allTrayGeometries = placements.map((placement) => {
+			allTrayGeometries = placements.map((placement, index) => {
 				const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
 				const spacerHeight = spacer?.floorSpacerHeight ?? 0;
 				const jscadGeom = createCounterTray(
@@ -200,7 +261,8 @@
 					geometry: jscadToBufferGeometry(jscadGeom),
 					jscadGeom,
 					placement,
-					counterStacks: getCounterPositions(placement.tray.params, maxHeight, spacerHeight)
+					counterStacks: getCounterPositions(placement.tray.params, maxHeight, spacerHeight),
+					trayLetter: String.fromCharCode(65 + index)
 				};
 			});
 
@@ -257,7 +319,114 @@
 	async function handleExportPdf() {
 		const project = getProject();
 		if (project.boxes.length === 0) return;
-		await exportPdfReference(project);
+
+		// If we don't have a capture function yet, fall back to SVG-based PDF
+		if (!captureFunction) {
+			await exportPdfReference(project);
+			return;
+		}
+
+		exportingPdf = true;
+		error = '';
+
+		try {
+			const screenshots: TrayScreenshot[] = [];
+
+			// Save current state
+			const savedViewMode = viewMode;
+			const savedShowCounters = showCounters;
+			const savedShowReferenceLabels = showReferenceLabels;
+			const savedHidePrintBed = hidePrintBed;
+			const savedGeometry = selectedTrayGeometry;
+			const savedCounters = selectedTrayCounters;
+
+			// Set up for capture mode
+			viewMode = 'tray';
+			showCounters = true;
+			showReferenceLabels = true;
+			hidePrintBed = true;
+
+			// Capture each tray
+			for (let boxIdx = 0; boxIdx < project.boxes.length; boxIdx++) {
+				const box = project.boxes[boxIdx];
+				const placements = arrangeTrays(box.trays);
+				const spacerInfo = calculateTraySpacers(box);
+				const maxHeight = Math.max(...placements.map((p) => p.dimensions.height));
+
+				for (let trayIdx = 0; trayIdx < placements.length; trayIdx++) {
+					const placement = placements[trayIdx];
+					const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
+					const spacerHeight = spacer?.floorSpacerHeight ?? 0;
+					const trayLetter = String.fromCharCode(65 + trayIdx);
+
+					// Generate geometry for this tray
+					const jscadGeom = createCounterTray(
+						placement.tray.params,
+						placement.tray.name,
+						maxHeight,
+						spacerHeight
+					);
+
+					// Set up scene for this tray
+					selectedTrayGeometry = jscadToBufferGeometry(jscadGeom);
+					selectedTrayCounters = getCounterPositions(
+						placement.tray.params,
+						maxHeight,
+						spacerHeight
+					);
+					captureTrayLetter = trayLetter;
+
+					// Enable capture mode for fixed top-down label rotation
+					captureFunction.setCaptureMode?.(true);
+
+					// Wait for render (multiple frames to ensure geometry and text labels are loaded)
+					await new Promise((r) => requestAnimationFrame(r));
+					await new Promise((r) => requestAnimationFrame(r));
+					await new Promise((r) => requestAnimationFrame(r));
+					await new Promise((r) => setTimeout(r, 200));
+
+					// Capture screenshot at 2x resolution for print quality (16:9 widescreen for long trays)
+					const dataUrl = captureFunction({
+						width: 1920,
+						height: 1080,
+						backgroundColor: '#f0f0f0',
+						bounds: {
+							width: placement.dimensions.width,
+							depth: placement.dimensions.depth,
+							height: placement.dimensions.height
+						}
+					});
+
+					screenshots.push({
+						boxIndex: boxIdx,
+						trayIndex: trayIdx,
+						trayLetter: String.fromCharCode(65 + trayIdx),
+						dataUrl
+					});
+				}
+			}
+
+			// Restore original state
+			captureFunction.setCaptureMode?.(false);
+			viewMode = savedViewMode;
+			showCounters = savedShowCounters;
+			showReferenceLabels = savedShowReferenceLabels;
+			hidePrintBed = savedHidePrintBed;
+			selectedTrayGeometry = savedGeometry;
+			selectedTrayCounters = savedCounters;
+			captureTrayLetter = null;
+
+			// Wait for state to restore
+			await new Promise((r) => requestAnimationFrame(r));
+
+			// Generate PDF with screenshots
+			await exportPdfWithScreenshots(project, screenshots);
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to export PDF';
+			console.error('PDF export error:', e);
+		} finally {
+			exportingPdf = false;
+		}
 	}
 
 	function handleExportJson() {
@@ -303,10 +472,10 @@
 		}
 	}
 
-	const viewModes: { mode: ViewMode; label: string }[] = [
-		{ mode: 'tray', label: 'Current tray' },
-		{ mode: 'all', label: 'Boxed' },
-		{ mode: 'exploded', label: 'Exploded' }
+	const viewModeOptions = [
+		{ value: 'tray', label: 'Current tray' },
+		{ value: 'all', label: 'Boxed' },
+		{ value: 'exploded', label: 'Exploded' }
 	];
 </script>
 
@@ -314,40 +483,34 @@
 	<title>Counter Tray Generator</title>
 </svelte:head>
 
-<div class="flex h-screen flex-col bg-gray-900 text-white">
+<div class="appContainer {mode}">
 	<!-- Header -->
-	<div
-		class="flex items-center justify-between border-b border-gray-700 px-3 py-2 text-sm text-gray-400"
-	>
-		<div class="flex items-center gap-1">
-			<h1 class="contents">Counter Slayer</h1>
+	<div class="appHeader">
+		<div style="display: flex; align-items: center; gap: 0.25rem;">
+			<h1 style="display: contents;">Counter Slayer</h1>
 			by
-			<a
-				href="https://davesnider.com"
-				target="_blank"
-				rel="noopener noreferrer"
-				class="cursor-pointer text-blue-400 hover:text-blue-300">Dave Snider</a
+			<Link href="https://davesnider.com" target="_blank" rel="noopener noreferrer"
+				>Dave Snider</Link
 			>
 		</div>
-		<div class="flex items-center gap-3">
-			<a
-				href="https://youtu.be/82d_-vjFpKw"
-				target="_blank"
-				rel="noopener noreferrer"
-				class="cursor-pointer text-blue-400 hover:text-blue-300">Tutorial</a
+		<div style="display: flex; align-items: center; gap: 0.75rem;">
+			<Link href="https://youtu.be/82d_-vjFpKw" target="_blank" rel="noopener noreferrer"
+				>Tutorial</Link
 			>
-			<a
+			<Link
 				href="https://github.com/Siege-Perilous/counterslayer"
 				target="_blank"
-				rel="noopener noreferrer"
-				class="cursor-pointer text-blue-400 hover:text-blue-300">GitHub</a
+				rel="noopener noreferrer">GitHub</Link
 			>
+			<IconButton variant="ghost" onclick={toggleTheme} size="sm">
+				<Icon Icon={mode === 'dark' ? IconSun : IconMoon} />
+			</IconButton>
 		</div>
 	</div>
-	<PaneGroup direction="vertical" class="min-h-0 flex-1">
+	<PaneGroup direction="vertical" style="flex: 1; min-height: 0;">
 		<!-- Preview Pane -->
-		<Pane defaultSize={60} minSize={30} class="h-full overflow-hidden">
-			<main class="relative h-full">
+		<Pane defaultSize={60} minSize={30} style="height: 100%; overflow: hidden;">
+			<main style="position: relative; height: 100%;">
 				{#if browser}
 					{#await import('$lib/components/TrayViewer.svelte') then { default: TrayViewer }}
 						<TrayViewer
@@ -364,212 +527,308 @@
 							{explosionAmount}
 							{showCounters}
 							{selectedTrayCounters}
+							{selectedTrayLetter}
+							triangleCornerRadius={selectedTray?.params.triangleCornerRadius ?? 1.5}
+							{showReferenceLabels}
+							{hidePrintBed}
+							onCaptureReady={(fn) => (captureFunction = fn)}
 						/>
 					{/await}
 				{/if}
 
 				{#if generating}
-					<div class="absolute inset-0 flex items-center justify-center bg-black/50">
-						<div class="text-lg">Generating geometry...</div>
+					<div class="generatingOverlay">
+						<Loader />
+						<div class="generatingText">Generating geometry...</div>
 					</div>
 				{/if}
 
 				<!-- View mode buttons -->
-				<div class="absolute top-4 left-1/2 flex -translate-x-1/2 items-center gap-4">
-					<div class="flex gap-1 rounded bg-gray-800 p-1">
-						{#each viewModes as { mode, label } (mode)}
-							<button
-								onclick={() => (viewMode = mode)}
-								class="cursor-pointer rounded px-3 py-1.5 text-sm font-medium transition {viewMode ===
-								mode
-									? 'bg-blue-600 text-white'
-									: 'text-gray-300 hover:bg-gray-700'}"
-							>
-								{label}
-							</button>
-						{/each}
-					</div>
+				<div class="viewToolbar">
+					<RadioButton
+						selected={viewMode}
+						onSelectedChange={(val) => (viewMode = val as ViewMode)}
+						options={viewModeOptions}
+					/>
 					{#if viewMode === 'exploded'}
-						<div class="flex items-center gap-2 rounded bg-gray-800 px-3 py-1.5">
-							<span class="text-xs text-gray-400">Explode</span>
+						<div class="sliderContainer">
+							<span class="sliderLabel">Explode</span>
 							<input
 								type="range"
 								min="0"
 								max="100"
 								bind:value={explosionAmount}
-								class="h-1 w-24 cursor-pointer appearance-none rounded-lg bg-gray-600"
+								class="rangeSlider"
 							/>
 						</div>
 					{/if}
 				</div>
 
 				<!-- Bottom toolbar -->
-				<div class="absolute right-4 bottom-4 left-4 flex items-center justify-between">
-					<div class="flex items-center gap-3">
-						<button
+				<div class="bottomToolbar">
+					<div class="toolbarLeft">
+						<Button
+							variant="primary"
 							onclick={regenerate}
-							disabled={generating}
-							class="cursor-pointer rounded bg-blue-600 px-3 py-2 text-sm font-medium transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+							isDisabled={generating}
+							isLoading={generating}
 						>
-							{generating ? 'Generating...' : 'Regenerate'}
-						</button>
-						<label
-							class="flex cursor-pointer items-center gap-2 rounded bg-gray-800 px-3 py-2 text-sm text-gray-300"
-						>
-							<input
-								type="checkbox"
-								bind:checked={showCounters}
-								class="h-4 w-4 cursor-pointer rounded border-gray-600 bg-gray-700 text-blue-600"
-							/>
-							Show counters
-						</label>
+							Regenerate
+						</Button>
+						<InputCheckbox
+							checked={showCounters}
+							onchange={(e) => (showCounters = e.currentTarget.checked)}
+							label="Preview counters"
+						/>
+						<InputCheckbox
+							checked={showReferenceLabels}
+							onchange={(e) => (showReferenceLabels = e.currentTarget.checked)}
+							label="Preview labels"
+						/>
 					</div>
-					<div class="relative">
-						<button
-							onclick={() => (menuOpen = !menuOpen)}
-							class="flex cursor-pointer items-center gap-2 rounded bg-green-600 px-3 py-2 text-sm font-medium transition hover:bg-green-700"
-						>
-							Import / Export
-							<svg
-								class="h-4 w-4 transition-transform {menuOpen ? 'rotate-180' : ''}"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M19 9l-7 7-7-7"
-								/>
-							</svg>
-						</button>
-						{#if menuOpen}
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<div
-								class="fixed inset-0 z-40"
-								onclick={() => (menuOpen = false)}
-								onkeydown={(e) => e.key === 'Escape' && (menuOpen = false)}
-							></div>
-							<div
-								class="absolute right-0 bottom-full z-50 mb-2 w-52 rounded bg-gray-800 py-1 shadow-lg"
-							>
+					<input
+						bind:this={jsonFileInput}
+						type="file"
+						accept=".json"
+						onchange={handleImportJson}
+						style="display: none;"
+					/>
+					<Popover positioning={{ placement: 'top-end' }}>
+						{#snippet trigger()}
+							<Button variant="special">
+								Import / Export
+								<Icon Icon={IconChevronDown} />
+							</Button>
+						{/snippet}
+						{#snippet content()}
+							<div class="popoverMenu">
 								{#if communityProjects.length > 0}
-									<div class="px-4 py-2">
-										<label class="mb-1 block text-xs text-gray-400"
-											>Load community project
-											<select
-												class="mt-1 w-full cursor-pointer rounded border border-gray-600 bg-gray-700 px-2 py-1.5 text-sm text-white"
-												onchange={(e) => {
-													const select = e.target as HTMLSelectElement;
-													const project = communityProjects.find((p) => p.id === select.value);
+									<FormControl label="Load community project" name="communityProject">
+										{#snippet input({ inputProps })}
+											<Select
+												selected={[]}
+												options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
+												onSelectedChange={(selected) => {
+													const project = communityProjects.find((p) => p.id === selected[0]);
 													if (project) {
 														loadCommunityProject(project);
 													}
-													select.value = '';
 												}}
-											>
-												<option value="">Select a project...</option>
-												{#each communityProjects as project (project.id)}
-													<option value={project.id}>{project.name}</option>
-												{/each}
-											</select>
-										</label>
-									</div>
+												{...inputProps}
+											/>
+										{/snippet}
+									</FormControl>
+									<Hr />
 								{/if}
-								<input
-									bind:this={jsonFileInput}
-									type="file"
-									accept=".json"
-									onchange={handleImportJson}
-									class="hidden"
-								/>
-								<button
-									onclick={() => {
-										jsonFileInput?.click();
-										menuOpen = false;
-									}}
-									class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700"
+								<Button
+									variant="ghost"
+									onclick={() => jsonFileInput?.click()}
+									style="width: 100%; justify-content: flex-start;"
 								>
 									Import project JSON
-								</button>
-								<button
-									onclick={() => {
-										handleExportJson();
-										menuOpen = false;
-									}}
-									class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700"
+								</Button>
+								<Button
+									variant="ghost"
+									onclick={handleExportJson}
+									style="width: 100%; justify-content: flex-start;"
 								>
 									Export project JSON
-								</button>
-								<div class="my-1 border-t border-gray-600"></div>
-								<button
-									onclick={() => {
-										handleExport();
-										menuOpen = false;
-									}}
+								</Button>
+								<Hr />
+								<Button
+									variant="ghost"
+									onclick={handleExport}
 									disabled={generating || !jscadSelectedTray}
-									class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+									style="width: 100%; justify-content: flex-start;"
 								>
 									Export tray STL
-								</button>
-								<button
-									onclick={() => {
-										handleExportAll();
-										menuOpen = false;
-									}}
+								</Button>
+								<Button
+									variant="ghost"
+									onclick={handleExportAll}
 									disabled={generating ||
 										(!jscadBox && !jscadLid && allTrayGeometries.length === 0)}
-									class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+									style="width: 100%; justify-content: flex-start;"
 								>
 									Export all STLs
-								</button>
-								<button
-									onclick={() => {
-										handleExportPdf();
-										menuOpen = false;
-									}}
-									disabled={getProject().boxes.length === 0}
-									class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+								</Button>
+								<Button
+									variant="ghost"
+									onclick={handleExportPdf}
+									disabled={getProject().boxes.length === 0 || exportingPdf}
+									isLoading={exportingPdf}
+									style="width: 100%; justify-content: flex-start;"
 								>
-									PDF reference
-								</button>
-								<div class="my-1 border-t border-gray-600"></div>
-								<button
-									onclick={() => {
-										handleReset();
-										menuOpen = false;
-									}}
-									class="w-full cursor-pointer px-4 py-2 text-left text-sm text-red-400 hover:bg-gray-700"
+									{exportingPdf ? 'Generating PDF...' : 'PDF reference'}
+								</Button>
+								<Hr />
+								<Button
+									variant="danger"
+									onclick={handleReset}
+									style="width: 100%; justify-content: flex-start;"
 								>
 									Clear current project
-								</button>
+								</Button>
 							</div>
-						{/if}
-					</div>
+						{/snippet}
+					</Popover>
 				</div>
 
 				{#if error}
-					<div
-						class="absolute top-16 left-1/2 -translate-x-1/2 rounded bg-red-900 px-4 py-2 text-sm text-red-200"
-					>
+					<div class="errorBanner">
 						{error}
 					</div>
 				{/if}
 			</main>
 		</Pane>
 
-		<PaneResizer
-			class="group relative flex h-1.5 items-center justify-center bg-gray-700 hover:bg-gray-600"
-		>
-			<div class="h-0.5 w-12 rounded-full bg-gray-500 group-hover:bg-gray-400"></div>
+		<PaneResizer class="paneResizer paneResizer--vertical">
+			<div class="paneResizerHandle paneResizerHandle--vertical"></div>
 		</PaneResizer>
 
 		<!-- Controls Pane -->
-		<Pane defaultSize={40} minSize={20} class="h-full overflow-hidden">
-			<div class="h-full">
+		<Pane defaultSize={40} minSize={20} style="height: 100%; overflow: hidden;">
+			<div style="height: 100%;">
 				<Sidebar />
 			</div>
 		</Pane>
 	</PaneGroup>
 </div>
+
+<style>
+	.appContainer {
+		display: flex;
+		flex-direction: column;
+		height: 100vh;
+		background: var(--bg);
+		color: var(--fg);
+	}
+
+	.appHeader {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.5rem 0.75rem;
+		border-bottom: var(--borderThin);
+		font-size: 0.875rem;
+		color: var(--fgMuted);
+	}
+
+	.viewToolbar {
+		position: absolute;
+		top: 1rem;
+		left: 50%;
+		transform: translateX(-50%);
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.sliderContainer {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.375rem 0.75rem;
+		border-radius: var(--radius-2);
+		background: var(--contrastLowest);
+	}
+
+	.sliderLabel {
+		font-size: 0.75rem;
+		color: var(--fgMuted);
+	}
+
+	.rangeSlider {
+		height: 0.25rem;
+		width: 6rem;
+		appearance: none;
+		border-radius: 9999px;
+		background: var(--contrastMedium);
+		cursor: pointer;
+	}
+
+	.bottomToolbar {
+		position: absolute;
+		right: 1rem;
+		bottom: 1rem;
+		left: 1rem;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.toolbarLeft {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.popoverMenu {
+		width: 13rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.errorBanner {
+		position: absolute;
+		top: 4rem;
+		left: 50%;
+		transform: translateX(-50%);
+		padding: 0.5rem 1rem;
+		border-radius: var(--radius-2);
+		background: var(--danger-900);
+		color: var(--danger-200);
+		font-size: 0.875rem;
+	}
+
+	.generatingOverlay {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		gap: 0.5rem;
+		align-items: center;
+		justify-content: center;
+		background: rgba(0, 0, 0, 0.5);
+	}
+
+	.generatingText {
+		font-size: 1.125rem;
+	}
+
+	:global(.paneResizer) {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: var(--contrastEmpty);
+	}
+
+	:global(.paneResizer--horizontal) {
+		width: 1rem;
+	}
+
+	:global(.paneResizer--vertical) {
+		height: 1rem;
+		border-top: var(--borderThin);
+	}
+
+	:global(.paneResizerHandle) {
+		border-radius: 9999px;
+		background: var(--contrastMedium);
+	}
+
+	:global(.paneResizerHandle--horizontal) {
+		height: 2rem;
+		width: 0.125rem;
+	}
+
+	:global(.paneResizerHandle--vertical) {
+		height: 0.125rem;
+		width: 3rem;
+	}
+
+	:global(.paneResizer:hover .paneResizerHandle) {
+		background: var(--fg);
+	}
+</style>

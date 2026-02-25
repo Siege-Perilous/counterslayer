@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { PaneGroup, Pane, PaneResizer } from 'paneforge';
+	import { Panel } from '@tableslayer/ui';
 	import {
 		getProject,
 		getSelectedBox,
@@ -72,43 +73,35 @@
 	}
 </script>
 
-<aside class="h-full w-full bg-gray-800">
-	<!-- Resizable Panels -->
-	<div class="h-full w-full overflow-hidden">
-		<PaneGroup direction="horizontal" class="h-full">
+<aside class="sidebar">
+	<div style="height: 100%; width: 100%; overflow: hidden;">
+		<PaneGroup direction="horizontal" style="height: 100%;">
 			<!-- Globals Panel -->
-			<Pane defaultSize={30} minSize={20} class="h-full overflow-hidden">
-				<div class="flex h-full flex-col border-r border-gray-700">
-					<div
-						class="bg-gray-750 flex items-center justify-between border-b border-gray-600 px-3 py-1.5"
-					>
-						<span class="text-xs font-semibold tracking-wide text-gray-300 uppercase">Globals</span>
+			<Pane defaultSize={30} minSize={20} style="height: 100%; overflow: hidden;">
+				<Panel class="sidebarPanel">
+					<div class="panelHeader">
+						<span class="sectionTitle" style="margin-bottom: 0;">Globals</span>
 					</div>
-					<div class="flex-1 overflow-y-auto">
+					<div class="panelContent">
 						{#if selectedTray}
 							<GlobalsPanel params={selectedTray.params} onchange={handleParamsChange} />
 						{:else}
-							<div class="p-3 text-center text-xs text-gray-500">Select a tray to edit globals</div>
+							<div class="emptyState">
+								<p class="emptyStateText">Select a tray to edit globals</p>
+							</div>
 						{/if}
 					</div>
-				</div>
+				</Panel>
 			</Pane>
 
-			<PaneResizer
-				class="group relative flex w-1.5 items-center justify-center bg-gray-700 hover:bg-gray-600"
-			>
-				<div class="h-8 w-0.5 rounded-full bg-gray-500 group-hover:bg-gray-400"></div>
+			<PaneResizer class="paneResizer paneResizer--horizontal">
+				<div class="paneResizerHandle paneResizerHandle--horizontal"></div>
 			</PaneResizer>
 
 			<!-- Boxes Panel -->
-			<Pane defaultSize={35} minSize={20} class="h-full overflow-hidden">
-				<div class="flex h-full flex-col border-r border-gray-700">
-					<div
-						class="bg-gray-750 flex items-center justify-between border-b border-gray-600 px-3 py-1.5"
-					>
-						<span class="text-xs font-semibold tracking-wide text-gray-300 uppercase">Boxes</span>
-					</div>
-					<div class="flex-1 overflow-hidden">
+			<Pane defaultSize={35} minSize={20} style="height: 100%; overflow: hidden;">
+				<Panel class="sidebarPanel">
+					<div class="panelContent">
 						<BoxesPanel
 							{project}
 							{selectedBox}
@@ -118,26 +111,17 @@
 							onUpdateBox={handleBoxUpdate}
 						/>
 					</div>
-				</div>
+				</Panel>
 			</Pane>
 
-			<PaneResizer
-				class="group relative flex w-1.5 items-center justify-center bg-gray-700 hover:bg-gray-600"
-			>
-				<div class="h-8 w-0.5 rounded-full bg-gray-500 group-hover:bg-gray-400"></div>
+			<PaneResizer class="paneResizer paneResizer--horizontal">
+				<div class="paneResizerHandle paneResizerHandle--horizontal"></div>
 			</PaneResizer>
 
 			<!-- Trays Panel -->
-			<Pane defaultSize={35} minSize={20} class="h-full overflow-hidden">
-				<div class="flex h-full flex-col">
-					<div
-						class="bg-gray-750 flex items-center justify-between border-b border-gray-600 px-3 py-1.5"
-					>
-						<span class="text-xs font-semibold tracking-wide text-gray-300 uppercase">
-							Trays {#if selectedBox}within {selectedBox.name}{/if}
-						</span>
-					</div>
-					<div class="flex-1 overflow-hidden">
+			<Pane defaultSize={35} minSize={20}>
+				<Panel class="sidebarPanel">
+					<div class="panelContent">
 						<TraysPanel
 							{selectedBox}
 							{selectedTray}
@@ -148,8 +132,59 @@
 							onUpdateParams={handleParamsChange}
 						/>
 					</div>
-				</div>
+				</Panel>
 			</Pane>
 		</PaneGroup>
 	</div>
 </aside>
+
+<style>
+	.sidebar {
+		height: 100%;
+		width: 100%;
+		background: var(--contrastEmpty);
+		padding: 0 1rem 1rem 1rem;
+	}
+
+	:global(.sidebarPanel) {
+		display: flex;
+		height: 100%;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.panelHeader {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.5rem 0.75rem;
+		background: var(--contrastLow);
+	}
+
+	.panelContent {
+		flex: 1;
+		overflow-y: auto;
+	}
+
+	.sectionTitle {
+		margin-bottom: 0.5rem;
+		font-size: 0.75rem;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--fgMuted);
+	}
+
+	.emptyState {
+		display: flex;
+		flex: 1;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		color: var(--fgMuted);
+	}
+
+	.emptyStateText {
+		font-size: 0.875rem;
+	}
+</style>

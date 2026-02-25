@@ -1,11 +1,15 @@
 <script lang="ts">
-	import { T } from '@threlte/core';
-	import { OrbitControls, Grid } from '@threlte/extras';
+	import { T, useThrelte, useTask } from '@threlte/core';
+	import { OrbitControls, Grid, Text, interactivity } from '@threlte/extras';
+
+	// Enable interactivity for pointer events on 3D objects
+	interactivity();
 	import type { BufferGeometry } from 'three';
 	import * as THREE from 'three';
 	import type { TrayPlacement } from '$lib/models/box';
 	import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 	import type { CounterStack } from '$lib/models/counterTray';
+	import { captureSceneToDataUrl, type CaptureOptions } from '$lib/utils/screenshotCapture';
 
 	interface TrayGeometryData {
 		trayId: string;
@@ -14,6 +18,7 @@
 		jscadGeom: Geom3;
 		placement: TrayPlacement;
 		counterStacks: CounterStack[];
+		trayLetter?: string;
 	}
 
 	interface Props {
@@ -30,6 +35,11 @@
 		explosionAmount?: number;
 		showCounters?: boolean;
 		selectedTrayCounters?: CounterStack[];
+		selectedTrayLetter?: string;
+		triangleCornerRadius?: number;
+		showReferenceLabels?: boolean;
+		hidePrintBed?: boolean;
+		onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
 	}
 
 	let {
@@ -45,8 +55,196 @@
 		boxFloorThickness = 2,
 		explosionAmount = 0,
 		showCounters = false,
-		selectedTrayCounters = []
+		selectedTrayCounters = [],
+		selectedTrayLetter = 'A',
+		triangleCornerRadius = 1.5,
+		showReferenceLabels = false,
+		hidePrintBed = false,
+		onCaptureReady
 	}: Props = $props();
+
+	// Get Threlte context for capture
+	const { renderer, scene, camera } = useThrelte();
+
+	// Billboard quaternion for text labels - updated each frame to face camera
+	let labelQuaternion = $state<[number, number, number, number]>([0, 0, 0, 1]);
+
+	// Capture mode - when true, use fixed top-down rotation instead of billboard
+	let captureMode = $state(false);
+	// Top-down quaternion: -90° around X axis to lay flat facing up
+	const topDownQuaternion: [number, number, number, number] = [-0.707, 0, 0, 0.707];
+
+	// Hovered label state for tooltip
+	let hoveredLabel = $state<{
+		refCode: string;
+		text: string;
+		position: [number, number, number];
+	} | null>(null);
+
+	// Monospace font for consistent character width in labels
+	const monoFont = '/fonts/JetBrainsMono-Regular.ttf';
+
+	// Generate a display label from a counter stack
+	function getStackLabel(stack: CounterStack): string {
+		// Use user-provided label if available
+		if (stack.label) {
+			return `${stack.label} x${stack.count}`;
+		}
+		// Fall back to shape name
+		const shapeName = stack.shape === 'custom' ? (stack.customShapeName ?? 'custom') : stack.shape;
+		return `${shapeName} x${stack.count}`;
+	}
+
+	// Update label rotation each frame to face the camera (true billboard)
+	useTask(() => {
+		if (camera.current) {
+			// Copy the camera's quaternion so text always faces the camera directly
+			const q = camera.current.quaternion;
+			labelQuaternion = [q.x, q.y, q.z, q.w];
+		}
+	});
+
+	// Expose capture function when Threlte is ready
+	$effect(() => {
+		if (onCaptureReady && renderer && scene && camera.current) {
+			const captureFunc = (
+				options: CaptureOptions & { bounds?: { width: number; depth: number; height: number } }
+			) => {
+				const cam = camera.current as THREE.PerspectiveCamera;
+
+				// If bounds provided, temporarily reposition camera for optimal framing
+				if (options.bounds && cam.isPerspectiveCamera) {
+					const savedPosition = cam.position.clone();
+					const savedQuaternion = cam.quaternion.clone();
+					const savedUp = cam.up.clone();
+
+					// Top-down view: position camera directly above looking down
+					const trayWidth = options.bounds.width;
+					const trayDepth = options.bounds.depth;
+					const captureAspect = options.width / options.height;
+
+					// Camera FOV is vertical (50 degrees)
+					const vFovRad = (50 * Math.PI) / 180;
+					// Calculate horizontal FOV based on aspect ratio
+					const hFovRad = 2 * Math.atan(Math.tan(vFovRad / 2) * captureAspect);
+
+					// Calculate distance needed to fit width (using horizontal FOV) and depth (using vertical FOV)
+					const distanceForWidth = trayWidth / 2 / Math.tan(hFovRad / 2);
+					const distanceForDepth = trayDepth / 2 / Math.tan(vFovRad / 2);
+
+					// Use the larger distance with padding for labels
+					const distance = Math.max(distanceForWidth, distanceForDepth) * 1.4;
+
+					// Position camera directly above origin (meshOffset centers the tray at origin)
+					cam.position.set(0, distance, 0);
+					cam.up.set(0, 0, -1); // Set "up" to -Z so the tray is oriented correctly
+					cam.lookAt(0, 0, 0);
+					cam.updateProjectionMatrix();
+
+					// Capture
+					const dataUrl = captureSceneToDataUrl(renderer, scene, cam, options);
+
+					// Restore camera
+					cam.position.copy(savedPosition);
+					cam.quaternion.copy(savedQuaternion);
+					cam.up.copy(savedUp);
+					cam.updateProjectionMatrix();
+
+					return dataUrl;
+				}
+
+				return captureSceneToDataUrl(renderer, scene, cam, options);
+			};
+
+			// Expose capture function and capture mode setter
+			const captureApi = Object.assign(captureFunc, {
+				setCaptureMode: (mode: boolean) => {
+					captureMode = mode;
+				}
+			});
+			onCaptureReady(captureApi);
+		}
+	});
+
+	// Create rounded triangle geometry for counter previews
+	// Matches the JSCAD hull-of-circles approach from counterTray.ts
+	function createRoundedTriangleGeometry(
+		side: number,
+		thickness: number,
+		cornerRadius: number
+	): BufferGeometry {
+		const r = cornerRadius;
+		const triHeight = side * (Math.sqrt(3) / 2);
+
+		// Circle centers matching JSCAD counterTray.ts createTrianglePrism
+		const insetX = side / 2 - r;
+		const insetYBottom = -triHeight / 2 + r;
+		const insetYTop = triHeight / 2 - r * 2;
+
+		const BL = { x: -insetX, y: insetYBottom };
+		const BR = { x: insetX, y: insetYBottom };
+		const T = { x: 0, y: insetYTop };
+
+		// Calculate direction vectors and perpendiculars for tangent points
+		// Left edge: BL to T
+		const BL_T_len = Math.sqrt((T.x - BL.x) ** 2 + (T.y - BL.y) ** 2);
+		const BL_T_dir = { x: (T.x - BL.x) / BL_T_len, y: (T.y - BL.y) / BL_T_len };
+		const BL_T_perp = { x: -BL_T_dir.y, y: BL_T_dir.x }; // perpendicular (outward)
+
+		// Right edge: T to BR
+		const T_BR_len = Math.sqrt((BR.x - T.x) ** 2 + (BR.y - T.y) ** 2);
+		const T_BR_dir = { x: (BR.x - T.x) / T_BR_len, y: (BR.y - T.y) / T_BR_len };
+		const T_BR_perp = { x: -T_BR_dir.y, y: T_BR_dir.x }; // perpendicular (outward)
+
+		// Tangent points
+		const BL_bottom = { x: BL.x, y: BL.y - r };
+		const BL_left = { x: BL.x + r * BL_T_perp.x, y: BL.y + r * BL_T_perp.y };
+		const T_left = { x: T.x + r * BL_T_perp.x, y: T.y + r * BL_T_perp.y };
+		const T_right = { x: T.x + r * T_BR_perp.x, y: T.y + r * T_BR_perp.y };
+		const BR_right = { x: BR.x + r * T_BR_perp.x, y: BR.y + r * T_BR_perp.y };
+		const BR_bottom = { x: BR.x, y: BR.y - r };
+
+		// Angles for arcs (from center to tangent point)
+		const angleBL_bottom = Math.atan2(BL_bottom.y - BL.y, BL_bottom.x - BL.x);
+		const angleBL_left = Math.atan2(BL_left.y - BL.y, BL_left.x - BL.x);
+		const angleT_left = Math.atan2(T_left.y - T.y, T_left.x - T.x);
+		const angleT_right = Math.atan2(T_right.y - T.y, T_right.x - T.x);
+		const angleBR_right = Math.atan2(BR_right.y - BR.y, BR_right.x - BR.x);
+		const angleBR_bottom = Math.atan2(BR_bottom.y - BR.y, BR_bottom.x - BR.x);
+
+		const shape = new THREE.Shape();
+
+		// Start at bottom-left tangent point
+		shape.moveTo(BL_bottom.x, BL_bottom.y);
+
+		// Bottom edge to BR
+		shape.lineTo(BR_bottom.x, BR_bottom.y);
+
+		// Arc around BR (clockwise from bottom to right-edge tangent)
+		shape.absarc(BR.x, BR.y, r, angleBR_bottom, angleBR_right, false);
+
+		// Right edge to T
+		shape.lineTo(T_right.x, T_right.y);
+
+		// Arc around T (clockwise from right to left)
+		shape.absarc(T.x, T.y, r, angleT_right, angleT_left, false);
+
+		// Left edge to BL
+		shape.lineTo(BL_left.x, BL_left.y);
+
+		// Arc around BL (clockwise from left to bottom)
+		shape.absarc(BL.x, BL.y, r, angleBL_left, angleBL_bottom, false);
+
+		const extrudeSettings = {
+			depth: thickness,
+			bevelEnabled: false
+		};
+
+		const geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+		// Center the geometry along extrusion axis, and adjust Y for asymmetric top inset
+		geom.translate(0, r / 2, -thickness / 2);
+		return geom;
+	}
 
 	// Interior offset from box origin (wall + tolerance)
 	let interiorStartOffset = $derived(boxWallThickness + boxTolerance);
@@ -251,8 +449,38 @@
 		};
 	});
 
-	// Tray colors for visual distinction - varied hues for easier differentiation
-	const trayColors = ['#f97316', '#06b6d4', '#ec4899', '#eab308', '#8b5cf6', '#10b981'];
+	// Tray colors - harmonious with tableslayer/ui primary red
+	const trayColors = ['#c9503c', '#3d7a6a', '#d4956a', '#7c5c4a', '#a36b5a', '#5a7c6a'];
+
+	// Create procedural texture for print bed
+	function createBedTexture(): THREE.CanvasTexture {
+		const canvas = document.createElement('canvas');
+		canvas.width = 256;
+		canvas.height = 256;
+		const ctx = canvas.getContext('2d')!;
+
+		// Dark base
+		ctx.fillStyle = '#0a0a0a';
+		ctx.fillRect(0, 0, 256, 256);
+
+		// Add some noise for texture
+		const imageData = ctx.getImageData(0, 0, 256, 256);
+		for (let i = 0; i < imageData.data.length; i += 4) {
+			const noise = (Math.random() - 0.5) * 10;
+			imageData.data[i] = Math.max(0, Math.min(255, imageData.data[i] + noise));
+			imageData.data[i + 1] = Math.max(0, Math.min(255, imageData.data[i + 1] + noise));
+			imageData.data[i + 2] = Math.max(0, Math.min(255, imageData.data[i + 2] + noise));
+		}
+		ctx.putImageData(imageData, 0, 0);
+
+		const texture = new THREE.CanvasTexture(canvas);
+		texture.wrapS = THREE.RepeatWrapping;
+		texture.wrapT = THREE.RepeatWrapping;
+		texture.repeat.set(printBedSize / 50, printBedSize / 50);
+		return texture;
+	}
+
+	let bedTexture = $derived(createBedTexture());
 
 	// Debug logging
 	$effect(() => {
@@ -326,9 +554,13 @@
 
 <T.DirectionalLight position={[50, 100, 50]} intensity={1.5} />
 <T.DirectionalLight position={[-50, 50, -50]} intensity={0.5} />
+<T.DirectionalLight
+	position={[0, 20, -80]}
+	intensity={0.3}
+/><!-- Subtle backlight for rim definition -->
 <T.AmbientLight intensity={0.4} />
 
-<!-- Box geometry (green) -->
+<!-- Box geometry -->
 {#if boxGeometry}
 	{@const boxWidth = boxBounds ? boxBounds.max.x - boxBounds.min.x : 0}
 	<T.Mesh
@@ -339,12 +571,10 @@
 		position.z={showAllTrays && !exploded ? sidePositions.box.z : meshOffset.z}
 	>
 		<T.MeshStandardMaterial
-			color="#22c55e"
+			color="#333333"
 			roughness={0.6}
 			metalness={0.1}
 			side={THREE.DoubleSide}
-			transparent
-			opacity={0.85}
 		/>
 	</T.Mesh>
 {/if}
@@ -389,7 +619,7 @@
 		position.z={meshOffset.z}
 	>
 		<T.MeshStandardMaterial
-			color="#f97316"
+			color="#c9503c"
 			roughness={0.6}
 			metalness={0.1}
 			side={THREE.DoubleSide}
@@ -397,7 +627,7 @@
 	</T.Mesh>
 {/if}
 
-<!-- Lid geometry (purple) -->
+<!-- Lid geometry -->
 {#if lidGeometry}
 	{@const lidWidth = lidBounds ? lidBounds.max.x - lidBounds.min.x : 0}
 	{@const lidHeight = lidBounds ? lidBounds.max.z - lidBounds.min.z : 0}
@@ -431,7 +661,7 @@
 		position.z={lidPosZ}
 	>
 		<T.MeshStandardMaterial
-			color="#a855f7"
+			color="#444444"
 			roughness={0.6}
 			metalness={0.1}
 			side={THREE.DoubleSide}
@@ -453,9 +683,12 @@
 						: stack.shape === 'custom'
 							? Math.min(stack.width, stack.length)
 							: Math.max(stack.width, stack.length)}
-				{@const counterY = stack.z + standingHeight / 2}
+				{@const triangleLift = 0}
+				{@const counterY = stack.z + standingHeight / 2 + triangleLift}
 				{@const isAlt = counterIdx % 2 === 1}
-				{@const counterColor = isAlt ? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)` : stack.color}
+				{@const counterColor = isAlt
+					? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
+					: stack.color}
 				{#if stack.edgeOrientation === 'lengthwise'}
 					<!-- Lengthwise: counters arranged along X axis, standing on edge -->
 					{@const counterSpacing = (stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
@@ -491,15 +724,20 @@
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{:else}
-						<!-- triangle: rotate so axis is along X -->
+						<!-- triangle: standing on edge lengthwise, axis=X, point down, flat up, rounded corners -->
+						{@const triGeom = createRoundedTriangleGeometry(
+							stack.width,
+							stack.thickness,
+							triangleCornerRadius
+						)}
 						<T.Mesh
+							geometry={triGeom}
 							position.x={posX}
 							position.y={counterY}
 							position.z={posZ}
-							rotation.z={Math.PI / 2}
-							rotation.x={Math.PI / 2}
+							rotation.y={Math.PI / 2}
+							rotation.x={Math.PI}
 						>
-							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{/if}
@@ -536,14 +774,19 @@
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{:else}
-						<!-- triangle -->
+						<!-- triangle: standing on edge crosswise, point down, flat up, rounded corners -->
+						{@const triGeom = createRoundedTriangleGeometry(
+							stack.width,
+							stack.thickness,
+							triangleCornerRadius
+						)}
 						<T.Mesh
+							geometry={triGeom}
 							position.x={posX}
 							position.y={counterY}
 							position.z={posZ}
-							rotation.x={Math.PI / 2}
+							rotation.x={Math.PI}
 						>
-							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{/if}
@@ -557,7 +800,9 @@
 				{@const posY = counterZ}
 				{@const posZ = meshOffset.z - stack.y}
 				{@const isAlt = counterIdx % 2 === 1}
-				{@const counterColor = isAlt ? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)` : stack.color}
+				{@const counterColor = isAlt
+					? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
+					: stack.color}
 				{@const effectiveShape =
 					stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 				{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
@@ -582,9 +827,20 @@
 						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 					</T.Mesh>
 				{:else}
-					<!-- triangle -->
-					<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
-						<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
+					<!-- triangle: rounded corners, geometry is centered -->
+					{@const triGeom = createRoundedTriangleGeometry(
+						stack.width,
+						stack.thickness,
+						triangleCornerRadius
+					)}
+					<T.Mesh
+						geometry={triGeom}
+						position.x={posX}
+						position.y={posY}
+						position.z={posZ}
+						rotation.x={-Math.PI / 2}
+						rotation.y={Math.PI}
+					>
 						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 					</T.Mesh>
 				{/if}
@@ -622,10 +878,11 @@
 							: stack.shape === 'custom'
 								? Math.min(stack.width, stack.length)
 								: Math.max(stack.width, stack.length)}
-					{@const counterY = trayYOffset + stack.z + standingHeight / 2}
+					{@const triangleLift = 0}
+					{@const counterY = trayYOffset + stack.z + standingHeight / 2 + triangleLift}
 					{@const isAlt = counterIdx % 2 === 1}
 					{@const counterColor = isAlt
-						? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)`
+						? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
 						: stack.color}
 					{#if stack.edgeOrientation === 'lengthwise'}
 						{@const counterSpacing =
@@ -664,15 +921,20 @@
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
 						{:else}
-							<!-- triangle: rotate so axis is along X -->
+							<!-- triangle: standing on edge lengthwise, axis=X, point down, flat up, rounded corners -->
+							{@const triGeom = createRoundedTriangleGeometry(
+								stack.width,
+								stack.thickness,
+								triangleCornerRadius
+							)}
 							<T.Mesh
+								geometry={triGeom}
 								position.x={posX}
 								position.y={counterY}
 								position.z={posZ}
-								rotation.z={Math.PI / 2}
-								rotation.x={Math.PI / 2}
+								rotation.y={Math.PI / 2}
+								rotation.x={Math.PI}
 							>
-								<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
 						{/if}
@@ -711,14 +973,19 @@
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
 						{:else}
-							<!-- triangle -->
+							<!-- triangle: standing on edge crosswise, point down, flat up, rounded corners -->
+							{@const triGeom = createRoundedTriangleGeometry(
+								stack.width,
+								stack.thickness,
+								triangleCornerRadius
+							)}
 							<T.Mesh
+								geometry={triGeom}
 								position.x={posX}
 								position.y={counterY}
 								position.z={posZ}
-								rotation.x={Math.PI / 2}
+								rotation.x={Math.PI}
 							>
-								<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
 								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 							</T.Mesh>
 						{/if}
@@ -733,7 +1000,7 @@
 					{@const posZ = trayZOffset - stack.y}
 					{@const isAlt = counterIdx % 2 === 1}
 					{@const counterColor = isAlt
-						? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)`
+						? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
 						: stack.color}
 					{@const effectiveShape =
 						stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
@@ -759,9 +1026,20 @@
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{:else}
-						<!-- triangle -->
-						<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
-							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 3]} />
+						<!-- triangle: rounded corners, geometry is centered -->
+						{@const triGeom = createRoundedTriangleGeometry(
+							stack.width,
+							stack.thickness,
+							triangleCornerRadius
+						)}
+						<T.Mesh
+							geometry={triGeom}
+							position.x={posX}
+							position.y={posY}
+							position.z={posZ}
+							rotation.x={-Math.PI / 2}
+							rotation.y={Math.PI}
+						>
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
 					{/if}
@@ -771,13 +1049,227 @@
 	{/each}
 {/if}
 
-<Grid
-	position.y={-0.01}
-	cellColor="#6f6f6f"
-	sectionColor="#9d4b4b"
-	sectionThickness={1.5}
-	cellSize={10}
-	sectionSize={50}
-	gridSize={[printBedSize, printBedSize]}
-	fadeDistance={printBedSize * 1.5}
-/>
+{#if !hidePrintBed}
+	<!-- Infinite grid -->
+	<Grid
+		position.y={-0.01}
+		cellColor="#5a5a5a"
+		sectionColor="#8b4a3c"
+		sectionThickness={1.5}
+		cellSize={10}
+		sectionSize={50}
+		gridSize={[2000, 2000]}
+		fadeDistance={500}
+	/>
+
+	<!-- Print bed indicator -->
+	<T.Mesh position.y={-1} rotation.x={-Math.PI / 2}>
+		<T.PlaneGeometry args={[printBedSize, printBedSize]} />
+		<T.MeshStandardMaterial
+			map={bedTexture}
+			side={THREE.DoubleSide}
+			roughness={0.7}
+			metalness={0.1}
+		/>
+	</T.Mesh>
+
+	<!-- Print bed border -->
+	<T.LineLoop position.y={-0.5}>
+		<T.BufferGeometry>
+			<T.BufferAttribute
+				attach="attributes-position"
+				args={[
+					new Float32Array([
+						-printBedSize / 2,
+						0,
+						-printBedSize / 2,
+						printBedSize / 2,
+						0,
+						-printBedSize / 2,
+						printBedSize / 2,
+						0,
+						printBedSize / 2,
+						-printBedSize / 2,
+						0,
+						printBedSize / 2
+					]),
+					3
+				]}
+			/>
+		</T.BufferGeometry>
+		<T.LineBasicMaterial color="#c9503c" linewidth={2} />
+	</T.LineLoop>
+
+	<!-- Print bed label -->
+	<Text
+		text={`${printBedSize}mm bed`}
+		fontSize={8}
+		position={[-printBedSize / 2 + 5, 0.5, printBedSize / 2 - 5]}
+		rotation={[-Math.PI / 2, 0, 0]}
+		color="#c9503c"
+		anchorX="left"
+		anchorY="bottom"
+	/>
+{/if}
+
+<!-- Reference labels for PDF capture - single tray view -->
+{#if showReferenceLabels && !showAllTrays && geometry && selectedTrayCounters.length > 0}
+	{@const maxStackHeight = Math.max(
+		...selectedTrayCounters.map((stack) => {
+			const effectiveShape =
+				stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape;
+			return stack.isEdgeLoaded
+				? effectiveShape === 'triangle'
+					? stack.length
+					: stack.shape === 'custom'
+						? Math.min(stack.width, stack.length)
+						: Math.max(stack.width, stack.length)
+				: stack.z + stack.count * stack.thickness;
+		})
+	)}
+	{@const labelHeight = maxStackHeight + 5}
+	{#each selectedTrayCounters as stack, stackIdx (stackIdx)}
+		{@const refCode = `${selectedTrayLetter}${stackIdx + 1}`}
+		{@const posX = stack.isEdgeLoaded
+			? stack.edgeOrientation === 'lengthwise'
+				? meshOffset.x + stack.x + (stack.slotWidth ?? stack.count * stack.thickness) / 2
+				: meshOffset.x + stack.x + (stack.slotWidth ?? stack.length) / 2
+			: meshOffset.x + stack.x}
+		{@const posZ = stack.isEdgeLoaded
+			? stack.edgeOrientation === 'lengthwise'
+				? meshOffset.z - stack.y - (stack.slotDepth ?? stack.length) / 2
+				: meshOffset.z - stack.y - (stack.slotDepth ?? stack.count * stack.thickness) / 2
+			: meshOffset.z - stack.y}
+		{@const stackLabel = getStackLabel(stack)}
+		{@const tooltipHeight = labelHeight + 6}
+		{@const isHovered = hoveredLabel?.refCode === refCode}
+		<!-- Floating label above stack -->
+		<Text
+			text={refCode}
+			font={monoFont}
+			fontSize={4}
+			position={[posX, labelHeight, posZ]}
+			quaternion={captureMode ? topDownQuaternion : labelQuaternion}
+			color={isHovered ? '#ffffff' : '#000000'}
+			anchorX="center"
+			anchorY="bottom"
+			outlineWidth="8%"
+			outlineColor={isHovered ? '#000000' : '#ffffff'}
+			onpointerenter={() => {
+				hoveredLabel = { refCode, text: stackLabel, position: [posX, tooltipHeight, posZ] };
+			}}
+			onpointerleave={() => {
+				hoveredLabel = null;
+			}}
+		/>
+	{/each}
+{/if}
+
+<!-- Tooltip for hovered label -->
+{#if hoveredLabel}
+	{@const tooltipFontSize = 3}
+	{@const charWidth = tooltipFontSize * 0.6}
+	{@const textWidth = hoveredLabel.text.length * charWidth}
+	{@const paddingX = 2}
+	{@const paddingY = 1.5}
+	{@const bgWidth = textWidth + paddingX * 2}
+	{@const bgHeight = tooltipFontSize + paddingY * 2}
+	{@const yOffset = tooltipFontSize + 3}
+	<!-- Background rectangle -->
+	<T.Mesh
+		position={[
+			hoveredLabel.position[0],
+			hoveredLabel.position[1] + yOffset,
+			hoveredLabel.position[2]
+		]}
+		quaternion={captureMode ? topDownQuaternion : labelQuaternion}
+	>
+		<T.PlaneGeometry args={[bgWidth, bgHeight]} />
+		<T.MeshBasicMaterial color="#000000" transparent opacity={0.8} />
+	</T.Mesh>
+	<!-- Tooltip text -->
+	<Text
+		text={hoveredLabel.text}
+		font={monoFont}
+		fontSize={tooltipFontSize}
+		position={[
+			hoveredLabel.position[0],
+			hoveredLabel.position[1] + yOffset,
+			hoveredLabel.position[2] + 0.1
+		]}
+		quaternion={captureMode ? topDownQuaternion : labelQuaternion}
+		color="#ffffff"
+		anchorX="center"
+		anchorY="middle"
+	/>
+{/if}
+
+<!-- Reference labels for PDF capture - all trays view -->
+{#if showReferenceLabels && showAllTrays && allTrays.length > 0}
+	{@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
+	{#each allTrays as trayData, trayIdx (trayData.trayId)}
+		{@const placement = trayData.placement}
+		{@const trayHeight = placement.dimensions.height}
+		{@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
+		{@const traySpacing = liftPhase * trayHeight * 1.2}
+		{@const trayXOffset = exploded
+			? meshOffset.x + interiorStartOffset + placement.x
+			: sidePositions.traysGroup.x - maxTrayWidth / 2 + placement.x}
+		{@const trayYOffset = exploded
+			? boxFloorThickness + explodedOffset.trays + trayIdx * traySpacing
+			: 0}
+		{@const trayZOffset = exploded
+			? meshOffset.z - interiorStartOffset - placement.y
+			: traysGroupDepth - placement.y}
+		{@const trayLetter = trayData.trayLetter ?? String.fromCharCode(65 + trayIdx)}
+		{@const maxStackHeight = Math.max(
+			...trayData.counterStacks.map((stack) => {
+				const effectiveShape =
+					stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape;
+				return stack.isEdgeLoaded
+					? effectiveShape === 'triangle'
+						? stack.length
+						: stack.shape === 'custom'
+							? Math.min(stack.width, stack.length)
+							: Math.max(stack.width, stack.length)
+					: stack.z + stack.count * stack.thickness;
+			})
+		)}
+		{@const labelHeight = trayYOffset + maxStackHeight + 5}
+		{#each trayData.counterStacks as stack, stackIdx (stackIdx)}
+			{@const refCode = `${trayLetter}${stackIdx + 1}`}
+			{@const posX = stack.isEdgeLoaded
+				? stack.edgeOrientation === 'lengthwise'
+					? trayXOffset + stack.x + (stack.slotWidth ?? stack.count * stack.thickness) / 2
+					: trayXOffset + stack.x + (stack.slotWidth ?? stack.length) / 2
+				: trayXOffset + stack.x}
+			{@const posZ = stack.isEdgeLoaded
+				? stack.edgeOrientation === 'lengthwise'
+					? trayZOffset - stack.y - (stack.slotDepth ?? stack.length) / 2
+					: trayZOffset - stack.y - (stack.slotDepth ?? stack.count * stack.thickness) / 2
+				: trayZOffset - stack.y}
+			{@const stackLabel = getStackLabel(stack)}
+			{@const tooltipHeight = labelHeight + 6}
+			{@const isHovered = hoveredLabel?.refCode === refCode}
+			<!-- Floating label above stack -->
+			<Text
+				text={refCode}
+				font={monoFont}
+				fontSize={4}
+				position={[posX, labelHeight, posZ]}
+				quaternion={captureMode ? topDownQuaternion : labelQuaternion}
+				color={isHovered ? '#ffffff' : '#000000'}
+				anchorX="center"
+				anchorY="bottom"
+				outlineWidth="8%"
+				outlineColor={isHovered ? '#000000' : '#ffffff'}
+				onpointerenter={() => {
+					hoveredLabel = { refCode, text: stackLabel, position: [posX, tooltipHeight, posZ] };
+				}}
+				onpointerleave={() => {
+					hoveredLabel = null;
+				}}
+			/>
+		{/each}
+	{/each}
+{/if}

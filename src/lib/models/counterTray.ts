@@ -73,14 +73,20 @@ export const defaultParams: CounterTrayParams = {
 	extraTrayRows: 1,
 	topLoadedStacks: [
 		['square', 12],
-		['square', 8],
-		['hex', 15],
-		['square', 6],
 		['hex', 10],
-		['circle', 20],
-		['triangle', 10]
+		['circle', 8],
+		['triangle', 6]
 	],
-	edgeLoadedStacks: [['triangle', 5, 'lengthwise']],
+	edgeLoadedStacks: [
+		['triangle', 10, 'lengthwise'],
+		['triangle', 10, 'crosswise'],
+		['circle', 8, 'lengthwise'],
+		['circle', 8, 'crosswise'],
+		['hex', 6, 'lengthwise'],
+		['hex', 6, 'crosswise'],
+		['square', 4, 'lengthwise'],
+		['square', 4, 'crosswise']
+	],
 	customShapes: [],
 	printBedSize: 256
 };
@@ -99,6 +105,7 @@ export interface CounterStack {
 	count: number; // Number of counters in stack
 	hexPointyTop: boolean;
 	color: string; // Random color for this stack
+	label?: string; // User-provided label for this stack
 	// Edge-loaded stack fields
 	isEdgeLoaded?: boolean;
 	edgeOrientation?: 'lengthwise' | 'crosswise';
@@ -106,10 +113,14 @@ export interface CounterStack {
 	slotDepth?: number; // Y dimension of the slot
 }
 
-// Generate random pastel colors for counter stacks
+// Generate harmonious colors for counter stacks (warm earth tones matching primary red)
 function generateStackColor(index: number): string {
-	const hue = (index * 137.508) % 360; // Golden angle for good distribution
-	return `hsl(${hue}, 70%, 60%)`;
+	// Warm palette hues: reds, oranges, browns, and complementary teals
+	const warmHues = [15, 25, 35, 160, 170, 30, 20, 165, 40, 155];
+	const hue = warmHues[index % warmHues.length];
+	const saturation = 50 + (index % 3) * 10; // 50-70%
+	const lightness = 45 + (index % 4) * 5; // 45-60%
+	return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 }
 
 // Calculate counter positions for preview rendering
@@ -351,12 +362,13 @@ export function getCounterPositions(
 		slotDepth: number; // Y dimension
 		standingHeight: number;
 		originalIndex: number;
+		label?: string;
 	}
 
 	const edgeLoadedSlots: EdgeLoadedSlot[] = [];
 	if (edgeLoadedStacks && edgeLoadedStacks.length > 0) {
 		for (let i = 0; i < edgeLoadedStacks.length; i++) {
-			const [shape, count, orientationPref] = edgeLoadedStacks[i];
+			const [shape, count, orientationPref, label] = edgeLoadedStacks[i];
 			const counterSpan = count * counterThickness + (count - 1) * clearance;
 
 			// Default to lengthwise if not specified
@@ -374,7 +386,8 @@ export function getCounterPositions(
 					slotWidth: counterSpan, // Counters stack along X (left to right)
 					slotDepth: slotDepthDim, // Counter dimension along Y (row depth)
 					standingHeight,
-					originalIndex: i
+					originalIndex: i,
+					label
 				});
 			} else {
 				// Crosswise: counters stack along Y (front to back), takes a column
@@ -388,7 +401,8 @@ export function getCounterPositions(
 					slotWidth: slotWidthDim, // Counter dimension along X (longer side)
 					slotDepth: counterSpan, // Counters stack along Y (front to back)
 					standingHeight,
-					originalIndex: i
+					originalIndex: i,
+					label
 				});
 			}
 		}
@@ -406,6 +420,7 @@ export function getCounterPositions(
 		rowAssignment: 'front' | 'back';
 		xPosition: number;
 		originalIndex: number;
+		label?: string;
 	}
 
 	// Sort top-loaded stacks by area (largest first for better packing)
@@ -529,7 +544,7 @@ export function getCounterPositions(
 
 	// Greedy bin-packing for top-loaded stacks
 	for (const { stack, originalIndex } of sortedStacks) {
-		const [shapeRef, count] = stack;
+		const [shapeRef, count, label] = stack;
 		const pw = getPocketWidth(shapeRef);
 		const pl = getPocketLength(shapeRef);
 
@@ -542,7 +557,8 @@ export function getCounterPositions(
 				pocketLength: pl,
 				rowAssignment: 'front',
 				xPosition: topLoadedFrontX,
-				originalIndex
+				originalIndex,
+				label
 			});
 			topLoadedFrontX += pw + wallThickness;
 		} else {
@@ -553,7 +569,8 @@ export function getCounterPositions(
 				pocketLength: pl,
 				rowAssignment: 'back',
 				xPosition: topLoadedBackX,
-				originalIndex
+				originalIndex,
+				label
 			});
 			topLoadedBackX += pw + wallThickness;
 		}
@@ -618,6 +635,7 @@ export function getCounterPositions(
 			count: slot.count,
 			hexPointyTop,
 			color: generateStackColor(100 + i),
+			label: slot.label,
 			isEdgeLoaded: true,
 			edgeOrientation: 'lengthwise',
 			slotWidth: slot.slotWidth,
@@ -675,6 +693,7 @@ export function getCounterPositions(
 			count: slot.count,
 			hexPointyTop,
 			color: generateStackColor(200 + i),
+			label: slot.label,
 			isEdgeLoaded: true,
 			edgeOrientation: 'crosswise',
 			slotWidth: slot.slotWidth,
@@ -716,7 +735,8 @@ export function getCounterPositions(
 			thickness: counterThickness,
 			count: placement.count,
 			hexPointyTop,
-			color: generateStackColor(placement.originalIndex)
+			color: generateStackColor(placement.originalIndex),
+			label: placement.label
 		});
 	}
 
@@ -934,12 +954,13 @@ export function createCounterTray(
 		slotDepth: number; // Y dimension
 		standingHeight: number;
 		originalIndex: number;
+		label?: string;
 	}
 
 	const edgeLoadedSlots: EdgeLoadedSlot[] = [];
 	if (edgeLoadedStacks && edgeLoadedStacks.length > 0) {
 		for (let i = 0; i < edgeLoadedStacks.length; i++) {
-			const [shape, count, orientationPref] = edgeLoadedStacks[i];
+			const [shape, count, orientationPref, label] = edgeLoadedStacks[i];
 			const counterSpan = count * counterThickness + (count - 1) * clearance;
 
 			// Default to lengthwise if not specified
@@ -957,7 +978,8 @@ export function createCounterTray(
 					slotWidth: counterSpan, // Counters stack along X (left to right)
 					slotDepth: slotDepthDim, // Counter dimension along Y (row depth)
 					standingHeight,
-					originalIndex: i
+					originalIndex: i,
+					label
 				});
 			} else {
 				// Crosswise: counters stack along Y (front to back), takes a column
@@ -971,7 +993,8 @@ export function createCounterTray(
 					slotWidth: slotWidthDim, // Counter dimension along X (longer side)
 					slotDepth: counterSpan, // Counters stack along Y (front to back)
 					standingHeight,
-					originalIndex: i
+					originalIndex: i,
+					label
 				});
 			}
 		}
@@ -989,6 +1012,7 @@ export function createCounterTray(
 		rowAssignment: 'front' | 'back';
 		xPosition: number;
 		originalIndex: number;
+		label?: string;
 	}
 
 	// Sort top-loaded stacks by area (largest first for better packing)
@@ -1140,7 +1164,7 @@ export function createCounterTray(
 
 	// Greedy bin-packing for top-loaded stacks
 	for (const { stack, originalIndex } of sortedStacks) {
-		const [shapeRef, count] = stack;
+		const [shapeRef, count, label] = stack;
 		const pw = getPocketWidth(shapeRef);
 		const pl = getPocketLength(shapeRef);
 
@@ -1153,7 +1177,8 @@ export function createCounterTray(
 				pocketLength: pl,
 				rowAssignment: 'front',
 				xPosition: topLoadedFrontX,
-				originalIndex
+				originalIndex,
+				label
 			});
 			topLoadedFrontX += pw + wallThickness;
 		} else {
@@ -1164,7 +1189,8 @@ export function createCounterTray(
 				pocketLength: pl,
 				rowAssignment: 'back',
 				xPosition: topLoadedBackX,
-				originalIndex
+				originalIndex,
+				label
 			});
 			topLoadedBackX += pw + wallThickness;
 		}
@@ -1405,11 +1431,21 @@ export function createCounterTray(
 			];
 			const roundedTriangle2D = hull(...corners2D);
 
-			const triCenterZ = trayHeight + 1 - triHeight / 2;
+			// Position cutout so bottom aligns with pocketFloorZ (where preview counter sits)
+			// Triangle 2D shape has bottom at (-triHeight/2 + r) relative to center
+			const triCenterZ = pocketFloorZ + triHeight / 2 - r;
+
+			// Add rectangle on top to extend through tray top surface (like circle and hex)
+			const topExtent = trayHeight + 1 - (triCenterZ + triHeight / 2);
+			const rect2D = rectangle({
+				size: [side, topExtent],
+				center: [0, triHeight / 2 + topExtent / 2]
+			});
+			const combinedTriangle2D = union(roundedTriangle2D, rect2D);
 
 			if (slot.orientation === 'crosswise') {
 				// Crosswise: extrude along slotDepth (Y direction), counters stack front-to-back
-				const extruded = extrudeLinear({ height: slot.slotDepth }, roundedTriangle2D);
+				const extruded = extrudeLinear({ height: slot.slotDepth }, combinedTriangle2D);
 				// Rotate so: point at -Z, base at +Z, extrusion along Y
 				const rotated = rotateX(Math.PI / 2, translate([0, 0, -slot.slotDepth / 2], extruded));
 				return translate(
@@ -1418,7 +1454,7 @@ export function createCounterTray(
 				);
 			} else {
 				// Lengthwise: extrude along slotWidth (X direction), counters stack left-to-right
-				const extruded = extrudeLinear({ height: slot.slotWidth }, roundedTriangle2D);
+				const extruded = extrudeLinear({ height: slot.slotWidth }, combinedTriangle2D);
 				// Rotate so: point at -Z, base at +Z, extrusion along X
 				const rotated = rotateZ(
 					-Math.PI / 2,
@@ -1440,13 +1476,16 @@ export function createCounterTray(
 			const diameter = isCircle ? circleDiameter : (custom?.width ?? 15) + clearance * 2;
 			const radius = diameter / 2;
 
+			// Position cutout so bottom aligns with pocketFloorZ (where preview counter sits)
+			const shapeCenterZ = pocketFloorZ + radius;
+
 			// Create shape with semicircular bottom and flat top for easy loading
 			// Union of: circle (for bottom half) + rectangle (for top half with straight sides)
+			// Rectangle must extend high enough to cut through tray top
+			const topExtent = trayHeight + 1 - shapeCenterZ;
 			const circle2D = circle({ radius, segments: 64 });
-			const rect2D = rectangle({ size: [diameter, radius], center: [0, radius / 2] });
+			const rect2D = rectangle({ size: [diameter, topExtent], center: [0, topExtent / 2] });
 			const combinedShape2D = union(circle2D, rect2D);
-
-			const shapeCenterZ = trayHeight + 1 - radius;
 
 			if (slot.orientation === 'crosswise') {
 				// Crosswise: extrude along slotDepth (Y direction), counters stack front-to-back
@@ -1482,16 +1521,18 @@ export function createCounterTray(
 			const pointToPoint = flatToFlat / Math.cos(Math.PI / 6);
 			const radius = pointToPoint / 2;
 
+			// Position cutout so bottom aligns with pocketFloorZ (where preview counter sits)
+			// Hex vertex is at bottom after rotateZ(π/6), so offset by pointToPoint/2
+			const shapeCenterZ = pocketFloorZ + pointToPoint / 2;
+
 			// Create shape with hex bottom (flat side down) and flat top for easy loading
 			// 2D hex with 6 segments, rotated π/6 so flat edge is at bottom
 			const hex2D = rotateZ(Math.PI / 6, circle({ radius, segments: 6 }));
-			// Rectangle covers top half (from center to top)
+			// Rectangle covers top half (from center to top), must extend to cut through tray top
 			// Width must match hex width at the flat edge (flatToFlat, not pointToPoint)
-			const rectHeight = flatToFlat / 2;
-			const rect2D = rectangle({ size: [flatToFlat, rectHeight], center: [0, rectHeight / 2] });
+			const topExtent = trayHeight + 1 - shapeCenterZ;
+			const rect2D = rectangle({ size: [flatToFlat, topExtent], center: [0, topExtent / 2] });
 			const combinedShape2D = union(hex2D, rect2D);
-
-			const shapeCenterZ = trayHeight + 1 - flatToFlat / 2;
 
 			if (slot.orientation === 'crosswise') {
 				// Crosswise: extrude along slotDepth (Y direction), counters stack front-to-back

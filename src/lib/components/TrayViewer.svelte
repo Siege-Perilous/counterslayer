@@ -5,6 +5,7 @@
 	import type { TrayPlacement } from '$lib/models/box';
 	import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 	import type { CounterStack } from '$lib/models/counterTray';
+	import type { CaptureOptions } from '$lib/utils/screenshotCapture';
 
 	interface TrayGeometryData {
 		trayId: string;
@@ -13,6 +14,7 @@
 		jscadGeom: Geom3;
 		placement: TrayPlacement;
 		counterStacks: CounterStack[];
+		trayLetter?: string;
 	}
 
 	interface Props {
@@ -29,6 +31,11 @@
 		explosionAmount?: number;
 		showCounters?: boolean;
 		selectedTrayCounters?: CounterStack[];
+		selectedTrayLetter?: string;
+		triangleCornerRadius?: number;
+		showReferenceLabels?: boolean;
+		hidePrintBed?: boolean;
+		onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
 	}
 
 	let {
@@ -44,11 +51,16 @@
 		boxFloorThickness = 2,
 		explosionAmount = 0,
 		showCounters = false,
-		selectedTrayCounters = []
+		selectedTrayCounters = [],
+		selectedTrayLetter = 'A',
+		triangleCornerRadius = 1.5,
+		showReferenceLabels = false,
+		hidePrintBed = false,
+		onCaptureReady
 	}: Props = $props();
 </script>
 
-<div class="h-full w-full">
+<div class="trayViewer">
 	<Canvas>
 		<TrayScene
 			{geometry}
@@ -64,6 +76,18 @@
 			{explosionAmount}
 			{showCounters}
 			{selectedTrayCounters}
+			{selectedTrayLetter}
+			{triangleCornerRadius}
+			{showReferenceLabels}
+			{hidePrintBed}
+			{onCaptureReady}
 		/>
 	</Canvas>
 </div>
+
+<style>
+	.trayViewer {
+		height: 100%;
+		width: 100%;
+	}
+</style>
