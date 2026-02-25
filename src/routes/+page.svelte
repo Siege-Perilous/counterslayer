@@ -113,8 +113,9 @@
 	let communityProjects = $state<CommunityProject[]>([]);
 	let showReferenceLabels = $state(false);
 	let hidePrintBed = $state(false);
-	let captureFunction = $state<((options: CaptureOptions) => string) | null>(null);
+	let captureFunction = $state<((options: CaptureOptions) => string) & { setCaptureMode?: (mode: boolean) => void } | null>(null);
 	let exportingPdf = $state(false);
+	let captureTrayLetter = $state<string | null>(null); // Override during PDF export
 
 	// Initialize project from localStorage and fetch community projects
 	$effect(() => {
@@ -148,6 +149,8 @@
 	let selectedBox = $derived(getSelectedBox());
 	let printBedSize = $derived(selectedTray?.params.printBedSize ?? 256);
 	let selectedTrayLetter = $derived.by(() => {
+		// Use override during PDF capture
+		if (captureTrayLetter) return captureTrayLetter;
 		if (!selectedBox || !selectedTray) return 'A';
 		const idx = selectedBox.trays.findIndex((t) => t.id === selectedTray.id);
 		return String.fromCharCode(65 + (idx >= 0 ? idx : 0));
@@ -352,6 +355,7 @@
 					const placement = placements[trayIdx];
 					const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
 					const spacerHeight = spacer?.floorSpacerHeight ?? 0;
+					const trayLetter = String.fromCharCode(65 + trayIdx);
 
 					// Generate geometry for this tray
 					const jscadGeom = createCounterTray(
@@ -364,18 +368,22 @@
 					// Set up scene for this tray
 					selectedTrayGeometry = jscadToBufferGeometry(jscadGeom);
 					selectedTrayCounters = getCounterPositions(placement.tray.params, maxHeight, spacerHeight);
+					captureTrayLetter = trayLetter;
 
-						// Wait for render (multiple frames to ensure geometry and text labels are loaded)
+					// Enable capture mode for fixed top-down label rotation
+					captureFunction.setCaptureMode?.(true);
+
+					// Wait for render (multiple frames to ensure geometry and text labels are loaded)
 					await new Promise((r) => requestAnimationFrame(r));
 					await new Promise((r) => requestAnimationFrame(r));
 					await new Promise((r) => requestAnimationFrame(r));
 					await new Promise((r) => setTimeout(r, 200));
 
-					// Capture screenshot at 2x resolution for print quality
+					// Capture screenshot at 2x resolution for print quality (16:9 widescreen for long trays)
 					const dataUrl = captureFunction({
-						width: 1600,
-						height: 1200,
-						backgroundColor: '#ffffff',
+						width: 1920,
+						height: 1080,
+						backgroundColor: '#f0f0f0',
 						bounds: {
 							width: placement.dimensions.width,
 							depth: placement.dimensions.depth,
@@ -393,12 +401,14 @@
 			}
 
 			// Restore original state
+			captureFunction.setCaptureMode?.(false);
 			viewMode = savedViewMode;
 			showCounters = savedShowCounters;
 			showReferenceLabels = savedShowReferenceLabels;
 			hidePrintBed = savedHidePrintBed;
 			selectedTrayGeometry = savedGeometry;
 			selectedTrayCounters = savedCounters;
+			captureTrayLetter = null;
 
 			// Wait for state to restore
 			await new Promise((r) => requestAnimationFrame(r));

@@ -213,9 +213,9 @@ const MARGIN_LEFT = 15;
 const MARGIN_RIGHT = 15;
 const USABLE_WIDTH = PAGE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
 
-// Screenshot image dimensions for PDF (in mm)
-const SCREENSHOT_WIDTH = 100;
-const SCREENSHOT_HEIGHT = 75;
+// Screenshot image dimensions for PDF (in mm) - 16:9 aspect ratio
+const SCREENSHOT_WIDTH = 160;
+const SCREENSHOT_HEIGHT = 90;
 
 // Generate PDF with isometric screenshots
 export async function generatePdfWithScreenshots(

@@ -69,6 +69,11 @@
 	// Billboard quaternion for text labels - updated each frame to face camera
 	let labelQuaternion = $state<[number, number, number, number]>([0, 0, 0, 1]);
 
+	// Capture mode - when true, use fixed top-down rotation instead of billboard
+	let captureMode = $state(false);
+	// Top-down quaternion: -90° around X axis to lay flat facing up
+	const topDownQuaternion: [number, number, number, number] = [-0.707, 0, 0, 0.707];
+
 	// Hovered label state for tooltip
 	let hoveredLabel = $state<{
 		refCode: string;
@@ -110,21 +115,30 @@
 				// If bounds provided, temporarily reposition camera for optimal framing
 				if (options.bounds && cam.isPerspectiveCamera) {
 					const savedPosition = cam.position.clone();
-					const savedTarget = new THREE.Vector3();
-					cam.getWorldDirection(savedTarget);
+					const savedQuaternion = cam.quaternion.clone();
+					const savedUp = cam.up.clone();
 
-					// Calculate camera position based on tray bounds
-					const maxDim = Math.max(options.bounds.width, options.bounds.depth, options.bounds.height);
-					const distance = maxDim * 1.2;
+					// Top-down view: position camera directly above looking down
+					const trayWidth = options.bounds.width;
+					const trayDepth = options.bounds.depth;
+					const captureAspect = options.width / options.height;
 
-					// Position camera at isometric angle looking at center
-					const centerY = options.bounds.height / 2;
-					cam.position.set(
-						meshOffset.x + distance * 0.7,
-						centerY + distance * 0.5,
-						meshOffset.z + distance * 0.7
-					);
-					cam.lookAt(meshOffset.x, centerY, meshOffset.z);
+					// Camera FOV is vertical (50 degrees)
+					const vFovRad = (50 * Math.PI) / 180;
+					// Calculate horizontal FOV based on aspect ratio
+					const hFovRad = 2 * Math.atan(Math.tan(vFovRad / 2) * captureAspect);
+
+					// Calculate distance needed to fit width (using horizontal FOV) and depth (using vertical FOV)
+					const distanceForWidth = (trayWidth / 2) / Math.tan(hFovRad / 2);
+					const distanceForDepth = (trayDepth / 2) / Math.tan(vFovRad / 2);
+
+					// Use the larger distance with padding for labels
+					const distance = Math.max(distanceForWidth, distanceForDepth) * 1.4;
+
+					// Position camera directly above origin (meshOffset centers the tray at origin)
+					cam.position.set(0, distance, 0);
+					cam.up.set(0, 0, -1); // Set "up" to -Z so the tray is oriented correctly
+					cam.lookAt(0, 0, 0);
 					cam.updateProjectionMatrix();
 
 					// Capture
@@ -132,7 +146,8 @@
 
 					// Restore camera
 					cam.position.copy(savedPosition);
-					cam.lookAt(savedPosition.x - savedTarget.x, savedPosition.y - savedTarget.y, savedPosition.z - savedTarget.z);
+					cam.quaternion.copy(savedQuaternion);
+					cam.up.copy(savedUp);
 					cam.updateProjectionMatrix();
 
 					return dataUrl;
@@ -140,7 +155,12 @@
 
 				return captureSceneToDataUrl(renderer, scene, cam, options);
 			};
-			onCaptureReady(captureFunc);
+
+			// Expose capture function and capture mode setter
+			const captureApi = Object.assign(captureFunc, {
+				setCaptureMode: (mode: boolean) => { captureMode = mode; }
+			});
+			onCaptureReady(captureApi);
 		}
 	});
 
@@ -1085,7 +1105,7 @@
 			font={monoFont}
 			fontSize={4}
 			position={[posX, labelHeight, posZ]}
-			quaternion={labelQuaternion}
+			quaternion={captureMode ? topDownQuaternion : labelQuaternion}
 			color={isHovered ? "#ffffff" : "#000000"}
 			anchorX="center"
 			anchorY="bottom"
@@ -1114,7 +1134,7 @@
 	<!-- Background rectangle -->
 	<T.Mesh
 		position={[hoveredLabel.position[0], hoveredLabel.position[1] + yOffset, hoveredLabel.position[2]]}
-		quaternion={labelQuaternion}
+		quaternion={captureMode ? topDownQuaternion : labelQuaternion}
 	>
 		<T.PlaneGeometry args={[bgWidth, bgHeight]} />
 		<T.MeshBasicMaterial color="#000000" transparent opacity={0.8} />
@@ -1125,7 +1145,7 @@
 		font={monoFont}
 		fontSize={tooltipFontSize}
 		position={[hoveredLabel.position[0], hoveredLabel.position[1] + yOffset, hoveredLabel.position[2] + 0.1]}
-		quaternion={labelQuaternion}
+		quaternion={captureMode ? topDownQuaternion : labelQuaternion}
 		color="#ffffff"
 		anchorX="center"
 		anchorY="middle"
@@ -1182,7 +1202,7 @@
 				font={monoFont}
 				fontSize={4}
 				position={[posX, labelHeight, posZ]}
-				quaternion={labelQuaternion}
+				quaternion={captureMode ? topDownQuaternion : labelQuaternion}
 				color={isHovered ? "#ffffff" : "#000000"}
 				anchorX="center"
 				anchorY="bottom"
