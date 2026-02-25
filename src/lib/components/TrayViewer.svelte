@@ -5,6 +5,7 @@
 	import type { TrayPlacement } from '$lib/models/box';
 	import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 	import type { CounterStack } from '$lib/models/counterTray';
+	import type { CaptureOptions } from '$lib/utils/screenshotCapture';
 
 	interface TrayGeometryData {
 		trayId: string;
@@ -13,6 +14,7 @@
 		jscadGeom: Geom3;
 		placement: TrayPlacement;
 		counterStacks: CounterStack[];
+		trayLetter?: string;
 	}
 
 	interface Props {
@@ -30,6 +32,9 @@
 		showCounters?: boolean;
 		selectedTrayCounters?: CounterStack[];
 		triangleCornerRadius?: number;
+		showReferenceLabels?: boolean;
+		hidePrintBed?: boolean;
+		onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
 	}
 
 	let {
@@ -46,7 +51,10 @@
 		explosionAmount = 0,
 		showCounters = false,
 		selectedTrayCounters = [],
-		triangleCornerRadius = 1.5
+		triangleCornerRadius = 1.5,
+		showReferenceLabels = false,
+		hidePrintBed = false,
+		onCaptureReady
 	}: Props = $props();
 </script>
 
@@ -67,6 +75,9 @@
 			{showCounters}
 			{selectedTrayCounters}
 			{triangleCornerRadius}
+			{showReferenceLabels}
+			{hidePrintBed}
+			{onCaptureReady}
 		/>
 	</Canvas>
 </div>

@@ -30,7 +30,12 @@
 	} from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 	import { exportStl } from '$lib/utils/exportStl';
-	import { exportPdfReference } from '$lib/utils/pdfGenerator';
+	import {
+		exportPdfReference,
+		exportPdfWithScreenshots,
+		type TrayScreenshot
+	} from '$lib/utils/pdfGenerator';
+	import type { CaptureOptions } from '$lib/utils/screenshotCapture';
 	import {
 		initProject,
 		getSelectedTray,
@@ -60,6 +65,7 @@
 		jscadGeom: Geom3;
 		placement: TrayPlacement;
 		counterStacks: CounterStack[];
+		trayLetter: string;
 	}
 
 	// Theme state - get from context if available, otherwise use local state
@@ -105,6 +111,10 @@
 	let explosionAmount = $state(0);
 	let showCounters = $state(false);
 	let communityProjects = $state<CommunityProject[]>([]);
+	let showReferenceLabels = $state(false);
+	let hidePrintBed = $state(false);
+	let captureFunction = $state<((options: CaptureOptions) => string) | null>(null);
+	let exportingPdf = $state(false);
 
 	// Initialize project from localStorage and fetch community projects
 	$effect(() => {
@@ -226,7 +236,7 @@
 			selectedTrayCounters = getCounterPositions(tray.params, maxHeight, selectedSpacerHeight);
 
 			// Generate all trays at box height with floor spacers
-			allTrayGeometries = placements.map((placement) => {
+			allTrayGeometries = placements.map((placement, index) => {
 				const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
 				const spacerHeight = spacer?.floorSpacerHeight ?? 0;
 				const jscadGeom = createCounterTray(
@@ -241,7 +251,8 @@
 					geometry: jscadToBufferGeometry(jscadGeom),
 					jscadGeom,
 					placement,
-					counterStacks: getCounterPositions(placement.tray.params, maxHeight, spacerHeight)
+					counterStacks: getCounterPositions(placement.tray.params, maxHeight, spacerHeight),
+					trayLetter: String.fromCharCode(65 + index)
 				};
 			});
 
@@ -298,7 +309,103 @@
 	async function handleExportPdf() {
 		const project = getProject();
 		if (project.boxes.length === 0) return;
-		await exportPdfReference(project);
+
+		// If we don't have a capture function yet, fall back to SVG-based PDF
+		if (!captureFunction) {
+			await exportPdfReference(project);
+			return;
+		}
+
+		exportingPdf = true;
+		error = '';
+
+		try {
+			const screenshots: TrayScreenshot[] = [];
+
+			// Save current state
+			const savedViewMode = viewMode;
+			const savedShowCounters = showCounters;
+			const savedShowReferenceLabels = showReferenceLabels;
+			const savedHidePrintBed = hidePrintBed;
+			const savedGeometry = selectedTrayGeometry;
+			const savedCounters = selectedTrayCounters;
+
+			// Set up for capture mode
+			viewMode = 'tray';
+			showCounters = true;
+			showReferenceLabels = true;
+			hidePrintBed = true;
+
+			// Capture each tray
+			for (let boxIdx = 0; boxIdx < project.boxes.length; boxIdx++) {
+				const box = project.boxes[boxIdx];
+				const placements = arrangeTrays(box.trays);
+				const spacerInfo = calculateTraySpacers(box);
+				const maxHeight = Math.max(...placements.map((p) => p.dimensions.height));
+
+				for (let trayIdx = 0; trayIdx < placements.length; trayIdx++) {
+					const placement = placements[trayIdx];
+					const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
+					const spacerHeight = spacer?.floorSpacerHeight ?? 0;
+
+					// Generate geometry for this tray
+					const jscadGeom = createCounterTray(
+						placement.tray.params,
+						placement.tray.name,
+						maxHeight,
+						spacerHeight
+					);
+
+					// Set up scene for this tray
+					selectedTrayGeometry = jscadToBufferGeometry(jscadGeom);
+					selectedTrayCounters = getCounterPositions(placement.tray.params, maxHeight, spacerHeight);
+
+						// Wait for render (multiple frames to ensure geometry and text labels are loaded)
+					await new Promise((r) => requestAnimationFrame(r));
+					await new Promise((r) => requestAnimationFrame(r));
+					await new Promise((r) => requestAnimationFrame(r));
+					await new Promise((r) => setTimeout(r, 200));
+
+					// Capture screenshot at 2x resolution for print quality
+					const dataUrl = captureFunction({
+						width: 1600,
+						height: 1200,
+						backgroundColor: '#ffffff',
+						bounds: {
+							width: placement.dimensions.width,
+							depth: placement.dimensions.depth,
+							height: placement.dimensions.height
+						}
+					});
+
+					screenshots.push({
+						boxIndex: boxIdx,
+						trayIndex: trayIdx,
+						trayLetter: String.fromCharCode(65 + trayIdx),
+						dataUrl
+					});
+				}
+			}
+
+			// Restore original state
+			viewMode = savedViewMode;
+			showCounters = savedShowCounters;
+			showReferenceLabels = savedShowReferenceLabels;
+			hidePrintBed = savedHidePrintBed;
+			selectedTrayGeometry = savedGeometry;
+			selectedTrayCounters = savedCounters;
+
+			// Wait for state to restore
+			await new Promise((r) => requestAnimationFrame(r));
+
+			// Generate PDF with screenshots
+			await exportPdfWithScreenshots(project, screenshots);
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to export PDF';
+			console.error('PDF export error:', e);
+		} finally {
+			exportingPdf = false;
+		}
 	}
 
 	function handleExportJson() {
@@ -400,6 +507,9 @@
 							{showCounters}
 							{selectedTrayCounters}
 							triangleCornerRadius={selectedTray?.params.triangleCornerRadius ?? 1.5}
+							{showReferenceLabels}
+							{hidePrintBed}
+							onCaptureReady={(fn) => (captureFunction = fn)}
 						/>
 					{/await}
 				{/if}
@@ -447,6 +557,11 @@
 							checked={showCounters}
 							onchange={(e) => (showCounters = e.currentTarget.checked)}
 							label="Preview counters"
+						/>
+						<InputCheckbox
+							checked={showReferenceLabels}
+							onchange={(e) => (showReferenceLabels = e.currentTarget.checked)}
+							label="Preview labels"
 						/>
 					</div>
 					<input
@@ -518,10 +633,11 @@
 								<Button
 									variant="ghost"
 									onclick={handleExportPdf}
-									disabled={getProject().boxes.length === 0}
+									disabled={getProject().boxes.length === 0 || exportingPdf}
+									isLoading={exportingPdf}
 									style="width: 100%; justify-content: flex-start;"
 								>
-									PDF reference
+									{exportingPdf ? 'Generating PDF...' : 'PDF reference'}
 								</Button>
 								<Hr />
 								<Button

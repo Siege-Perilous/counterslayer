@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { T } from '@threlte/core';
+	import { T, useThrelte, useTask } from '@threlte/core';
 	import { OrbitControls, Grid, Text } from '@threlte/extras';
 	import type { BufferGeometry } from 'three';
 	import * as THREE from 'three';
 	import type { TrayPlacement } from '$lib/models/box';
 	import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 	import type { CounterStack } from '$lib/models/counterTray';
+	import { captureSceneToDataUrl, type CaptureOptions } from '$lib/utils/screenshotCapture';
 
 	interface TrayGeometryData {
 		trayId: string;
@@ -14,6 +15,7 @@
 		jscadGeom: Geom3;
 		placement: TrayPlacement;
 		counterStacks: CounterStack[];
+		trayLetter?: string;
 	}
 
 	interface Props {
@@ -31,6 +33,9 @@
 		showCounters?: boolean;
 		selectedTrayCounters?: CounterStack[];
 		triangleCornerRadius?: number;
+		showReferenceLabels?: boolean;
+		hidePrintBed?: boolean;
+		onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
 	}
 
 	let {
@@ -47,8 +52,69 @@
 		explosionAmount = 0,
 		showCounters = false,
 		selectedTrayCounters = [],
-		triangleCornerRadius = 1.5
+		triangleCornerRadius = 1.5,
+		showReferenceLabels = false,
+		hidePrintBed = false,
+		onCaptureReady
 	}: Props = $props();
+
+	// Get Threlte context for capture
+	const { renderer, scene, camera } = useThrelte();
+
+	// Billboard quaternion for text labels - updated each frame to face camera
+	let labelQuaternion = $state<[number, number, number, number]>([0, 0, 0, 1]);
+
+	// Update label rotation each frame to face the camera (true billboard)
+	useTask(() => {
+		if (camera.current) {
+			// Copy the camera's quaternion so text always faces the camera directly
+			const q = camera.current.quaternion;
+			labelQuaternion = [q.x, q.y, q.z, q.w];
+		}
+	});
+
+	// Expose capture function when Threlte is ready
+	$effect(() => {
+		if (onCaptureReady && renderer && scene && camera.current) {
+			const captureFunc = (options: CaptureOptions & { bounds?: { width: number; depth: number; height: number } }) => {
+				const cam = camera.current as THREE.PerspectiveCamera;
+
+				// If bounds provided, temporarily reposition camera for optimal framing
+				if (options.bounds && cam.isPerspectiveCamera) {
+					const savedPosition = cam.position.clone();
+					const savedTarget = new THREE.Vector3();
+					cam.getWorldDirection(savedTarget);
+
+					// Calculate camera position based on tray bounds
+					const maxDim = Math.max(options.bounds.width, options.bounds.depth, options.bounds.height);
+					const distance = maxDim * 1.2;
+
+					// Position camera at isometric angle looking at center
+					const centerY = options.bounds.height / 2;
+					cam.position.set(
+						meshOffset.x + distance * 0.7,
+						centerY + distance * 0.5,
+						meshOffset.z + distance * 0.7
+					);
+					cam.lookAt(meshOffset.x, centerY, meshOffset.z);
+					cam.updateProjectionMatrix();
+
+					// Capture
+					const dataUrl = captureSceneToDataUrl(renderer, scene, cam, options);
+
+					// Restore camera
+					cam.position.copy(savedPosition);
+					cam.lookAt(savedPosition.x - savedTarget.x, savedPosition.y - savedTarget.y, savedPosition.z - savedTarget.z);
+					cam.updateProjectionMatrix();
+
+					return dataUrl;
+				}
+
+				return captureSceneToDataUrl(renderer, scene, cam, options);
+			};
+			onCaptureReady(captureFunc);
+		}
+	});
 
 	// Create rounded triangle geometry for counter previews
 	// Matches the JSCAD hull-of-circles approach from counterTray.ts
@@ -905,52 +971,152 @@
 	{/each}
 {/if}
 
-<!-- Infinite grid -->
-<Grid
-	position.y={-0.01}
-	cellColor="#5a5a5a"
-	sectionColor="#8b4a3c"
-	sectionThickness={1.5}
-	cellSize={10}
-	sectionSize={50}
-	gridSize={[2000, 2000]}
-	fadeDistance={500}
-/>
-
-<!-- Print bed indicator -->
-<T.Mesh position.y={-1} rotation.x={-Math.PI / 2}>
-	<T.PlaneGeometry args={[printBedSize, printBedSize]} />
-	<T.MeshStandardMaterial
-		map={bedTexture}
-		side={THREE.DoubleSide}
-		roughness={0.7}
-		metalness={0.1}
+{#if !hidePrintBed}
+	<!-- Infinite grid -->
+	<Grid
+		position.y={-0.01}
+		cellColor="#5a5a5a"
+		sectionColor="#8b4a3c"
+		sectionThickness={1.5}
+		cellSize={10}
+		sectionSize={50}
+		gridSize={[2000, 2000]}
+		fadeDistance={500}
 	/>
-</T.Mesh>
 
-<!-- Print bed border -->
-<T.LineLoop position.y={-0.5}>
-	<T.BufferGeometry>
-		<T.BufferAttribute
-			attach="attributes-position"
-			args={[new Float32Array([
-				-printBedSize / 2, 0, -printBedSize / 2,
-				printBedSize / 2, 0, -printBedSize / 2,
-				printBedSize / 2, 0, printBedSize / 2,
-				-printBedSize / 2, 0, printBedSize / 2
-			]), 3]}
+	<!-- Print bed indicator -->
+	<T.Mesh position.y={-1} rotation.x={-Math.PI / 2}>
+		<T.PlaneGeometry args={[printBedSize, printBedSize]} />
+		<T.MeshStandardMaterial
+			map={bedTexture}
+			side={THREE.DoubleSide}
+			roughness={0.7}
+			metalness={0.1}
 		/>
-	</T.BufferGeometry>
-	<T.LineBasicMaterial color="#c9503c" linewidth={2} />
-</T.LineLoop>
+	</T.Mesh>
 
-<!-- Print bed label -->
-<Text
-	text={`${printBedSize}mm bed`}
-	fontSize={8}
-	position={[-printBedSize / 2 + 5, 0.5, printBedSize / 2 - 5]}
-	rotation={[-Math.PI / 2, 0, 0]}
-	color="#c9503c"
-	anchorX="left"
-	anchorY="bottom"
-/>
+	<!-- Print bed border -->
+	<T.LineLoop position.y={-0.5}>
+		<T.BufferGeometry>
+			<T.BufferAttribute
+				attach="attributes-position"
+				args={[new Float32Array([
+					-printBedSize / 2, 0, -printBedSize / 2,
+					printBedSize / 2, 0, -printBedSize / 2,
+					printBedSize / 2, 0, printBedSize / 2,
+					-printBedSize / 2, 0, printBedSize / 2
+				]), 3]}
+			/>
+		</T.BufferGeometry>
+		<T.LineBasicMaterial color="#c9503c" linewidth={2} />
+	</T.LineLoop>
+
+	<!-- Print bed label -->
+	<Text
+		text={`${printBedSize}mm bed`}
+		fontSize={8}
+		position={[-printBedSize / 2 + 5, 0.5, printBedSize / 2 - 5]}
+		rotation={[-Math.PI / 2, 0, 0]}
+		color="#c9503c"
+		anchorX="left"
+		anchorY="bottom"
+	/>
+{/if}
+
+<!-- Reference labels for PDF capture - single tray view -->
+{#if showReferenceLabels && !showAllTrays && geometry && selectedTrayCounters.length > 0}
+	{@const maxStackHeight = Math.max(...selectedTrayCounters.map(stack => {
+		const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape;
+		return stack.isEdgeLoaded
+			? (effectiveShape === 'triangle'
+				? stack.length
+				: stack.shape === 'custom'
+					? Math.min(stack.width, stack.length)
+					: Math.max(stack.width, stack.length))
+			: stack.z + stack.count * stack.thickness;
+	}))}
+	{@const labelHeight = maxStackHeight + 5}
+	{#each selectedTrayCounters as stack, stackIdx (stackIdx)}
+		{@const trayLetter = 'A'}
+		{@const refCode = `${trayLetter}${stackIdx + 1}`}
+		{@const posX = stack.isEdgeLoaded
+			? (stack.edgeOrientation === 'lengthwise'
+				? meshOffset.x + stack.x + (stack.slotWidth ?? stack.count * stack.thickness) / 2
+				: meshOffset.x + stack.x + (stack.slotWidth ?? stack.length) / 2)
+			: meshOffset.x + stack.x}
+		{@const posZ = stack.isEdgeLoaded
+			? (stack.edgeOrientation === 'lengthwise'
+				? meshOffset.z - stack.y - (stack.slotDepth ?? stack.length) / 2
+				: meshOffset.z - stack.y - (stack.slotDepth ?? stack.count * stack.thickness) / 2)
+			: meshOffset.z - stack.y}
+		<!-- Floating label above stack -->
+		<Text
+			text={refCode}
+			fontSize={4}
+			position={[posX, labelHeight, posZ]}
+			quaternion={labelQuaternion}
+			color="#000000"
+			anchorX="center"
+			anchorY="bottom"
+			outlineWidth="8%"
+			outlineColor="#ffffff"
+		/>
+	{/each}
+{/if}
+
+<!-- Reference labels for PDF capture - all trays view -->
+{#if showReferenceLabels && showAllTrays && allTrays.length > 0}
+	{@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
+	{#each allTrays as trayData, trayIdx (trayData.trayId)}
+		{@const placement = trayData.placement}
+		{@const trayHeight = placement.dimensions.height}
+		{@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
+		{@const traySpacing = liftPhase * trayHeight * 1.2}
+		{@const trayXOffset = exploded
+			? meshOffset.x + interiorStartOffset + placement.x
+			: sidePositions.traysGroup.x - maxTrayWidth / 2 + placement.x}
+		{@const trayYOffset = exploded
+			? boxFloorThickness + explodedOffset.trays + trayIdx * traySpacing
+			: 0}
+		{@const trayZOffset = exploded
+			? meshOffset.z - interiorStartOffset - placement.y
+			: traysGroupDepth - placement.y}
+		{@const trayLetter = trayData.trayLetter ?? String.fromCharCode(65 + trayIdx)}
+		{@const maxStackHeight = Math.max(...trayData.counterStacks.map(stack => {
+			const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape;
+			return stack.isEdgeLoaded
+				? (effectiveShape === 'triangle'
+					? stack.length
+					: stack.shape === 'custom'
+						? Math.min(stack.width, stack.length)
+						: Math.max(stack.width, stack.length))
+				: stack.z + stack.count * stack.thickness;
+		}))}
+		{@const labelHeight = trayYOffset + maxStackHeight + 5}
+		{#each trayData.counterStacks as stack, stackIdx (stackIdx)}
+			{@const refCode = `${trayLetter}${stackIdx + 1}`}
+			{@const posX = stack.isEdgeLoaded
+				? (stack.edgeOrientation === 'lengthwise'
+					? trayXOffset + stack.x + (stack.slotWidth ?? stack.count * stack.thickness) / 2
+					: trayXOffset + stack.x + (stack.slotWidth ?? stack.length) / 2)
+				: trayXOffset + stack.x}
+			{@const posZ = stack.isEdgeLoaded
+				? (stack.edgeOrientation === 'lengthwise'
+					? trayZOffset - stack.y - (stack.slotDepth ?? stack.length) / 2
+					: trayZOffset - stack.y - (stack.slotDepth ?? stack.count * stack.thickness) / 2)
+				: trayZOffset - stack.y}
+			<!-- Floating label above stack -->
+			<Text
+				text={refCode}
+				fontSize={4}
+				position={[posX, labelHeight, posZ]}
+				quaternion={labelQuaternion}
+				color="#000000"
+				anchorX="center"
+				anchorY="bottom"
+				outlineWidth="8%"
+				outlineColor="#ffffff"
+			/>
+		{/each}
+	{/each}
+{/if}

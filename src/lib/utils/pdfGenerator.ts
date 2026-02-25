@@ -7,7 +7,14 @@ import {
 	type EdgeLoadedStackDef
 } from '$lib/models/counterTray';
 import type { Project } from '$lib/types/project';
-import { generateBoxDiagramSvg, getBoxDiagramDimensions } from './svgDiagramGenerator';
+
+// Screenshot data structure for each tray
+export interface TrayScreenshot {
+	boxIndex: number;
+	trayIndex: number;
+	trayLetter: string;
+	dataUrl: string;
+}
 
 // PDF data interfaces
 export interface PdfStackData {
@@ -206,9 +213,163 @@ const MARGIN_LEFT = 15;
 const MARGIN_RIGHT = 15;
 const USABLE_WIDTH = PAGE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
 
-// Generate PDF from extracted data
+// Screenshot image dimensions for PDF (in mm)
+const SCREENSHOT_WIDTH = 100;
+const SCREENSHOT_HEIGHT = 75;
+
+// Generate PDF with isometric screenshots
+export async function generatePdfWithScreenshots(
+	data: PdfData,
+	screenshots: TrayScreenshot[]
+): Promise<void> {
+	const doc = new jsPDF({
+		orientation: 'portrait',
+		unit: 'mm',
+		format: 'a4'
+	});
+
+	let currentY = MARGIN_TOP;
+	let isFirstBox = true;
+
+	// Group screenshots by box and tray
+	const screenshotMap = new Map<string, string>();
+	for (const ss of screenshots) {
+		screenshotMap.set(`${ss.boxIndex}-${ss.trayIndex}`, ss.dataUrl);
+	}
+
+	for (const box of data.boxes) {
+		const titleHeight = 10;
+		const trayNameHeight = 8;
+		const screenshotMargin = 5;
+		const tableHeaderHeight = 8;
+		const tableRowHeight = 6;
+		const traySpacing = 12;
+		const boxSpacing = 15;
+
+		// Each tray gets its own section with screenshot above table
+		for (let trayIdx = 0; trayIdx < box.trays.length; trayIdx++) {
+			const tray = box.trays[trayIdx];
+			const screenshotKey = `${box.boxIndex}-${trayIdx}`;
+			const screenshot = screenshotMap.get(screenshotKey);
+
+			// Calculate height needed for this tray section (screenshot + table stacked vertically)
+			const trayTableHeight = tableHeaderHeight + tray.stacks.length * tableRowHeight;
+			const sectionHeight =
+				(trayIdx === 0 ? titleHeight : 0) +
+				trayNameHeight +
+				SCREENSHOT_HEIGHT +
+				screenshotMargin +
+				trayTableHeight +
+				traySpacing;
+
+			// Check if we need a new page
+			if (!isFirstBox && currentY + sectionHeight > PAGE_HEIGHT - MARGIN_BOTTOM) {
+				doc.addPage();
+				currentY = MARGIN_TOP;
+				isFirstBox = true;
+			}
+
+			// Draw box title only for first tray or after page break
+			if (trayIdx === 0 || currentY === MARGIN_TOP) {
+				doc.setFontSize(14);
+				doc.setFont('courier', 'bold');
+				doc.text(`Box ${box.boxIndex + 1}: ${box.name}`, MARGIN_LEFT, currentY);
+				currentY += titleHeight;
+				isFirstBox = false;
+			}
+
+			// Draw tray name
+			doc.setFontSize(11);
+			doc.setFont('courier', 'bold');
+			doc.text(tray.name, MARGIN_LEFT, currentY);
+			currentY += trayNameHeight;
+
+			// Embed screenshot (centered)
+			const screenshotX = MARGIN_LEFT + (USABLE_WIDTH - SCREENSHOT_WIDTH) / 2;
+			if (screenshot) {
+				doc.addImage(screenshot, 'PNG', screenshotX, currentY, SCREENSHOT_WIDTH, SCREENSHOT_HEIGHT);
+			} else {
+				doc.setDrawColor(200, 200, 200);
+				doc.setFillColor(245, 245, 245);
+				doc.rect(screenshotX, currentY, SCREENSHOT_WIDTH, SCREENSHOT_HEIGHT, 'FD');
+				doc.setFontSize(8);
+				doc.setFont('courier', 'normal');
+				doc.setTextColor(150, 150, 150);
+				doc.text('No preview', screenshotX + SCREENSHOT_WIDTH / 2, currentY + SCREENSHOT_HEIGHT / 2, { align: 'center' });
+				doc.setTextColor(0, 0, 0);
+			}
+			currentY += SCREENSHOT_HEIGHT + screenshotMargin;
+
+			// Draw reference table below screenshot
+			const tableX = MARGIN_LEFT;
+			const colRefEnd = tableX + 20;
+			const colCountEnd = tableX + 45;
+			const colStack = tableX + 50;
+			const tableWidth = USABLE_WIDTH;
+
+			// Table header
+			doc.setFontSize(10);
+			doc.setFont('courier', 'bold');
+			doc.text('Ref', colRefEnd, currentY, { align: 'right' });
+			doc.text('Count', colCountEnd, currentY, { align: 'right' });
+			doc.text('Stack Name', colStack, currentY);
+			currentY += 2;
+
+			// Header line
+			doc.setDrawColor(0, 0, 0);
+			doc.setLineWidth(0.5);
+			doc.line(tableX, currentY, tableX + tableWidth, currentY);
+			currentY += tableHeaderHeight - 2;
+
+			// Table rows
+			let rowIndex = 0;
+			for (const stack of tray.stacks) {
+				// Check if we need a new page mid-table
+				if (currentY + tableRowHeight > PAGE_HEIGHT - MARGIN_BOTTOM) {
+					doc.addPage();
+					currentY = MARGIN_TOP;
+
+					// Redraw table header on new page
+					doc.setFont('courier', 'bold');
+					doc.text('Ref', colRefEnd, currentY, { align: 'right' });
+					doc.text('Count', colCountEnd, currentY, { align: 'right' });
+					doc.text('Stack Name', colStack, currentY);
+					currentY += 2;
+					doc.line(tableX, currentY, tableX + tableWidth, currentY);
+					currentY += tableHeaderHeight - 2;
+					rowIndex = 0;
+				}
+
+				// Zebra stripe
+				if (rowIndex % 2 === 1) {
+					doc.setFillColor(245, 245, 245);
+					doc.rect(tableX, currentY - 4, tableWidth, tableRowHeight, 'F');
+				}
+
+				doc.setFont('courier', 'normal');
+				doc.text(stack.refCode, colRefEnd, currentY, { align: 'right' });
+				doc.text(stack.count.toString(), colCountEnd, currentY, { align: 'right' });
+				doc.text(stack.label, colStack, currentY);
+
+				currentY += tableRowHeight;
+				rowIndex++;
+			}
+
+			currentY += traySpacing;
+		}
+
+		currentY += boxSpacing;
+	}
+
+	// Generate filename from project name
+	const filename = `${data.projectName.toLowerCase().replace(/\s+/g, '-')}-reference.pdf`;
+	doc.save(filename);
+}
+
+// Generate PDF from extracted data (legacy SVG approach - kept for fallback)
 export async function generatePdf(data: PdfData): Promise<void> {
 	// Dynamic import to handle ESM/CommonJS compatibility
+	const { generateBoxDiagramSvg, getBoxDiagramDimensions } = await import('./svgDiagramGenerator');
 	const svg2pdfModule = await import('svg2pdf.js');
 	const svg2pdf = svg2pdfModule.svg2pdf;
 
@@ -354,8 +515,17 @@ export async function generatePdf(data: PdfData): Promise<void> {
 	doc.save(filename);
 }
 
-// Main export function to be called from UI
+// Main export function to be called from UI (legacy SVG approach)
 export async function exportPdfReference(project: Project): Promise<void> {
 	const data = extractPdfData(project);
 	await generatePdf(data);
+}
+
+// Export PDF with screenshots
+export async function exportPdfWithScreenshots(
+	project: Project,
+	screenshots: TrayScreenshot[]
+): Promise<void> {
+	const data = extractPdfData(project);
+	await generatePdfWithScreenshots(data, screenshots);
 }
