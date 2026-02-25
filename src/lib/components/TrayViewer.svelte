@@ -48,7 +48,7 @@
 	}: Props = $props();
 </script>
 
-<div class="h-full w-full">
+<div class="trayViewer">
 	<Canvas>
 		<TrayScene
 			{geometry}
@@ -67,3 +67,10 @@
 		/>
 	</Canvas>
 </div>
+
+<style>
+	.trayViewer {
+		height: 100%;
+		width: 100%;
+	}
+</style>

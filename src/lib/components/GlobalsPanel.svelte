@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { Button, Input, InputCheckbox, FormControl, Spacer, Hr, Select, Link, IconButton, Icon } from '@tableslayer/ui';
+	import { IconX } from '@tabler/icons-svelte';
 	import type { CounterTrayParams, CustomShape, CustomBaseShape } from '$lib/models/counterTray';
 
 	interface Props {
@@ -105,229 +107,301 @@
 	}
 </script>
 
-<div class="h-full space-y-4 overflow-y-auto p-3">
-	<section>
-		<h3 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">Print Bed</h3>
-		<label class="block">
-			<span class="text-xs text-gray-400">Bed Size (mm)</span>
-			<input
-				type="number"
-				step="1"
-				min="100"
-				value={params.printBedSize}
-				onchange={(e) => updateParam('printBedSize', parseInt(e.currentTarget.value))}
-				class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-			/>
-		</label>
+<div class="globalsPanel">
+	<section class="section">
+		<h3 class="sectionTitle">Print Bed</h3>
+		<FormControl label="Bed Size" name="printBedSize">
+			{#snippet input({ inputProps })}
+				<Input
+					{...inputProps}
+					type="number"
+					step="1"
+					min="100"
+					value={params.printBedSize}
+					onchange={(e) => updateParam('printBedSize', parseInt(e.currentTarget.value))}
+				/>
+			{/snippet}
+			{#snippet end()}mm{/snippet}
+		</FormControl>
 	</section>
 
-	<section>
-		<h3 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
-			Simple Counters
-		</h3>
-		<div class="grid grid-cols-2 gap-2">
-			<label class="block">
-				<span class="text-xs text-gray-400">Square</span>
-				<input
-					type="number"
-					step="0.1"
-					value={params.squareWidth}
-					onchange={(e) => {
-						const val = parseFloat(e.currentTarget.value);
-						onchange({ ...params, squareWidth: val, squareLength: val });
-					}}
-					class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-				/>
-			</label>
-			<label class="block">
-				<span class="text-xs text-gray-400">Hex (flat-to-flat)</span>
-				<input
-					type="number"
-					step="0.1"
-					value={params.hexFlatToFlat}
-					onchange={(e) => updateParam('hexFlatToFlat', parseFloat(e.currentTarget.value))}
-					class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-				/>
-			</label>
-			<label class="block">
-				<span class="text-xs text-gray-400">Circle Diameter</span>
-				<input
-					type="number"
-					step="0.1"
-					value={params.circleDiameter}
-					onchange={(e) => updateParam('circleDiameter', parseFloat(e.currentTarget.value))}
-					class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-				/>
-			</label>
-			<label class="block">
-				<span class="text-xs text-gray-400">Triangle (side)</span>
-				<input
-					type="number"
-					step="0.1"
-					value={params.triangleSide}
-					onchange={(e) => updateParam('triangleSide', parseFloat(e.currentTarget.value))}
-					class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-				/>
-			</label>
-			<label class="block">
-				<span class="text-xs text-gray-400">Triangle Radius</span>
-				<input
-					type="number"
-					step="0.1"
-					min="0"
-					value={params.triangleCornerRadius}
-					onchange={(e) => updateParam('triangleCornerRadius', parseFloat(e.currentTarget.value))}
-					class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-				/>
-			</label>
-			<label class="block">
-				<span class="text-xs text-gray-400">Thickness</span>
-				<input
-					type="number"
-					step="0.1"
-					value={params.counterThickness}
-					onchange={(e) => updateParam('counterThickness', parseFloat(e.currentTarget.value))}
-					class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-				/>
-			</label>
-			<label class="flex items-center gap-2 pt-5">
-				<input
-					type="checkbox"
-					checked={params.hexPointyTop}
-					onchange={(e) => updateParam('hexPointyTop', e.currentTarget.checked)}
-					class="rounded border-gray-600 bg-gray-700"
-				/>
-				<span class="text-xs text-gray-400">Hex Pointy Top</span>
-			</label>
+	<Hr />
+
+	<section class="section">
+		<h3 class="sectionTitle">Simple Counters</h3>
+		<Spacer size="0.5rem" />
+		<div class="formGrid">
+			<FormControl label="Square" name="squareWidth">
+				{#snippet input({ inputProps })}
+					<Input
+						{...inputProps}
+						type="number"
+						step="0.1"
+						value={params.squareWidth}
+						onchange={(e) => {
+							const val = parseFloat(e.currentTarget.value);
+							onchange({ ...params, squareWidth: val, squareLength: val });
+						}}
+					/>
+				{/snippet}
+				{#snippet end()}mm{/snippet}
+			</FormControl>
+			<FormControl label="Hex (flat-to-flat)" name="hexFlatToFlat">
+				{#snippet input({ inputProps })}
+					<Input
+						{...inputProps}
+						type="number"
+						step="0.1"
+						value={params.hexFlatToFlat}
+						onchange={(e) => updateParam('hexFlatToFlat', parseFloat(e.currentTarget.value))}
+					/>
+				{/snippet}
+				{#snippet end()}mm{/snippet}
+			</FormControl>
+			<FormControl label="Circle Diameter" name="circleDiameter">
+				{#snippet input({ inputProps })}
+					<Input
+						{...inputProps}
+						type="number"
+						step="0.1"
+						value={params.circleDiameter}
+						onchange={(e) => updateParam('circleDiameter', parseFloat(e.currentTarget.value))}
+					/>
+				{/snippet}
+				{#snippet end()}mm{/snippet}
+			</FormControl>
+			<FormControl label="Triangle (side)" name="triangleSide">
+				{#snippet input({ inputProps })}
+					<Input
+						{...inputProps}
+						type="number"
+						step="0.1"
+						value={params.triangleSide}
+						onchange={(e) => updateParam('triangleSide', parseFloat(e.currentTarget.value))}
+					/>
+				{/snippet}
+				{#snippet end()}mm{/snippet}
+			</FormControl>
+			<FormControl label="Triangle Radius" name="triangleCornerRadius">
+				{#snippet input({ inputProps })}
+					<Input
+						{...inputProps}
+						type="number"
+						step="0.1"
+						min="0"
+						value={params.triangleCornerRadius}
+						onchange={(e) => updateParam('triangleCornerRadius', parseFloat(e.currentTarget.value))}
+					/>
+				{/snippet}
+				{#snippet end()}mm{/snippet}
+			</FormControl>
+			<FormControl label="Thickness" name="counterThickness">
+				{#snippet input({ inputProps })}
+					<Input
+						{...inputProps}
+						type="number"
+						step="0.1"
+						value={params.counterThickness}
+						onchange={(e) => updateParam('counterThickness', parseFloat(e.currentTarget.value))}
+					/>
+				{/snippet}
+				{#snippet end()}mm{/snippet}
+			</FormControl>
 		</div>
+		<Spacer size="0.5rem" />
+		<InputCheckbox
+			checked={params.hexPointyTop}
+			onchange={(e) => updateParam('hexPointyTop', e.currentTarget.checked)}
+			label="Hex Pointy Top"
+		/>
 	</section>
 
-	<section>
-		<h3 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
-			Custom Counters
-		</h3>
-		<div class="space-y-2">
+	<Hr />
+
+	<section class="section">
+		<h3 class="sectionTitle">Custom Counters</h3>
+		<Spacer size="0.5rem" />
+		<div class="customShapesList">
 			{#each params.customShapes as shape, index (shape.name)}
 				{@const baseShape = shape.baseShape ?? 'rectangle'}
-				<div class="bg-gray-750 rounded p-2">
-					<div class="mb-2 flex items-center gap-2">
-						<input
+				<div class="shapeCard">
+					<div class="shapeCardHeader">
+						<Input
 							type="text"
 							value={shape.name}
 							onchange={(e) => updateCustomShape(index, 'name', e.currentTarget.value)}
 							placeholder="Shape name"
-							class="flex-1 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+							style="flex: 1;"
 						/>
-						<button
+						<IconButton
 							onclick={() => removeCustomShape(index)}
-							class="rounded px-2 py-1 text-red-400 hover:bg-red-900/30"
 							title="Remove shape"
+							variant="ghost"
+							color="var(--fgMuted)"
 						>
-							&times;
-						</button>
+							<Icon Icon={IconX} color="var(--fgMuted)" />
+						</IconButton>
 					</div>
-					<div class="mb-2">
-						<label class="block">
-							<span class="text-xs text-gray-400">Base Shape</span>
-							<select
-								value={baseShape}
-								onchange={(e) => updateCustomShape(index, 'baseShape', e.currentTarget.value)}
-								class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-							>
-								{#each baseShapeOptions as option (option.value)}
-									<option value={option.value}>{option.label}</option>
-								{/each}
-							</select>
-						</label>
-					</div>
-					<div class="grid grid-cols-2 gap-2">
+					<Spacer size="0.5rem" />
+					<FormControl label="Base Shape" name="baseShape-{index}">
+						{#snippet input({ inputProps })}
+							<Select
+								selected={[baseShape]}
+								onSelectedChange={(selected) => updateCustomShape(index, 'baseShape', selected[0])}
+								options={baseShapeOptions}
+								{...inputProps}
+							/>
+						{/snippet}
+					</FormControl>
+					<Spacer size="0.5rem" />
+					<div class="formGrid">
 						{#if baseShape === 'rectangle'}
-							<label class="block">
-								<span class="text-xs text-gray-400">Width</span>
-								<input
-									type="number"
-									step="0.1"
-									min="1"
-									value={shape.width}
-									onchange={(e) =>
-										updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
-									class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-								/>
-							</label>
-							<label class="block">
-								<span class="text-xs text-gray-400">Length</span>
-								<input
-									type="number"
-									step="0.1"
-									min="1"
-									value={shape.length}
-									onchange={(e) =>
-										updateCustomShape(index, 'length', parseFloat(e.currentTarget.value))}
-									class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-								/>
-							</label>
+							<FormControl label="Width" name="width-{index}">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										min="1"
+										value={shape.width}
+										onchange={(e) =>
+											updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Length" name="length-{index}">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										min="1"
+										value={shape.length}
+										onchange={(e) =>
+											updateCustomShape(index, 'length', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
 						{:else if baseShape === 'square'}
-							<label class="col-span-2 block">
-								<span class="text-xs text-gray-400">Size</span>
-								<input
-									type="number"
-									step="0.1"
-									min="1"
-									value={shape.width}
-									onchange={(e) =>
-										updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
-									class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-								/>
-							</label>
+							<FormControl label="Size" name="size-{index}" class="formGrid__spanTwo">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										min="1"
+										value={shape.width}
+										onchange={(e) =>
+											updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
 						{:else if baseShape === 'circle'}
-							<label class="col-span-2 block">
-								<span class="text-xs text-gray-400">Diameter</span>
-								<input
-									type="number"
-									step="0.1"
-									min="1"
-									value={shape.width}
-									onchange={(e) =>
-										updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
-									class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-								/>
-							</label>
+							<FormControl label="Diameter" name="diameter-{index}" class="formGrid__spanTwo">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										min="1"
+										value={shape.width}
+										onchange={(e) =>
+											updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
 						{:else if baseShape === 'hex'}
-							<label class="col-span-2 block">
-								<span class="text-xs text-gray-400">Flat-to-Flat</span>
-								<input
-									type="number"
-									step="0.1"
-									min="1"
-									value={shape.width}
-									onchange={(e) =>
-										updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
-									class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-								/>
-							</label>
+							<FormControl label="Flat-to-Flat" name="flatToFlat-{index}" class="formGrid__spanTwo">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										min="1"
+										value={shape.width}
+										onchange={(e) =>
+											updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
 						{:else if baseShape === 'triangle'}
-							<label class="col-span-2 block">
-								<span class="text-xs text-gray-400">Side</span>
-								<input
-									type="number"
-									step="0.1"
-									min="1"
-									value={shape.width}
-									onchange={(e) =>
-										updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
-									class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-								/>
-							</label>
+							<FormControl label="Side" name="side-{index}" class="formGrid__spanTwo">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										min="1"
+										value={shape.width}
+										onchange={(e) =>
+											updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
 						{/if}
 					</div>
 				</div>
 			{/each}
-			<button
-				onclick={addCustomShape}
-				class="w-full rounded border border-dashed border-gray-600 px-2 py-1 text-xs text-gray-400 hover:border-gray-500 hover:text-gray-300"
-			>
-				+ Add Custom Shape
-			</button>
+			<Link as="button" onclick={addCustomShape}>+ Add Custom Shape</Link>
 		</div>
 	</section>
 </div>
+
+<style>
+	.globalsPanel {
+		height: 100%;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.section {
+		margin-bottom: 1rem;
+	}
+
+	.sectionTitle {
+		margin-bottom: 0.5rem;
+		font-size: 0.75rem;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--fgMuted);
+	}
+
+	.formGrid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem;
+	}
+
+	:global(.formGrid__spanTwo) {
+		grid-column: span 2;
+	}
+
+	.customShapesList {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.shapeCard {
+		padding: 0.5rem;
+		border-radius: var(--radius-2);
+		background: var(--contrastLowest);
+	}
+
+	.shapeCardHeader {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 0.5rem;
+	}
+
+</style>

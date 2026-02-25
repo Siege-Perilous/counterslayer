@@ -106,10 +106,14 @@ export interface CounterStack {
 	slotDepth?: number; // Y dimension of the slot
 }
 
-// Generate random pastel colors for counter stacks
+// Generate harmonious colors for counter stacks (warm earth tones matching primary red)
 function generateStackColor(index: number): string {
-	const hue = (index * 137.508) % 360; // Golden angle for good distribution
-	return `hsl(${hue}, 70%, 60%)`;
+	// Warm palette hues: reds, oranges, browns, and complementary teals
+	const warmHues = [15, 25, 35, 160, 170, 30, 20, 165, 40, 155];
+	const hue = warmHues[index % warmHues.length];
+	const saturation = 50 + (index % 3) * 10; // 50-70%
+	const lightness = 45 + (index % 4) * 5; // 45-60%
+	return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 }
 
 // Calculate counter positions for preview rendering

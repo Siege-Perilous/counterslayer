@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { Button, Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon } from '@tableslayer/ui';
+	import { IconX } from '@tabler/icons-svelte';
 	import type { Box, Project } from '$lib/types/project';
 	import { calculateMinimumBoxDimensions } from '$lib/models/box';
 
@@ -20,39 +22,35 @@
 	);
 </script>
 
-<div class="flex h-full flex-col overflow-hidden">
+<div class="boxesPanel">
 	<!-- Box List -->
-	<div class="border-b border-gray-700 p-2">
-		<div class="mb-2 flex items-center justify-between px-1">
-			<span class="text-xs font-semibold tracking-wide text-gray-400 uppercase">Boxes</span>
-			<button onclick={onAddBox} class="rounded bg-gray-700 px-2 py-0.5 text-xs hover:bg-gray-600">
-				+ New
-			</button>
+	<div class="panelList">
+		<div class="panelListHeader">
+			<span class="panelListTitle">Boxes</span>
+			<Button variant="ghost" size="sm" onclick={onAddBox}>+ New</Button>
 		</div>
-		<div class="max-h-24 space-y-1 overflow-y-auto">
+		<div class="panelListItems">
 			{#each project.boxes as box (box.id)}
 				<div
-					class="flex cursor-pointer items-center justify-between rounded px-2 py-1 text-sm {selectedBox?.id ===
-					box.id
-						? 'bg-blue-600'
-						: 'hover:bg-gray-700'}"
+					class="listItem {selectedBox?.id === box.id ? 'listItem--selected' : ''}"
 					onclick={() => onSelectBox(box)}
 					role="button"
 					tabindex="0"
 					onkeydown={(e) => e.key === 'Enter' && onSelectBox(box)}
 				>
-					<span class="truncate">{box.name}</span>
+					<span style="overflow: hidden; text-overflow: ellipsis;">{box.name}</span>
 					{#if project.boxes.length > 1}
-						<button
+						<IconButton
 							onclick={(e) => {
 								e.stopPropagation();
 								onDeleteBox(box.id);
 							}}
-							class="ml-2 rounded px-1 text-xs text-gray-400 hover:bg-red-600 hover:text-white"
 							title="Delete box"
+							variant="ghost"
+							color="var(--fgMuted)"
 						>
-							&times;
-						</button>
+							<Icon Icon={IconX} color="var(--fgMuted)" />
+						</IconButton>
 					{/if}
 				</div>
 			{/each}
@@ -61,77 +59,83 @@
 
 	<!-- Box Settings -->
 	{#if selectedBox}
-		<div class="flex-1 space-y-3 overflow-y-auto p-3">
-			<div>
-				<label for="box-name" class="mb-1 block text-xs text-gray-400">Name</label>
-				<input
-					id="box-name"
-					type="text"
-					value={selectedBox.name}
-					onchange={(e) => onUpdateBox({ name: (e.target as HTMLInputElement).value })}
-					class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
-				/>
+		<div class="panelForm">
+			<FormControl label="Name" name="boxName">
+				{#snippet input({ inputProps })}
+					<Input
+						{...inputProps}
+						type="text"
+						value={selectedBox.name}
+						onchange={(e) => onUpdateBox({ name: (e.target as HTMLInputElement).value })}
+					/>
+				{/snippet}
+			</FormControl>
+
+			<Spacer size="0.75rem" />
+
+			<div class="formGrid">
+				<FormControl label="Tolerance" name="tolerance">
+					{#snippet input({ inputProps })}
+						<Input
+							{...inputProps}
+							type="number"
+							step="0.1"
+							min="0"
+							value={selectedBox.tolerance}
+							onchange={(e) =>
+								onUpdateBox({ tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5 })}
+						/>
+					{/snippet}
+					{#snippet end()}mm{/snippet}
+				</FormControl>
+				<FormControl label="Wall" name="wallThickness">
+					{#snippet input({ inputProps })}
+						<Input
+							{...inputProps}
+							type="number"
+							step="0.5"
+							min="1"
+							value={selectedBox.wallThickness}
+							onchange={(e) =>
+								onUpdateBox({
+									wallThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
+								})}
+						/>
+					{/snippet}
+					{#snippet end()}mm{/snippet}
+				</FormControl>
+				<FormControl label="Floor" name="floorThickness" class="formGrid__spanTwo">
+					{#snippet input({ inputProps })}
+						<Input
+							{...inputProps}
+							type="number"
+							step="0.5"
+							min="1"
+							value={selectedBox.floorThickness}
+							onchange={(e) =>
+								onUpdateBox({
+									floorThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
+								})}
+						/>
+					{/snippet}
+					{#snippet end()}mm{/snippet}
+				</FormControl>
 			</div>
 
-			<div class="grid grid-cols-2 gap-2">
-				<div>
-					<label for="box-tolerance" class="mb-1 block text-xs text-gray-400">Tolerance</label>
-					<input
-						id="box-tolerance"
-						type="number"
-						step="0.1"
-						min="0"
-						value={selectedBox.tolerance}
-						onchange={(e) =>
-							onUpdateBox({ tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5 })}
-						class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
-					/>
-				</div>
-				<div>
-					<label for="box-wall" class="mb-1 block text-xs text-gray-400">Wall</label>
-					<input
-						id="box-wall"
-						type="number"
-						step="0.5"
-						min="1"
-						value={selectedBox.wallThickness}
-						onchange={(e) =>
-							onUpdateBox({
-								wallThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
-							})}
-						class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
-					/>
-				</div>
-				<div class="col-span-2">
-					<label for="box-floor" class="mb-1 block text-xs text-gray-400">Floor Thickness</label>
-					<input
-						id="box-floor"
-						type="number"
-						step="0.5"
-						min="1"
-						value={selectedBox.floorThickness}
-						onchange={(e) =>
-							onUpdateBox({
-								floorThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
-							})}
-						class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
-					/>
-				</div>
-			</div>
+			<Spacer size="0.75rem" />
+			<Hr />
+			<Spacer size="0.75rem" />
 
 			<!-- Custom Size -->
-			<div class="border-t border-gray-700 pt-3">
-				<h4 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
-					Custom Size
-				</h4>
-				<p class="mb-2 text-xs text-gray-500">Leave empty for auto-sizing.</p>
-				<div class="space-y-2">
-					<div>
-						<label for="box-width" class="mb-1 block text-xs text-gray-400">
-							Width <span class="text-gray-500">min: {minimums.minWidth.toFixed(1)}</span>
-						</label>
-						<input
-							id="box-width"
+			<h4 class="sectionTitle">Custom Size</h4>
+			<p class="sectionHint">Leave empty for auto-sizing.</p>
+			<Spacer size="0.5rem" />
+
+			<div class="formGrid">
+				<FormControl label="Width (min: {minimums.minWidth.toFixed(1)})" name="customWidth">
+					{#snippet input({ inputProps })}
+						<Input
+							{...inputProps}
 							type="number"
 							step="0.5"
 							min={minimums.minWidth}
@@ -141,15 +145,14 @@
 								onUpdateBox({ customWidth: v ? parseFloat(v) : undefined });
 							}}
 							placeholder="Auto"
-							class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
 						/>
-					</div>
-					<div>
-						<label for="box-depth" class="mb-1 block text-xs text-gray-400">
-							Depth <span class="text-gray-500">min: {minimums.minDepth.toFixed(1)}</span>
-						</label>
-						<input
-							id="box-depth"
+					{/snippet}
+					{#snippet end()}mm{/snippet}
+				</FormControl>
+				<FormControl label="Depth (min: {minimums.minDepth.toFixed(1)})" name="customDepth">
+					{#snippet input({ inputProps })}
+						<Input
+							{...inputProps}
 							type="number"
 							step="0.5"
 							min={minimums.minDepth}
@@ -159,15 +162,14 @@
 								onUpdateBox({ customDepth: v ? parseFloat(v) : undefined });
 							}}
 							placeholder="Auto"
-							class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
 						/>
-					</div>
-					<div>
-						<label for="box-height" class="mb-1 block text-xs text-gray-400">
-							Height <span class="text-gray-500">min: {minimums.minHeight.toFixed(1)}</span>
-						</label>
-						<input
-							id="box-height"
+					{/snippet}
+					{#snippet end()}mm{/snippet}
+				</FormControl>
+				<FormControl label="Height (min: {minimums.minHeight.toFixed(1)})" name="customHeight" class="formGrid__spanTwo">
+					{#snippet input({ inputProps })}
+						<Input
+							{...inputProps}
 							type="number"
 							step="0.5"
 							min={minimums.minHeight}
@@ -177,26 +179,124 @@
 								onUpdateBox({ customHeight: v ? parseFloat(v) : undefined });
 							}}
 							placeholder="Auto"
-							class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
 						/>
-					</div>
-				</div>
-
-				<label class="mt-2 flex cursor-pointer items-center gap-2">
-					<input
-						type="checkbox"
-						checked={selectedBox.fillSolidEmpty ?? false}
-						onchange={(e) =>
-							onUpdateBox({ fillSolidEmpty: (e.target as HTMLInputElement).checked })}
-						class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-					/>
-					<span class="text-xs text-gray-400">Fill empty space solid</span>
-				</label>
+					{/snippet}
+					{#snippet end()}mm{/snippet}
+				</FormControl>
 			</div>
+
+			<Spacer size="0.5rem" />
+			<InputCheckbox
+				checked={selectedBox.fillSolidEmpty ?? false}
+				onchange={(e) => onUpdateBox({ fillSolidEmpty: (e.target as HTMLInputElement).checked })}
+				label="Fill empty space solid"
+			/>
 		</div>
 	{:else}
-		<div class="flex flex-1 items-center justify-center p-4 text-gray-500">
-			<p class="text-sm">No box selected</p>
+		<div class="emptyState">
+			<p class="emptyStateText">No box selected</p>
 		</div>
 	{/if}
 </div>
+
+<style>
+	.boxesPanel {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		overflow: hidden;
+	}
+
+	.panelList {
+		padding: 0.5rem;
+		border-bottom: var(--borderThin);
+	}
+
+	.panelListHeader {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 0.25rem;
+		margin-bottom: 0.5rem;
+	}
+
+	.panelListTitle {
+		font-size: 0.75rem;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--fgMuted);
+	}
+
+	.panelListItems {
+		max-height: 6rem;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.listItem {
+		display: flex;
+		cursor: pointer;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.25rem 0.5rem;
+		border-radius: var(--radius-2);
+		font-size: 0.875rem;
+	}
+
+	.listItem:hover {
+		background: var(--contrastLow);
+	}
+
+	.listItem--selected {
+		background: var(--primary-500);
+	}
+
+	.panelForm {
+		flex: 1;
+		overflow-y: auto;
+		padding: 0.75rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.formGrid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem;
+	}
+
+	:global(.formGrid__spanTwo) {
+		grid-column: span 2;
+	}
+
+	.sectionTitle {
+		margin-bottom: 0.5rem;
+		font-size: 0.75rem;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--fgMuted);
+	}
+
+	.sectionHint {
+		font-size: 0.75rem;
+		color: var(--fgMuted);
+	}
+
+	.emptyState {
+		display: flex;
+		flex: 1;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		color: var(--fgMuted);
+	}
+
+	.emptyStateText {
+		font-size: 0.875rem;
+	}
+</style>

@@ -1,4 +1,16 @@
 <script lang="ts">
+	import {
+		Button,
+		Input,
+		FormControl,
+		Spacer,
+		Hr,
+		Select,
+		Link,
+		IconButton,
+		Icon
+	} from '@tableslayer/ui';
+	import { IconX } from '@tabler/icons-svelte';
 	import type { Box, Tray } from '$lib/types/project';
 	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
 
@@ -170,46 +182,39 @@
 	}
 </script>
 
-<div class="flex h-full flex-col overflow-hidden">
+<div class="traysPanel">
 	<!-- Tray List -->
 	{#if selectedBox}
-		<div class="border-b border-gray-700 p-2">
-			<div class="mb-2 flex items-center justify-between px-1">
-				<span class="text-xs font-semibold tracking-wide text-gray-400 uppercase">Trays</span>
-				<button
-					onclick={() => onAddTray(selectedBox.id)}
-					class="rounded bg-gray-700 px-2 py-0.5 text-xs hover:bg-gray-600"
-				>
-					+ New
-				</button>
+		<div class="panelList">
+			<div class="panelListHeader">
+				<span class="panelListTitle">Trays</span>
+				<Button variant="ghost" size="sm" onclick={() => onAddTray(selectedBox.id)}>+ New</Button>
 			</div>
-			<div class="max-h-24 space-y-1 overflow-y-auto">
+			<div class="panelListItems">
 				{#each selectedBox.trays as tray (tray.id)}
 					{@const stats = getTrayStats(tray)}
 					<div
-						class="flex cursor-pointer items-center justify-between rounded px-2 py-1 text-sm {selectedTray?.id ===
-						tray.id
-							? 'bg-blue-600'
-							: 'hover:bg-gray-700'}"
+						class="listItem {selectedTray?.id === tray.id ? 'listItem--selected' : ''}"
 						onclick={() => onSelectTray(tray)}
 						role="button"
 						tabindex="0"
 						onkeydown={(e) => e.key === 'Enter' && onSelectTray(tray)}
 					>
-						<span class="truncate">{tray.name}</span>
-						<span class="flex items-center gap-1">
-							<span class="text-xs text-gray-400">{stats.counters} in {stats.stacks}</span>
+						<span style="overflow: hidden; text-overflow: ellipsis;">{tray.name}</span>
+						<span style="display: flex; align-items: center; gap: 0.25rem;">
+							<span style="font-size: 0.75rem; color: var(--fgMuted);"
+								>{stats.counters} in {stats.stacks}</span
+							>
 							{#if selectedBox.trays.length > 1}
-								<button
+								<IconButton
 									onclick={(e) => {
 										e.stopPropagation();
 										onDeleteTray(selectedBox.id, tray.id);
 									}}
-									class="rounded px-1 text-xs text-gray-400 hover:bg-red-600 hover:text-white"
 									title="Delete tray"
 								>
-									&times;
-								</button>
+									<Icon Icon={IconX} />
+								</IconButton>
 							{/if}
 						</span>
 					</div>
@@ -220,144 +225,173 @@
 
 	<!-- Tray Settings -->
 	{#if selectedTray}
-		<div class="flex-1 space-y-4 overflow-y-auto p-3">
+		<div class="panelForm">
 			<!-- Name -->
-			<label class="block">
-				<span class="mb-1 block text-xs text-gray-400">Name</span>
-				<input
-					type="text"
-					value={selectedTray.name}
-					onchange={(e) => onUpdateTray({ name: (e.currentTarget as HTMLInputElement).value })}
-					class="w-full rounded bg-gray-700 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
-				/>
-			</label>
+			<FormControl label="Name" name="trayName">
+				{#snippet input({ inputProps })}
+					<Input
+						{...inputProps}
+						type="text"
+						value={selectedTray.name}
+						onchange={(e) => onUpdateTray({ name: (e.currentTarget as HTMLInputElement).value })}
+					/>
+				{/snippet}
+			</FormControl>
+
+			<Spacer size="0.75rem" />
+			<Hr />
+			<Spacer size="0.75rem" />
 
 			<!-- Tray Settings -->
-			<section>
-				<h3 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">Settings</h3>
-				<div class="grid grid-cols-2 gap-2">
-					<label class="block">
-						<span class="text-xs text-gray-400">Clearance</span>
-						<input
-							type="number"
-							step="0.1"
-							value={selectedTray.params.clearance}
-							onchange={(e) => updateParam('clearance', parseFloat(e.currentTarget.value))}
-							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-						/>
-					</label>
-					<label class="block">
-						<span class="text-xs text-gray-400">Wall</span>
-						<input
-							type="number"
-							step="0.1"
-							value={selectedTray.params.wallThickness}
-							onchange={(e) => updateParam('wallThickness', parseFloat(e.currentTarget.value))}
-							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-						/>
-					</label>
-					<label class="block">
-						<span class="text-xs text-gray-400">Floor</span>
-						<input
-							type="number"
-							step="0.1"
-							value={selectedTray.params.floorThickness}
-							onchange={(e) => updateParam('floorThickness', parseFloat(e.currentTarget.value))}
-							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-						/>
-					</label>
-					<label class="block">
-						<span class="text-xs text-gray-400">Rim</span>
-						<input
-							type="number"
-							step="0.1"
-							value={selectedTray.params.rimHeight}
-							onchange={(e) => updateParam('rimHeight', parseFloat(e.currentTarget.value))}
-							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-						/>
-					</label>
-					<label class="block">
-						<span class="text-xs text-gray-400">Cutout %</span>
-						<input
-							type="number"
-							step="0.05"
-							min="0"
-							max="1"
-							value={selectedTray.params.cutoutRatio}
-							onchange={(e) => updateParam('cutoutRatio', parseFloat(e.currentTarget.value))}
-							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-						/>
-					</label>
-					<label class="block">
-						<span class="text-xs text-gray-400">Cutout Max</span>
-						<input
-							type="number"
-							step="1"
-							value={selectedTray.params.cutoutMax}
-							onchange={(e) => updateParam('cutoutMax', parseFloat(e.currentTarget.value))}
-							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-						/>
-					</label>
+			<section class="section">
+				<h3 class="sectionTitle">Settings</h3>
+				<Spacer size="0.5rem" />
+				<div class="formGrid">
+					<FormControl label="Clearance" name="clearance">
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="0.1"
+								value={selectedTray.params.clearance}
+								onchange={(e) => updateParam('clearance', parseFloat(e.currentTarget.value))}
+							/>
+						{/snippet}
+						{#snippet end()}mm{/snippet}
+					</FormControl>
+					<FormControl label="Wall" name="wallThickness">
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="0.1"
+								value={selectedTray.params.wallThickness}
+								onchange={(e) => updateParam('wallThickness', parseFloat(e.currentTarget.value))}
+							/>
+						{/snippet}
+						{#snippet end()}mm{/snippet}
+					</FormControl>
+					<FormControl label="Floor" name="floorThickness">
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="0.1"
+								value={selectedTray.params.floorThickness}
+								onchange={(e) => updateParam('floorThickness', parseFloat(e.currentTarget.value))}
+							/>
+						{/snippet}
+						{#snippet end()}mm{/snippet}
+					</FormControl>
+					<FormControl label="Rim" name="rimHeight">
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="0.1"
+								value={selectedTray.params.rimHeight}
+								onchange={(e) => updateParam('rimHeight', parseFloat(e.currentTarget.value))}
+							/>
+						{/snippet}
+						{#snippet end()}mm{/snippet}
+					</FormControl>
+					<FormControl label="Cutout %" name="cutoutRatio">
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="0.05"
+								min="0"
+								max="1"
+								value={selectedTray.params.cutoutRatio}
+								onchange={(e) => updateParam('cutoutRatio', parseFloat(e.currentTarget.value))}
+							/>
+						{/snippet}
+					</FormControl>
+					<FormControl label="Cutout Max" name="cutoutMax">
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="1"
+								value={selectedTray.params.cutoutMax}
+								onchange={(e) => updateParam('cutoutMax', parseFloat(e.currentTarget.value))}
+							/>
+						{/snippet}
+						{#snippet end()}mm{/snippet}
+					</FormControl>
 				</div>
 			</section>
+
+			<Spacer size="0.5rem" />
 
 			<!-- Tray Override -->
-			<section>
-				<h3 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">Override</h3>
-				<div class="grid grid-cols-2 gap-2">
-					<label class="col-span-2 block">
-						<span class="text-xs text-gray-400">Length (0 = auto)</span>
-						<input
-							type="number"
-							step="1"
-							value={selectedTray.params.trayLengthOverride}
-							onchange={(e) => updateParam('trayLengthOverride', parseFloat(e.currentTarget.value))}
-							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-						/>
-					</label>
-					<label class="block">
-						<span class="text-xs text-gray-400">Extra Cols</span>
-						<input
-							type="number"
-							step="1"
-							min="1"
-							value={selectedTray.params.extraTrayCols}
-							onchange={(e) => updateParam('extraTrayCols', parseInt(e.currentTarget.value))}
-							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-						/>
-					</label>
-					<label class="block">
-						<span class="text-xs text-gray-400">Extra Rows</span>
-						<input
-							type="number"
-							step="1"
-							min="1"
-							value={selectedTray.params.extraTrayRows}
-							onchange={(e) => updateParam('extraTrayRows', parseInt(e.currentTarget.value))}
-							class="mt-1 block w-full rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-						/>
-					</label>
+			<section class="section">
+				<h3 class="sectionTitle">Override</h3>
+				<Spacer size="0.5rem" />
+				<div class="formGrid">
+					<FormControl
+						label="Length (0 = auto)"
+						name="trayLengthOverride"
+						class="formGrid__spanTwo"
+					>
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="1"
+								value={selectedTray.params.trayLengthOverride}
+								onchange={(e) =>
+									updateParam('trayLengthOverride', parseFloat(e.currentTarget.value))}
+							/>
+						{/snippet}
+						{#snippet end()}mm{/snippet}
+					</FormControl>
+					<FormControl label="Extra Cols" name="extraTrayCols">
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="1"
+								min="1"
+								value={selectedTray.params.extraTrayCols}
+								onchange={(e) => updateParam('extraTrayCols', parseInt(e.currentTarget.value))}
+							/>
+						{/snippet}
+					</FormControl>
+					<FormControl label="Extra Rows" name="extraTrayRows">
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="1"
+								min="1"
+								value={selectedTray.params.extraTrayRows}
+								onchange={(e) => updateParam('extraTrayRows', parseInt(e.currentTarget.value))}
+							/>
+						{/snippet}
+					</FormControl>
 				</div>
 			</section>
 
+			<Spacer size="0.5rem" />
+
 			<!-- Top-Loaded Stacks -->
-			<section>
-				<h3 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
-					Top-Loaded Stacks
-				</h3>
-				<div class="space-y-1">
+			<section class="section">
+				<h3 class="sectionTitle">Top-Loaded Stacks</h3>
+				<Spacer size="0.5rem" />
+				<div class="stackList">
 					{#each selectedTray.params.topLoadedStacks as stack, index (index)}
 						<div
-							class="flex items-center gap-1 rounded {dragOverIndex === index &&
-							draggedType === 'top'
-								? 'bg-blue-900/30'
+							class="stackRow {dragOverIndex === index && draggedType === 'top'
+								? 'stackRow--dragover'
 								: ''}"
 							role="listitem"
 							ondragover={(e) => handleDragOver(e, index, 'top')}
 							ondrop={(e) => handleDrop(e, index, 'top')}
 						>
 							<span
-								class="cursor-grab px-1 text-gray-500 hover:text-gray-300"
+								class="dragHandle"
 								title="Drag to reorder"
 								draggable="true"
 								ondragstart={(e) => handleDragStart(e, index, 'top')}
@@ -367,66 +401,60 @@
 							>
 								&#x2630;
 							</span>
-							<input
+							<Input
 								type="text"
 								placeholder="Label"
 								value={stack[2] ?? ''}
 								onchange={(e) => updateTopLoadedStack(index, 'label', e.currentTarget.value)}
-								class="flex-1 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-								title="Optional label for organization"
+								style="flex: 1; min-width: 0;"
 							/>
-							<select
-								value={stack[0]}
-								onchange={(e) => updateTopLoadedStack(index, 'shape', e.currentTarget.value)}
-								class="w-16 rounded border-gray-600 bg-gray-700 px-1 py-1 text-sm"
-							>
-								{#each shapeOptions as shapeOpt (shapeOpt)}
-									<option value={shapeOpt}>{getShapeDisplayName(shapeOpt)}</option>
-								{/each}
-							</select>
-							<input
+							<div class="stackSelect">
+								<Select
+									selected={[stack[0]]}
+									options={shapeOptions.map((s) => ({ value: s, label: getShapeDisplayName(s) }))}
+									onSelectedChange={(selected) => updateTopLoadedStack(index, 'shape', selected[0])}
+								/>
+							</div>
+							<Input
 								type="number"
 								min="1"
 								value={stack[1]}
 								onchange={(e) =>
 									updateTopLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
-								class="w-14 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+								style="width: 3.5rem;"
 							/>
-							<button
+							<IconButton
+								variant="ghost"
 								onclick={() => removeTopLoadedStack(index)}
-								class="rounded px-1.5 py-1 text-red-400 hover:bg-red-900/30"
+								title="Remove stack"
+								color="var(--fgMuted)"
 							>
-								&times;
-							</button>
+								<Icon Icon={IconX} color="var(--fgMuted)" />
+							</IconButton>
 						</div>
 					{/each}
-					<button
-						onclick={addTopLoadedStack}
-						class="w-full rounded border border-dashed border-gray-600 px-2 py-1 text-xs text-gray-400 hover:border-gray-500 hover:text-gray-300"
-					>
-						+ Add Stack
-					</button>
+					<Link as="button" onclick={addTopLoadedStack}>+ Add Stack</Link>
 				</div>
 			</section>
 
+			<Spacer size="0.5rem" />
+
 			<!-- Edge-Loaded Stacks -->
-			<section>
-				<h3 class="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
-					Edge-Loaded Stacks
-				</h3>
-				<div class="space-y-1">
+			<section class="section">
+				<h3 class="sectionTitle">Edge-Loaded Stacks</h3>
+				<Spacer size="0.5rem" />
+				<div class="stackList">
 					{#each selectedTray.params.edgeLoadedStacks as stack, index (index)}
 						<div
-							class="flex items-center gap-1 rounded {dragOverIndex === index &&
-							draggedType === 'edge'
-								? 'bg-blue-900/30'
+							class="stackRow {dragOverIndex === index && draggedType === 'edge'
+								? 'stackRow--dragover'
 								: ''}"
 							role="listitem"
 							ondragover={(e) => handleDragOver(e, index, 'edge')}
 							ondrop={(e) => handleDrop(e, index, 'edge')}
 						>
 							<span
-								class="cursor-grab px-1 text-gray-500 hover:text-gray-300"
+								class="dragHandle"
 								title="Drag to reorder"
 								draggable="true"
 								ondragstart={(e) => handleDragStart(e, index, 'edge')}
@@ -436,60 +464,192 @@
 							>
 								&#x2630;
 							</span>
-							<input
+							<Input
 								type="text"
 								placeholder="Label"
 								value={stack[3] ?? ''}
 								onchange={(e) => updateEdgeLoadedStack(index, 'label', e.currentTarget.value)}
-								class="flex-1 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
-								title="Optional label for organization"
+								style="flex: 1; min-width: 0;"
 							/>
-							<select
-								value={stack[0]}
-								onchange={(e) => updateEdgeLoadedStack(index, 'shape', e.currentTarget.value)}
-								class="w-16 rounded border-gray-600 bg-gray-700 px-1 py-1 text-sm"
-							>
-								{#each shapeOptions as shapeOpt (shapeOpt)}
-									<option value={shapeOpt}>{getShapeDisplayName(shapeOpt)}</option>
-								{/each}
-							</select>
-							<input
+							<div class="stackSelect">
+								<Select
+									selected={[stack[0]]}
+									options={shapeOptions.map((s) => ({ value: s, label: getShapeDisplayName(s) }))}
+									onSelectedChange={(selected) =>
+										updateEdgeLoadedStack(index, 'shape', selected[0])}
+								/>
+							</div>
+							<Input
 								type="number"
 								min="1"
 								value={stack[1]}
 								onchange={(e) =>
 									updateEdgeLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
-								class="w-12 rounded border-gray-600 bg-gray-700 px-2 py-1 text-sm"
+								style="width: 3rem;"
 							/>
-							<select
-								value={stack[2] ?? 'lengthwise'}
-								onchange={(e) => updateEdgeLoadedStack(index, 'orientation', e.currentTarget.value)}
-								class="w-20 rounded border-gray-600 bg-gray-700 px-1 py-1 text-xs"
-							>
-								{#each orientationOptions as orientation (orientation)}
-									<option value={orientation}>{orientation.slice(0, 6)}</option>
-								{/each}
-							</select>
-							<button
+							<div class="stackSelectSmall">
+								<Select
+									selected={[stack[2] ?? 'lengthwise']}
+									options={orientationOptions.map((o) => ({ value: o, label: o.slice(0, 6) }))}
+									onSelectedChange={(selected) =>
+										updateEdgeLoadedStack(index, 'orientation', selected[0])}
+								/>
+							</div>
+							<IconButton
 								onclick={() => removeEdgeLoadedStack(index)}
-								class="rounded px-1.5 py-1 text-red-400 hover:bg-red-900/30"
+								title="Remove stack"
+								variant="ghost"
 							>
-								&times;
-							</button>
+								<Icon Icon={IconX} color="var(--fgMuted)" />
+							</IconButton>
 						</div>
 					{/each}
-					<button
-						onclick={addEdgeLoadedStack}
-						class="w-full rounded border border-dashed border-gray-600 px-2 py-1 text-xs text-gray-400 hover:border-gray-500 hover:text-gray-300"
-					>
-						+ Add Stack
-					</button>
+					<Link as="button" onclick={addEdgeLoadedStack}>+ Add Stack</Link>
 				</div>
 			</section>
 		</div>
 	{:else}
-		<div class="flex flex-1 items-center justify-center p-4 text-gray-500">
-			<p class="text-sm">No tray selected</p>
+		<div class="emptyState">
+			<p class="emptyStateText">No tray selected</p>
 		</div>
 	{/if}
 </div>
+
+<style>
+	.traysPanel {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		overflow: hidden;
+	}
+
+	.panelList {
+		padding: 0.5rem;
+		border-bottom: var(--borderThin);
+	}
+
+	.panelListHeader {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 0.25rem;
+		margin-bottom: 0.5rem;
+	}
+
+	.panelListTitle {
+		font-size: 0.75rem;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--fgMuted);
+	}
+
+	.panelListItems {
+		max-height: 6rem;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.listItem {
+		display: flex;
+		cursor: pointer;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.25rem 0.5rem;
+		border-radius: var(--radius-2);
+		font-size: 0.875rem;
+	}
+
+	.listItem:hover {
+		background: var(--contrastLow);
+	}
+
+	.listItem--selected {
+		background: var(--primary-500);
+	}
+
+	.panelForm {
+		flex: 1;
+		overflow-y: auto;
+		padding: 0.75rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.section {
+		margin-bottom: 1rem;
+	}
+
+	.sectionTitle {
+		margin-bottom: 0.5rem;
+		font-size: 0.75rem;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--fgMuted);
+	}
+
+	.formGrid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem;
+	}
+
+	:global(.formGrid__spanTwo) {
+		grid-column: span 2;
+	}
+
+	.stackList {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.stackRow {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0.25rem;
+		border-radius: var(--radius-2);
+	}
+
+	.stackRow--dragover {
+		background: color-mix(in srgb, var(--primary-900) 30%, transparent);
+	}
+
+	.dragHandle {
+		cursor: grab;
+		padding: 0 0.25rem;
+		color: var(--fgMuted);
+	}
+
+	.dragHandle:hover {
+		color: var(--fgMuted);
+	}
+
+	.stackSelect {
+		width: 7rem;
+		flex-shrink: 0;
+	}
+
+	.stackSelectSmall {
+		width: 6rem;
+		flex-shrink: 0;
+	}
+
+	.emptyState {
+		display: flex;
+		flex: 1;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		color: var(--fgMuted);
+	}
+
+	.emptyStateText {
+		font-size: 0.875rem;
+	}
+</style>

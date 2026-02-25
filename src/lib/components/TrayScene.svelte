@@ -251,8 +251,8 @@
 		};
 	});
 
-	// Tray colors for visual distinction - varied hues for easier differentiation
-	const trayColors = ['#f97316', '#06b6d4', '#ec4899', '#eab308', '#8b5cf6', '#10b981'];
+	// Tray colors - harmonious with tableslayer/ui primary red
+	const trayColors = ['#c9503c', '#3d7a6a', '#d4956a', '#7c5c4a', '#a36b5a', '#5a7c6a'];
 
 	// Debug logging
 	$effect(() => {
@@ -326,9 +326,10 @@
 
 <T.DirectionalLight position={[50, 100, 50]} intensity={1.5} />
 <T.DirectionalLight position={[-50, 50, -50]} intensity={0.5} />
+<T.DirectionalLight position={[0, 20, -80]} intensity={0.3} /><!-- Subtle backlight for rim definition -->
 <T.AmbientLight intensity={0.4} />
 
-<!-- Box geometry (green) -->
+<!-- Box geometry -->
 {#if boxGeometry}
 	{@const boxWidth = boxBounds ? boxBounds.max.x - boxBounds.min.x : 0}
 	<T.Mesh
@@ -339,12 +340,10 @@
 		position.z={showAllTrays && !exploded ? sidePositions.box.z : meshOffset.z}
 	>
 		<T.MeshStandardMaterial
-			color="#22c55e"
+			color="#333333"
 			roughness={0.6}
 			metalness={0.1}
 			side={THREE.DoubleSide}
-			transparent
-			opacity={0.85}
 		/>
 	</T.Mesh>
 {/if}
@@ -389,7 +388,7 @@
 		position.z={meshOffset.z}
 	>
 		<T.MeshStandardMaterial
-			color="#f97316"
+			color="#c9503c"
 			roughness={0.6}
 			metalness={0.1}
 			side={THREE.DoubleSide}
@@ -397,7 +396,7 @@
 	</T.Mesh>
 {/if}
 
-<!-- Lid geometry (purple) -->
+<!-- Lid geometry -->
 {#if lidGeometry}
 	{@const lidWidth = lidBounds ? lidBounds.max.x - lidBounds.min.x : 0}
 	{@const lidHeight = lidBounds ? lidBounds.max.z - lidBounds.min.z : 0}
@@ -431,7 +430,7 @@
 		position.z={lidPosZ}
 	>
 		<T.MeshStandardMaterial
-			color="#a855f7"
+			color="#444444"
 			roughness={0.6}
 			metalness={0.1}
 			side={THREE.DoubleSide}
@@ -455,7 +454,7 @@
 							: Math.max(stack.width, stack.length)}
 				{@const counterY = stack.z + standingHeight / 2}
 				{@const isAlt = counterIdx % 2 === 1}
-				{@const counterColor = isAlt ? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)` : stack.color}
+				{@const counterColor = isAlt ? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)` : stack.color}
 				{#if stack.edgeOrientation === 'lengthwise'}
 					<!-- Lengthwise: counters arranged along X axis, standing on edge -->
 					{@const counterSpacing = (stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
@@ -557,7 +556,7 @@
 				{@const posY = counterZ}
 				{@const posZ = meshOffset.z - stack.y}
 				{@const isAlt = counterIdx % 2 === 1}
-				{@const counterColor = isAlt ? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)` : stack.color}
+				{@const counterColor = isAlt ? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)` : stack.color}
 				{@const effectiveShape =
 					stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 				{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
@@ -625,7 +624,7 @@
 					{@const counterY = trayYOffset + stack.z + standingHeight / 2}
 					{@const isAlt = counterIdx % 2 === 1}
 					{@const counterColor = isAlt
-						? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)`
+						? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
 						: stack.color}
 					{#if stack.edgeOrientation === 'lengthwise'}
 						{@const counterSpacing =
@@ -733,7 +732,7 @@
 					{@const posZ = trayZOffset - stack.y}
 					{@const isAlt = counterIdx % 2 === 1}
 					{@const counterColor = isAlt
-						? `hsl(${(stackIdx * 137.508) % 360}, 50%, 40%)`
+						? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
 						: stack.color}
 					{@const effectiveShape =
 						stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
@@ -773,8 +772,8 @@
 
 <Grid
 	position.y={-0.01}
-	cellColor="#6f6f6f"
-	sectionColor="#9d4b4b"
+	cellColor="#5a5a5a"
+	sectionColor="#8b4a3c"
 	sectionThickness={1.5}
 	cellSize={10}
 	sectionSize={50}

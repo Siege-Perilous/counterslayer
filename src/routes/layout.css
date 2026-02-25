@@ -1,2 +1,5 @@
-@import 'tailwindcss';
-@plugin '@tailwindcss/forms';
+@import '@tableslayer/ui/styles/globals.css';
+
+:where(html) {
+	--font-serif: 'Inter';
+}

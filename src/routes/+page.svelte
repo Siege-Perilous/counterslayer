@@ -1,6 +1,19 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { PaneGroup, Pane, PaneResizer } from 'paneforge';
+	import {
+		Button,
+		IconButton,
+		Icon,
+		InputCheckbox,
+		Select,
+		RadioButton,
+		Popover,
+		Hr,
+		Link,
+		FormControl
+	} from '@tableslayer/ui';
+	import { IconSun, IconMoon, IconChevronDown } from '@tabler/icons-svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import {
 		createCounterTray,
@@ -28,6 +41,7 @@
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
 	import type { Geom3 } from '@jscad/modeling/src/geometries/types';
+	import { getContext, setContext } from 'svelte';
 
 	type ViewMode = 'tray' | 'all' | 'exploded';
 
@@ -47,6 +61,34 @@
 		counterStacks: CounterStack[];
 	}
 
+	// Theme state - get from context if available, otherwise use local state
+	let mode = $state<'light' | 'dark'>('dark');
+
+	// Initialize mode from localStorage
+	$effect(() => {
+		if (browser) {
+			const saved = localStorage.getItem('counterslayer-theme');
+			if (saved === 'light' || saved === 'dark') {
+				mode = saved;
+			}
+		}
+	});
+
+	function toggleTheme() {
+		mode = mode === 'dark' ? 'light' : 'dark';
+		if (browser) {
+			localStorage.setItem('counterslayer-theme', mode);
+		}
+	}
+
+	// Set context for child components
+	setContext('theme', {
+		get mode() {
+			return mode;
+		},
+		toggle: toggleTheme
+	});
+
 	let viewMode = $state<ViewMode>('tray');
 	let selectedTrayGeometry = $state<BufferGeometry | null>(null);
 	let selectedTrayCounters = $state<CounterStack[]>([]);
@@ -61,7 +103,6 @@
 	let jsonFileInput = $state<HTMLInputElement | null>(null);
 	let explosionAmount = $state(0);
 	let showCounters = $state(false);
-	let menuOpen = $state(false);
 	let communityProjects = $state<CommunityProject[]>([]);
 
 	// Initialize project from localStorage and fetch community projects
@@ -85,7 +126,6 @@
 			const res = await fetch(`/projects/${project.file}`);
 			const data = (await res.json()) as Project;
 			importProject(data);
-			menuOpen = false;
 			error = '';
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load project';
@@ -303,10 +343,10 @@
 		}
 	}
 
-	const viewModes: { mode: ViewMode; label: string }[] = [
-		{ mode: 'tray', label: 'Current tray' },
-		{ mode: 'all', label: 'Boxed' },
-		{ mode: 'exploded', label: 'Exploded' }
+	const viewModeOptions = [
+		{ value: 'tray', label: 'Current tray' },
+		{ value: 'all', label: 'Boxed' },
+		{ value: 'exploded', label: 'Exploded' }
 	];
 </script>
 
@@ -314,40 +354,34 @@
 	<title>Counter Tray Generator</title>
 </svelte:head>
 
-<div class="flex h-screen flex-col bg-gray-900 text-white">
+<div class="appContainer {mode}">
 	<!-- Header -->
-	<div
-		class="flex items-center justify-between border-b border-gray-700 px-3 py-2 text-sm text-gray-400"
-	>
-		<div class="flex items-center gap-1">
-			<h1 class="contents">Counter Slayer</h1>
+	<div class="appHeader">
+		<div style="display: flex; align-items: center; gap: 0.25rem;">
+			<h1 style="display: contents;">Counter Slayer</h1>
 			by
-			<a
-				href="https://davesnider.com"
-				target="_blank"
-				rel="noopener noreferrer"
-				class="cursor-pointer text-blue-400 hover:text-blue-300">Dave Snider</a
+			<Link href="https://davesnider.com" target="_blank" rel="noopener noreferrer"
+				>Dave Snider</Link
 			>
 		</div>
-		<div class="flex items-center gap-3">
-			<a
-				href="https://youtu.be/82d_-vjFpKw"
-				target="_blank"
-				rel="noopener noreferrer"
-				class="cursor-pointer text-blue-400 hover:text-blue-300">Tutorial</a
+		<div style="display: flex; align-items: center; gap: 0.75rem;">
+			<Link href="https://youtu.be/82d_-vjFpKw" target="_blank" rel="noopener noreferrer"
+				>Tutorial</Link
 			>
-			<a
+			<Link
 				href="https://github.com/Siege-Perilous/counterslayer"
 				target="_blank"
-				rel="noopener noreferrer"
-				class="cursor-pointer text-blue-400 hover:text-blue-300">GitHub</a
+				rel="noopener noreferrer">GitHub</Link
 			>
+			<IconButton onclick={toggleTheme} size="sm">
+				<Icon Icon={mode === 'dark' ? IconSun : IconMoon} />
+			</IconButton>
 		</div>
 	</div>
-	<PaneGroup direction="vertical" class="min-h-0 flex-1">
+	<PaneGroup direction="vertical" style="flex: 1; min-height: 0;">
 		<!-- Preview Pane -->
-		<Pane defaultSize={60} minSize={30} class="h-full overflow-hidden">
-			<main class="relative h-full">
+		<Pane defaultSize={60} minSize={30} style="height: 100%; overflow: hidden;">
+			<main style="position: relative; height: 100%;">
 				{#if browser}
 					{#await import('$lib/components/TrayViewer.svelte') then { default: TrayViewer }}
 						<TrayViewer
@@ -369,207 +403,290 @@
 				{/if}
 
 				{#if generating}
-					<div class="absolute inset-0 flex items-center justify-center bg-black/50">
-						<div class="text-lg">Generating geometry...</div>
+					<div class="generatingOverlay">
+						<div class="generatingText">Generating geometry...</div>
 					</div>
 				{/if}
 
 				<!-- View mode buttons -->
-				<div class="absolute top-4 left-1/2 flex -translate-x-1/2 items-center gap-4">
-					<div class="flex gap-1 rounded bg-gray-800 p-1">
-						{#each viewModes as { mode, label } (mode)}
-							<button
-								onclick={() => (viewMode = mode)}
-								class="cursor-pointer rounded px-3 py-1.5 text-sm font-medium transition {viewMode ===
-								mode
-									? 'bg-blue-600 text-white'
-									: 'text-gray-300 hover:bg-gray-700'}"
-							>
-								{label}
-							</button>
-						{/each}
-					</div>
+				<div class="viewToolbar">
+					<RadioButton
+						selected={viewMode}
+						onSelectedChange={(val) => (viewMode = val as ViewMode)}
+						options={viewModeOptions}
+					/>
 					{#if viewMode === 'exploded'}
-						<div class="flex items-center gap-2 rounded bg-gray-800 px-3 py-1.5">
-							<span class="text-xs text-gray-400">Explode</span>
+						<div class="sliderContainer">
+							<span class="sliderLabel">Explode</span>
 							<input
 								type="range"
 								min="0"
 								max="100"
 								bind:value={explosionAmount}
-								class="h-1 w-24 cursor-pointer appearance-none rounded-lg bg-gray-600"
+								class="rangeSlider"
 							/>
 						</div>
 					{/if}
 				</div>
 
 				<!-- Bottom toolbar -->
-				<div class="absolute right-4 bottom-4 left-4 flex items-center justify-between">
-					<div class="flex items-center gap-3">
-						<button
+				<div class="bottomToolbar">
+					<div class="toolbarLeft">
+						<Button
+							variant="primary"
 							onclick={regenerate}
-							disabled={generating}
-							class="cursor-pointer rounded bg-blue-600 px-3 py-2 text-sm font-medium transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+							isDisabled={generating}
+							isLoading={generating}
 						>
-							{generating ? 'Generating...' : 'Regenerate'}
-						</button>
-						<label
-							class="flex cursor-pointer items-center gap-2 rounded bg-gray-800 px-3 py-2 text-sm text-gray-300"
-						>
-							<input
-								type="checkbox"
-								bind:checked={showCounters}
-								class="h-4 w-4 cursor-pointer rounded border-gray-600 bg-gray-700 text-blue-600"
-							/>
-							Show counters
-						</label>
+							Regenerate
+						</Button>
+						<InputCheckbox
+							checked={showCounters}
+							onchange={(e) => (showCounters = e.currentTarget.checked)}
+							label="Preview counters"
+						/>
 					</div>
-					<div class="relative">
-						<button
-							onclick={() => (menuOpen = !menuOpen)}
-							class="flex cursor-pointer items-center gap-2 rounded bg-green-600 px-3 py-2 text-sm font-medium transition hover:bg-green-700"
-						>
-							Import / Export
-							<svg
-								class="h-4 w-4 transition-transform {menuOpen ? 'rotate-180' : ''}"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M19 9l-7 7-7-7"
-								/>
-							</svg>
-						</button>
-						{#if menuOpen}
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<div
-								class="fixed inset-0 z-40"
-								onclick={() => (menuOpen = false)}
-								onkeydown={(e) => e.key === 'Escape' && (menuOpen = false)}
-							></div>
-							<div
-								class="absolute right-0 bottom-full z-50 mb-2 w-52 rounded bg-gray-800 py-1 shadow-lg"
-							>
+					<input
+						bind:this={jsonFileInput}
+						type="file"
+						accept=".json"
+						onchange={handleImportJson}
+						style="display: none;"
+					/>
+					<Popover positioning={{ placement: 'top-end' }}>
+						{#snippet trigger()}
+							<Button variant="special">
+								Import / Export
+								<Icon Icon={IconChevronDown} />
+							</Button>
+						{/snippet}
+						{#snippet content()}
+							<div class="popoverMenu">
 								{#if communityProjects.length > 0}
-									<div class="px-4 py-2">
-										<label class="mb-1 block text-xs text-gray-400"
-											>Load community project
-											<select
-												class="mt-1 w-full cursor-pointer rounded border border-gray-600 bg-gray-700 px-2 py-1.5 text-sm text-white"
-												onchange={(e) => {
-													const select = e.target as HTMLSelectElement;
-													const project = communityProjects.find((p) => p.id === select.value);
+									<FormControl label="Load community project" name="communityProject">
+										{#snippet input({ inputProps })}
+											<Select
+												selected={[]}
+												options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
+												onSelectedChange={(selected) => {
+													const project = communityProjects.find((p) => p.id === selected[0]);
 													if (project) {
 														loadCommunityProject(project);
 													}
-													select.value = '';
 												}}
-											>
-												<option value="">Select a project...</option>
-												{#each communityProjects as project (project.id)}
-													<option value={project.id}>{project.name}</option>
-												{/each}
-											</select>
-										</label>
-									</div>
+												{...inputProps}
+											/>
+										{/snippet}
+									</FormControl>
+									<Hr />
 								{/if}
-								<input
-									bind:this={jsonFileInput}
-									type="file"
-									accept=".json"
-									onchange={handleImportJson}
-									class="hidden"
-								/>
-								<button
-									onclick={() => {
-										jsonFileInput?.click();
-										menuOpen = false;
-									}}
-									class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700"
+								<Button
+									variant="ghost"
+									onclick={() => jsonFileInput?.click()}
+									style="width: 100%; justify-content: flex-start;"
 								>
 									Import project JSON
-								</button>
-								<button
-									onclick={() => {
-										handleExportJson();
-										menuOpen = false;
-									}}
-									class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700"
+								</Button>
+								<Button
+									variant="ghost"
+									onclick={handleExportJson}
+									style="width: 100%; justify-content: flex-start;"
 								>
 									Export project JSON
-								</button>
-								<div class="my-1 border-t border-gray-600"></div>
-								<button
-									onclick={() => {
-										handleExport();
-										menuOpen = false;
-									}}
+								</Button>
+								<Hr />
+								<Button
+									variant="ghost"
+									onclick={handleExport}
 									disabled={generating || !jscadSelectedTray}
-									class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+									style="width: 100%; justify-content: flex-start;"
 								>
 									Export tray STL
-								</button>
-								<button
-									onclick={() => {
-										handleExportAll();
-										menuOpen = false;
-									}}
+								</Button>
+								<Button
+									variant="ghost"
+									onclick={handleExportAll}
 									disabled={generating ||
 										(!jscadBox && !jscadLid && allTrayGeometries.length === 0)}
-									class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+									style="width: 100%; justify-content: flex-start;"
 								>
 									Export all STLs
-								</button>
-								<button
-									onclick={() => {
-										handleExportPdf();
-										menuOpen = false;
-									}}
+								</Button>
+								<Button
+									variant="ghost"
+									onclick={handleExportPdf}
 									disabled={getProject().boxes.length === 0}
-									class="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+									style="width: 100%; justify-content: flex-start;"
 								>
 									PDF reference
-								</button>
-								<div class="my-1 border-t border-gray-600"></div>
-								<button
-									onclick={() => {
-										handleReset();
-										menuOpen = false;
-									}}
-									class="w-full cursor-pointer px-4 py-2 text-left text-sm text-red-400 hover:bg-gray-700"
+								</Button>
+								<Hr />
+								<Button
+									variant="danger"
+									onclick={handleReset}
+									style="width: 100%; justify-content: flex-start;"
 								>
 									Clear current project
-								</button>
+								</Button>
 							</div>
-						{/if}
-					</div>
+						{/snippet}
+					</Popover>
 				</div>
 
 				{#if error}
-					<div
-						class="absolute top-16 left-1/2 -translate-x-1/2 rounded bg-red-900 px-4 py-2 text-sm text-red-200"
-					>
+					<div class="errorBanner">
 						{error}
 					</div>
 				{/if}
 			</main>
 		</Pane>
 
-		<PaneResizer
-			class="group relative flex h-1.5 items-center justify-center bg-gray-700 hover:bg-gray-600"
-		>
-			<div class="h-0.5 w-12 rounded-full bg-gray-500 group-hover:bg-gray-400"></div>
+		<PaneResizer class="paneResizer paneResizer--vertical">
+			<div class="paneResizerHandle paneResizerHandle--vertical"></div>
 		</PaneResizer>
 
 		<!-- Controls Pane -->
-		<Pane defaultSize={40} minSize={20} class="h-full overflow-hidden">
-			<div class="h-full">
+		<Pane defaultSize={40} minSize={20} style="height: 100%; overflow: hidden;">
+			<div style="height: 100%;">
 				<Sidebar />
 			</div>
 		</Pane>
 	</PaneGroup>
 </div>
+
+<style>
+	.appContainer {
+		display: flex;
+		flex-direction: column;
+		height: 100vh;
+		background: var(--bg);
+		color: var(--fg);
+	}
+
+	.appHeader {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.5rem 0.75rem;
+		border-bottom: var(--borderThin);
+		font-size: 0.875rem;
+		color: var(--fgMuted);
+	}
+
+	.viewToolbar {
+		position: absolute;
+		top: 1rem;
+		left: 50%;
+		transform: translateX(-50%);
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.sliderContainer {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.375rem 0.75rem;
+		border-radius: var(--radius-2);
+		background: var(--contrastLowest);
+	}
+
+	.sliderLabel {
+		font-size: 0.75rem;
+		color: var(--fgMuted);
+	}
+
+	.rangeSlider {
+		height: 0.25rem;
+		width: 6rem;
+		appearance: none;
+		border-radius: 9999px;
+		background: var(--contrastMedium);
+		cursor: pointer;
+	}
+
+	.bottomToolbar {
+		position: absolute;
+		right: 1rem;
+		bottom: 1rem;
+		left: 1rem;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.toolbarLeft {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.popoverMenu {
+		width: 13rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.errorBanner {
+		position: absolute;
+		top: 4rem;
+		left: 50%;
+		transform: translateX(-50%);
+		padding: 0.5rem 1rem;
+		border-radius: var(--radius-2);
+		background: var(--danger-900);
+		color: var(--danger-200);
+		font-size: 0.875rem;
+	}
+
+	.generatingOverlay {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: rgba(0, 0, 0, 0.5);
+	}
+
+	.generatingText {
+		font-size: 1.125rem;
+	}
+
+	:global(.paneResizer) {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: var(--contrastEmpty);
+	}
+
+	:global(.paneResizer--horizontal) {
+		width: 1rem;
+	}
+
+	:global(.paneResizer--vertical) {
+		height: 1rem;
+		border-top: var(--borderThin);
+	}
+
+	:global(.paneResizerHandle) {
+		border-radius: 9999px;
+		background: var(--contrastMedium);
+	}
+
+	:global(.paneResizerHandle--horizontal) {
+		height: 2rem;
+		width: 0.125rem;
+	}
+
+	:global(.paneResizerHandle--vertical) {
+		height: 0.125rem;
+		width: 3rem;
+	}
+
+	:global(.paneResizer:hover .paneResizerHandle) {
+		background: var(--fg);
+	}
+</style>
