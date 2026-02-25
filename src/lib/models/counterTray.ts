@@ -1450,13 +1450,16 @@ export function createCounterTray(
 			const diameter = isCircle ? circleDiameter : (custom?.width ?? 15) + clearance * 2;
 			const radius = diameter / 2;
 
+			// Position cutout so bottom aligns with pocketFloorZ (where preview counter sits)
+			const shapeCenterZ = pocketFloorZ + radius;
+
 			// Create shape with semicircular bottom and flat top for easy loading
 			// Union of: circle (for bottom half) + rectangle (for top half with straight sides)
+			// Rectangle must extend high enough to cut through tray top
+			const topExtent = trayHeight + 1 - shapeCenterZ;
 			const circle2D = circle({ radius, segments: 64 });
-			const rect2D = rectangle({ size: [diameter, radius], center: [0, radius / 2] });
+			const rect2D = rectangle({ size: [diameter, topExtent], center: [0, topExtent / 2] });
 			const combinedShape2D = union(circle2D, rect2D);
-
-			const shapeCenterZ = trayHeight + 1 - radius;
 
 			if (slot.orientation === 'crosswise') {
 				// Crosswise: extrude along slotDepth (Y direction), counters stack front-to-back
@@ -1492,16 +1495,18 @@ export function createCounterTray(
 			const pointToPoint = flatToFlat / Math.cos(Math.PI / 6);
 			const radius = pointToPoint / 2;
 
+			// Position cutout so bottom aligns with pocketFloorZ (where preview counter sits)
+			// Hex vertex is at bottom after rotateZ(π/6), so offset by pointToPoint/2
+			const shapeCenterZ = pocketFloorZ + pointToPoint / 2;
+
 			// Create shape with hex bottom (flat side down) and flat top for easy loading
 			// 2D hex with 6 segments, rotated π/6 so flat edge is at bottom
 			const hex2D = rotateZ(Math.PI / 6, circle({ radius, segments: 6 }));
-			// Rectangle covers top half (from center to top)
+			// Rectangle covers top half (from center to top), must extend to cut through tray top
 			// Width must match hex width at the flat edge (flatToFlat, not pointToPoint)
-			const rectHeight = flatToFlat / 2;
-			const rect2D = rectangle({ size: [flatToFlat, rectHeight], center: [0, rectHeight / 2] });
+			const topExtent = trayHeight + 1 - shapeCenterZ;
+			const rect2D = rectangle({ size: [flatToFlat, topExtent], center: [0, topExtent / 2] });
 			const combinedShape2D = union(hex2D, rect2D);
-
-			const shapeCenterZ = trayHeight + 1 - flatToFlat / 2;
 
 			if (slot.orientation === 'crosswise') {
 				// Crosswise: extrude along slotDepth (Y direction), counters stack front-to-back
