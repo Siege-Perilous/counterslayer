@@ -31,6 +31,7 @@
 		explosionAmount?: number;
 		showCounters?: boolean;
 		selectedTrayCounters?: CounterStack[];
+		selectedTrayLetter?: string;
 		triangleCornerRadius?: number;
 		showReferenceLabels?: boolean;
 		hidePrintBed?: boolean;
@@ -51,6 +52,7 @@
 		explosionAmount = 0,
 		showCounters = false,
 		selectedTrayCounters = [],
+		selectedTrayLetter = 'A',
 		triangleCornerRadius = 1.5,
 		showReferenceLabels = false,
 		hidePrintBed = false,
@@ -74,6 +76,7 @@
 			{explosionAmount}
 			{showCounters}
 			{selectedTrayCounters}
+			{selectedTrayLetter}
 			{triangleCornerRadius}
 			{showReferenceLabels}
 			{hidePrintBed}

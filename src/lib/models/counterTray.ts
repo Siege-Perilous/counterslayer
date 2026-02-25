@@ -105,6 +105,7 @@ export interface CounterStack {
 	count: number; // Number of counters in stack
 	hexPointyTop: boolean;
 	color: string; // Random color for this stack
+	label?: string; // User-provided label for this stack
 	// Edge-loaded stack fields
 	isEdgeLoaded?: boolean;
 	edgeOrientation?: 'lengthwise' | 'crosswise';
@@ -361,12 +362,13 @@ export function getCounterPositions(
 		slotDepth: number; // Y dimension
 		standingHeight: number;
 		originalIndex: number;
+		label?: string;
 	}
 
 	const edgeLoadedSlots: EdgeLoadedSlot[] = [];
 	if (edgeLoadedStacks && edgeLoadedStacks.length > 0) {
 		for (let i = 0; i < edgeLoadedStacks.length; i++) {
-			const [shape, count, orientationPref] = edgeLoadedStacks[i];
+			const [shape, count, orientationPref, label] = edgeLoadedStacks[i];
 			const counterSpan = count * counterThickness + (count - 1) * clearance;
 
 			// Default to lengthwise if not specified
@@ -384,7 +386,8 @@ export function getCounterPositions(
 					slotWidth: counterSpan, // Counters stack along X (left to right)
 					slotDepth: slotDepthDim, // Counter dimension along Y (row depth)
 					standingHeight,
-					originalIndex: i
+					originalIndex: i,
+					label
 				});
 			} else {
 				// Crosswise: counters stack along Y (front to back), takes a column
@@ -398,7 +401,8 @@ export function getCounterPositions(
 					slotWidth: slotWidthDim, // Counter dimension along X (longer side)
 					slotDepth: counterSpan, // Counters stack along Y (front to back)
 					standingHeight,
-					originalIndex: i
+					originalIndex: i,
+					label
 				});
 			}
 		}
@@ -416,6 +420,7 @@ export function getCounterPositions(
 		rowAssignment: 'front' | 'back';
 		xPosition: number;
 		originalIndex: number;
+		label?: string;
 	}
 
 	// Sort top-loaded stacks by area (largest first for better packing)
@@ -539,7 +544,7 @@ export function getCounterPositions(
 
 	// Greedy bin-packing for top-loaded stacks
 	for (const { stack, originalIndex } of sortedStacks) {
-		const [shapeRef, count] = stack;
+		const [shapeRef, count, label] = stack;
 		const pw = getPocketWidth(shapeRef);
 		const pl = getPocketLength(shapeRef);
 
@@ -552,7 +557,8 @@ export function getCounterPositions(
 				pocketLength: pl,
 				rowAssignment: 'front',
 				xPosition: topLoadedFrontX,
-				originalIndex
+				originalIndex,
+				label
 			});
 			topLoadedFrontX += pw + wallThickness;
 		} else {
@@ -563,7 +569,8 @@ export function getCounterPositions(
 				pocketLength: pl,
 				rowAssignment: 'back',
 				xPosition: topLoadedBackX,
-				originalIndex
+				originalIndex,
+				label
 			});
 			topLoadedBackX += pw + wallThickness;
 		}
@@ -628,6 +635,7 @@ export function getCounterPositions(
 			count: slot.count,
 			hexPointyTop,
 			color: generateStackColor(100 + i),
+			label: slot.label,
 			isEdgeLoaded: true,
 			edgeOrientation: 'lengthwise',
 			slotWidth: slot.slotWidth,
@@ -685,6 +693,7 @@ export function getCounterPositions(
 			count: slot.count,
 			hexPointyTop,
 			color: generateStackColor(200 + i),
+			label: slot.label,
 			isEdgeLoaded: true,
 			edgeOrientation: 'crosswise',
 			slotWidth: slot.slotWidth,
@@ -726,7 +735,8 @@ export function getCounterPositions(
 			thickness: counterThickness,
 			count: placement.count,
 			hexPointyTop,
-			color: generateStackColor(placement.originalIndex)
+			color: generateStackColor(placement.originalIndex),
+			label: placement.label
 		});
 	}
 
@@ -944,12 +954,13 @@ export function createCounterTray(
 		slotDepth: number; // Y dimension
 		standingHeight: number;
 		originalIndex: number;
+		label?: string;
 	}
 
 	const edgeLoadedSlots: EdgeLoadedSlot[] = [];
 	if (edgeLoadedStacks && edgeLoadedStacks.length > 0) {
 		for (let i = 0; i < edgeLoadedStacks.length; i++) {
-			const [shape, count, orientationPref] = edgeLoadedStacks[i];
+			const [shape, count, orientationPref, label] = edgeLoadedStacks[i];
 			const counterSpan = count * counterThickness + (count - 1) * clearance;
 
 			// Default to lengthwise if not specified
@@ -967,7 +978,8 @@ export function createCounterTray(
 					slotWidth: counterSpan, // Counters stack along X (left to right)
 					slotDepth: slotDepthDim, // Counter dimension along Y (row depth)
 					standingHeight,
-					originalIndex: i
+					originalIndex: i,
+					label
 				});
 			} else {
 				// Crosswise: counters stack along Y (front to back), takes a column
@@ -981,7 +993,8 @@ export function createCounterTray(
 					slotWidth: slotWidthDim, // Counter dimension along X (longer side)
 					slotDepth: counterSpan, // Counters stack along Y (front to back)
 					standingHeight,
-					originalIndex: i
+					originalIndex: i,
+					label
 				});
 			}
 		}
@@ -999,6 +1012,7 @@ export function createCounterTray(
 		rowAssignment: 'front' | 'back';
 		xPosition: number;
 		originalIndex: number;
+		label?: string;
 	}
 
 	// Sort top-loaded stacks by area (largest first for better packing)
@@ -1150,7 +1164,7 @@ export function createCounterTray(
 
 	// Greedy bin-packing for top-loaded stacks
 	for (const { stack, originalIndex } of sortedStacks) {
-		const [shapeRef, count] = stack;
+		const [shapeRef, count, label] = stack;
 		const pw = getPocketWidth(shapeRef);
 		const pl = getPocketLength(shapeRef);
 
@@ -1163,7 +1177,8 @@ export function createCounterTray(
 				pocketLength: pl,
 				rowAssignment: 'front',
 				xPosition: topLoadedFrontX,
-				originalIndex
+				originalIndex,
+				label
 			});
 			topLoadedFrontX += pw + wallThickness;
 		} else {
@@ -1174,7 +1189,8 @@ export function createCounterTray(
 				pocketLength: pl,
 				rowAssignment: 'back',
 				xPosition: topLoadedBackX,
-				originalIndex
+				originalIndex,
+				label
 			});
 			topLoadedBackX += pw + wallThickness;
 		}

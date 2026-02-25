@@ -147,6 +147,11 @@
 	let selectedTray = $derived(getSelectedTray());
 	let selectedBox = $derived(getSelectedBox());
 	let printBedSize = $derived(selectedTray?.params.printBedSize ?? 256);
+	let selectedTrayLetter = $derived.by(() => {
+		if (!selectedBox || !selectedTray) return 'A';
+		const idx = selectedBox.trays.findIndex((t) => t.id === selectedTray.id);
+		return String.fromCharCode(65 + (idx >= 0 ? idx : 0));
+	});
 
 	// Compute which geometries to show based on view mode
 	let visibleGeometries = $derived.by(() => {
@@ -506,6 +511,7 @@
 							{explosionAmount}
 							{showCounters}
 							{selectedTrayCounters}
+							{selectedTrayLetter}
 							triangleCornerRadius={selectedTray?.params.triangleCornerRadius ?? 1.5}
 							{showReferenceLabels}
 							{hidePrintBed}

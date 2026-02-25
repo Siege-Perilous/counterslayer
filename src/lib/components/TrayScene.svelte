@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { T, useThrelte, useTask } from '@threlte/core';
-	import { OrbitControls, Grid, Text } from '@threlte/extras';
+	import { OrbitControls, Grid, Text, interactivity } from '@threlte/extras';
+
+	// Enable interactivity for pointer events on 3D objects
+	interactivity();
 	import type { BufferGeometry } from 'three';
 	import * as THREE from 'three';
 	import type { TrayPlacement } from '$lib/models/box';
@@ -32,6 +35,7 @@
 		explosionAmount?: number;
 		showCounters?: boolean;
 		selectedTrayCounters?: CounterStack[];
+		selectedTrayLetter?: string;
 		triangleCornerRadius?: number;
 		showReferenceLabels?: boolean;
 		hidePrintBed?: boolean;
@@ -52,6 +56,7 @@
 		explosionAmount = 0,
 		showCounters = false,
 		selectedTrayCounters = [],
+		selectedTrayLetter = 'A',
 		triangleCornerRadius = 1.5,
 		showReferenceLabels = false,
 		hidePrintBed = false,
@@ -63,6 +68,29 @@
 
 	// Billboard quaternion for text labels - updated each frame to face camera
 	let labelQuaternion = $state<[number, number, number, number]>([0, 0, 0, 1]);
+
+	// Hovered label state for tooltip
+	let hoveredLabel = $state<{
+		refCode: string;
+		text: string;
+		position: [number, number, number];
+	} | null>(null);
+
+	// Monospace font for consistent character width in labels
+	const monoFont = '/fonts/JetBrainsMono-Regular.ttf';
+
+	// Generate a display label from a counter stack
+	function getStackLabel(stack: CounterStack): string {
+		// Use user-provided label if available
+		if (stack.label) {
+			return `${stack.label} x${stack.count}`;
+		}
+		// Fall back to shape name
+		const shapeName = stack.shape === 'custom'
+			? (stack.customShapeName ?? 'custom')
+			: stack.shape;
+		return `${shapeName} x${stack.count}`;
+	}
 
 	// Update label rotation each frame to face the camera (true billboard)
 	useTask(() => {
@@ -1037,8 +1065,7 @@
 	}))}
 	{@const labelHeight = maxStackHeight + 5}
 	{#each selectedTrayCounters as stack, stackIdx (stackIdx)}
-		{@const trayLetter = 'A'}
-		{@const refCode = `${trayLetter}${stackIdx + 1}`}
+		{@const refCode = `${selectedTrayLetter}${stackIdx + 1}`}
 		{@const posX = stack.isEdgeLoaded
 			? (stack.edgeOrientation === 'lengthwise'
 				? meshOffset.x + stack.x + (stack.slotWidth ?? stack.count * stack.thickness) / 2
@@ -1049,19 +1076,60 @@
 				? meshOffset.z - stack.y - (stack.slotDepth ?? stack.length) / 2
 				: meshOffset.z - stack.y - (stack.slotDepth ?? stack.count * stack.thickness) / 2)
 			: meshOffset.z - stack.y}
+		{@const stackLabel = getStackLabel(stack)}
+		{@const tooltipHeight = labelHeight + 6}
+		{@const isHovered = hoveredLabel?.refCode === refCode}
 		<!-- Floating label above stack -->
 		<Text
 			text={refCode}
+			font={monoFont}
 			fontSize={4}
 			position={[posX, labelHeight, posZ]}
 			quaternion={labelQuaternion}
-			color="#000000"
+			color={isHovered ? "#ffffff" : "#000000"}
 			anchorX="center"
 			anchorY="bottom"
 			outlineWidth="8%"
-			outlineColor="#ffffff"
+			outlineColor={isHovered ? "#000000" : "#ffffff"}
+			onpointerenter={() => {
+				hoveredLabel = { refCode, text: stackLabel, position: [posX, tooltipHeight, posZ] };
+			}}
+			onpointerleave={() => {
+				hoveredLabel = null;
+			}}
 		/>
 	{/each}
+{/if}
+
+<!-- Tooltip for hovered label -->
+{#if hoveredLabel}
+	{@const tooltipFontSize = 3}
+	{@const charWidth = tooltipFontSize * 0.6}
+	{@const textWidth = hoveredLabel.text.length * charWidth}
+	{@const paddingX = 2}
+	{@const paddingY = 1.5}
+	{@const bgWidth = textWidth + paddingX * 2}
+	{@const bgHeight = tooltipFontSize + paddingY * 2}
+	{@const yOffset = tooltipFontSize + 3}
+	<!-- Background rectangle -->
+	<T.Mesh
+		position={[hoveredLabel.position[0], hoveredLabel.position[1] + yOffset, hoveredLabel.position[2]]}
+		quaternion={labelQuaternion}
+	>
+		<T.PlaneGeometry args={[bgWidth, bgHeight]} />
+		<T.MeshBasicMaterial color="#000000" transparent opacity={0.8} />
+	</T.Mesh>
+	<!-- Tooltip text -->
+	<Text
+		text={hoveredLabel.text}
+		font={monoFont}
+		fontSize={tooltipFontSize}
+		position={[hoveredLabel.position[0], hoveredLabel.position[1] + yOffset, hoveredLabel.position[2] + 0.1]}
+		quaternion={labelQuaternion}
+		color="#ffffff"
+		anchorX="center"
+		anchorY="middle"
+	/>
 {/if}
 
 <!-- Reference labels for PDF capture - all trays view -->
@@ -1105,17 +1173,27 @@
 					? trayZOffset - stack.y - (stack.slotDepth ?? stack.length) / 2
 					: trayZOffset - stack.y - (stack.slotDepth ?? stack.count * stack.thickness) / 2)
 				: trayZOffset - stack.y}
+			{@const stackLabel = getStackLabel(stack)}
+			{@const tooltipHeight = labelHeight + 6}
+			{@const isHovered = hoveredLabel?.refCode === refCode}
 			<!-- Floating label above stack -->
 			<Text
 				text={refCode}
+				font={monoFont}
 				fontSize={4}
 				position={[posX, labelHeight, posZ]}
 				quaternion={labelQuaternion}
-				color="#000000"
+				color={isHovered ? "#ffffff" : "#000000"}
 				anchorX="center"
 				anchorY="bottom"
 				outlineWidth="8%"
-				outlineColor="#ffffff"
+				outlineColor={isHovered ? "#000000" : "#ffffff"}
+				onpointerenter={() => {
+					hoveredLabel = { refCode, text: stackLabel, position: [posX, tooltipHeight, posZ] };
+				}}
+				onpointerleave={() => {
+					hoveredLabel = null;
+				}}
 			/>
 		{/each}
 	{/each}
