@@ -481,14 +481,14 @@
 
 			<Spacer size="0.5rem" />
 
-			<!-- Custom Length -->
+			<!-- Custom Width -->
 			<section class="section">
-				<h3 class="sectionTitle">Custom length</h3>
+				<h3 class="sectionTitle">Custom width</h3>
 				<Spacer size="0.5rem" />
 				<div class="formGrid">
 					<FormControl
-						label="Tray length (0 = auto)"
-						name="trayLengthOverride"
+						label="Tray width (0 = auto)"
+						name="trayWidthOverride"
 						class="formGrid__spanTwo"
 					>
 						{#snippet input({ inputProps })}
@@ -496,9 +496,9 @@
 								{...inputProps}
 								type="number"
 								step="1"
-								value={selectedTray.params.trayLengthOverride}
+								value={selectedTray.params.trayWidthOverride}
 								onchange={(e) =>
-									updateParam('trayLengthOverride', parseFloat(e.currentTarget.value))}
+									updateParam('trayWidthOverride', parseFloat(e.currentTarget.value))}
 							/>
 						{/snippet}
 						{#snippet end()}mm{/snippet}
