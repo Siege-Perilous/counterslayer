@@ -468,10 +468,14 @@ export function arrangeTrays(
 	}
 	const placementsWithRow: PlacementWithRow[] = [];
 
-	console.log(`\n=== arrangeTrays: ${trays.length} trays, maxRowWidth: ${maxRowWidth.toFixed(1)} ===`);
+	console.log(
+		`\n=== arrangeTrays: ${trays.length} trays, maxRowWidth: ${maxRowWidth.toFixed(1)} ===`
+	);
 
 	for (const { tray, dimensions } of trayDims) {
-		console.log(`Placing tray "${tray.name}": ${dimensions.width.toFixed(1)}w x ${dimensions.depth.toFixed(1)}d`);
+		console.log(
+			`Placing tray "${tray.name}": ${dimensions.width.toFixed(1)}w x ${dimensions.depth.toFixed(1)}d`
+		);
 
 		// Try to find an existing row where this tray fits
 		let placed = false;
@@ -490,7 +494,9 @@ export function arrangeTrays(
 				row.depth = Math.max(row.depth, dimensions.depth);
 				console.log(`  -> Placed in row ${i} at x=${row.currentX - dimensions.width}`);
 				if (row.depth !== oldDepth) {
-					console.log(`  -> Row ${i} depth changed: ${oldDepth.toFixed(1)} -> ${row.depth.toFixed(1)}`);
+					console.log(
+						`  -> Row ${i} depth changed: ${oldDepth.toFixed(1)} -> ${row.depth.toFixed(1)}`
+					);
 				}
 				placed = true;
 				break;
@@ -531,7 +537,9 @@ export function arrangeTrays(
 		// First row: align to north edge (push away from south box wall)
 		if (p.rowIndex === 0 && p.dimensions.depth < row.depth) {
 			y = row.y + (row.depth - p.dimensions.depth);
-			console.log(`  Pushing "${p.tray.name}" north in row 0: y=${y.toFixed(1)} (gap of ${(row.depth - p.dimensions.depth).toFixed(1)} at south)`);
+			console.log(
+				`  Pushing "${p.tray.name}" north in row 0: y=${y.toFixed(1)} (gap of ${(row.depth - p.dimensions.depth).toFixed(1)} at south)`
+			);
 		}
 
 		return {
@@ -544,11 +552,15 @@ export function arrangeTrays(
 
 	console.log(`\nFinal rows:`);
 	for (let i = 0; i < rows.length; i++) {
-		console.log(`  Row ${i}: y=${rows[i].y.toFixed(1)}, depth=${rows[i].depth.toFixed(1)}, fillX=${rows[i].currentX.toFixed(1)}`);
+		console.log(
+			`  Row ${i}: y=${rows[i].y.toFixed(1)}, depth=${rows[i].depth.toFixed(1)}, fillX=${rows[i].currentX.toFixed(1)}`
+		);
 	}
 	console.log(`\nPlacements:`);
 	for (const p of placements) {
-		console.log(`  ${p.tray.name}: (${p.x.toFixed(1)}, ${p.y.toFixed(1)}) - ${p.dimensions.width.toFixed(1)}x${p.dimensions.depth.toFixed(1)}`);
+		console.log(
+			`  ${p.tray.name}: (${p.x.toFixed(1)}, ${p.y.toFixed(1)}) - ${p.dimensions.width.toFixed(1)}x${p.dimensions.depth.toFixed(1)}`
+		);
 	}
 
 	return placements;
