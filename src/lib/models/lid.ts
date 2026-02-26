@@ -44,7 +44,11 @@ export const defaultLidParams: LidParams = {
 export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	if (box.trays.length === 0) return null;
 
-	const placements = arrangeTrays(box.trays);
+	const placements = arrangeTrays(box.trays, {
+		customBoxWidth: box.customWidth,
+		wallThickness: box.wallThickness,
+		tolerance: box.tolerance
+	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
 	if (interior.width <= 0 || interior.depth <= 0 || interior.height <= 0) {
@@ -838,7 +842,11 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 export function createLid(box: Box): Geom3 | null {
 	if (box.trays.length === 0) return null;
 
-	const placements = arrangeTrays(box.trays);
+	const placements = arrangeTrays(box.trays, {
+		customBoxWidth: box.customWidth,
+		wallThickness: box.wallThickness,
+		tolerance: box.tolerance
+	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
 	if (interior.width <= 0 || interior.depth <= 0) {

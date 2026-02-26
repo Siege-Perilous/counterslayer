@@ -424,7 +424,11 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 
 // Arrange trays in a box layout with bin-packing
 // Smaller trays can share a row if their combined width fits within the max tray width
-export function arrangeTrays(trays: Tray[]): TrayPlacement[] {
+// If customBoxWidth is provided, use interior width (minus walls/tolerance) for packing
+export function arrangeTrays(
+	trays: Tray[],
+	options?: { customBoxWidth?: number; wallThickness?: number; tolerance?: number }
+): TrayPlacement[] {
 	if (trays.length === 0) return [];
 
 	// Calculate dimensions for all trays
@@ -436,8 +440,16 @@ export function arrangeTrays(trays: Tray[]): TrayPlacement[] {
 	// Sort by width (X dimension) descending so widest trays are first
 	trayDims.sort((a, b) => b.dimensions.width - a.dimensions.width);
 
-	// The widest tray determines the max row width
-	const maxRowWidth = trayDims[0].dimensions.width;
+	// Use custom box interior width if provided, otherwise use widest tray
+	const widestTrayWidth = trayDims[0].dimensions.width;
+	let maxRowWidth = widestTrayWidth;
+
+	if (options?.customBoxWidth) {
+		const wallThickness = options.wallThickness ?? 3;
+		const tolerance = options.tolerance ?? 0.5;
+		const interiorWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
+		maxRowWidth = Math.max(interiorWidth, widestTrayWidth);
+	}
 
 	// Track rows: each row has a Y position, current X fill, and max depth
 	interface Row {
@@ -447,42 +459,108 @@ export function arrangeTrays(trays: Tray[]): TrayPlacement[] {
 	}
 	const rows: Row[] = [];
 
-	const placements: TrayPlacement[] = [];
+	// Track which row each placement belongs to
+	interface PlacementWithRow {
+		tray: Tray;
+		dimensions: TrayDimensions;
+		x: number;
+		rowIndex: number;
+	}
+	const placementsWithRow: PlacementWithRow[] = [];
+
+	console.log(
+		`\n=== arrangeTrays: ${trays.length} trays, maxRowWidth: ${maxRowWidth.toFixed(1)} ===`
+	);
 
 	for (const { tray, dimensions } of trayDims) {
+		console.log(
+			`Placing tray "${tray.name}": ${dimensions.width.toFixed(1)}w x ${dimensions.depth.toFixed(1)}d`
+		);
+
 		// Try to find an existing row where this tray fits
 		let placed = false;
-		for (const row of rows) {
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
 			if (row.currentX + dimensions.width <= maxRowWidth) {
 				// Fits in this row
-				placements.push({
+				const oldDepth = row.depth;
+				placementsWithRow.push({
 					tray,
 					dimensions,
 					x: row.currentX,
-					y: row.y
+					rowIndex: i
 				});
 				row.currentX += dimensions.width;
 				row.depth = Math.max(row.depth, dimensions.depth);
+				console.log(`  -> Placed in row ${i} at x=${row.currentX - dimensions.width}`);
+				if (row.depth !== oldDepth) {
+					console.log(
+						`  -> Row ${i} depth changed: ${oldDepth.toFixed(1)} -> ${row.depth.toFixed(1)}`
+					);
+				}
 				placed = true;
 				break;
 			}
 		}
 
 		if (!placed) {
-			// Create a new row
-			const newY = rows.length === 0 ? 0 : rows.reduce((sum, r) => sum + r.depth, 0);
+			// Create a new row (Y will be calculated after all placements)
 			rows.push({
-				y: newY,
+				y: 0, // Placeholder, will be recalculated
 				currentX: dimensions.width,
 				depth: dimensions.depth
 			});
-			placements.push({
+			placementsWithRow.push({
 				tray,
 				dimensions,
 				x: 0,
-				y: newY
+				rowIndex: rows.length - 1
 			});
+			console.log(`  -> Created row ${rows.length - 1}, depth=${dimensions.depth.toFixed(1)}`);
 		}
+	}
+
+	// Recalculate row Y positions based on actual final depths
+	let currentY = 0;
+	for (let i = 0; i < rows.length; i++) {
+		rows[i].y = currentY;
+		currentY += rows[i].depth;
+	}
+
+	// Build final placements with correct Y positions
+	// For row 0 (against south box wall): push smaller trays to north edge of row
+	// so the gap merges with the box wall instead of creating an internal wall
+	const placements: TrayPlacement[] = placementsWithRow.map((p) => {
+		const row = rows[p.rowIndex];
+		let y = row.y;
+
+		// First row: align to north edge (push away from south box wall)
+		if (p.rowIndex === 0 && p.dimensions.depth < row.depth) {
+			y = row.y + (row.depth - p.dimensions.depth);
+			console.log(
+				`  Pushing "${p.tray.name}" north in row 0: y=${y.toFixed(1)} (gap of ${(row.depth - p.dimensions.depth).toFixed(1)} at south)`
+			);
+		}
+
+		return {
+			tray: p.tray,
+			dimensions: p.dimensions,
+			x: p.x,
+			y
+		};
+	});
+
+	console.log(`\nFinal rows:`);
+	for (let i = 0; i < rows.length; i++) {
+		console.log(
+			`  Row ${i}: y=${rows[i].y.toFixed(1)}, depth=${rows[i].depth.toFixed(1)}, fillX=${rows[i].currentX.toFixed(1)}`
+		);
+	}
+	console.log(`\nPlacements:`);
+	for (const p of placements) {
+		console.log(
+			`  ${p.tray.name}: (${p.x.toFixed(1)}, ${p.y.toFixed(1)}) - ${p.dimensions.width.toFixed(1)}x${p.dimensions.depth.toFixed(1)}`
+		);
 	}
 
 	return placements;
@@ -562,7 +640,11 @@ const POKE_HOLE_DIAMETER = 15;
 export function createBox(box: Box): Geom3 | null {
 	if (box.trays.length === 0) return null;
 
-	const placements = arrangeTrays(box.trays);
+	const placements = arrangeTrays(box.trays, {
+		customBoxWidth: box.customWidth,
+		wallThickness: box.wallThickness,
+		tolerance: box.tolerance
+	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
 	// Box exterior dimensions
@@ -619,7 +701,11 @@ export function calculateMinimumBoxDimensions(box: Box): BoxMinimumDimensions {
 		return { minWidth: 0, minDepth: 0, minHeight: 0 };
 	}
 
-	const placements = arrangeTrays(box.trays);
+	const placements = arrangeTrays(box.trays, {
+		customBoxWidth: box.customWidth,
+		wallThickness: box.wallThickness,
+		tolerance: box.tolerance
+	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
 	return {
@@ -661,7 +747,11 @@ export function validateCustomDimensions(box: Box): ValidationResult {
 export function calculateTraySpacers(box: Box): TraySpacerInfo[] {
 	if (box.trays.length === 0) return [];
 
-	const placements = arrangeTrays(box.trays);
+	const placements = arrangeTrays(box.trays, {
+		customBoxWidth: box.customWidth,
+		wallThickness: box.wallThickness,
+		tolerance: box.tolerance
+	});
 	const minimums = calculateMinimumBoxDimensions(box);
 
 	// Target exterior height (custom or auto)

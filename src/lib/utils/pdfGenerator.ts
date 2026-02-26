@@ -117,7 +117,11 @@ export function extractPdfData(project: Project): PdfData {
 		const box = project.boxes[boxIndex];
 
 		// Get tray placements
-		const placements = arrangeTrays(box.trays);
+		const placements = arrangeTrays(box.trays, {
+			customBoxWidth: box.customWidth,
+			wallThickness: box.wallThickness,
+			tolerance: box.tolerance
+		});
 
 		// Calculate box dimensions
 		let maxX = 0;

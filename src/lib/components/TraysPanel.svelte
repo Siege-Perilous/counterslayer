@@ -3,6 +3,7 @@
 	import { IconX, IconPlus, IconMenu } from '@tabler/icons-svelte';
 	import type { Box, Tray } from '$lib/types/project';
 	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
+	import { getTrayDimensions } from '$lib/models/box';
 
 	interface Props {
 		selectedBox: Box | null;
@@ -114,6 +115,14 @@
 			onUpdateParams({ ...selectedTray.params, [key]: value });
 		}
 	}
+
+	// Compute minimum tray width for display
+	let minTrayWidth = $derived.by(() => {
+		if (!selectedTray) return 0;
+		// Use trayWidthOverride=0 to get the auto-calculated width
+		const paramsWithoutOverride = { ...selectedTray.params, trayWidthOverride: 0 };
+		return getTrayDimensions(paramsWithoutOverride).width;
+	});
 
 	// Top-loaded stack handlers
 	function updateTopLoadedStack(
@@ -487,7 +496,7 @@
 				<Spacer size="0.5rem" />
 				<div class="formGrid">
 					<FormControl
-						label="Tray width (0 = auto)"
+						label="Tray width (min: {minTrayWidth.toFixed(1)})"
 						name="trayWidthOverride"
 						class="formGrid__spanTwo"
 					>
@@ -496,9 +505,12 @@
 								{...inputProps}
 								type="number"
 								step="1"
-								value={selectedTray.params.trayWidthOverride}
-								onchange={(e) =>
-									updateParam('trayWidthOverride', parseFloat(e.currentTarget.value))}
+								placeholder="Auto"
+								value={selectedTray.params.trayWidthOverride || ''}
+								onchange={(e) => {
+									const val = e.currentTarget.value;
+									updateParam('trayWidthOverride', val === '' ? 0 : parseFloat(val));
+								}}
 							/>
 						{/snippet}
 						{#snippet end()}mm{/snippet}
