@@ -223,7 +223,11 @@
 			}
 
 			// Generate all trays with their placements
-			const placements = arrangeTrays(box.trays);
+			const placements = arrangeTrays(box.trays, {
+				customBoxWidth: box.customWidth,
+				wallThickness: box.wallThickness,
+				tolerance: box.tolerance
+			});
 
 			// Calculate floor spacers for each tray (for custom box height)
 			const spacerInfo = calculateTraySpacers(box);
@@ -349,7 +353,11 @@
 			// Capture each tray
 			for (let boxIdx = 0; boxIdx < project.boxes.length; boxIdx++) {
 				const box = project.boxes[boxIdx];
-				const placements = arrangeTrays(box.trays);
+				const placements = arrangeTrays(box.trays, {
+					customBoxWidth: box.customWidth,
+					wallThickness: box.wallThickness,
+					tolerance: box.tolerance
+				});
 				const spacerInfo = calculateTraySpacers(box);
 				const maxHeight = Math.max(...placements.map((p) => p.dimensions.height));
 
