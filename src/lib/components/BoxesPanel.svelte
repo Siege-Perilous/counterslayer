@@ -2,7 +2,7 @@
 	import { Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon } from '@tableslayer/ui';
 	import { IconX, IconPlus } from '@tabler/icons-svelte';
 	import type { Box, Project } from '$lib/types/project';
-	import { calculateMinimumBoxDimensions } from '$lib/models/box';
+	import { calculateMinimumBoxDimensions, getLidHeight } from '$lib/models/box';
 
 	interface Props {
 		project: Project;
@@ -19,6 +19,17 @@
 		selectedBox
 			? calculateMinimumBoxDimensions(selectedBox)
 			: { minWidth: 0, minDepth: 0, minHeight: 0 }
+	);
+
+	// Lid height for total height calculations
+	const lidHeight = $derived(selectedBox ? getLidHeight(selectedBox) : 0);
+
+	// Minimum total height (box + lid) for display
+	const minTotalHeight = $derived(minimums.minHeight + lidHeight);
+
+	// Display value for height input: convert box height to total height
+	const displayTotalHeight = $derived(
+		selectedBox?.customBoxHeight !== undefined ? selectedBox.customBoxHeight + lidHeight : undefined
 	);
 </script>
 
@@ -169,8 +180,8 @@
 					{#snippet end()}mm{/snippet}
 				</FormControl>
 				<FormControl
-					label="Height (min: {minimums.minHeight.toFixed(1)})"
-					name="customHeight"
+					label="Total Height (min: {minTotalHeight.toFixed(1)})"
+					name="customBoxHeight"
 					class="formGrid__spanTwo"
 				>
 					{#snippet input({ inputProps })}
@@ -178,11 +189,13 @@
 							{...inputProps}
 							type="number"
 							step="0.5"
-							min={minimums.minHeight}
-							value={selectedBox.customHeight ?? ''}
+							min={minTotalHeight}
+							value={displayTotalHeight ?? ''}
 							onchange={(e) => {
 								const v = (e.target as HTMLInputElement).value.trim();
-								onUpdateBox({ customHeight: v ? parseFloat(v) : undefined });
+								// Convert total height to box-only height by subtracting lid
+								const boxHeight = v ? parseFloat(v) - lidHeight : undefined;
+								onUpdateBox({ customBoxHeight: boxHeight });
 							}}
 							placeholder="Auto"
 						/>

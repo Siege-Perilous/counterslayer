@@ -34,7 +34,7 @@ export interface Box {
 	// Custom exterior dimensions (undefined = auto-size)
 	customWidth?: number; // Exterior X dimension
 	customDepth?: number; // Exterior Y dimension
-	customHeight?: number; // Exterior Z dimension
+	customBoxHeight?: number; // Exterior Z dimension (box only, excludes lid; UI shows total height)
 	// Gap-filling behavior
 	fillSolidEmpty?: boolean; // false = walls only (default), true = solid fill
 }

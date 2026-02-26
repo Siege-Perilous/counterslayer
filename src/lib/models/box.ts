@@ -53,7 +53,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		wallThickness,
 		floorThickness,
 		rimHeight,
-		trayLengthOverride,
+		trayWidthOverride,
 		topLoadedStacks,
 		edgeLoadedStacks,
 		customShapes
@@ -125,7 +125,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		const custom = getCustomShape(shape);
 		if (custom) {
 			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.max(w, l) + clearance * 2; // Longer side along X (parallel to tray length)
+			return Math.max(w, l) + clearance * 2; // Longer side along X (parallel to tray width)
 		}
 		return circlePocketWidth;
 	};
@@ -148,7 +148,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		const custom = getCustomShape(shape);
 		if (custom) {
 			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.max(w, l) + clearance * 2; // Longer side along Y (perpendicular to tray length)
+			return Math.max(w, l) + clearance * 2; // Longer side along Y (perpendicular to tray width)
 		}
 		return getPocketLength(shape);
 	};
@@ -266,7 +266,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 				const slotDepthDim = getPocketLengthLengthwise(stack[0]);
 				lengthwiseSlots.push({ slotDepth: slotDepthDim, slotWidth: counterSpan });
 			} else {
-				// For custom shapes: longer side along X (parallel to tray length), shorter side is height
+				// For custom shapes: longer side along X (parallel to tray width), shorter side is height
 				const standingHeight = getStandingHeightCrosswise(stack[0]);
 				maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);
 				const slotWidthDim = getPocketWidth(stack[0]); // Longer side along X
@@ -403,21 +403,21 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 
 	// Tray length (X dimension)
 	const topLoadedEndX = Math.max(topLoadedFrontX, topLoadedBackX);
-	const trayLengthAuto = topLoadedPlacements.length > 0 ? topLoadedEndX : edgeLoadedEndX;
-	const trayLength = trayLengthOverride > 0 ? trayLengthOverride : trayLengthAuto;
+	const trayWidthAuto = topLoadedPlacements.length > 0 ? topLoadedEndX : edgeLoadedEndX;
+	const trayWidth = trayWidthOverride > 0 ? trayWidthOverride : trayWidthAuto;
 
 	// Tray width (Y dimension) - always 2 rows
 	const topLoadedTotalDepth =
 		effectiveFrontRowDepth +
 		(effectiveBackRowDepth > 0 ? wallThickness + effectiveBackRowDepth : 0);
-	const trayWidthAuto = topLoadedTotalDepth > 0 ? topLoadedTotalDepth : crosswiseMaxDepth;
-	const trayWidth = wallThickness + trayWidthAuto + wallThickness;
+	const trayDepthAuto = topLoadedTotalDepth > 0 ? topLoadedTotalDepth : crosswiseMaxDepth;
+	const trayDepth = wallThickness + trayDepthAuto + wallThickness;
 
 	const trayHeight = floorThickness + finalMaxStackHeight + rimHeight;
 
 	return {
-		width: trayLength, // X
-		depth: trayWidth, // Y
+		width: trayWidth, // X
+		depth: trayDepth, // Y
 		height: trayHeight // Z
 	};
 }
@@ -644,9 +644,9 @@ export function validateCustomDimensions(box: Box): ValidationResult {
 			`Custom depth (${box.customDepth.toFixed(1)}mm) is smaller than minimum required (${minimums.minDepth.toFixed(1)}mm)`
 		);
 	}
-	if (box.customHeight !== undefined && box.customHeight < minimums.minHeight) {
+	if (box.customBoxHeight !== undefined && box.customBoxHeight < minimums.minHeight) {
 		errors.push(
-			`Custom height (${box.customHeight.toFixed(1)}mm) is smaller than minimum required (${minimums.minHeight.toFixed(1)}mm)`
+			`Custom height (${box.customBoxHeight.toFixed(1)}mm) is smaller than minimum required (${minimums.minHeight.toFixed(1)}mm)`
 		);
 	}
 
@@ -665,7 +665,7 @@ export function calculateTraySpacers(box: Box): TraySpacerInfo[] {
 	const minimums = calculateMinimumBoxDimensions(box);
 
 	// Target exterior height (custom or auto)
-	const targetExteriorHeight = box.customHeight ?? minimums.minHeight;
+	const targetExteriorHeight = box.customBoxHeight ?? minimums.minHeight;
 	const extraHeight = Math.max(0, targetExteriorHeight - minimums.minHeight);
 
 	// Each tray gets the same floor spacer (keeps all trays flush at top)
@@ -685,6 +685,24 @@ export function getBoxDimensions(box: Box): TrayDimensions | null {
 	return {
 		width: box.customWidth ?? minimums.minWidth,
 		depth: box.customDepth ?? minimums.minDepth,
-		height: box.customHeight ?? minimums.minHeight
+		height: box.customBoxHeight ?? minimums.minHeight
 	};
+}
+
+// Get lid height for a box (lid thickness is 2x wall thickness)
+export function getLidHeight(box: Box): number {
+	return box.wallThickness * 2;
+}
+
+// Get total assembled height (box + lid)
+export function getTotalAssembledHeight(box: Box): number | null {
+	const dims = getBoxDimensions(box);
+	if (!dims) return null;
+	return dims.height + getLidHeight(box);
+}
+
+// Calculate minimum total height (minimum box height + lid height)
+export function calculateMinimumTotalHeight(box: Box): number {
+	const minimums = calculateMinimumBoxDimensions(box);
+	return minimums.minHeight + getLidHeight(box);
 }

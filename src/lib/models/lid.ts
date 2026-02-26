@@ -62,7 +62,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	// Box exterior dimensions (use custom if set, otherwise auto)
 	const extWidth = box.customWidth ?? minimums.minWidth;
 	const extDepth = box.customDepth ?? minimums.minDepth;
-	const extHeight = box.customHeight ?? minimums.minHeight;
+	const extHeight = box.customBoxHeight ?? minimums.minHeight;
 
 	// Calculate gaps for fill logic
 	const widthGap = extWidth - minimums.minWidth; // Extra space at east (high X)

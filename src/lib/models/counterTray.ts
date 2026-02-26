@@ -44,7 +44,7 @@ export interface CounterTrayParams {
 	rimHeight: number;
 	cutoutRatio: number;
 	cutoutMax: number;
-	trayLengthOverride: number;
+	trayWidthOverride: number;
 	extraTrayCols: number;
 	extraTrayRows: number;
 	topLoadedStacks: TopLoadedStackDef[];
@@ -68,7 +68,7 @@ export const defaultParams: CounterTrayParams = {
 	rimHeight: 2.0,
 	cutoutRatio: 0.35,
 	cutoutMax: 12,
-	trayLengthOverride: 0,
+	trayWidthOverride: 0,
 	extraTrayCols: 1,
 	extraTrayRows: 1,
 	topLoadedStacks: [
@@ -206,7 +206,7 @@ export function getCounterPositions(
 		return [custom.width, custom.length];
 	};
 
-	// Pocket width (X dimension) - for top-loaded/crosswise, use LONGER side (parallel to tray length)
+	// Pocket width (X dimension) - for top-loaded/crosswise, use LONGER side (parallel to tray width)
 	const getPocketWidth = (shape: string): number => {
 		if (shape === 'square') return squarePocketWidth;
 		if (shape === 'hex') return hexPocketWidth;
@@ -214,7 +214,7 @@ export function getCounterPositions(
 		const custom = getCustomShape(shape);
 		if (custom) {
 			const [w, l] = getCustomEffectiveDims(custom);
-			// For top-loaded/crosswise: longer side along X (parallel to tray length)
+			// For top-loaded/crosswise: longer side along X (parallel to tray width)
 			return Math.max(w, l) + clearance * 2;
 		}
 		return circleDiameter;
@@ -240,7 +240,7 @@ export function getCounterPositions(
 		const custom = getCustomShape(shape);
 		if (custom) {
 			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.max(w, l) + clearance * 2; // Longer side along Y (perpendicular to tray length)
+			return Math.max(w, l) + clearance * 2; // Longer side along Y (perpendicular to tray width)
 		}
 		return getPocketLength(shape);
 	};
@@ -391,7 +391,7 @@ export function getCounterPositions(
 				});
 			} else {
 				// Crosswise: counters stack along Y (front to back), takes a column
-				// For custom shapes: longer side along X (parallel to tray length), shorter side is height
+				// For custom shapes: longer side along X (parallel to tray width), shorter side is height
 				const slotWidthDim = getPocketWidth(shape); // Longer side along X
 				const standingHeight = getStandingHeightCrosswise(shape);
 				edgeLoadedSlots.push({
@@ -647,7 +647,7 @@ export function getCounterPositions(
 	const topLoadedTotalDepthPreview =
 		effectiveFrontRowDepth +
 		(effectiveBackRowDepth > 0 ? wallThickness + effectiveBackRowDepth : 0);
-	const trayWidthPreview = wallThickness + topLoadedTotalDepthPreview + wallThickness;
+	const trayDepthPreview = wallThickness + topLoadedTotalDepthPreview + wallThickness;
 
 	// Add crosswise edge-loaded stacks (using pre-calculated positions and row assignments)
 	for (let i = 0; i < crosswiseSlots.length; i++) {
@@ -661,7 +661,7 @@ export function getCounterPositions(
 		let slotYStart: number;
 		if (rowAssignment === 'back') {
 			// Back position: align to back of tray
-			slotYStart = trayWidthPreview - wallThickness - slot.slotDepth;
+			slotYStart = trayDepthPreview - wallThickness - slot.slotDepth;
 		} else {
 			// Front position: start at front wall
 			slotYStart = wallThickness;
@@ -764,7 +764,7 @@ export function createCounterTray(
 		rimHeight,
 		cutoutRatio,
 		cutoutMax,
-		trayLengthOverride,
+		trayWidthOverride,
 		extraTrayCols,
 		extraTrayRows,
 		topLoadedStacks,
@@ -849,7 +849,7 @@ export function createCounterTray(
 		const custom = getCustomShape(shape);
 		if (custom) {
 			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.max(w, l) + clearance * 2; // Longer side along X (parallel to tray length)
+			return Math.max(w, l) + clearance * 2; // Longer side along X (parallel to tray width)
 		}
 		return circlePocketWidth;
 	};
@@ -872,7 +872,7 @@ export function createCounterTray(
 		const custom = getCustomShape(shape);
 		if (custom) {
 			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.max(w, l) + clearance * 2; // Longer side along Y (perpendicular to tray length)
+			return Math.max(w, l) + clearance * 2; // Longer side along Y (perpendicular to tray width)
 		}
 		return getPocketLength(shape);
 	};
@@ -983,7 +983,7 @@ export function createCounterTray(
 				});
 			} else {
 				// Crosswise: counters stack along Y (front to back), takes a column
-				// For custom shapes: longer side along X (parallel to tray length), shorter side is height
+				// For custom shapes: longer side along X (parallel to tray width), shorter side is height
 				const slotWidthDim = getPocketWidth(shape); // Longer side along X
 				const standingHeight = getStandingHeightCrosswise(shape);
 				edgeLoadedSlots.push({
@@ -1215,10 +1215,10 @@ export function createCounterTray(
 	// Use maximum of both for tray height
 	const maxStackHeight = Math.max(maxTopLoadedHeight, maxEdgeLoadedHeight);
 
-	// Calculate tray length from placements
+	// Calculate tray width from placements
 	const topLoadedEndX = Math.max(topLoadedFrontX, topLoadedBackX);
-	const trayLengthAuto = topLoadedPlacements.length > 0 ? topLoadedEndX : edgeLoadedEndX;
-	const trayLength = trayLengthOverride > 0 ? trayLengthOverride : trayLengthAuto;
+	const trayWidthAuto = topLoadedPlacements.length > 0 ? topLoadedEndX : edgeLoadedEndX;
+	const trayWidth = trayWidthOverride > 0 ? trayWidthOverride : trayWidthAuto;
 
 	// Y positions for front and back rows
 	const frontRowYStart = wallThickness;
@@ -1240,8 +1240,8 @@ export function createCounterTray(
 	}
 
 	// Tray width based on 2-row layout
-	const trayWidthAuto = topLoadedTotalDepth > 0 ? topLoadedTotalDepth : crosswiseMaxDepth;
-	const trayWidth = wallThickness + trayWidthAuto + wallThickness;
+	const trayDepthAuto = topLoadedTotalDepth > 0 ? topLoadedTotalDepth : crosswiseMaxDepth;
+	const trayDepth = wallThickness + trayDepthAuto + wallThickness;
 
 	// Base tray height from this tray's stacks
 	const baseTrayHeight = floorThickness + maxStackHeight + rimHeight;
@@ -1252,9 +1252,9 @@ export function createCounterTray(
 	const spacerHeight = floorSpacerHeight ?? 0;
 	const trayHeight = trayHeightWithoutSpacer + spacerHeight;
 	// Extra tray area
-	const extraTrayLength = trayLength > trayLengthAuto ? trayLength - trayLengthAuto : 0;
-	const extraTrayStartX = trayLengthAuto;
-	const extraTrayInnerWidth = trayWidth - 2 * wallThickness;
+	const extraTrayLength = trayWidth > trayWidthAuto ? trayWidth - trayWidthAuto : 0;
+	const extraTrayStartX = trayWidthAuto;
+	const extraTrayInnerWidth = trayDepth - 2 * wallThickness;
 	const extraTrayInnerLength = extraTrayLength - wallThickness;
 	// Extra tray depth should not include the spacer - it's the usable depth from the tray surface
 	const extraTrayDepth = trayHeightWithoutSpacer - floorThickness;
@@ -1617,8 +1617,8 @@ export function createCounterTray(
 
 	// Build the tray
 	const trayBody = cuboid({
-		size: [trayLength, trayWidth, trayHeight],
-		center: [trayLength / 2, trayWidth / 2, trayHeight / 2]
+		size: [trayWidth, trayDepth, trayHeight],
+		center: [trayWidth / 2, trayDepth / 2, trayHeight / 2]
 	});
 
 	const pocketCuts = [];
@@ -1704,8 +1704,8 @@ export function createCounterTray(
 		// Position based on row assignment
 		let slotYStart: number;
 		if (rowAssignment === 'back') {
-			// Back position: align to back of tray (end at trayWidth - wallThickness)
-			slotYStart = trayWidth - wallThickness - slot.slotDepth;
+			// Back position: align to back of tray (end at trayDepth - wallThickness)
+			slotYStart = trayDepth - wallThickness - slot.slotDepth;
 		} else {
 			// Front position: start at front wall
 			slotYStart = wallThickness;
@@ -1718,7 +1718,7 @@ export function createCounterTray(
 		if (rowAssignment === 'back') {
 			// Back slot: cutout at back edge
 			fingerCuts.push(
-				translate([slotXStart + slot.slotWidth / 2, trayWidth, 0], createFingerCutout(cutoutRadius))
+				translate([slotXStart + slot.slotWidth / 2, trayDepth, 0], createFingerCutout(cutoutRadius))
 			);
 		} else {
 			// Front slot: cutout at front edge
@@ -1758,7 +1758,7 @@ export function createCounterTray(
 			fingerCuts.push(translate([xCenter, 0, 0], createFingerCutout(cutoutRadius)));
 		} else {
 			// Back row: cutout at tray back
-			fingerCuts.push(translate([xCenter, trayWidth, 0], createFingerCutout(cutoutRadius)));
+			fingerCuts.push(translate([xCenter, trayDepth, 0], createFingerCutout(cutoutRadius)));
 		}
 	}
 
@@ -1809,15 +1809,15 @@ export function createCounterTray(
 				const textWidthCalc = maxX - minX + strokeWidth;
 				const textHeightY = maxY - minY + strokeWidth;
 
-				// Fit text along tray length (X axis)
-				const availableWidth = trayLength - margin * 2;
-				const availableDepth = trayWidth - margin * 2;
+				// Fit text along tray width (X axis)
+				const availableWidth = trayWidth - margin * 2;
+				const availableDepth = trayDepth - margin * 2;
 				const scaleX = Math.min(1, availableWidth / textWidthCalc);
 				const scaleY = Math.min(1, availableDepth / textHeightY);
 				const textScale = Math.min(scaleX, scaleY);
 
-				const centerX = trayLength / 2;
-				const centerY = trayWidth / 2;
+				const centerX = trayWidth / 2;
+				const centerY = trayDepth / 2;
 				const textCenterX = (minX + maxX) / 2;
 				const textCenterY = (minY + maxY) / 2;
 

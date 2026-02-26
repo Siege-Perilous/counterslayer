@@ -20,7 +20,7 @@
             "rimHeight": 2,
             "cutoutRatio": 0.3,
             "cutoutMax": 12,
-            "trayLengthOverride": 0,
+            "trayWidthOverride": 0,
             "extraTrayCols": 1,
             "extraTrayRows": 1,
             "topLoadedStacks": [
@@ -121,7 +121,7 @@
             "rimHeight": 2,
             "cutoutRatio": 0.3,
             "cutoutMax": 12,
-            "trayLengthOverride": 0,
+            "trayWidthOverride": 0,
             "extraTrayCols": 1,
             "extraTrayRows": 1,
             "topLoadedStacks": [
@@ -202,7 +202,7 @@
             "rimHeight": 2,
             "cutoutRatio": 0.3,
             "cutoutMax": 12,
-            "trayLengthOverride": 0,
+            "trayWidthOverride": 0,
             "extraTrayCols": 1,
             "extraTrayRows": 1,
             "topLoadedStacks": [
@@ -333,7 +333,7 @@
             "rimHeight": 2,
             "cutoutRatio": 0.3,
             "cutoutMax": 12,
-            "trayLengthOverride": 0,
+            "trayWidthOverride": 0,
             "extraTrayCols": 1,
             "extraTrayRows": 1,
             "topLoadedStacks": [
@@ -463,7 +463,7 @@
       },
       "customWidth": 219,
       "fillSolidEmpty": true,
-      "customHeight": 28.2
+      "customBoxHeight": 28.2
     }
   ],
   "selectedBoxId": "x20qob1",
