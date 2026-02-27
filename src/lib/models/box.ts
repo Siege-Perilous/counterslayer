@@ -197,23 +197,18 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	let maxEdgeLoadedHeight = 0;
 	let crosswiseMaxDepth = 0;
 
-	// Cutout ratio/max for half-sphere cutouts (same as counterTray.ts defaults)
-	const cutoutRatio = 0.3;
-	const cutoutMax = 12;
+	// Use actual cutout params from tray (not hardcoded defaults)
+	const cutoutRatio = params.cutoutRatio;
+	const cutoutMax = params.cutoutMax;
 
-	// Track lengthwise and crosswise slots
-	interface LengthwiseSlot {
+	// Track edge-loaded slots with unified structure (matching counterTray.ts sorting)
+	interface EdgeLoadedSlot {
 		slotDepth: number;
 		slotWidth: number;
+		orientation: 'lengthwise' | 'crosswise';
 		rowAssignment?: 'front' | 'back';
 	}
-	interface CrosswiseSlot {
-		slotWidth: number;
-		slotDepth: number;
-		rowAssignment?: 'front' | 'back';
-	}
-	const lengthwiseSlots: LengthwiseSlot[] = [];
-	const crosswiseSlots: CrosswiseSlot[] = [];
+	const edgeLoadedSlots: EdgeLoadedSlot[] = [];
 
 	if (edgeLoadedStacks && edgeLoadedStacks.length > 0) {
 		for (const stack of edgeLoadedStacks) {
@@ -225,17 +220,24 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 				const standingHeight = getStandingHeightLengthwise(stack[0]);
 				maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);
 				const slotDepthDim = getPocketLengthLengthwise(stack[0]);
-				lengthwiseSlots.push({ slotDepth: slotDepthDim, slotWidth: counterSpan });
+				edgeLoadedSlots.push({ slotDepth: slotDepthDim, slotWidth: counterSpan, orientation: 'lengthwise' });
 			} else {
 				// For custom shapes: longer side along X (parallel to tray width), shorter side is height
 				const standingHeight = getStandingHeightCrosswise(stack[0]);
 				maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);
 				const slotWidthDim = getPocketWidth(stack[0]); // Longer side along X
 				crosswiseMaxDepth = Math.max(crosswiseMaxDepth, counterSpan);
-				crosswiseSlots.push({ slotWidth: slotWidthDim, slotDepth: counterSpan });
+				edgeLoadedSlots.push({ slotWidth: slotWidthDim, slotDepth: counterSpan, orientation: 'crosswise' });
 			}
 		}
 	}
+
+	// Sort all edge-loaded slots by area (largest first) - must match counterTray.ts sorting
+	edgeLoadedSlots.sort((a, b) => b.slotWidth * b.slotDepth - a.slotWidth * a.slotDepth);
+
+	// Split into lengthwise and crosswise while preserving sorted order
+	const lengthwiseSlots = edgeLoadedSlots.filter((s) => s.orientation === 'lengthwise');
+	const crosswiseSlots = edgeLoadedSlots.filter((s) => s.orientation === 'crosswise');
 
 	// === GREEDY BIN-PACKING FOR LENGTHWISE SLOTS ===
 	// Adjacent slots share a half-cylinder cutout; first slot uses wall cutout (no left space needed)
@@ -268,8 +270,8 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	// === CROSSWISE SLOT BIN-PACKING ===
 	// Try to pair crosswise slots into columns (one at front, one at back) when they fit
 	interface CrosswiseColumn {
-		frontSlot: CrosswiseSlot | null;
-		backSlot: CrosswiseSlot | null;
+		frontSlot: EdgeLoadedSlot | null;
+		backSlot: EdgeLoadedSlot | null;
 		columnWidth: number;
 	}
 	const crosswiseColumns: CrosswiseColumn[] = [];
@@ -429,22 +431,13 @@ export function arrangeTrays(
 	}
 	const placementsWithRow: PlacementWithRow[] = [];
 
-	console.log(
-		`\n=== arrangeTrays: ${trays.length} trays, maxRowWidth: ${maxRowWidth.toFixed(1)} ===`
-	);
-
 	for (const { tray, dimensions } of trayDims) {
-		console.log(
-			`Placing tray "${tray.name}": ${dimensions.width.toFixed(1)}w x ${dimensions.depth.toFixed(1)}d`
-		);
-
 		// Try to find an existing row where this tray fits
 		let placed = false;
 		for (let i = 0; i < rows.length; i++) {
 			const row = rows[i];
 			if (row.currentX + dimensions.width <= maxRowWidth) {
 				// Fits in this row
-				const oldDepth = row.depth;
 				placementsWithRow.push({
 					tray,
 					dimensions,
@@ -453,12 +446,6 @@ export function arrangeTrays(
 				});
 				row.currentX += dimensions.width;
 				row.depth = Math.max(row.depth, dimensions.depth);
-				console.log(`  -> Placed in row ${i} at x=${row.currentX - dimensions.width}`);
-				if (row.depth !== oldDepth) {
-					console.log(
-						`  -> Row ${i} depth changed: ${oldDepth.toFixed(1)} -> ${row.depth.toFixed(1)}`
-					);
-				}
 				placed = true;
 				break;
 			}
@@ -477,7 +464,6 @@ export function arrangeTrays(
 				x: 0,
 				rowIndex: rows.length - 1
 			});
-			console.log(`  -> Created row ${rows.length - 1}, depth=${dimensions.depth.toFixed(1)}`);
 		}
 	}
 
@@ -498,9 +484,6 @@ export function arrangeTrays(
 		// First row: align to north edge (push away from south box wall)
 		if (p.rowIndex === 0 && p.dimensions.depth < row.depth) {
 			y = row.y + (row.depth - p.dimensions.depth);
-			console.log(
-				`  Pushing "${p.tray.name}" north in row 0: y=${y.toFixed(1)} (gap of ${(row.depth - p.dimensions.depth).toFixed(1)} at south)`
-			);
 		}
 
 		return {
@@ -510,19 +493,6 @@ export function arrangeTrays(
 			y
 		};
 	});
-
-	console.log(`\nFinal rows:`);
-	for (let i = 0; i < rows.length; i++) {
-		console.log(
-			`  Row ${i}: y=${rows[i].y.toFixed(1)}, depth=${rows[i].depth.toFixed(1)}, fillX=${rows[i].currentX.toFixed(1)}`
-		);
-	}
-	console.log(`\nPlacements:`);
-	for (const p of placements) {
-		console.log(
-			`  ${p.tray.name}: (${p.x.toFixed(1)}, ${p.y.toFixed(1)}) - ${p.dimensions.width.toFixed(1)}x${p.dimensions.depth.toFixed(1)}`
-		);
-	}
 
 	return placements;
 }

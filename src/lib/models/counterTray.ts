@@ -556,7 +556,10 @@ export function getCounterPositions(
 		const pocketFloorZ = trayHeight - rimHeight - slot.standingHeight;
 		const rowAssignment = (slot as EdgeLoadedSlot & { rowAssignment: string }).rowAssignment;
 		const slotXStart = (slot as EdgeLoadedSlot & { xPosition: number }).xPosition;
-		const slotYStart = rowAssignment === 'front' ? frontRowYStart : effectiveBackRowYStart;
+		// Center slot within row depth so it aligns with shared cutouts
+		const rowYStart = rowAssignment === 'front' ? frontRowYStart : effectiveBackRowYStart;
+		const rowDepth = rowAssignment === 'front' ? effectiveFrontRowDepth : effectiveBackRowDepth;
+		const slotYStart = rowYStart + (rowDepth - slot.slotDepth) / 2;
 
 		const customShape = getCustomShape(slot.shape);
 		counterStacks.push({
@@ -1501,7 +1504,10 @@ export function createCounterTray(
 			const slotXStart = (slot as EdgeLoadedSlot & { xPosition: number }).xPosition;
 			const cutoutRadius = getSlotCutoutRadius(slot);
 
-			pocketCuts.push(createEdgeLoadedPocket(slot, slotXStart, yStart));
+			// Center slot within row depth so shared cutouts align
+			const centeredYStart = yStart + (rowDepth - slot.slotDepth) / 2;
+
+			pocketCuts.push(createEdgeLoadedPocket(slot, slotXStart, centeredYStart));
 
 			// Left cutout: if first slot against wall, use vertical wall cutout; otherwise quarter-sphere
 			if (i === 0) {
@@ -1513,10 +1519,10 @@ export function createCounterTray(
 						translate([0, yStart + rowDepth / 2, 0], createFingerCutout(cutoutRadius))
 					);
 				} else {
-					// Quarter-sphere at left edge of slot
+					// Quarter-sphere at left edge of slot (centered with slot)
 					fingerCuts.push(
 						translate(
-							[slotXStart, yStart + slot.slotDepth / 2, 0],
+							[slotXStart, centeredYStart + slot.slotDepth / 2, 0],
 							createHalfSphereCutout(cutoutRadius)
 						)
 					);
@@ -1531,10 +1537,10 @@ export function createCounterTray(
 					translate([betweenX, yStart, 0], createHorizontalFingerCutout(cutoutRadius, rowDepth))
 				);
 			} else {
-				// Quarter-sphere at right edge of last slot
+				// Quarter-sphere at right edge of last slot (centered with slot)
 				fingerCuts.push(
 					translate(
-						[slotXStart + slot.slotWidth, yStart + slot.slotDepth / 2, 0],
+						[slotXStart + slot.slotWidth, centeredYStart + slot.slotDepth / 2, 0],
 						createHalfSphereCutout(cutoutRadius)
 					)
 				);

@@ -1200,7 +1200,7 @@
 {/if}
 
 <!-- Tooltip for hovered label -->
-{#if hoveredLabel}
+{#if hoveredLabel && hoveredLabel.text}
 	{@const tooltipFontSize = 3}
 	{@const charWidth = tooltipFontSize * 0.6}
 	{@const textWidth = hoveredLabel.text.length * charWidth}
