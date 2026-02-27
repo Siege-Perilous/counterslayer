@@ -8,7 +8,6 @@
 	import type { BufferGeometry } from 'three';
 	import * as THREE from 'three';
 	import { arrangeBoxes, type TrayPlacement } from '$lib/models/box';
-	import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 	import type { CounterStack } from '$lib/models/counterTray';
 	import { captureSceneToDataUrl, type CaptureOptions } from '$lib/utils/screenshotCapture';
 
@@ -16,7 +15,6 @@
 		trayId: string;
 		name: string;
 		geometry: BufferGeometry;
-		jscadGeom: Geom3;
 		placement: TrayPlacement;
 		counterStacks: CounterStack[];
 		trayLetter?: string;

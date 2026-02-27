@@ -246,10 +246,49 @@ export function updateTrayParams(trayId: string, params: CounterTrayParams): voi
 
 	// Propagate changed global params to all other trays
 	if (Object.keys(changedGlobals).length > 0) {
+		// Detect shape renames by comparing old and new customShapes
+		const shapeRenames = new Map<string, string>(); // oldName -> newName
+		if (changedGlobals.customShapes && oldParams.customShapes) {
+			const newShapes = changedGlobals.customShapes as typeof oldParams.customShapes;
+			// Match shapes by index (shapes are edited in place, not reordered)
+			for (let i = 0; i < Math.min(oldParams.customShapes.length, newShapes.length); i++) {
+				const oldName = oldParams.customShapes[i].name;
+				const newName = newShapes[i].name;
+				if (oldName !== newName) {
+					shapeRenames.set(oldName, newName);
+				}
+			}
+		}
+
 		for (const box of project.boxes) {
 			for (const tray of box.trays) {
 				if (tray.id !== trayId) {
-					tray.params = { ...tray.params, ...changedGlobals };
+					let updatedParams = { ...tray.params, ...changedGlobals };
+
+					// Update stack references if shapes were renamed
+					if (shapeRenames.size > 0) {
+						updatedParams = {
+							...updatedParams,
+							topLoadedStacks: updatedParams.topLoadedStacks.map(([shape, count]) => {
+								for (const [oldName, newName] of shapeRenames) {
+									if (shape === `custom:${oldName}`) {
+										return [`custom:${newName}`, count] as typeof updatedParams.topLoadedStacks[0];
+									}
+								}
+								return [shape, count] as typeof updatedParams.topLoadedStacks[0];
+							}),
+							edgeLoadedStacks: updatedParams.edgeLoadedStacks.map(([shape, count, orient]) => {
+								for (const [oldName, newName] of shapeRenames) {
+									if (shape === `custom:${oldName}`) {
+										return [`custom:${newName}`, count, orient] as typeof updatedParams.edgeLoadedStacks[0];
+									}
+								}
+								return [shape, count, orient] as typeof updatedParams.edgeLoadedStacks[0];
+							})
+						};
+					}
+
+					tray.params = updatedParams;
 				}
 			}
 		}

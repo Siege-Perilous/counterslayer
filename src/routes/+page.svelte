@@ -27,17 +27,17 @@
 		getCounterPositions,
 		type CounterStack
 	} from '$lib/models/counterTray';
-	import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
 	import {
 		arrangeTrays,
-		validateCustomDimensions,
 		calculateTraySpacers,
-		getBoxDimensions,
-		arrangeBoxes,
 		type TrayPlacement
 	} from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
-	import { exportStl } from '$lib/utils/exportStl';
+	import {
+		getGeometryWorker,
+		type TrayGeometryData,
+		type BoxGeometryData
+	} from '$lib/utils/geometryWorker';
 	import {
 		exportPdfReference,
 		exportPdfWithScreenshots,
@@ -54,8 +54,7 @@
 	} from '$lib/stores/project.svelte';
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
-	import type { Geom3 } from '@jscad/modeling/src/geometries/types';
-	import { setContext } from 'svelte';
+	import { setContext, onMount, onDestroy } from 'svelte';
 
 	type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid';
 	type SelectionType = 'dimensions' | 'box' | 'tray';
@@ -67,23 +66,7 @@
 		file: string;
 	}
 
-	interface TrayGeometryData {
-		trayId: string;
-		name: string;
-		geometry: BufferGeometry;
-		jscadGeom: Geom3;
-		placement: TrayPlacement;
-		counterStacks: CounterStack[];
-		trayLetter: string;
-	}
-
-	interface BoxGeometryData {
-		boxId: string;
-		boxName: string;
-		boxGeometry: BufferGeometry | null;
-		trayGeometries: TrayGeometryData[];
-		boxDimensions: { width: number; depth: number; height: number };
-	}
+	// TrayGeometryData and BoxGeometryData are imported from geometryWorker
 
 	// Theme state - get from context if available, otherwise use local state
 	let mode = $state<'light' | 'dark'>('dark');
@@ -123,10 +106,8 @@
 	let allBoxGeometries = $state<BoxGeometryData[]>([]);
 	let boxGeometry = $state<BufferGeometry | null>(null);
 	let lidGeometry = $state<BufferGeometry | null>(null);
-	let jscadSelectedTray = $state<Geom3 | null>(null);
-	let jscadBox = $state<Geom3 | null>(null);
-	let jscadLid = $state<Geom3 | null>(null);
 	let generating = $state(false);
+	let geometryWorker = getGeometryWorker();
 	let error = $state('');
 	let isDirty = $state(false);
 	let lastGeneratedHash = $state('');
@@ -270,7 +251,7 @@
 		}
 	}
 
-	async function regenerate() {
+	async function regenerate(force = false) {
 		if (!browser) return;
 
 		const project = getProject();
@@ -282,129 +263,32 @@
 			return;
 		}
 
+		// Check if cache is still valid (hash matches what was used to generate it)
+		const cacheValid = lastGeneratedHash && currentStateHash === lastGeneratedHash;
+
+		// If cache valid and not forced, try to use cached geometry
+		if (cacheValid && !force && allTrayGeometries.length > 0) {
+			const cachedTray = allTrayGeometries.find(t => t.trayId === tray.id);
+			if (cachedTray) {
+				selectedTrayGeometry = cachedTray.geometry;
+				selectedTrayCounters = cachedTray.counterStacks;
+				return;
+			}
+		}
+
 		generating = true;
 		error = '';
 
-		await new Promise((resolve) => setTimeout(resolve, 10));
-
 		try {
-			// Validate custom dimensions before generation
-			const validation = validateCustomDimensions(box);
-			if (!validation.valid) {
-				error = validation.errors.join('; ');
-				generating = false;
-				return;
-			}
+			// Use web worker for geometry generation (non-blocking)
+			const result = await geometryWorker.generate(project, box.id, tray.id);
 
-			// Generate all trays with their placements for selected box
-			const placements = arrangeTrays(box.trays, {
-				customBoxWidth: box.customWidth,
-				wallThickness: box.wallThickness,
-				tolerance: box.tolerance
-			});
-
-			// Calculate floor spacers for each tray (for custom box height)
-			const spacerInfo = calculateTraySpacers(box);
-
-			// Calculate max height so all trays are normalized to box interior height
-			const maxHeight = Math.max(...placements.map((p) => p.dimensions.height));
-
-			// Find spacer for selected tray
-			const selectedSpacer = spacerInfo.find((s) => s.trayId === tray.id);
-			const selectedSpacerHeight = selectedSpacer?.floorSpacerHeight ?? 0;
-
-			// Generate selected tray at box height (all trays in a box share the same height)
-			jscadSelectedTray = createCounterTray(
-				tray.params,
-				tray.name,
-				maxHeight,
-				selectedSpacerHeight
-			);
-			selectedTrayGeometry = jscadToBufferGeometry(jscadSelectedTray);
-			selectedTrayCounters = getCounterPositions(tray.params, maxHeight, selectedSpacerHeight);
-
-			// Generate all trays at box height with floor spacers (for selected box)
-			allTrayGeometries = placements.map((placement, index) => {
-				const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
-				const spacerHeight = spacer?.floorSpacerHeight ?? 0;
-				const jscadGeom = createCounterTray(
-					placement.tray.params,
-					placement.tray.name,
-					maxHeight,
-					spacerHeight
-				);
-				return {
-					trayId: placement.tray.id,
-					name: placement.tray.name,
-					geometry: jscadToBufferGeometry(jscadGeom),
-					jscadGeom,
-					placement,
-					counterStacks: getCounterPositions(placement.tray.params, maxHeight, spacerHeight),
-					trayLetter: String.fromCharCode(65 + index)
-				};
-			});
-
-			// Generate box with lid grooves (for selected box)
-			jscadBox = createBoxWithLidGrooves(box);
-			boxGeometry = jscadBox ? jscadToBufferGeometry(jscadBox) : null;
-
-			// Generate lid (for selected box)
-			jscadLid = createLid(box);
-			lidGeometry = jscadLid ? jscadToBufferGeometry(jscadLid) : null;
-
-			// Generate geometries for ALL boxes (for all-no-lid view)
-			allBoxGeometries = project.boxes.map((projectBox) => {
-				// Validate box dimensions
-				const boxValidation = validateCustomDimensions(projectBox);
-				if (!boxValidation.valid) {
-					console.warn(`Box "${projectBox.name}" validation failed:`, boxValidation.errors);
-				}
-
-				// Generate box geometry
-				const boxJscad = createBoxWithLidGrooves(projectBox);
-				const boxBufferGeom = boxJscad ? jscadToBufferGeometry(boxJscad) : null;
-
-				// Get box dimensions
-				const boxDims = getBoxDimensions(projectBox);
-
-				// Generate tray placements and geometries for this box
-				const boxPlacements = arrangeTrays(projectBox.trays, {
-					customBoxWidth: projectBox.customWidth,
-					wallThickness: projectBox.wallThickness,
-					tolerance: projectBox.tolerance
-				});
-
-				const boxSpacerInfo = calculateTraySpacers(projectBox);
-				const boxMaxHeight = Math.max(...boxPlacements.map((p) => p.dimensions.height), 0);
-
-				const trayGeoms: TrayGeometryData[] = boxPlacements.map((placement, index) => {
-					const spacer = boxSpacerInfo.find((s) => s.trayId === placement.tray.id);
-					const spacerHeight = spacer?.floorSpacerHeight ?? 0;
-					const jscadGeom = createCounterTray(
-						placement.tray.params,
-						placement.tray.name,
-						boxMaxHeight,
-						spacerHeight
-					);
-					return {
-						trayId: placement.tray.id,
-						name: placement.tray.name,
-						geometry: jscadToBufferGeometry(jscadGeom),
-						jscadGeom,
-						placement,
-						counterStacks: getCounterPositions(placement.tray.params, boxMaxHeight, spacerHeight),
-						trayLetter: String.fromCharCode(65 + index)
-					};
-				});
-
-				return {
-					boxId: projectBox.id,
-					boxName: projectBox.name,
-					boxGeometry: boxBufferGeom,
-					trayGeometries: trayGeoms,
-					boxDimensions: boxDims ?? { width: 0, depth: 0, height: 0 }
-				};
-			});
+			selectedTrayGeometry = result.selectedTrayGeometry;
+			selectedTrayCounters = result.selectedTrayCounters;
+			allTrayGeometries = result.allTrayGeometries;
+			boxGeometry = result.boxGeometry;
+			lidGeometry = result.lidGeometry;
+			allBoxGeometries = result.allBoxGeometries;
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Unknown error';
 			console.error('Generation error:', e);
@@ -415,39 +299,57 @@
 		}
 	}
 
-	function handleExport() {
-		if (!jscadSelectedTray) return;
+	async function handleExport() {
+		if (!selectedTrayGeometry) return;
 
-		const tray = getSelectedTray();
-		const filename = `${tray?.name.toLowerCase().replace(/\s+/g, '-') ?? 'tray'}.stl`;
-
-		exportStl(jscadSelectedTray, filename);
+		try {
+			const { data, filename } = await geometryWorker.exportTrayStl();
+			downloadStl(data, filename);
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Export failed';
+			console.error('Export error:', e);
+		}
 	}
 
 	async function handleExportAll() {
 		const box = getSelectedBox();
 		if (!box) return;
 
-		const baseName = box.name.toLowerCase().replace(/\s+/g, '-');
+		try {
+			// Export box
+			if (boxGeometry) {
+				const { data, filename } = await geometryWorker.exportBoxStl();
+				downloadStl(data, filename);
+				await new Promise((resolve) => setTimeout(resolve, 100));
+			}
 
-		// Export box
-		if (jscadBox) {
-			exportStl(jscadBox, `${baseName}-box.stl`);
-			await new Promise((resolve) => setTimeout(resolve, 100));
-		}
+			// Export lid
+			if (lidGeometry) {
+				const { data, filename } = await geometryWorker.exportLidStl();
+				downloadStl(data, filename);
+				await new Promise((resolve) => setTimeout(resolve, 100));
+			}
 
-		// Export lid
-		if (jscadLid) {
-			exportStl(jscadLid, `${baseName}-lid.stl`);
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			// Export all trays
+			for (let i = 0; i < allTrayGeometries.length; i++) {
+				const { data, filename } = await geometryWorker.exportTrayByIndexStl(i);
+				downloadStl(data, filename);
+				await new Promise((resolve) => setTimeout(resolve, 100));
+			}
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Export failed';
+			console.error('Export error:', e);
 		}
+	}
 
-		// Export all trays
-		for (const trayData of allTrayGeometries) {
-			const trayName = trayData.name.toLowerCase().replace(/\s+/g, '-');
-			exportStl(trayData.jscadGeom, `${baseName}-${trayName}.stl`);
-			await new Promise((resolve) => setTimeout(resolve, 100));
-		}
+	function downloadStl(data: ArrayBuffer, filename: string) {
+		const blob = new Blob([data], { type: 'application/octet-stream' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		a.click();
+		URL.revokeObjectURL(url);
 	}
 
 	async function handleExportPdf() {
@@ -623,10 +525,16 @@
 		}
 	});
 
-	// Generate on mount and when tray/box selection changes
+	// Generate on mount (forced) and when tray/box selection changes (uses cache if not dirty)
+	let hasInitialized = false;
 	$effect(() => {
 		if (browser && selectedTray && selectedBox) {
-			regenerate();
+			if (!hasInitialized) {
+				hasInitialized = true;
+				regenerate(true); // Force on initial load
+			} else {
+				regenerate(); // Use cache if not dirty
+			}
 		}
 	});
 
@@ -635,6 +543,11 @@
 			resetProject();
 		}
 	}
+
+	// Cleanup worker on component destroy
+	onDestroy(() => {
+		geometryWorker.terminate();
+	});
 </script>
 
 <svelte:head>
@@ -697,7 +610,7 @@
 								{showCounters}
 								{selectedTrayCounters}
 								{selectedTrayLetter}
-								triangleCornerRadius={selectedTray?.params.triangleCornerRadius ?? 1.5}
+								triangleCornerRadius={1.5}
 								{showReferenceLabels}
 								{hidePrintBed}
 								{viewTitle}
@@ -783,7 +696,7 @@
 									<Button
 										variant="ghost"
 										onclick={handleExport}
-										disabled={generating || !jscadSelectedTray}
+										disabled={generating || !selectedTrayGeometry}
 										style="width: 100%; justify-content: flex-start;"
 									>
 										Export tray STL
@@ -792,7 +705,7 @@
 										variant="ghost"
 										onclick={handleExportAll}
 										disabled={generating ||
-											(!jscadBox && !jscadLid && allTrayGeometries.length === 0)}
+											(!boxGeometry && !lidGeometry && allTrayGeometries.length === 0)}
 										style="width: 100%; justify-content: flex-start;"
 									>
 										Export all STLs
@@ -831,7 +744,7 @@
 							<span class="regenerateButton {isDirty && !generating ? 'regenerateButton--dirty' : ''}">
 								<Button
 									variant="primary"
-									onclick={regenerate}
+									onclick={() => regenerate(true)}
 									isDisabled={generating}
 									isLoading={generating}
 								>
