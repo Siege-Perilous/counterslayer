@@ -1,34 +1,46 @@
 <script lang="ts">
 	import { T, useThrelte, useTask } from '@threlte/core';
 	import { OrbitControls, Grid, Text, interactivity } from '@threlte/extras';
+	import PrintBed from './PrintBed.svelte';
 
 	// Enable interactivity for pointer events on 3D objects
 	interactivity();
 	import type { BufferGeometry } from 'three';
 	import * as THREE from 'three';
-	import type { TrayPlacement } from '$lib/models/box';
-	import type { Geom3 } from '@jscad/modeling/src/geometries/types';
+	import { arrangeBoxes, type TrayPlacement } from '$lib/models/box';
 	import type { CounterStack } from '$lib/models/counterTray';
 	import { captureSceneToDataUrl, type CaptureOptions } from '$lib/utils/screenshotCapture';
+	import { getTrayLetter, getProject, TRAY_COLORS } from '$lib/stores/project.svelte';
 
 	interface TrayGeometryData {
 		trayId: string;
 		name: string;
+		color: string;
 		geometry: BufferGeometry;
-		jscadGeom: Geom3;
 		placement: TrayPlacement;
 		counterStacks: CounterStack[];
 		trayLetter?: string;
 	}
 
+	interface BoxGeometryData {
+		boxId: string;
+		boxName: string;
+		boxGeometry: BufferGeometry | null;
+		lidGeometry: BufferGeometry | null;
+		trayGeometries: TrayGeometryData[];
+		boxDimensions: { width: number; depth: number; height: number };
+	}
+
 	interface Props {
 		geometry: BufferGeometry | null;
 		allTrays?: TrayGeometryData[];
+		allBoxes?: BoxGeometryData[];
 		boxGeometry?: BufferGeometry | null;
 		lidGeometry?: BufferGeometry | null;
 		printBedSize: number;
 		exploded?: boolean;
 		showAllTrays?: boolean;
+		showAllBoxes?: boolean;
 		boxWallThickness?: number;
 		boxTolerance?: number;
 		boxFloorThickness?: number;
@@ -36,20 +48,24 @@
 		showCounters?: boolean;
 		selectedTrayCounters?: CounterStack[];
 		selectedTrayLetter?: string;
+		selectedTrayId?: string;
 		triangleCornerRadius?: number;
 		showReferenceLabels?: boolean;
 		hidePrintBed?: boolean;
+		viewTitle?: string;
 		onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
 	}
 
 	let {
 		geometry,
 		allTrays = [],
+		allBoxes = [],
 		boxGeometry = null,
 		lidGeometry = null,
 		printBedSize,
 		exploded = false,
 		showAllTrays = false,
+		showAllBoxes = false,
 		boxWallThickness = 3,
 		boxTolerance = 0.5,
 		boxFloorThickness = 2,
@@ -57,9 +73,11 @@
 		showCounters = false,
 		selectedTrayCounters = [],
 		selectedTrayLetter = 'A',
+		selectedTrayId = '',
 		triangleCornerRadius = 1.5,
 		showReferenceLabels = false,
 		hidePrintBed = false,
+		viewTitle = '',
 		onCaptureReady
 	}: Props = $props();
 
@@ -329,6 +347,19 @@
 		return positions;
 	});
 
+	// Calculate positions for all boxes in multi-box view (using print bed size for spacing)
+	let boxPositions = $derived.by(() => {
+		if (!showAllBoxes || allBoxes.length === 0) return [];
+
+		// Each box gets its own print bed, so use printBedSize for arrangement
+		const bedDims = allBoxes.map(() => ({
+			width: printBedSize,
+			depth: printBedSize
+		}));
+
+		return arrangeBoxes(bedDims, sideGap);
+	});
+
 	// Combined bounds for camera positioning
 	let allGeometries = $derived.by(() => {
 		const geoms: BufferGeometry[] = [];
@@ -365,6 +396,16 @@
 
 	// Camera target
 	let cameraTarget = $derived.by(() => {
+		// For multi-box view, center on the print beds
+		if (showAllBoxes && allBoxes.length > 0) {
+			const maxHeight = Math.max(...allBoxes.map((b) => b.boxDimensions.height));
+			return {
+				x: 0,
+				y: maxHeight / 2,
+				z: printBedSize / 2
+			};
+		}
+
 		if (!combinedBounds) return { x: 0, y: 0, z: 0 };
 		const height = combinedBounds.max.z - combinedBounds.min.z;
 		return {
@@ -375,6 +416,14 @@
 	});
 
 	let cameraDistance = $derived.by(() => {
+		// For multi-box view, calculate based on total arrangement width (using print bed sizes)
+		if (showAllBoxes && allBoxes.length > 0) {
+			const totalWidth = allBoxes.length * printBedSize + (allBoxes.length - 1) * sideGap;
+			const maxHeight = Math.max(...allBoxes.map((b) => b.boxDimensions.height));
+			const size = Math.max(totalWidth, printBedSize, maxHeight);
+			return size * 1.5;
+		}
+
 		if (!combinedBounds) return printBedSize;
 
 		let effectiveWidth = combinedBounds.max.x - combinedBounds.min.x;
@@ -449,38 +498,15 @@
 		};
 	});
 
-	// Tray colors - harmonious with tableslayer/ui primary red
-	const trayColors = ['#c9503c', '#3d7a6a', '#d4956a', '#7c5c4a', '#a36b5a', '#5a7c6a'];
-
-	// Create procedural texture for print bed
-	function createBedTexture(): THREE.CanvasTexture {
-		const canvas = document.createElement('canvas');
-		canvas.width = 256;
-		canvas.height = 256;
-		const ctx = canvas.getContext('2d')!;
-
-		// Dark base
-		ctx.fillStyle = '#0a0a0a';
-		ctx.fillRect(0, 0, 256, 256);
-
-		// Add some noise for texture
-		const imageData = ctx.getImageData(0, 0, 256, 256);
-		for (let i = 0; i < imageData.data.length; i += 4) {
-			const noise = (Math.random() - 0.5) * 10;
-			imageData.data[i] = Math.max(0, Math.min(255, imageData.data[i] + noise));
-			imageData.data[i + 1] = Math.max(0, Math.min(255, imageData.data[i + 1] + noise));
-			imageData.data[i + 2] = Math.max(0, Math.min(255, imageData.data[i + 2] + noise));
+	// Get live tray color from project store (for reactive updates)
+	function getTrayColor(trayId: string, fallbackIndex: number): string {
+		const project = getProject();
+		for (const box of project.boxes) {
+			const tray = box.trays.find((t) => t.id === trayId);
+			if (tray?.color) return tray.color;
 		}
-		ctx.putImageData(imageData, 0, 0);
-
-		const texture = new THREE.CanvasTexture(canvas);
-		texture.wrapS = THREE.RepeatWrapping;
-		texture.wrapT = THREE.RepeatWrapping;
-		texture.repeat.set(printBedSize / 50, printBedSize / 50);
-		return texture;
+		return TRAY_COLORS[fallbackIndex % TRAY_COLORS.length];
 	}
-
-	let bedTexture = $derived(createBedTexture());
 
 	// Debug logging
 	$effect(() => {
@@ -560,8 +586,259 @@
 /><!-- Subtle backlight for rim definition -->
 <T.AmbientLight intensity={0.4} />
 
-<!-- Box geometry -->
-{#if boxGeometry}
+<!-- Background grid for multi-box view (subtle, at world origin for alignment) -->
+{#if showAllBoxes && !hidePrintBed}
+	<Grid
+		position.y={-0.51}
+		cellColor="#2a2a2a"
+		sectionColor="#5a3530"
+		sectionThickness={1}
+		cellSize={10}
+		sectionSize={50}
+		gridSize={[2000, 2000]}
+		fadeDistance={1000}
+		fadeStrength={2}
+	/>
+{/if}
+
+<!-- Multi-box view: All boxes arranged side by side with their own bed planes -->
+{#if showAllBoxes && allBoxes.length > 0}
+	{#each allBoxes as boxData, boxIndex (boxData.boxId)}
+		{@const boxPos = boxPositions[boxIndex]}
+		{@const boxWidth = boxData.boxDimensions.width}
+		{@const boxDepth = boxData.boxDimensions.depth}
+		{@const xOffset = boxPos?.x ?? 0}
+		{@const zOffset = printBedSize / 2}
+
+		<!-- Print bed for this box -->
+		<PrintBed size={printBedSize} title={boxData.boxName} position={[xOffset, 0, zOffset]} />
+
+		<!-- Box geometry (without lid) -->
+		{#if boxData.boxGeometry}
+			<T.Mesh
+				geometry={boxData.boxGeometry}
+				rotation.x={-Math.PI / 2}
+				position.x={xOffset - boxWidth / 2}
+				position.y={0}
+				position.z={zOffset + boxDepth / 2}
+			>
+				<T.MeshStandardMaterial
+					color="#333333"
+					roughness={0.6}
+					metalness={0.1}
+					side={THREE.DoubleSide}
+				/>
+			</T.Mesh>
+		{/if}
+
+		<!-- Trays inside this box -->
+		{#each boxData.trayGeometries as trayData, trayIndex (trayData.trayId)}
+			{@const placement = trayData.placement}
+			{@const trayX = xOffset - boxWidth / 2 + boxWallThickness + boxTolerance + placement.x}
+			{@const trayZ = zOffset + boxDepth / 2 - boxWallThickness - boxTolerance - placement.y}
+			{@const trayY = boxFloorThickness}
+			<T.Mesh
+				geometry={trayData.geometry}
+				rotation.x={-Math.PI / 2}
+				position.x={trayX}
+				position.y={trayY}
+				position.z={trayZ}
+			>
+				<T.MeshStandardMaterial
+					color={getTrayColor(trayData.trayId, trayIndex)}
+					roughness={0.6}
+					metalness={0.1}
+					side={THREE.DoubleSide}
+				/>
+			</T.Mesh>
+
+			<!-- Counter previews for this tray -->
+			{#if showCounters && trayData.counterStacks}
+				{#each trayData.counterStacks as stack, stackIdx (stackIdx)}
+					{#if stack.isEdgeLoaded}
+						{#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
+							{@const effectiveShape =
+								stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
+							{@const standingHeight =
+								effectiveShape === 'triangle'
+									? stack.length
+									: stack.shape === 'custom'
+										? Math.min(stack.width, stack.length)
+										: Math.max(stack.width, stack.length)}
+							{@const counterY = trayY + stack.z + standingHeight / 2}
+							{@const isAlt = counterIdx % 2 === 1}
+							{@const counterColor = isAlt
+								? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
+								: stack.color}
+							{#if stack.edgeOrientation === 'lengthwise'}
+								{@const counterSpacing =
+									(stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
+								{@const posX = trayX + stack.x + (counterIdx + 0.5) * counterSpacing}
+								{@const posZ = trayZ - stack.y - (stack.slotDepth ?? stack.length) / 2}
+								{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
+									<T.Mesh position.x={posX} position.y={counterY} position.z={posZ}>
+										<T.BoxGeometry args={[stack.thickness, standingHeight, stack.length]} />
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{:else if effectiveShape === 'circle'}
+									<T.Mesh
+										position.x={posX}
+										position.y={counterY}
+										position.z={posZ}
+										rotation.z={Math.PI / 2}
+									>
+										<T.CylinderGeometry
+											args={[stack.width / 2, stack.width / 2, stack.thickness, 32]}
+										/>
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{:else if effectiveShape === 'hex'}
+									<T.Mesh
+										position.x={posX}
+										position.y={counterY}
+										position.z={posZ}
+										rotation.z={Math.PI / 2}
+										rotation.x={stack.hexPointyTop ? 0 : Math.PI / 6}
+									>
+										<T.CylinderGeometry
+											args={[stack.width / 2, stack.width / 2, stack.thickness, 6]}
+										/>
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{:else}
+									{@const triGeom = createRoundedTriangleGeometry(
+										stack.width,
+										stack.thickness,
+										triangleCornerRadius
+									)}
+									<T.Mesh
+										geometry={triGeom}
+										position.x={posX}
+										position.y={counterY}
+										position.z={posZ}
+										rotation.y={Math.PI / 2}
+										rotation.x={Math.PI}
+									>
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{/if}
+							{:else}
+								{@const counterSpacing =
+									(stack.slotDepth ?? stack.count * stack.thickness) / stack.count}
+								{@const posX = trayX + stack.x + (stack.slotWidth ?? stack.length) / 2}
+								{@const posZ = trayZ - stack.y - (counterIdx + 0.5) * counterSpacing}
+								{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
+									<T.Mesh position.x={posX} position.y={counterY} position.z={posZ}>
+										<T.BoxGeometry args={[stack.length, standingHeight, stack.thickness]} />
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{:else if effectiveShape === 'circle'}
+									<T.Mesh
+										position.x={posX}
+										position.y={counterY}
+										position.z={posZ}
+										rotation.x={Math.PI / 2}
+									>
+										<T.CylinderGeometry
+											args={[stack.width / 2, stack.width / 2, stack.thickness, 32]}
+										/>
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{:else if effectiveShape === 'hex'}
+									<T.Mesh
+										position.x={posX}
+										position.y={counterY}
+										position.z={posZ}
+										rotation.x={Math.PI / 2}
+										rotation.y={stack.hexPointyTop ? Math.PI / 6 : 0}
+									>
+										<T.CylinderGeometry
+											args={[stack.width / 2, stack.width / 2, stack.thickness, 6]}
+										/>
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{:else}
+									{@const triGeom = createRoundedTriangleGeometry(
+										stack.width,
+										stack.thickness,
+										triangleCornerRadius
+									)}
+									<T.Mesh
+										geometry={triGeom}
+										position.x={posX}
+										position.y={counterY}
+										position.z={posZ}
+										rotation.x={Math.PI}
+									>
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{/if}
+							{/if}
+						{/each}
+					{:else}
+						<!-- Top-loaded counters -->
+						{#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
+							{@const counterZ = stack.z + counterIdx * stack.thickness + stack.thickness / 2}
+							{@const posX = trayX + stack.x}
+							{@const posY = trayY + counterZ}
+							{@const posZ = trayZ - stack.y}
+							{@const isAlt = counterIdx % 2 === 1}
+							{@const counterColor = isAlt
+								? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
+								: stack.color}
+							{@const effectiveShape =
+								stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
+							{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
+								<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
+									<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
+									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+								</T.Mesh>
+							{:else if effectiveShape === 'circle'}
+								<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
+									<T.CylinderGeometry
+										args={[stack.width / 2, stack.width / 2, stack.thickness, 32]}
+									/>
+									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+								</T.Mesh>
+							{:else if effectiveShape === 'hex'}
+								<T.Mesh
+									position.x={posX}
+									position.y={posY}
+									position.z={posZ}
+									rotation.y={stack.hexPointyTop ? 0 : Math.PI / 6}
+								>
+									<T.CylinderGeometry
+										args={[stack.width / 2, stack.width / 2, stack.thickness, 6]}
+									/>
+									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+								</T.Mesh>
+							{:else}
+								{@const triGeom = createRoundedTriangleGeometry(
+									stack.width,
+									stack.thickness,
+									triangleCornerRadius
+								)}
+								<T.Mesh
+									geometry={triGeom}
+									position.x={posX}
+									position.y={posY}
+									position.z={posZ}
+									rotation.x={-Math.PI / 2}
+									rotation.y={Math.PI}
+								>
+									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+								</T.Mesh>
+							{/if}
+						{/each}
+					{/if}
+				{/each}
+			{/if}
+		{/each}
+	{/each}
+{/if}
+
+<!-- Box geometry (single box view) -->
+{#if boxGeometry && !showAllBoxes}
 	{@const boxWidth = boxBounds ? boxBounds.max.x - boxBounds.min.x : 0}
 	<T.Mesh
 		geometry={boxGeometry}
@@ -579,8 +856,8 @@
 	</T.Mesh>
 {/if}
 
-<!-- All trays with positions (when showAllTrays is true) -->
-{#if showAllTrays && allTrays.length > 0}
+<!-- All trays with positions (when showAllTrays is true, single box view) -->
+{#if showAllTrays && !showAllBoxes && allTrays.length > 0}
 	{@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
 	{#each allTrays as trayData, i (trayData.trayId)}
 		{@const placement = trayData.placement}
@@ -602,7 +879,7 @@
 			position.z={zOffset}
 		>
 			<T.MeshStandardMaterial
-				color={trayColors[i % trayColors.length]}
+				color={getTrayColor(trayData.trayId, i)}
 				roughness={0.6}
 				metalness={0.1}
 				side={THREE.DoubleSide}
@@ -619,7 +896,7 @@
 		position.z={meshOffset.z}
 	>
 		<T.MeshStandardMaterial
-			color="#c9503c"
+			color={getTrayColor(selectedTrayId, 0)}
 			roughness={0.6}
 			metalness={0.1}
 			side={THREE.DoubleSide}
@@ -627,8 +904,8 @@
 	</T.Mesh>
 {/if}
 
-<!-- Lid geometry -->
-{#if lidGeometry}
+<!-- Lid geometry (single box view) -->
+{#if lidGeometry && !showAllBoxes}
 	{@const lidWidth = lidBounds ? lidBounds.max.x - lidBounds.min.x : 0}
 	{@const lidHeight = lidBounds ? lidBounds.max.z - lidBounds.min.z : 0}
 	{@const lidDepth = lidBounds ? lidBounds.max.y - lidBounds.min.y : 0}
@@ -670,7 +947,7 @@
 {/if}
 
 <!-- Counter preview for single tray view (only when tray geometry is visible) -->
-{#if showCounters && !showAllTrays && geometry && selectedTrayCounters.length > 0}
+{#if showCounters && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
 	{#each selectedTrayCounters as stack, stackIdx (stackIdx)}
 		{#if stack.isEdgeLoaded}
 			<!-- Edge-loaded: counters standing on edge like books -->
@@ -849,8 +1126,8 @@
 	{/each}
 {/if}
 
-<!-- Counter preview for all trays view -->
-{#if showCounters && showAllTrays && allTrays.length > 0}
+<!-- Counter preview for all trays view (single box view) -->
+{#if showCounters && showAllTrays && !showAllBoxes && allTrays.length > 0}
 	{@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
 	{#each allTrays as trayData, trayIdx (trayData.trayId)}
 		{@const placement = trayData.placement}
@@ -1049,71 +1326,24 @@
 	{/each}
 {/if}
 
-{#if !hidePrintBed}
-	<!-- Infinite grid -->
+{#if !hidePrintBed && !showAllBoxes}
+	<!-- Background grid for single box view (subtle) -->
 	<Grid
-		position.y={-0.01}
-		cellColor="#5a5a5a"
-		sectionColor="#8b4a3c"
-		sectionThickness={1.5}
+		position.y={-0.51}
+		cellColor="#2a2a2a"
+		sectionColor="#5a3530"
+		sectionThickness={1}
 		cellSize={10}
 		sectionSize={50}
 		gridSize={[2000, 2000]}
-		fadeDistance={500}
+		fadeDistance={800}
 	/>
 
-	<!-- Print bed indicator -->
-	<T.Mesh position.y={-1} rotation.x={-Math.PI / 2}>
-		<T.PlaneGeometry args={[printBedSize, printBedSize]} />
-		<T.MeshStandardMaterial
-			map={bedTexture}
-			side={THREE.DoubleSide}
-			roughness={0.7}
-			metalness={0.1}
-		/>
-	</T.Mesh>
-
-	<!-- Print bed border -->
-	<T.LineLoop position.y={-0.5}>
-		<T.BufferGeometry>
-			<T.BufferAttribute
-				attach="attributes-position"
-				args={[
-					new Float32Array([
-						-printBedSize / 2,
-						0,
-						-printBedSize / 2,
-						printBedSize / 2,
-						0,
-						-printBedSize / 2,
-						printBedSize / 2,
-						0,
-						printBedSize / 2,
-						-printBedSize / 2,
-						0,
-						printBedSize / 2
-					]),
-					3
-				]}
-			/>
-		</T.BufferGeometry>
-		<T.LineBasicMaterial color="#c9503c" linewidth={2} />
-	</T.LineLoop>
-
-	<!-- Print bed label -->
-	<Text
-		text={`${printBedSize}mm bed`}
-		fontSize={8}
-		position={[-printBedSize / 2 + 5, 0.5, printBedSize / 2 - 5]}
-		rotation={[-Math.PI / 2, 0, 0]}
-		color="#c9503c"
-		anchorX="left"
-		anchorY="bottom"
-	/>
+	<PrintBed size={printBedSize} title={viewTitle} position={[0, 0, 0]} />
 {/if}
 
 <!-- Reference labels for PDF capture - single tray view -->
-{#if showReferenceLabels && !showAllTrays && geometry && selectedTrayCounters.length > 0}
+{#if showReferenceLabels && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
 	{@const maxStackHeight = Math.max(
 		...selectedTrayCounters.map((stack) => {
 			const effectiveShape =
@@ -1166,7 +1396,7 @@
 {/if}
 
 <!-- Tooltip for hovered label -->
-{#if hoveredLabel}
+{#if hoveredLabel && hoveredLabel.text}
 	{@const tooltipFontSize = 3}
 	{@const charWidth = tooltipFontSize * 0.6}
 	{@const textWidth = hoveredLabel.text.length * charWidth}
@@ -1204,8 +1434,8 @@
 	/>
 {/if}
 
-<!-- Reference labels for PDF capture - all trays view -->
-{#if showReferenceLabels && showAllTrays && allTrays.length > 0}
+<!-- Reference labels for PDF capture - all trays view (single box view) -->
+{#if showReferenceLabels && showAllTrays && !showAllBoxes && allTrays.length > 0}
 	{@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
 	{#each allTrays as trayData, trayIdx (trayData.trayId)}
 		{@const placement = trayData.placement}
@@ -1270,6 +1500,78 @@
 					hoveredLabel = null;
 				}}
 			/>
+		{/each}
+	{/each}
+{/if}
+
+<!-- Reference labels for multi-box (print) view -->
+{#if showReferenceLabels && showAllBoxes && allBoxes.length > 0}
+	{#each allBoxes as boxData, boxIndex (boxData.boxId)}
+		{@const boxPos = boxPositions[boxIndex]}
+		{@const boxWidth = boxData.boxDimensions.width}
+		{@const boxDepth = boxData.boxDimensions.depth}
+		{@const xOffset = boxPos?.x ?? 0}
+		{@const zOffset = printBedSize / 2}
+		{#each boxData.trayGeometries as trayData, trayIndex (trayData.trayId)}
+			{@const placement = trayData.placement}
+			{@const trayX = xOffset - boxWidth / 2 + boxWallThickness + boxTolerance + placement.x}
+			{@const trayZ = zOffset + boxDepth / 2 - boxWallThickness - boxTolerance - placement.y}
+			{@const trayY = boxFloorThickness}
+			{@const cumulativeIdx =
+				allBoxes.slice(0, boxIndex).reduce((sum, b) => sum + b.trayGeometries.length, 0) +
+				trayIndex}
+			{@const trayLetter = trayData.trayLetter ?? getTrayLetter(cumulativeIdx)}
+			{@const maxStackHeight =
+				trayData.counterStacks.length > 0
+					? Math.max(
+							...trayData.counterStacks.map((stack) => {
+								const effectiveShape =
+									stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape;
+								return stack.isEdgeLoaded
+									? effectiveShape === 'triangle'
+										? stack.length
+										: stack.shape === 'custom'
+											? Math.min(stack.width, stack.length)
+											: Math.max(stack.width, stack.length)
+									: stack.z + stack.count * stack.thickness;
+							})
+						)
+					: 10}
+			{@const labelHeight = trayY + maxStackHeight + 5}
+			{#each trayData.counterStacks as stack, stackIdx (stackIdx)}
+				{@const refCode = `${trayLetter}${stackIdx + 1}`}
+				{@const posX = stack.isEdgeLoaded
+					? stack.edgeOrientation === 'lengthwise'
+						? trayX + stack.x + (stack.slotWidth ?? stack.count * stack.thickness) / 2
+						: trayX + stack.x + (stack.slotWidth ?? stack.length) / 2
+					: trayX + stack.x}
+				{@const posZ = stack.isEdgeLoaded
+					? stack.edgeOrientation === 'lengthwise'
+						? trayZ - stack.y - (stack.slotDepth ?? stack.length) / 2
+						: trayZ - stack.y - (stack.slotDepth ?? stack.count * stack.thickness) / 2
+					: trayZ - stack.y}
+				{@const stackLabel = getStackLabel(stack)}
+				{@const tooltipHeight = labelHeight + 6}
+				{@const isHovered = hoveredLabel?.refCode === refCode}
+				<Text
+					text={refCode}
+					font={monoFont}
+					fontSize={4}
+					position={[posX, labelHeight, posZ]}
+					quaternion={captureMode ? topDownQuaternion : labelQuaternion}
+					color={isHovered ? '#ffffff' : '#000000'}
+					anchorX="center"
+					anchorY="bottom"
+					outlineWidth="8%"
+					outlineColor={isHovered ? '#000000' : '#ffffff'}
+					onpointerenter={() => {
+						hoveredLabel = { refCode, text: stackLabel, position: [posX, tooltipHeight, posZ] };
+					}}
+					onpointerleave={() => {
+						hoveredLabel = null;
+					}}
+				/>
+			{/each}
 		{/each}
 	{/each}
 {/if}

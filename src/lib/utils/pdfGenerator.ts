@@ -6,7 +6,31 @@ import {
 	type TopLoadedStackDef,
 	type EdgeLoadedStackDef
 } from '$lib/models/counterTray';
-import type { Project } from '$lib/types/project';
+import type { Box, Project } from '$lib/types/project';
+
+/**
+ * Generate a tray letter based on cumulative index across all boxes.
+ * A-Z for first 26, then AA, BB, CC... for 26+
+ */
+function getTrayLetter(index: number): string {
+	if (index < 26) {
+		return String.fromCharCode(65 + index);
+	}
+	const letter = String.fromCharCode(65 + (index % 26));
+	const repeat = Math.floor(index / 26) + 1;
+	return letter.repeat(repeat);
+}
+
+/**
+ * Get cumulative tray index across all boxes.
+ */
+function getCumulativeTrayIndex(boxes: Box[], boxIndex: number, trayIndex: number): number {
+	let cumulative = 0;
+	for (let i = 0; i < boxIndex; i++) {
+		cumulative += boxes[i].trays.length;
+	}
+	return cumulative + trayIndex;
+}
 
 // Screenshot data structure for each tray
 export interface TrayScreenshot {
@@ -136,7 +160,7 @@ export function extractPdfData(project: Project): PdfData {
 		for (let trayIndex = 0; trayIndex < placements.length; trayIndex++) {
 			const placement = placements[trayIndex];
 			const tray = placement.tray;
-			const trayLetter = String.fromCharCode(65 + trayIndex); // A, B, C... per tray
+			const trayLetter = getTrayLetter(getCumulativeTrayIndex(project.boxes, boxIndex, trayIndex));
 			const counterPositions = getCounterPositions(tray.params);
 			const stacks: PdfStackData[] = [];
 

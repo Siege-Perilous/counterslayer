@@ -3,6 +3,7 @@ import type { CounterTrayParams } from '$lib/models/counterTray';
 export interface Tray {
 	id: string;
 	name: string;
+	color: string;
 	params: CounterTrayParams;
 }
 

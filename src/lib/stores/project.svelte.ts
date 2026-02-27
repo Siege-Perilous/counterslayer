@@ -2,6 +2,7 @@ import { defaultParams, type CounterTrayParams } from '$lib/models/counterTray';
 import { defaultLidParams } from '$lib/models/lid';
 import { saveProject, loadProject, migrateProjectData } from '$lib/utils/storage';
 import type { Tray, Box, Project, LidParams } from '$lib/types/project';
+import { SvelteMap } from 'svelte/reactivity';
 
 export type { Tray, Box, Project, LidParams };
 
@@ -9,10 +10,55 @@ function generateId(): string {
 	return Math.random().toString(36).substring(2, 9);
 }
 
-function createDefaultTray(name: string): Tray {
+/**
+ * Generate a tray letter based on cumulative index across all boxes.
+ * A-Z for first 26, then AA, BB, CC... for 26+
+ */
+export function getTrayLetter(index: number): string {
+	if (index < 26) {
+		return String.fromCharCode(65 + index);
+	}
+	// For 26+, use AA, BB, CC, etc.
+	const letter = String.fromCharCode(65 + (index % 26));
+	const repeat = Math.floor(index / 26) + 1;
+	return letter.repeat(repeat);
+}
+
+/**
+ * Get cumulative tray index across all boxes up to (but not including) the given box,
+ * plus the tray index within that box.
+ */
+export function getCumulativeTrayIndex(boxes: Box[], boxIndex: number, trayIndex: number): number {
+	let cumulative = 0;
+	for (let i = 0; i < boxIndex; i++) {
+		cumulative += boxes[i].trays.length;
+	}
+	return cumulative + trayIndex;
+}
+
+/**
+ * Get tray letter for a specific tray, cumulative across all boxes.
+ */
+export function getCumulativeTrayLetter(boxes: Box[], boxIndex: number, trayIndex: number): string {
+	return getTrayLetter(getCumulativeTrayIndex(boxes, boxIndex, trayIndex));
+}
+
+// Color palette for trays
+export const TRAY_COLORS = ['#c9503c', '#3d7a6a', '#d4956a', '#7c5c4a', '#a36b5a', '#5a7c6a'];
+
+/**
+ * Get the next color for a new tray based on total tray count across all boxes.
+ */
+function getNextTrayColor(boxes: Box[]): string {
+	const totalTrays = boxes.reduce((sum, box) => sum + box.trays.length, 0);
+	return TRAY_COLORS[totalTrays % TRAY_COLORS.length];
+}
+
+function createDefaultTray(name: string, color: string): Tray {
 	return {
 		id: generateId(),
 		name,
+		color,
 		params: { ...defaultParams }
 	};
 }
@@ -31,7 +77,7 @@ function createDefaultBox(name: string): Box {
 
 function createDefaultProject(): Project {
 	const box = createDefaultBox('Box 1');
-	const tray = createDefaultTray('Tray 1');
+	const tray = createDefaultTray('Tray 1', TRAY_COLORS[0]);
 	box.trays.push(tray);
 
 	return {
@@ -98,7 +144,7 @@ export function selectTray(trayId: string): void {
 export function addBox(): Box {
 	const boxNumber = project.boxes.length + 1;
 	const box = createDefaultBox(`Box ${boxNumber}`);
-	const tray = createDefaultTray('Tray 1');
+	const tray = createDefaultTray('Tray 1', getNextTrayColor(project.boxes));
 	// Inherit global params (including customShapes) from existing trays
 	const globalParams = getGlobalParamsFromExisting();
 	tray.params = { ...tray.params, ...globalParams };
@@ -159,7 +205,7 @@ export function addTray(boxId: string): Tray | null {
 	if (!box) return null;
 
 	const trayNumber = box.trays.length + 1;
-	const tray = createDefaultTray(`Tray ${trayNumber}`);
+	const tray = createDefaultTray(`Tray ${trayNumber}`, getNextTrayColor(project.boxes));
 	// Inherit global params (including customShapes) from existing trays
 	const globalParams = getGlobalParamsFromExisting();
 	tray.params = { ...tray.params, ...globalParams };
@@ -204,12 +250,7 @@ export function updateTray(trayId: string, updates: Partial<Omit<Tray, 'id'>>): 
 // Global params that should be shared across all trays when changed
 const GLOBAL_PARAM_KEYS: (keyof CounterTrayParams)[] = [
 	'printBedSize',
-	'squareWidth',
-	'squareLength',
-	'hexFlatToFlat',
-	'circleDiameter',
 	'counterThickness',
-	'hexPointyTop',
 	'customShapes'
 ];
 
@@ -251,10 +292,56 @@ export function updateTrayParams(trayId: string, params: CounterTrayParams): voi
 
 	// Propagate changed global params to all other trays
 	if (Object.keys(changedGlobals).length > 0) {
+		// Detect shape renames by comparing old and new customShapes
+		const shapeRenames = new SvelteMap<string, string>(); // oldName -> newName
+		if (changedGlobals.customShapes && oldParams.customShapes) {
+			const newShapes = changedGlobals.customShapes as typeof oldParams.customShapes;
+			// Match shapes by index (shapes are edited in place, not reordered)
+			for (let i = 0; i < Math.min(oldParams.customShapes.length, newShapes.length); i++) {
+				const oldName = oldParams.customShapes[i].name;
+				const newName = newShapes[i].name;
+				if (oldName !== newName) {
+					shapeRenames.set(oldName, newName);
+				}
+			}
+		}
+
 		for (const box of project.boxes) {
 			for (const tray of box.trays) {
 				if (tray.id !== trayId) {
-					tray.params = { ...tray.params, ...changedGlobals };
+					let updatedParams = { ...tray.params, ...changedGlobals };
+
+					// Update stack references if shapes were renamed
+					if (shapeRenames.size > 0) {
+						updatedParams = {
+							...updatedParams,
+							topLoadedStacks: updatedParams.topLoadedStacks.map(([shape, count]) => {
+								for (const [oldName, newName] of shapeRenames) {
+									if (shape === `custom:${oldName}`) {
+										return [
+											`custom:${newName}`,
+											count
+										] as (typeof updatedParams.topLoadedStacks)[0];
+									}
+								}
+								return [shape, count] as (typeof updatedParams.topLoadedStacks)[0];
+							}),
+							edgeLoadedStacks: updatedParams.edgeLoadedStacks.map(([shape, count, orient]) => {
+								for (const [oldName, newName] of shapeRenames) {
+									if (shape === `custom:${oldName}`) {
+										return [
+											`custom:${newName}`,
+											count,
+											orient
+										] as (typeof updatedParams.edgeLoadedStacks)[0];
+									}
+								}
+								return [shape, count, orient] as (typeof updatedParams.edgeLoadedStacks)[0];
+							})
+						};
+					}
+
+					tray.params = updatedParams;
 				}
 			}
 		}
@@ -266,6 +353,62 @@ export function updateTrayParams(trayId: string, params: CounterTrayParams): voi
 // Reset project
 export function resetProject(): void {
 	project = createDefaultProject();
+	autosave();
+}
+
+// Move a tray to a different box (or create a new box)
+export function moveTray(trayId: string, targetBoxId: string | 'new'): void {
+	// Find the tray and its current box
+	let sourceTray: Tray | null = null;
+	let sourceBox: Box | null = null;
+	let sourceIndex = -1;
+
+	for (const box of project.boxes) {
+		const trayIndex = box.trays.findIndex((t) => t.id === trayId);
+		if (trayIndex !== -1) {
+			sourceTray = box.trays[trayIndex];
+			sourceBox = box;
+			sourceIndex = trayIndex;
+			break;
+		}
+	}
+
+	if (!sourceTray || !sourceBox) return;
+
+	// Determine target box
+	let targetBox: Box;
+	if (targetBoxId === 'new') {
+		// Create a new box
+		const boxNumber = project.boxes.length + 1;
+		targetBox = {
+			id: generateId(),
+			name: `Box ${boxNumber}`,
+			trays: [],
+			tolerance: sourceBox.tolerance,
+			wallThickness: sourceBox.wallThickness,
+			floorThickness: sourceBox.floorThickness,
+			lidParams: { ...sourceBox.lidParams }
+		};
+		project.boxes.push(targetBox);
+	} else {
+		const found = project.boxes.find((b) => b.id === targetBoxId);
+		if (!found || found.id === sourceBox.id) return; // Can't move to same box
+		targetBox = found;
+	}
+
+	// Remove from source box
+	sourceBox.trays.splice(sourceIndex, 1);
+
+	// Add to target box
+	targetBox.trays.push(sourceTray);
+
+	// Update selection to follow the moved tray
+	project.selectedBoxId = targetBox.id;
+	project.selectedTrayId = sourceTray.id;
+
+	// If source box is now empty, we might want to select the target anyway (already done)
+	// But we should also handle if the user was viewing a different tray in source box
+
 	autosave();
 }
 

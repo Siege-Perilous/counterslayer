@@ -7,10 +7,18 @@
 		Hr,
 		Select,
 		Link,
-		IconButton,
-		Icon
+		Icon,
+		Panel,
+		Button,
+		ConfirmActionButton
 	} from '@tableslayer/ui';
-	import { IconX } from '@tabler/icons-svelte';
+	import {
+		IconSquare,
+		IconCircle,
+		IconHexagon,
+		IconTriangle,
+		IconRectangle
+	} from '@tabler/icons-svelte';
 	import type { CounterTrayParams, CustomShape, CustomBaseShape } from '$lib/models/counterTray';
 
 	interface Props {
@@ -19,6 +27,45 @@
 	}
 
 	let { params, onchange }: Props = $props();
+
+	// Track which counter is expanded (null = none)
+	let expandedIndex: number | null = $state(null);
+
+	// Get the shape icon component for a base shape
+	function getShapeIcon(baseShape: CustomBaseShape) {
+		switch (baseShape) {
+			case 'square':
+				return IconSquare;
+			case 'circle':
+				return IconCircle;
+			case 'hex':
+				return IconHexagon;
+			case 'triangle':
+				return IconTriangle;
+			case 'rectangle':
+			default:
+				return IconRectangle;
+		}
+	}
+
+	// Calculate icon scale relative to max size (with clamping)
+	function getRelativeIconScale(shape: CustomShape): number {
+		const maxWidth = Math.max(...params.customShapes.map((s) => Math.max(s.width, s.length)));
+		const shapeSize = Math.max(shape.width, shape.length);
+		const minScale = 0.6;
+		const maxScale = 1.4;
+		const ratio = maxWidth > 0 ? shapeSize / maxWidth : 1;
+		return minScale + ratio * (maxScale - minScale);
+	}
+
+	// Get display size string for a shape
+	function getSizeDisplay(shape: CustomShape): string {
+		const baseShape = shape.baseShape ?? 'rectangle';
+		if (baseShape === 'rectangle') {
+			return `${shape.width} × ${shape.length}`;
+		}
+		return `${shape.width}`;
+	}
 
 	const baseShapeOptions: { value: CustomBaseShape; label: string }[] = [
 		{ value: 'rectangle', label: 'Rectangle' },
@@ -34,7 +81,8 @@
 
 	// Custom shape handlers
 	function addCustomShape() {
-		const newName = `Custom ${params.customShapes.length + 1}`;
+		const newIndex = params.customShapes.length;
+		const newName = `Custom ${newIndex + 1}`;
 		onchange({
 			...params,
 			customShapes: [
@@ -42,9 +90,14 @@
 				{ name: newName, baseShape: 'rectangle', width: 20, length: 30 }
 			]
 		});
+		expandedIndex = newIndex;
 	}
 
-	function updateCustomShape(index: number, field: keyof CustomShape, value: string | number) {
+	function updateCustomShape(
+		index: number,
+		field: keyof CustomShape | 'cornerRadius' | 'pointyTop',
+		value: string | number | boolean
+	) {
 		const newShapes = [...params.customShapes];
 		if (field === 'name') {
 			const newName = value as string;
@@ -74,7 +127,7 @@
 		if (field === 'baseShape') {
 			const baseShape = value as CustomBaseShape;
 			if (baseShape !== 'rectangle') {
-				// For square, circle, hex: set length = width
+				// For square, circle, hex, triangle: set length = width
 				newShapes[index] = { ...newShapes[index], baseShape, length: newShapes[index].width };
 			} else {
 				newShapes[index] = { ...newShapes[index], baseShape };
@@ -88,7 +141,7 @@
 			const shape = newShapes[index];
 			const baseShape = shape.baseShape ?? 'rectangle';
 			if (baseShape !== 'rectangle') {
-				// For square, circle, hex: length = width
+				// For square, circle, hex, triangle: length = width
 				newShapes[index] = { ...newShapes[index], width: value as number, length: value as number };
 			} else {
 				newShapes[index] = { ...newShapes[index], width: value as number };
@@ -97,8 +150,30 @@
 			return;
 		}
 
+		// Handle cornerRadius for triangles
+		if (field === 'cornerRadius') {
+			newShapes[index] = { ...newShapes[index], cornerRadius: value as number };
+			onchange({ ...params, customShapes: newShapes });
+			return;
+		}
+
+		// Handle pointyTop for hexes
+		if (field === 'pointyTop') {
+			newShapes[index] = { ...newShapes[index], pointyTop: Boolean(value) };
+			onchange({ ...params, customShapes: newShapes });
+			return;
+		}
+
 		newShapes[index] = { ...newShapes[index], [field]: value };
 		onchange({ ...params, customShapes: newShapes });
+	}
+
+	// Count stacks using a given shape
+	function countStacksUsingShape(shapeName: string): number {
+		const shapeRef = `custom:${shapeName}`;
+		const topCount = params.topLoadedStacks.filter(([shape]) => shape === shapeRef).length;
+		const edgeCount = params.edgeLoadedStacks.filter(([shape]) => shape === shapeRef).length;
+		return topCount + edgeCount;
 	}
 
 	function removeCustomShape(index: number) {
@@ -107,13 +182,11 @@
 		onchange({
 			...params,
 			customShapes: params.customShapes.filter((_, i) => i !== index),
-			topLoadedStacks: params.topLoadedStacks.map(([shape, count]) =>
-				shape === shapeRef ? ['square', count] : [shape, count]
-			),
-			edgeLoadedStacks: params.edgeLoadedStacks.map(([shape, count, orient]) =>
-				shape === shapeRef ? ['square', count, orient] : [shape, count, orient]
-			)
+			topLoadedStacks: params.topLoadedStacks.filter(([shape]) => shape !== shapeRef),
+			edgeLoadedStacks: params.edgeLoadedStacks.filter(([shape]) => shape !== shapeRef)
 		});
+		// Collapse the expanded view after delete
+		expandedIndex = null;
 	}
 </script>
 
@@ -138,229 +211,227 @@
 	<Hr />
 
 	<section class="section">
-		<h3 class="sectionTitle">Simple Counters</h3>
+		<h3 class="sectionTitle">Counter Settings</h3>
 		<Spacer size="0.5rem" />
-		<div class="formGrid">
-			<FormControl label="Square" name="squareWidth">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="number"
-						step="0.1"
-						value={params.squareWidth}
-						onchange={(e) => {
-							const val = parseFloat(e.currentTarget.value);
-							onchange({ ...params, squareWidth: val, squareLength: val });
-						}}
-					/>
-				{/snippet}
-				{#snippet end()}mm{/snippet}
-			</FormControl>
-			<FormControl label="Hex (flat-to-flat)" name="hexFlatToFlat">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="number"
-						step="0.1"
-						value={params.hexFlatToFlat}
-						onchange={(e) => updateParam('hexFlatToFlat', parseFloat(e.currentTarget.value))}
-					/>
-				{/snippet}
-				{#snippet end()}mm{/snippet}
-			</FormControl>
-			<FormControl label="Circle diameter" name="circleDiameter">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="number"
-						step="0.1"
-						value={params.circleDiameter}
-						onchange={(e) => updateParam('circleDiameter', parseFloat(e.currentTarget.value))}
-					/>
-				{/snippet}
-				{#snippet end()}mm{/snippet}
-			</FormControl>
-			<FormControl label="Triangle (side)" name="triangleSide">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="number"
-						step="0.1"
-						value={params.triangleSide}
-						onchange={(e) => updateParam('triangleSide', parseFloat(e.currentTarget.value))}
-					/>
-				{/snippet}
-				{#snippet end()}mm{/snippet}
-			</FormControl>
-			<FormControl label="Triangle radius" name="triangleCornerRadius">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="number"
-						step="0.1"
-						min="0"
-						value={params.triangleCornerRadius}
-						onchange={(e) => updateParam('triangleCornerRadius', parseFloat(e.currentTarget.value))}
-					/>
-				{/snippet}
-				{#snippet end()}mm{/snippet}
-			</FormControl>
-			<FormControl label="Thickness" name="counterThickness">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="number"
-						step="0.1"
-						value={params.counterThickness}
-						onchange={(e) => updateParam('counterThickness', parseFloat(e.currentTarget.value))}
-					/>
-				{/snippet}
-				{#snippet end()}mm{/snippet}
-			</FormControl>
-		</div>
-		<Spacer size="0.5rem" />
-		<InputCheckbox
-			checked={params.hexPointyTop}
-			onchange={(e) => updateParam('hexPointyTop', e.currentTarget.checked)}
-			label="Hex Pointy Top"
-		/>
+		<FormControl label="Thickness" name="counterThickness">
+			{#snippet input({ inputProps })}
+				<Input
+					{...inputProps}
+					type="number"
+					step="0.1"
+					value={params.counterThickness}
+					onchange={(e) => updateParam('counterThickness', parseFloat(e.currentTarget.value))}
+				/>
+			{/snippet}
+			{#snippet end()}mm{/snippet}
+		</FormControl>
 	</section>
 
 	<Hr />
 
 	<section class="section">
-		<h3 class="sectionTitle">Custom Counters</h3>
+		<h3 class="sectionTitle">Counters</h3>
 		<Spacer size="0.5rem" />
 		<div class="customShapesList">
 			{#each params.customShapes as shape, index (shape.name)}
 				{@const baseShape = shape.baseShape ?? 'rectangle'}
-				<div class="shapeCard">
-					<div class="shapeCardHeader">
-						<Input
-							type="text"
-							value={shape.name}
-							onchange={(e) => updateCustomShape(index, 'name', e.currentTarget.value)}
-							placeholder="Shape name"
-							style="flex: 1;"
-						/>
-						<IconButton
-							onclick={() => removeCustomShape(index)}
-							title="Remove shape"
-							variant="ghost"
-							color="var(--fgMuted)"
+				{@const isExpanded = expandedIndex === index}
+				{#if isExpanded}
+					<!-- Expanded view: full form in Panel -->
+					<Panel class="shapePanel">
+						<div class="shapePanelContent">
+							<div class="shapeFormGrid">
+								<FormControl label="Name" name="name-{index}">
+									{#snippet input({ inputProps })}
+										<Input
+											{...inputProps}
+											type="text"
+											value={shape.name}
+											onchange={(e) => updateCustomShape(index, 'name', e.currentTarget.value)}
+											placeholder="Name"
+										/>
+									{/snippet}
+								</FormControl>
+								<FormControl label="Shape" name="baseShape-{index}">
+									{#snippet input({ inputProps })}
+										<Select
+											selected={[baseShape]}
+											onSelectedChange={(selected) =>
+												updateCustomShape(index, 'baseShape', selected[0])}
+											options={baseShapeOptions}
+											{...inputProps}
+										/>
+									{/snippet}
+								</FormControl>
+								{#if baseShape === 'rectangle'}
+									<FormControl label="Width" name="width-{index}">
+										{#snippet input({ inputProps })}
+											<Input
+												{...inputProps}
+												type="number"
+												step="0.1"
+												min="1"
+												value={shape.width}
+												onchange={(e) =>
+													updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+											/>
+										{/snippet}
+										{#snippet end()}mm{/snippet}
+									</FormControl>
+									<FormControl label="Length" name="length-{index}">
+										{#snippet input({ inputProps })}
+											<Input
+												{...inputProps}
+												type="number"
+												step="0.1"
+												min="1"
+												value={shape.length}
+												onchange={(e) =>
+													updateCustomShape(index, 'length', parseFloat(e.currentTarget.value))}
+											/>
+										{/snippet}
+										{#snippet end()}mm{/snippet}
+									</FormControl>
+								{:else if baseShape === 'square'}
+									<FormControl label="Size" name="size-{index}">
+										{#snippet input({ inputProps })}
+											<Input
+												{...inputProps}
+												type="number"
+												step="0.1"
+												min="1"
+												value={shape.width}
+												onchange={(e) =>
+													updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+											/>
+										{/snippet}
+										{#snippet end()}mm{/snippet}
+									</FormControl>
+								{:else if baseShape === 'circle'}
+									<FormControl label="Diameter" name="diameter-{index}">
+										{#snippet input({ inputProps })}
+											<Input
+												{...inputProps}
+												type="number"
+												step="0.1"
+												min="1"
+												value={shape.width}
+												onchange={(e) =>
+													updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+											/>
+										{/snippet}
+										{#snippet end()}mm{/snippet}
+									</FormControl>
+								{:else if baseShape === 'hex'}
+									<FormControl label="Flat-to-flat" name="flatToFlat-{index}">
+										{#snippet input({ inputProps })}
+											<Input
+												{...inputProps}
+												type="number"
+												step="0.1"
+												min="1"
+												value={shape.width}
+												onchange={(e) =>
+													updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+											/>
+										{/snippet}
+										{#snippet end()}mm{/snippet}
+									</FormControl>
+									<InputCheckbox
+										checked={shape.pointyTop ?? false}
+										onchange={(e) =>
+											updateCustomShape(index, 'pointyTop', e.currentTarget.checked ? 1 : 0)}
+										label="Pointy top"
+									/>
+								{:else if baseShape === 'triangle'}
+									<FormControl label="Side" name="side-{index}">
+										{#snippet input({ inputProps })}
+											<Input
+												{...inputProps}
+												type="number"
+												step="0.1"
+												min="1"
+												value={shape.width}
+												onchange={(e) =>
+													updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+											/>
+										{/snippet}
+										{#snippet end()}mm{/snippet}
+									</FormControl>
+									<FormControl label="Radius" name="cornerRadius-{index}">
+										{#snippet input({ inputProps })}
+											<Input
+												{...inputProps}
+												type="number"
+												step="0.1"
+												min="0"
+												value={shape.cornerRadius ?? 1.5}
+												onchange={(e) =>
+													updateCustomShape(
+														index,
+														'cornerRadius',
+														parseFloat(e.currentTarget.value)
+													)}
+											/>
+										{/snippet}
+										{#snippet end()}mm{/snippet}
+									</FormControl>
+								{/if}
+							</div>
+						</div>
+						<Hr />
+						{@const stackCount = countStacksUsingShape(shape.name)}
+						<div class="shapePanelActions">
+							<Button size="sm" onclick={() => (expandedIndex = null)}>Save</Button>
+							<ConfirmActionButton
+								action={() => removeCustomShape(index)}
+								actionButtonText="Delete counter"
+							>
+								{#snippet trigger({ triggerProps })}
+									<Button {...triggerProps} size="sm" variant="ghost">Delete</Button>
+								{/snippet}
+								{#snippet actionMessage()}
+									{#if stackCount > 0}
+										<p>
+											This will delete the "{shape.name}" counter and remove {stackCount} stack{stackCount ===
+											1
+												? ''
+												: 's'} using it.
+										</p>
+									{:else}
+										<p>Delete the "{shape.name}" counter?</p>
+									{/if}
+								{/snippet}
+							</ConfirmActionButton>
+						</div>
+					</Panel>
+				{:else}
+					{@const iconScale = getRelativeIconScale(shape)}
+					<div class="shapeCard">
+						<!-- Collapsed view: compact summary -->
+						<button
+							class="shapeSummary"
+							onclick={() => (expandedIndex = index)}
+							title="Click to edit {shape.name}"
 						>
-							<Icon Icon={IconX} color="var(--fgMuted)" />
-						</IconButton>
+							<span
+								class="shapeIcon"
+								style="transform: scale({iconScale}); --stroke-width: {2 / iconScale};"
+							>
+								<Icon Icon={getShapeIcon(baseShape)} size={16} />
+							</span>
+							<span class="shapeName">{shape.name}</span>
+							<span class="shapeSize">{getSizeDisplay(shape)} mm</span>
+						</button>
 					</div>
-					<Spacer size="0.5rem" />
-					<FormControl label="Base shape" name="baseShape-{index}">
-						{#snippet input({ inputProps })}
-							<Select
-								selected={[baseShape]}
-								onSelectedChange={(selected) => updateCustomShape(index, 'baseShape', selected[0])}
-								options={baseShapeOptions}
-								{...inputProps}
-							/>
-						{/snippet}
-					</FormControl>
-					<Spacer size="0.5rem" />
-					<div class="formGrid">
-						{#if baseShape === 'rectangle'}
-							<FormControl label="Width" name="width-{index}">
-								{#snippet input({ inputProps })}
-									<Input
-										{...inputProps}
-										type="number"
-										step="0.1"
-										min="1"
-										value={shape.width}
-										onchange={(e) =>
-											updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
-									/>
-								{/snippet}
-								{#snippet end()}mm{/snippet}
-							</FormControl>
-							<FormControl label="Length" name="length-{index}">
-								{#snippet input({ inputProps })}
-									<Input
-										{...inputProps}
-										type="number"
-										step="0.1"
-										min="1"
-										value={shape.length}
-										onchange={(e) =>
-											updateCustomShape(index, 'length', parseFloat(e.currentTarget.value))}
-									/>
-								{/snippet}
-								{#snippet end()}mm{/snippet}
-							</FormControl>
-						{:else if baseShape === 'square'}
-							<FormControl label="Size" name="size-{index}" class="formGrid__spanTwo">
-								{#snippet input({ inputProps })}
-									<Input
-										{...inputProps}
-										type="number"
-										step="0.1"
-										min="1"
-										value={shape.width}
-										onchange={(e) =>
-											updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
-									/>
-								{/snippet}
-								{#snippet end()}mm{/snippet}
-							</FormControl>
-						{:else if baseShape === 'circle'}
-							<FormControl label="Diameter" name="diameter-{index}" class="formGrid__spanTwo">
-								{#snippet input({ inputProps })}
-									<Input
-										{...inputProps}
-										type="number"
-										step="0.1"
-										min="1"
-										value={shape.width}
-										onchange={(e) =>
-											updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
-									/>
-								{/snippet}
-								{#snippet end()}mm{/snippet}
-							</FormControl>
-						{:else if baseShape === 'hex'}
-							<FormControl label="Flat-to-flat" name="flatToFlat-{index}" class="formGrid__spanTwo">
-								{#snippet input({ inputProps })}
-									<Input
-										{...inputProps}
-										type="number"
-										step="0.1"
-										min="1"
-										value={shape.width}
-										onchange={(e) =>
-											updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
-									/>
-								{/snippet}
-								{#snippet end()}mm{/snippet}
-							</FormControl>
-						{:else if baseShape === 'triangle'}
-							<FormControl label="Side" name="side-{index}" class="formGrid__spanTwo">
-								{#snippet input({ inputProps })}
-									<Input
-										{...inputProps}
-										type="number"
-										step="0.1"
-										min="1"
-										value={shape.width}
-										onchange={(e) =>
-											updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
-									/>
-								{/snippet}
-								{#snippet end()}mm{/snippet}
-							</FormControl>
-						{/if}
-					</div>
-				</div>
+				{/if}
 			{/each}
-			<Link as="button" onclick={addCustomShape}>+ Add Custom Shape</Link>
 		</div>
+		<Spacer />
+		<Link as="button" onclick={addCustomShape}>+ New counter</Link>
 	</section>
+
+	<Hr />
 </div>
 
 <style>
@@ -370,11 +441,11 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
-		padding: 0.75rem;
+		padding: 0.75rem 0;
 	}
 
 	.section {
-		margin-bottom: 1rem;
+		padding: 0 0.75rem;
 	}
 
 	.sectionTitle {
@@ -386,32 +457,82 @@
 		color: var(--fgMuted);
 	}
 
-	.formGrid {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
-	}
-
-	:global(.formGrid__spanTwo) {
-		grid-column: span 2;
-	}
-
 	.customShapesList {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: 0.25rem;
 	}
 
 	.shapeCard {
-		padding: 0.5rem;
 		border-radius: var(--radius-2);
 		background: var(--contrastLowest);
+		overflow: hidden;
 	}
 
-	.shapeCardHeader {
+	:global(.panel.shapePanel) {
+		padding: 0;
+		background: var(--contrastLow) !important;
+	}
+
+	.shapePanelContent {
+		padding: 0.75rem;
+	}
+
+	.shapeFormGrid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+		gap: 0.75rem;
+	}
+
+	.shapePanelActions {
+		display: flex;
+		gap: 0.5rem;
+		padding: 0.75rem;
+	}
+
+	.shapeSummary {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		margin-bottom: 0.5rem;
+		width: 100%;
+		padding: 0.5rem;
+		border: none;
+		background: transparent;
+		cursor: pointer;
+		text-align: left;
+		font: inherit;
+		color: inherit;
+	}
+
+	.shapeSummary:hover {
+		background: var(--contrastLow);
+	}
+
+	.shapeIcon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		width: 24px;
+		height: 24px;
+		color: var(--fgMuted);
+	}
+
+	.shapeIcon :global(svg) {
+		stroke-width: var(--stroke-width, 2);
+	}
+
+	.shapeName {
+		flex: 1;
+		font-weight: 500;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.shapeSize {
+		font-size: 0.75rem;
+		color: var(--fgMuted);
+		font-family: var(--font-mono);
 	}
 </style>

@@ -42,13 +42,7 @@ export interface TraySpacerInfo {
 // Calculate tray dimensions from params (same logic as counterTray.ts)
 export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const {
-		squareWidth,
-		squareLength,
-		hexFlatToFlat: hexFlatToFlatBase,
-		circleDiameter: circleDiameterBase,
-		triangleSide: triangleSideBase,
 		counterThickness,
-		hexPointyTop,
 		clearance,
 		wallThickness,
 		floorThickness,
@@ -61,25 +55,6 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 
 	// Use topLoadedStacks (renamed from stacks)
 	const stacks = topLoadedStacks || [];
-
-	// Pocket dimensions per shape
-	const squarePocketWidth = squareWidth + clearance * 2;
-	const squarePocketLength = squareLength + clearance * 2;
-
-	const hexFlatToFlat = hexFlatToFlatBase + clearance * 2;
-	const hexPointToPoint = hexFlatToFlat / Math.cos(Math.PI / 6);
-	const hexPocketWidth = hexPointyTop ? hexFlatToFlat : hexPointToPoint;
-	const hexPocketLength = hexPointyTop ? hexPointToPoint : hexFlatToFlat;
-
-	const circleDiameter = circleDiameterBase + clearance * 2;
-	const circlePocketWidth = circleDiameter;
-	const circlePocketLength = circleDiameter;
-
-	// Triangle: equilateral, side length is the base (X), height is side * sqrt(3)/2 (Y)
-	const triangleSide = triangleSideBase + clearance * 2;
-	const triangleHeight = triangleSide * (Math.sqrt(3) / 2);
-	const trianglePocketWidth = triangleSide;
-	const trianglePocketLength = triangleHeight;
 
 	// Helper to get custom shape by name from 'custom:ShapeName' reference
 	const getCustomShape = (shapeRef: string) => {
@@ -98,7 +73,8 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 			// width stores flat-to-flat, calculate point-to-point
 			const flatToFlat = custom.width;
 			const pointToPoint = flatToFlat / Math.cos(Math.PI / 6);
-			// Use global hexPointyTop to determine orientation
+			// Use shape's pointyTop setting
+			const hexPointyTop = custom.pointyTop ?? false;
 			const w = hexPointyTop ? flatToFlat : pointToPoint;
 			const l = hexPointyTop ? pointToPoint : flatToFlat;
 			return [w, l];
@@ -119,90 +95,79 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 
 	// For top-loaded/crosswise custom shapes: LONGER side = width (X), SHORTER side = length (Y)
 	const getPocketWidth = (shape: string): number => {
-		if (shape === 'square') return squarePocketWidth;
-		if (shape === 'hex') return hexPocketWidth;
-		if (shape === 'triangle') return trianglePocketWidth;
 		const custom = getCustomShape(shape);
-		if (custom) {
-			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.max(w, l) + clearance * 2; // Longer side along X (parallel to tray width)
-		}
-		return circlePocketWidth;
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.max(w, l) + clearance * 2; // Longer side along X (parallel to tray width)
 	};
 
 	const getPocketLength = (shape: string): number => {
-		if (shape === 'square') return squarePocketLength;
-		if (shape === 'hex') return hexPocketLength;
-		if (shape === 'triangle') return trianglePocketLength;
 		const custom = getCustomShape(shape);
-		if (custom) {
-			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.min(w, l) + clearance * 2; // Shorter side along Y
-		}
-		return circlePocketLength;
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.min(w, l) + clearance * 2; // Shorter side along Y
 	};
 
 	// For lengthwise edge-loaded: longest dimension runs perpendicular to tray (along Y)
 	// This prevents the slot from receding too far into the tray depth
 	const getPocketLengthLengthwise = (shape: string): number => {
 		const custom = getCustomShape(shape);
-		if (custom) {
-			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.max(w, l) + clearance * 2; // Longer side along Y (perpendicular to tray width)
-		}
-		return getPocketLength(shape);
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.max(w, l) + clearance * 2; // Longer side along Y (perpendicular to tray width)
 	};
 
 	// For lengthwise custom shapes: shorter dimension is height (longer runs along Y)
 	const getStandingHeightLengthwise = (shape: string): number => {
 		const custom = getCustomShape(shape);
-		if (custom) {
-			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.min(w, l); // Shorter side is height
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		if (custom.baseShape === 'triangle') {
+			return custom.width * (Math.sqrt(3) / 2); // Triangle geometric height
 		}
-		return getCounterStandingHeight(shape);
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.min(w, l); // Shorter side is height
 	};
 
 	// For crosswise custom shapes: shorter dimension is height (longer runs along X)
 	const getStandingHeightCrosswise = (shape: string): number => {
 		const custom = getCustomShape(shape);
-		if (custom) {
-			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.min(w, l); // Shorter side is height
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		if (custom.baseShape === 'triangle') {
+			return custom.width * (Math.sqrt(3) / 2); // Triangle geometric height
 		}
-		return getCounterStandingHeight(shape);
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.min(w, l); // Shorter side is height
 	};
 
 	// Get actual counter dimensions (without clearance) for standing height
-	const getCounterWidth = (shape: string): number => {
-		if (shape === 'square') return squareWidth;
-		if (shape === 'hex')
-			return hexPointyTop ? hexFlatToFlatBase : hexFlatToFlatBase / Math.cos(Math.PI / 6);
-		if (shape === 'triangle') return triangleSideBase;
+	const _getCounterWidth = (shape: string): number => {
 		const custom = getCustomShape(shape);
-		if (custom) {
-			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.max(w, l); // Longer side along X
-		}
-		return circleDiameterBase;
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.max(w, l); // Longer side along X
 	};
 
-	const getCounterLength = (shape: string): number => {
-		if (shape === 'square') return squareLength;
-		if (shape === 'hex')
-			return hexPointyTop ? hexFlatToFlatBase / Math.cos(Math.PI / 6) : hexFlatToFlatBase;
-		if (shape === 'triangle') return triangleSideBase * (Math.sqrt(3) / 2);
+	const _getCounterLength = (shape: string): number => {
 		const custom = getCustomShape(shape);
-		if (custom) {
-			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.min(w, l); // Shorter side along Y
-		}
-		return circleDiameterBase;
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.min(w, l); // Shorter side along Y
 	};
 
 	// Get counter standing height (for edge-loaded stacks) - uses actual counter size, not pocket size
-	const getCounterStandingHeight = (shape: string): number =>
-		Math.max(getCounterWidth(shape), getCounterLength(shape));
+	const _getCounterStandingHeight = (shape: string): number => {
+		const custom = getCustomShape(shape);
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		if (custom.baseShape === 'triangle') {
+			return custom.width * (Math.sqrt(3) / 2); // Triangle geometric height
+		}
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.max(w, l);
+	};
+	// Suppress unused warnings for future use
+	void _getCounterWidth;
+	void _getCounterLength;
+	void _getCounterStandingHeight;
 
 	// === TOP-LOADED STACK PLACEMENTS (greedy bin-packing) ===
 	interface TopLoadedPlacement {
@@ -236,23 +201,18 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	let maxEdgeLoadedHeight = 0;
 	let crosswiseMaxDepth = 0;
 
-	// Cutout ratio/max for half-sphere cutouts (same as counterTray.ts defaults)
-	const cutoutRatio = 0.3;
-	const cutoutMax = 12;
+	// Use actual cutout params from tray (not hardcoded defaults)
+	const cutoutRatio = params.cutoutRatio;
+	const cutoutMax = params.cutoutMax;
 
-	// Track lengthwise and crosswise slots
-	interface LengthwiseSlot {
+	// Track edge-loaded slots with unified structure (matching counterTray.ts sorting)
+	interface EdgeLoadedSlot {
 		slotDepth: number;
 		slotWidth: number;
+		orientation: 'lengthwise' | 'crosswise';
 		rowAssignment?: 'front' | 'back';
 	}
-	interface CrosswiseSlot {
-		slotWidth: number;
-		slotDepth: number;
-		rowAssignment?: 'front' | 'back';
-	}
-	const lengthwiseSlots: LengthwiseSlot[] = [];
-	const crosswiseSlots: CrosswiseSlot[] = [];
+	const edgeLoadedSlots: EdgeLoadedSlot[] = [];
 
 	if (edgeLoadedStacks && edgeLoadedStacks.length > 0) {
 		for (const stack of edgeLoadedStacks) {
@@ -264,17 +224,32 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 				const standingHeight = getStandingHeightLengthwise(stack[0]);
 				maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);
 				const slotDepthDim = getPocketLengthLengthwise(stack[0]);
-				lengthwiseSlots.push({ slotDepth: slotDepthDim, slotWidth: counterSpan });
+				edgeLoadedSlots.push({
+					slotDepth: slotDepthDim,
+					slotWidth: counterSpan,
+					orientation: 'lengthwise'
+				});
 			} else {
 				// For custom shapes: longer side along X (parallel to tray width), shorter side is height
 				const standingHeight = getStandingHeightCrosswise(stack[0]);
 				maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);
 				const slotWidthDim = getPocketWidth(stack[0]); // Longer side along X
 				crosswiseMaxDepth = Math.max(crosswiseMaxDepth, counterSpan);
-				crosswiseSlots.push({ slotWidth: slotWidthDim, slotDepth: counterSpan });
+				edgeLoadedSlots.push({
+					slotWidth: slotWidthDim,
+					slotDepth: counterSpan,
+					orientation: 'crosswise'
+				});
 			}
 		}
 	}
+
+	// Sort all edge-loaded slots by area (largest first) - must match counterTray.ts sorting
+	edgeLoadedSlots.sort((a, b) => b.slotWidth * b.slotDepth - a.slotWidth * a.slotDepth);
+
+	// Split into lengthwise and crosswise while preserving sorted order
+	const lengthwiseSlots = edgeLoadedSlots.filter((s) => s.orientation === 'lengthwise');
+	const crosswiseSlots = edgeLoadedSlots.filter((s) => s.orientation === 'crosswise');
 
 	// === GREEDY BIN-PACKING FOR LENGTHWISE SLOTS ===
 	// Adjacent slots share a half-cylinder cutout; first slot uses wall cutout (no left space needed)
@@ -307,8 +282,8 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	// === CROSSWISE SLOT BIN-PACKING ===
 	// Try to pair crosswise slots into columns (one at front, one at back) when they fit
 	interface CrosswiseColumn {
-		frontSlot: CrosswiseSlot | null;
-		backSlot: CrosswiseSlot | null;
+		frontSlot: EdgeLoadedSlot | null;
+		backSlot: EdgeLoadedSlot | null;
 		columnWidth: number;
 	}
 	const crosswiseColumns: CrosswiseColumn[] = [];
@@ -468,22 +443,13 @@ export function arrangeTrays(
 	}
 	const placementsWithRow: PlacementWithRow[] = [];
 
-	console.log(
-		`\n=== arrangeTrays: ${trays.length} trays, maxRowWidth: ${maxRowWidth.toFixed(1)} ===`
-	);
-
 	for (const { tray, dimensions } of trayDims) {
-		console.log(
-			`Placing tray "${tray.name}": ${dimensions.width.toFixed(1)}w x ${dimensions.depth.toFixed(1)}d`
-		);
-
 		// Try to find an existing row where this tray fits
 		let placed = false;
 		for (let i = 0; i < rows.length; i++) {
 			const row = rows[i];
 			if (row.currentX + dimensions.width <= maxRowWidth) {
 				// Fits in this row
-				const oldDepth = row.depth;
 				placementsWithRow.push({
 					tray,
 					dimensions,
@@ -492,12 +458,6 @@ export function arrangeTrays(
 				});
 				row.currentX += dimensions.width;
 				row.depth = Math.max(row.depth, dimensions.depth);
-				console.log(`  -> Placed in row ${i} at x=${row.currentX - dimensions.width}`);
-				if (row.depth !== oldDepth) {
-					console.log(
-						`  -> Row ${i} depth changed: ${oldDepth.toFixed(1)} -> ${row.depth.toFixed(1)}`
-					);
-				}
 				placed = true;
 				break;
 			}
@@ -516,7 +476,6 @@ export function arrangeTrays(
 				x: 0,
 				rowIndex: rows.length - 1
 			});
-			console.log(`  -> Created row ${rows.length - 1}, depth=${dimensions.depth.toFixed(1)}`);
 		}
 	}
 
@@ -537,9 +496,6 @@ export function arrangeTrays(
 		// First row: align to north edge (push away from south box wall)
 		if (p.rowIndex === 0 && p.dimensions.depth < row.depth) {
 			y = row.y + (row.depth - p.dimensions.depth);
-			console.log(
-				`  Pushing "${p.tray.name}" north in row 0: y=${y.toFixed(1)} (gap of ${(row.depth - p.dimensions.depth).toFixed(1)} at south)`
-			);
 		}
 
 		return {
@@ -549,19 +505,6 @@ export function arrangeTrays(
 			y
 		};
 	});
-
-	console.log(`\nFinal rows:`);
-	for (let i = 0; i < rows.length; i++) {
-		console.log(
-			`  Row ${i}: y=${rows[i].y.toFixed(1)}, depth=${rows[i].depth.toFixed(1)}, fillX=${rows[i].currentX.toFixed(1)}`
-		);
-	}
-	console.log(`\nPlacements:`);
-	for (const p of placements) {
-		console.log(
-			`  ${p.tray.name}: (${p.x.toFixed(1)}, ${p.y.toFixed(1)}) - ${p.dimensions.width.toFixed(1)}x${p.dimensions.depth.toFixed(1)}`
-		);
-	}
 
 	return placements;
 }
@@ -795,4 +738,27 @@ export function getTotalAssembledHeight(box: Box): number | null {
 export function calculateMinimumTotalHeight(box: Box): number {
 	const minimums = calculateMinimumBoxDimensions(box);
 	return minimums.minHeight + getLidHeight(box);
+}
+
+// Arrange multiple boxes in a row for the "all boxes" view
+// Returns X positions centered around origin
+export function arrangeBoxes(
+	boxes: { width: number; depth: number }[],
+	gap: number = 20
+): { x: number; totalWidth: number }[] {
+	if (boxes.length === 0) return [];
+
+	let currentX = 0;
+	const positions: { x: number; totalWidth: number }[] = [];
+
+	for (const box of boxes) {
+		positions.push({ x: currentX + box.width / 2, totalWidth: currentX + box.width });
+		currentX += box.width + gap;
+	}
+
+	// Center all boxes around origin
+	const totalWidth = currentX - gap;
+	const offset = totalWidth / 2;
+
+	return positions.map((p) => ({ ...p, x: p.x - offset }));
 }
