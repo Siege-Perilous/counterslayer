@@ -24,6 +24,7 @@
 		boxId: string;
 		boxName: string;
 		boxGeometry: BufferGeometry | null;
+		lidGeometry: BufferGeometry | null;
 		trayGeometries: TrayGeometryData[];
 		boxDimensions: { width: number; depth: number; height: number };
 	}

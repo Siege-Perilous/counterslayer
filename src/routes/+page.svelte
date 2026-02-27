@@ -267,12 +267,21 @@
 		const cacheValid = lastGeneratedHash && currentStateHash === lastGeneratedHash;
 
 		// If cache valid and not forced, try to use cached geometry
-		if (cacheValid && !force && allTrayGeometries.length > 0) {
-			const cachedTray = allTrayGeometries.find(t => t.trayId === tray.id);
-			if (cachedTray) {
-				selectedTrayGeometry = cachedTray.geometry;
-				selectedTrayCounters = cachedTray.counterStacks;
-				return;
+		if (cacheValid && !force && allBoxGeometries.length > 0) {
+			// Find the selected box in the all-boxes cache
+			const cachedBox = allBoxGeometries.find(b => b.boxId === box.id);
+			if (cachedBox) {
+				// Find the selected tray within this box
+				const cachedTray = cachedBox.trayGeometries.find(t => t.trayId === tray.id);
+				if (cachedTray) {
+					// Use cached data for this box
+					selectedTrayGeometry = cachedTray.geometry;
+					selectedTrayCounters = cachedTray.counterStacks;
+					allTrayGeometries = cachedBox.trayGeometries;
+					boxGeometry = cachedBox.boxGeometry;
+					lidGeometry = cachedBox.lidGeometry;
+					return;
+				}
 			}
 		}
 
