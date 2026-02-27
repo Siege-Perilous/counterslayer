@@ -205,7 +205,6 @@ export function updateTray(trayId: string, updates: Partial<Omit<Tray, 'id'>>): 
 const GLOBAL_PARAM_KEYS: (keyof CounterTrayParams)[] = [
 	'printBedSize',
 	'counterThickness',
-	'hexPointyTop',
 	'customShapes'
 ];
 

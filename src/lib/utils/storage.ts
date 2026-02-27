@@ -33,6 +33,7 @@ interface LegacyTrayParams {
 	circleDiameter?: number;
 	triangleSide?: number;
 	triangleCornerRadius?: number;
+	hexPointyTop?: boolean;
 	stacks?: [string, number][];
 }
 
@@ -77,7 +78,8 @@ function migrateTrayParams(params: CounterTrayParams & LegacyTrayParams): Counte
 				name: 'Hex',
 				baseShape: 'hex' as const,
 				width: params.hexFlatToFlat ?? 15.9,
-				length: params.hexFlatToFlat ?? 15.9
+				length: params.hexFlatToFlat ?? 15.9,
+				pointyTop: params.hexPointyTop ?? false
 			},
 			{
 				name: 'Circle',
@@ -138,6 +140,16 @@ function migrateTrayParams(params: CounterTrayParams & LegacyTrayParams): Counte
 		return [shape, count, orient, label] as EdgeLoadedStackDef;
 	});
 
+	// Migrate global hexPointyTop to per-shape pointyTop for existing hex shapes
+	if (params.hexPointyTop !== undefined) {
+		migrated.customShapes = migrated.customShapes.map((shape) => {
+			if (shape.baseShape === 'hex' && shape.pointyTop === undefined) {
+				return { ...shape, pointyTop: params.hexPointyTop };
+			}
+			return shape;
+		});
+	}
+
 	// Remove old params that are no longer used
 	delete (migrated as LegacyTrayParams).squareWidth;
 	delete (migrated as LegacyTrayParams).squareLength;
@@ -145,6 +157,7 @@ function migrateTrayParams(params: CounterTrayParams & LegacyTrayParams): Counte
 	delete (migrated as LegacyTrayParams).circleDiameter;
 	delete (migrated as LegacyTrayParams).triangleSide;
 	delete (migrated as LegacyTrayParams).triangleCornerRadius;
+	delete (migrated as LegacyTrayParams).hexPointyTop;
 
 	return migrated;
 }

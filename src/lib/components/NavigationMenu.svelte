@@ -1,14 +1,6 @@
 <script lang="ts">
-	import {
-		Button,
-		IconButton,
-		Icon,
-		ConfirmActionButton,
-		Hr,
-		Spacer,
-		Panel
-	} from '@tableslayer/ui';
-	import { IconX, IconPlus, IconChevronDown, IconChevronRight } from '@tabler/icons-svelte';
+	import { IconButton, Icon, ConfirmActionButton, Hr, Panel } from '@tableslayer/ui';
+	import { IconX, IconPackage, IconRuler } from '@tabler/icons-svelte';
 	import {
 		getProject,
 		getSelectedBox,
@@ -36,20 +28,6 @@
 	let project = $derived(getProject());
 	let selectedBox = $derived(getSelectedBox());
 	let selectedTray = $derived(getSelectedTray());
-
-	// Track which boxes are collapsed in the tree view
-	let collapsedBoxes = $state<Set<string>>(new Set());
-
-	function toggleBoxCollapse(boxId: string, e: Event) {
-		e.stopPropagation();
-		const newSet = new Set(collapsedBoxes);
-		if (newSet.has(boxId)) {
-			newSet.delete(boxId);
-		} else {
-			newSet.add(boxId);
-		}
-		collapsedBoxes = newSet;
-	}
 
 	function handleDimensionsClick() {
 		onSelectionChange('dimensions');
@@ -111,9 +89,12 @@
 <Panel class="navMenu">
 	<!-- Dimensions (Globals) -->
 	<button
-		class="navItem {selectionType === 'dimensions' ? 'navItem--selected' : ''}"
+		class="navItem navItem--dimensions {selectionType === 'dimensions' ? 'navItem--selected' : ''}"
 		onclick={handleDimensionsClick}
 	>
+		<span class="navItemIcon">
+			<Icon Icon={IconRuler} size="1rem" />
+		</span>
 		Dimensions
 	</button>
 	<Hr />
@@ -122,60 +103,57 @@
 	<div class="navTree">
 		{#each project.boxes as box (box.id)}
 			{@const isBoxSelected = selectedBox?.id === box.id && selectionType === 'box'}
-			{@const isCollapsed = collapsedBoxes.has(box.id)}
 
 			<div class="navBoxGroup">
 				<!-- Box Item -->
 				<div class="navItem navItem--box {isBoxSelected ? 'navItem--selected' : ''}">
-					<button
-						class="navItemCollapse"
-						onclick={(e) => toggleBoxCollapse(box.id, e)}
-						title={isCollapsed ? 'Expand' : 'Collapse'}
-					>
-						<Icon Icon={isCollapsed ? IconChevronRight : IconChevronDown} size="1rem" />
-					</button>
+					<span class="navItemIcon">
+						<Icon Icon={IconPackage} size="1rem" />
+					</span>
 					<button class="navItemLabel" onclick={() => handleBoxClick(box)}>
 						{box.name}
 					</button>
 					{#if project.boxes.length > 1}
-						<ConfirmActionButton
-							action={() => handleDeleteBox(box.id)}
-							actionButtonText="Delete box"
-							positioning={{ placement: 'right' }}
-						>
-							{#snippet trigger({ triggerProps })}
-								<IconButton {...triggerProps} size="sm" variant="ghost" title="Delete box">
-									<Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
-								</IconButton>
-							{/snippet}
-							{#snippet actionMessage()}
-								<p>Delete this box and all its trays?</p>
-							{/snippet}
-						</ConfirmActionButton>
+						<span class="navItemDelete">
+							<ConfirmActionButton
+								action={() => handleDeleteBox(box.id)}
+								actionButtonText="Delete box"
+								positioning={{ placement: 'right' }}
+							>
+								{#snippet trigger({ triggerProps })}
+									<IconButton {...triggerProps} size="sm" variant="ghost" title="Delete box">
+										<Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
+									</IconButton>
+								{/snippet}
+								{#snippet actionMessage()}
+									<p>Delete this box and all its trays?</p>
+								{/snippet}
+							</ConfirmActionButton>
+						</span>
 					{/if}
 				</div>
 
 				<!-- Trays within Box -->
-				{#if !isCollapsed}
-					<div class="navTrayList">
-						{#each box.trays as tray, trayIdx (tray.id)}
-							{@const isTraySelected =
-								selectedTray?.id === tray.id &&
-								selectedBox?.id === box.id &&
-								selectionType === 'tray'}
-							{@const letter = String.fromCharCode(65 + trayIdx)}
-							{@const stats = getTrayStats(tray)}
+				<div class="navTrayList">
+					{#each box.trays as tray, trayIdx (tray.id)}
+						{@const isTraySelected =
+							selectedTray?.id === tray.id &&
+							selectedBox?.id === box.id &&
+							selectionType === 'tray'}
+						{@const letter = String.fromCharCode(65 + trayIdx)}
+						{@const stats = getTrayStats(tray)}
 
-							<div class="navItem navItem--tray {isTraySelected ? 'navItem--selected' : ''}">
-								<button
-									class="navItemLabel"
-									onclick={() => handleTrayClick(tray, box)}
-									title="{tray.name} ({letter}: {stats.counters}c in {stats.stacks}s)"
-								>
-									<span class="trayLetter">{letter}</span>
-									{tray.name}
-								</button>
-								{#if box.trays.length > 1}
+						<div class="navItem navItem--tray {isTraySelected ? 'navItem--selected' : ''}">
+							<button
+								class="navItemLabel"
+								onclick={() => handleTrayClick(tray, box)}
+								title="{tray.name} ({letter}: {stats.counters}c in {stats.stacks}s)"
+							>
+								<span class="trayLetter">{letter}</span>
+								{tray.name}
+							</button>
+							{#if box.trays.length > 1}
+								<span class="navItemDelete">
 									<ConfirmActionButton
 										action={() => handleDeleteTray(box.id, tray.id)}
 										actionButtonText="Delete tray"
@@ -190,29 +168,26 @@
 											<p>Delete this tray?</p>
 										{/snippet}
 									</ConfirmActionButton>
-								{/if}
-							</div>
-						{/each}
+								</span>
+							{/if}
+						</div>
+					{/each}
 
-						<!-- Add Tray Button -->
-						<Button variant="link" size="sm" onclick={(e) => handleAddTray(box.id, e)}>
-							{#snippet start()}
-								<Icon Icon={IconPlus} size="1rem" />
-							{/snippet}
-							Add tray
-						</Button>
-					</div>
-				{/if}
+					<!-- Add Tray Button -->
+					<button class="navItem navItem--add navItem--tray" onclick={(e) => handleAddTray(box.id, e)}>
+						<span class="addIcon">+</span>
+						<span class="addLabel">Add tray</span>
+					</button>
+				</div>
+				<Hr />
 			</div>
 		{/each}
 
 		<!-- Add Box Button -->
-		<Button variant="link" size="sm" onclick={handleAddBox}>
-			{#snippet start()}
-				<Icon Icon={IconPlus} size="1rem" />
-			{/snippet}
-			Add box
-		</Button>
+		<button class="navItem navItem--add" onclick={handleAddBox}>
+			<span class="addIcon">+</span>
+			<span class="addLabel">Add box</span>
+		</button>
 	</div>
 </Panel>
 
@@ -224,8 +199,7 @@
 		z-index: 100;
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
-		padding: 0.5rem;
+		padding: 0;
 		min-width: 12rem;
 		max-width: 16rem;
 		max-height: calc(100vh - 8rem);
@@ -235,9 +209,9 @@
 	.navItem {
 		display: flex;
 		align-items: center;
-		gap: 0.25rem;
-		padding: 0.25rem 0.5rem;
-		border-radius: var(--radius-2);
+		gap: 0.5rem;
+		min-height: 2rem;
+		padding: 0 0.5rem;
 		font-size: 0.875rem;
 		background: transparent;
 		border: none;
@@ -256,50 +230,33 @@
 		font-weight: 600;
 	}
 
-	.navItem--dimensions {
-		padding: 0.5rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		font-size: 0.75rem;
-		letter-spacing: 0.05em;
-		color: var(--fgMuted);
-	}
-
-	.navItem--dimensions.navItem--selected {
-		color: var(--fgPrimary);
-	}
-
-	.navTree {
-		display: flex;
-		flex-direction: column;
-		gap: 0.125rem;
-	}
-
-	.navBoxGroup {
-		display: flex;
-		flex-direction: column;
-	}
-
 	.navItem--box {
 		font-weight: 500;
 	}
 
-	.navItemCollapse {
+	.navItem--add {
+		color: var(--fgMuted);
+	}
+
+	.navItem--add:hover {
+		color: var(--fg);
+	}
+
+	.navItemIcon,
+	.trayLetter,
+	.addIcon {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding: 0;
-		background: none;
-		border: none;
-		cursor: pointer;
-		color: var(--fgMuted);
-		width: 1.25rem;
-		height: 1.25rem;
 		flex-shrink: 0;
+		width: 1rem;
+		color: var(--fgMuted);
+		font-family: var(--font-mono);
+		font-size: 0.625rem;
 	}
 
-	.navItemCollapse:hover {
-		color: var(--fg);
+	.navItemIcon {
+		width: 1.25rem;
 	}
 
 	.navItemLabel {
@@ -307,7 +264,6 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.25rem 0;
 		background: none;
 		border: none;
 		cursor: pointer;
@@ -319,32 +275,35 @@
 		white-space: nowrap;
 	}
 
+	.navItemDelete {
+		opacity: 0;
+	}
+
+	.navItem:hover .navItemDelete {
+		opacity: 1;
+	}
+
+	.navTree {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.navBoxGroup {
+		display: flex;
+		flex-direction: column;
+	}
+
 	.navTrayList {
 		display: flex;
 		flex-direction: column;
-		gap: 0.125rem;
 
 		.navItem {
 			padding-left: 2rem;
 		}
 	}
 
-	.navItem--tray {
-		font-size: 0.8125rem;
-	}
-
-	.trayLetter {
-		font-family: var(--font-mono);
-		font-size: 0.625rem;
-		color: var(--fgMuted);
-		width: 1rem;
-		flex-shrink: 0;
-	}
-
-	.navAddBoxWrapper {
-		margin-top: 0.5rem;
-		padding-top: 0.5rem;
-		border-top: var(--borderThin);
+	.addLabel {
+		flex: 1;
 	}
 
 	/* Mobile styles */

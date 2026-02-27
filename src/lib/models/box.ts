@@ -42,13 +42,7 @@ export interface TraySpacerInfo {
 // Calculate tray dimensions from params (same logic as counterTray.ts)
 export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const {
-		squareWidth,
-		squareLength,
-		hexFlatToFlat: hexFlatToFlatBase,
-		circleDiameter: circleDiameterBase,
-		triangleSide: triangleSideBase,
 		counterThickness,
-		hexPointyTop,
 		clearance,
 		wallThickness,
 		floorThickness,
@@ -61,25 +55,6 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 
 	// Use topLoadedStacks (renamed from stacks)
 	const stacks = topLoadedStacks || [];
-
-	// Pocket dimensions per shape
-	const squarePocketWidth = squareWidth + clearance * 2;
-	const squarePocketLength = squareLength + clearance * 2;
-
-	const hexFlatToFlat = hexFlatToFlatBase + clearance * 2;
-	const hexPointToPoint = hexFlatToFlat / Math.cos(Math.PI / 6);
-	const hexPocketWidth = hexPointyTop ? hexFlatToFlat : hexPointToPoint;
-	const hexPocketLength = hexPointyTop ? hexPointToPoint : hexFlatToFlat;
-
-	const circleDiameter = circleDiameterBase + clearance * 2;
-	const circlePocketWidth = circleDiameter;
-	const circlePocketLength = circleDiameter;
-
-	// Triangle: equilateral, side length is the base (X), height is side * sqrt(3)/2 (Y)
-	const triangleSide = triangleSideBase + clearance * 2;
-	const triangleHeight = triangleSide * (Math.sqrt(3) / 2);
-	const trianglePocketWidth = triangleSide;
-	const trianglePocketLength = triangleHeight;
 
 	// Helper to get custom shape by name from 'custom:ShapeName' reference
 	const getCustomShape = (shapeRef: string) => {
@@ -98,7 +73,8 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 			// width stores flat-to-flat, calculate point-to-point
 			const flatToFlat = custom.width;
 			const pointToPoint = flatToFlat / Math.cos(Math.PI / 6);
-			// Use global hexPointyTop to determine orientation
+			// Use shape's pointyTop setting
+			const hexPointyTop = custom.pointyTop ?? false;
 			const w = hexPointyTop ? flatToFlat : pointToPoint;
 			const l = hexPointyTop ? pointToPoint : flatToFlat;
 			return [w, l];
@@ -119,90 +95,75 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 
 	// For top-loaded/crosswise custom shapes: LONGER side = width (X), SHORTER side = length (Y)
 	const getPocketWidth = (shape: string): number => {
-		if (shape === 'square') return squarePocketWidth;
-		if (shape === 'hex') return hexPocketWidth;
-		if (shape === 'triangle') return trianglePocketWidth;
 		const custom = getCustomShape(shape);
-		if (custom) {
-			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.max(w, l) + clearance * 2; // Longer side along X (parallel to tray width)
-		}
-		return circlePocketWidth;
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.max(w, l) + clearance * 2; // Longer side along X (parallel to tray width)
 	};
 
 	const getPocketLength = (shape: string): number => {
-		if (shape === 'square') return squarePocketLength;
-		if (shape === 'hex') return hexPocketLength;
-		if (shape === 'triangle') return trianglePocketLength;
 		const custom = getCustomShape(shape);
-		if (custom) {
-			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.min(w, l) + clearance * 2; // Shorter side along Y
-		}
-		return circlePocketLength;
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.min(w, l) + clearance * 2; // Shorter side along Y
 	};
 
 	// For lengthwise edge-loaded: longest dimension runs perpendicular to tray (along Y)
 	// This prevents the slot from receding too far into the tray depth
 	const getPocketLengthLengthwise = (shape: string): number => {
 		const custom = getCustomShape(shape);
-		if (custom) {
-			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.max(w, l) + clearance * 2; // Longer side along Y (perpendicular to tray width)
-		}
-		return getPocketLength(shape);
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.max(w, l) + clearance * 2; // Longer side along Y (perpendicular to tray width)
 	};
 
 	// For lengthwise custom shapes: shorter dimension is height (longer runs along Y)
 	const getStandingHeightLengthwise = (shape: string): number => {
 		const custom = getCustomShape(shape);
-		if (custom) {
-			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.min(w, l); // Shorter side is height
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		if (custom.baseShape === 'triangle') {
+			return custom.width * (Math.sqrt(3) / 2); // Triangle geometric height
 		}
-		return getCounterStandingHeight(shape);
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.min(w, l); // Shorter side is height
 	};
 
 	// For crosswise custom shapes: shorter dimension is height (longer runs along X)
 	const getStandingHeightCrosswise = (shape: string): number => {
 		const custom = getCustomShape(shape);
-		if (custom) {
-			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.min(w, l); // Shorter side is height
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		if (custom.baseShape === 'triangle') {
+			return custom.width * (Math.sqrt(3) / 2); // Triangle geometric height
 		}
-		return getCounterStandingHeight(shape);
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.min(w, l); // Shorter side is height
 	};
 
 	// Get actual counter dimensions (without clearance) for standing height
 	const getCounterWidth = (shape: string): number => {
-		if (shape === 'square') return squareWidth;
-		if (shape === 'hex')
-			return hexPointyTop ? hexFlatToFlatBase : hexFlatToFlatBase / Math.cos(Math.PI / 6);
-		if (shape === 'triangle') return triangleSideBase;
 		const custom = getCustomShape(shape);
-		if (custom) {
-			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.max(w, l); // Longer side along X
-		}
-		return circleDiameterBase;
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.max(w, l); // Longer side along X
 	};
 
 	const getCounterLength = (shape: string): number => {
-		if (shape === 'square') return squareLength;
-		if (shape === 'hex')
-			return hexPointyTop ? hexFlatToFlatBase / Math.cos(Math.PI / 6) : hexFlatToFlatBase;
-		if (shape === 'triangle') return triangleSideBase * (Math.sqrt(3) / 2);
 		const custom = getCustomShape(shape);
-		if (custom) {
-			const [w, l] = getCustomEffectiveDims(custom);
-			return Math.min(w, l); // Shorter side along Y
-		}
-		return circleDiameterBase;
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.min(w, l); // Shorter side along Y
 	};
 
 	// Get counter standing height (for edge-loaded stacks) - uses actual counter size, not pocket size
-	const getCounterStandingHeight = (shape: string): number =>
-		Math.max(getCounterWidth(shape), getCounterLength(shape));
+	const getCounterStandingHeight = (shape: string): number => {
+		const custom = getCustomShape(shape);
+		if (!custom) throw new Error(`Unknown shape: ${shape}`);
+		if (custom.baseShape === 'triangle') {
+			return custom.width * (Math.sqrt(3) / 2); // Triangle geometric height
+		}
+		const [w, l] = getCustomEffectiveDims(custom);
+		return Math.max(w, l);
+	};
 
 	// === TOP-LOADED STACK PLACEMENTS (greedy bin-packing) ===
 	interface TopLoadedPlacement {

@@ -28,11 +28,11 @@ export interface CustomShape {
 	width: number; // For rectangle: width. For square/circle/hex: the single dimension (size/diameter/flat-to-flat)
 	length: number; // For rectangle: length. For square/circle/hex: same as width (auto-set)
 	cornerRadius?: number; // For triangle shapes: rounded corner radius
+	pointyTop?: boolean; // For hex shapes: pointy top orientation
 }
 
 export interface CounterTrayParams {
 	counterThickness: number;
-	hexPointyTop: boolean;
 	clearance: number;
 	wallThickness: number;
 	floorThickness: number;
@@ -50,7 +50,6 @@ export interface CounterTrayParams {
 
 export const defaultParams: CounterTrayParams = {
 	counterThickness: 1.3,
-	hexPointyTop: false,
 	clearance: 0.3,
 	wallThickness: 2.0,
 	floorThickness: 2.0,
@@ -78,7 +77,7 @@ export const defaultParams: CounterTrayParams = {
 	],
 	customShapes: [
 		{ name: 'Square', baseShape: 'square', width: 15.9, length: 15.9 },
-		{ name: 'Hex', baseShape: 'hex', width: 15.9, length: 15.9 },
+		{ name: 'Hex', baseShape: 'hex', width: 15.9, length: 15.9, pointyTop: false },
 		{ name: 'Circle', baseShape: 'circle', width: 15.9, length: 15.9 },
 		{ name: 'Triangle', baseShape: 'triangle', width: 15.9, length: 15.9, cornerRadius: 1.5 }
 	],
@@ -126,7 +125,6 @@ export function getCounterPositions(
 	const spacerOffset = floorSpacerHeight ?? 0;
 	const {
 		counterThickness,
-		hexPointyTop,
 		clearance,
 		wallThickness,
 		floorThickness,
@@ -159,7 +157,8 @@ export function getCounterPositions(
 			// width stores flat-to-flat, calculate point-to-point
 			const flatToFlat = custom.width;
 			const pointToPoint = flatToFlat / Math.cos(Math.PI / 6);
-			// Use global hexPointyTop to determine orientation
+			// Use shape's pointyTop setting
+			const hexPointyTop = custom.pointyTop ?? false;
 			const w = hexPointyTop ? flatToFlat : pointToPoint;
 			const l = hexPointyTop ? pointToPoint : flatToFlat;
 			return [w, l];
@@ -559,6 +558,7 @@ export function getCounterPositions(
 		const slotXStart = (slot as EdgeLoadedSlot & { xPosition: number }).xPosition;
 		const slotYStart = rowAssignment === 'front' ? frontRowYStart : effectiveBackRowYStart;
 
+		const customShape = getCustomShape(slot.shape);
 		counterStacks.push({
 			shape: shapeType,
 			customShapeName: customName,
@@ -570,7 +570,7 @@ export function getCounterPositions(
 			length: getCounterLengthLengthwise(slot.shape),
 			thickness: counterThickness,
 			count: slot.count,
-			hexPointyTop,
+			hexPointyTop: customShape?.pointyTop ?? false,
 			color: generateStackColor(100 + i),
 			label: slot.label,
 			isEdgeLoaded: true,
@@ -628,7 +628,7 @@ export function getCounterPositions(
 			length: counterLength,
 			thickness: counterThickness,
 			count: slot.count,
-			hexPointyTop,
+			hexPointyTop: custom?.pointyTop ?? false,
 			color: generateStackColor(200 + i),
 			label: slot.label,
 			isEdgeLoaded: true,
@@ -660,6 +660,7 @@ export function getCounterPositions(
 				placement.pocketLength / 2;
 		}
 
+		const customShape = getCustomShape(placement.shapeRef);
 		counterStacks.push({
 			shape: shapeType,
 			customShapeName: customName,
@@ -671,7 +672,7 @@ export function getCounterPositions(
 			length: getCounterLength(placement.shapeRef),
 			thickness: counterThickness,
 			count: placement.count,
-			hexPointyTop,
+			hexPointyTop: customShape?.pointyTop ?? false,
 			color: generateStackColor(placement.originalIndex),
 			label: placement.label
 		});
@@ -688,7 +689,6 @@ export function createCounterTray(
 ) {
 	const {
 		counterThickness,
-		hexPointyTop,
 		clearance,
 		wallThickness,
 		floorThickness,
@@ -733,7 +733,8 @@ export function createCounterTray(
 			// width stores flat-to-flat, calculate point-to-point
 			const flatToFlat = custom.width;
 			const pointToPoint = flatToFlat / Math.cos(Math.PI / 6);
-			// Use global hexPointyTop to determine orientation
+			// Use shape's pointyTop setting
+			const hexPointyTop = custom.pointyTop ?? false;
 			const w = hexPointyTop ? flatToFlat : pointToPoint;
 			const l = hexPointyTop ? pointToPoint : flatToFlat;
 			return [w, l];
@@ -1178,6 +1179,7 @@ export function createCounterTray(
 				segments: 6,
 				center: [0, 0, height / 2]
 			});
+			const hexPointyTop = custom.pointyTop ?? false;
 			const rotated = hexPointyTop ? rotateZ(Math.PI / 6, hex) : hex;
 			return translate([pw / 2, pl / 2, 0], rotated);
 		} else if (baseShape === 'triangle') {

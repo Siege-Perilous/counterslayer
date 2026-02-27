@@ -117,6 +117,8 @@
 	let jscadLid = $state<Geom3 | null>(null);
 	let generating = $state(false);
 	let error = $state('');
+	let isDirty = $state(false);
+	let lastGeneratedHash = $state('');
 	let jsonFileInput = $state<HTMLInputElement | null>(null);
 	let explosionAmount = $state(0);
 	let showCounters = $state(false);
@@ -331,6 +333,8 @@
 			console.error('Generation error:', e);
 		} finally {
 			generating = false;
+			isDirty = false;
+			lastGeneratedHash = currentStateHash;
 		}
 	}
 
@@ -516,7 +520,32 @@
 		input.value = '';
 	}
 
-	// Generate on mount and when tray/box changes
+	// Create a hash of current state to detect changes
+	let currentStateHash = $derived.by(() => {
+		if (!selectedBox || !selectedTray) return '';
+		return JSON.stringify({
+			boxId: selectedBox.id,
+			box: {
+				tolerance: selectedBox.tolerance,
+				wallThickness: selectedBox.wallThickness,
+				floorThickness: selectedBox.floorThickness,
+				lidParams: selectedBox.lidParams,
+				customWidth: selectedBox.customWidth,
+				customBoxHeight: selectedBox.customBoxHeight,
+				fillSolidEmpty: selectedBox.fillSolidEmpty
+			},
+			trays: selectedBox.trays.map((t) => ({ id: t.id, params: t.params }))
+		});
+	});
+
+	// Track dirty state when params change after generation
+	$effect(() => {
+		if (currentStateHash && lastGeneratedHash && currentStateHash !== lastGeneratedHash) {
+			isDirty = true;
+		}
+	});
+
+	// Generate on mount and when tray/box selection changes
 	$effect(() => {
 		if (browser && selectedTray && selectedBox) {
 			regenerate();
@@ -621,26 +650,6 @@
 
 					<!-- Bottom toolbar -->
 					<div class="bottomToolbar">
-						<div class="toolbarLeft">
-							<Button
-								variant="primary"
-								onclick={regenerate}
-								isDisabled={generating}
-								isLoading={generating}
-							>
-								Regenerate
-							</Button>
-							<InputCheckbox
-								checked={showCounters}
-								onchange={(e) => (showCounters = e.currentTarget.checked)}
-								label="Preview counters"
-							/>
-							<InputCheckbox
-								checked={showReferenceLabels}
-								onchange={(e) => (showReferenceLabels = e.currentTarget.checked)}
-								label="Preview labels"
-							/>
-						</div>
 						<input
 							bind:this={jsonFileInput}
 							type="file"
@@ -648,7 +657,7 @@
 							onchange={handleImportJson}
 							style="display: none;"
 						/>
-						<Popover positioning={{ placement: 'top-end' }}>
+						<Popover positioning={{ placement: 'top-start' }}>
 							{#snippet trigger()}
 								<Button variant="special">
 									Import / Export
@@ -727,6 +736,28 @@
 								</div>
 							{/snippet}
 						</Popover>
+						<div class="toolbarRight">
+							<InputCheckbox
+								checked={showCounters}
+								onchange={(e) => (showCounters = e.currentTarget.checked)}
+								label="Preview counters"
+							/>
+							<InputCheckbox
+								checked={showReferenceLabels}
+								onchange={(e) => (showReferenceLabels = e.currentTarget.checked)}
+								label="Preview labels"
+							/>
+							<span class="regenerateButton {isDirty && !generating ? 'regenerateButton--dirty' : ''}">
+								<Button
+									variant="primary"
+									onclick={regenerate}
+									isDisabled={generating}
+									isLoading={generating}
+								>
+									Regenerate
+								</Button>
+							</span>
+						</div>
 					</div>
 
 					{#if error}
@@ -846,7 +877,8 @@
 		justify-content: space-between;
 	}
 
-	.toolbarLeft {
+	.toolbarLeft,
+	.toolbarRight {
 		display: flex;
 		align-items: center;
 		gap: 0.75rem;
@@ -931,7 +963,8 @@
 			gap: 0.5rem;
 		}
 
-		.toolbarLeft {
+		.toolbarLeft,
+		.toolbarRight {
 			flex-wrap: wrap;
 		}
 
@@ -947,6 +980,43 @@
 			margin-top: 0 !important;
 			margin-left: 50%;
 			transform: translateX(-50%);
+		}
+	}
+
+	/* Regenerate button dirty state animation */
+	.regenerateButton {
+		display: contents;
+	}
+
+	.regenerateButton--dirty :global(button) {
+		animation: wigglePing 3s ease-in-out infinite;
+	}
+
+	@keyframes wigglePing {
+		0%,
+		10%,
+		100% {
+			transform: rotate(0deg);
+		}
+		2% {
+			transform: rotate(-2deg);
+			border: var(--btn-borderHover);
+			background: var(--btn-bgSpecial);
+		}
+		4% {
+			transform: rotate(2deg);
+			border: var(--btn-borderHover);
+			background: var(--btn-bgSpecial);
+		}
+		6% {
+			transform: rotate(-2deg);
+			border: var(--btn-borderHover);
+			background: var(--btn-bgSpecial);
+		}
+		8% {
+			transform: rotate(2deg);
+			border: var(--btn-borderHover);
+			background: var(--btn-bgSpecial);
 		}
 	}
 </style>
