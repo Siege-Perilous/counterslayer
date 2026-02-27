@@ -17,14 +17,24 @@
 		trayLetter?: string;
 	}
 
+	interface BoxGeometryData {
+		boxId: string;
+		boxName: string;
+		boxGeometry: BufferGeometry | null;
+		trayGeometries: TrayGeometryData[];
+		boxDimensions: { width: number; depth: number; height: number };
+	}
+
 	interface Props {
 		geometry: BufferGeometry | null;
 		allTrays?: TrayGeometryData[];
+		allBoxes?: BoxGeometryData[];
 		boxGeometry?: BufferGeometry | null;
 		lidGeometry?: BufferGeometry | null;
 		printBedSize: number;
 		exploded?: boolean;
 		showAllTrays?: boolean;
+		showAllBoxes?: boolean;
 		boxWallThickness?: number;
 		boxTolerance?: number;
 		boxFloorThickness?: number;
@@ -35,17 +45,20 @@
 		triangleCornerRadius?: number;
 		showReferenceLabels?: boolean;
 		hidePrintBed?: boolean;
+		viewTitle?: string;
 		onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
 	}
 
 	let {
 		geometry,
 		allTrays = [],
+		allBoxes = [],
 		boxGeometry = null,
 		lidGeometry = null,
 		printBedSize,
 		exploded = false,
 		showAllTrays = false,
+		showAllBoxes = false,
 		boxWallThickness = 3,
 		boxTolerance = 0.5,
 		boxFloorThickness = 2,
@@ -56,6 +69,7 @@
 		triangleCornerRadius = 1.5,
 		showReferenceLabels = false,
 		hidePrintBed = false,
+		viewTitle = '',
 		onCaptureReady
 	}: Props = $props();
 </script>
@@ -65,11 +79,13 @@
 		<TrayScene
 			{geometry}
 			{allTrays}
+			{allBoxes}
 			{boxGeometry}
 			{lidGeometry}
 			{printBedSize}
 			{exploded}
 			{showAllTrays}
+			{showAllBoxes}
 			{boxWallThickness}
 			{boxTolerance}
 			{boxFloorThickness}
@@ -80,6 +96,7 @@
 			{triangleCornerRadius}
 			{showReferenceLabels}
 			{hidePrintBed}
+			{viewTitle}
 			{onCaptureReady}
 		/>
 	</Canvas>

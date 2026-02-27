@@ -32,6 +32,8 @@
 		arrangeTrays,
 		validateCustomDimensions,
 		calculateTraySpacers,
+		getBoxDimensions,
+		arrangeBoxes,
 		type TrayPlacement
 	} from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
@@ -75,6 +77,14 @@
 		trayLetter: string;
 	}
 
+	interface BoxGeometryData {
+		boxId: string;
+		boxName: string;
+		boxGeometry: BufferGeometry | null;
+		trayGeometries: TrayGeometryData[];
+		boxDimensions: { width: number; depth: number; height: number };
+	}
+
 	// Theme state - get from context if available, otherwise use local state
 	let mode = $state<'light' | 'dark'>('dark');
 
@@ -110,6 +120,7 @@
 	let selectedTrayGeometry = $state<BufferGeometry | null>(null);
 	let selectedTrayCounters = $state<CounterStack[]>([]);
 	let allTrayGeometries = $state<TrayGeometryData[]>([]);
+	let allBoxGeometries = $state<BoxGeometryData[]>([]);
 	let boxGeometry = $state<BufferGeometry | null>(null);
 	let lidGeometry = $state<BufferGeometry | null>(null);
 	let jscadSelectedTray = $state<Geom3 | null>(null);
@@ -170,22 +181,35 @@
 		return String.fromCharCode(65 + (idx >= 0 ? idx : 0));
 	});
 
+	// Title for the print bed based on current view
+	let viewTitle = $derived.by(() => {
+		if (viewMode === 'tray') {
+			return selectedTray?.name ?? '';
+		}
+		// For box views (all, exploded), show box name
+		return selectedBox?.name ?? '';
+	});
+
 	// Compute which geometries to show based on view mode
 	let visibleGeometries = $derived.by(() => {
 		const result: {
 			tray: BufferGeometry | null;
 			allTrays: TrayGeometryData[];
+			allBoxes: BoxGeometryData[];
 			box: BufferGeometry | null;
 			lid: BufferGeometry | null;
 			exploded: boolean;
 			showAllTrays: boolean;
+			showAllBoxes: boolean;
 		} = {
 			tray: null,
 			allTrays: [],
+			allBoxes: [],
 			box: null,
 			lid: null,
 			exploded: false,
-			showAllTrays: false
+			showAllTrays: false,
+			showAllBoxes: false
 		};
 
 		switch (viewMode) {
@@ -200,10 +224,8 @@
 				break;
 			case 'all-no-lid':
 				// Show all boxes together without lids (default view / dimensions view)
-				result.allTrays = allTrayGeometries;
-				result.box = boxGeometry;
-				result.lid = null; // No lid
-				result.showAllTrays = true;
+				result.allBoxes = allBoxGeometries;
+				result.showAllBoxes = true;
 				break;
 			case 'exploded':
 				result.allTrays = allTrayGeometries;
@@ -251,6 +273,7 @@
 	async function regenerate() {
 		if (!browser) return;
 
+		const project = getProject();
 		const box = getSelectedBox();
 		const tray = getSelectedTray();
 
@@ -273,7 +296,7 @@
 				return;
 			}
 
-			// Generate all trays with their placements
+			// Generate all trays with their placements for selected box
 			const placements = arrangeTrays(box.trays, {
 				customBoxWidth: box.customWidth,
 				wallThickness: box.wallThickness,
@@ -300,7 +323,7 @@
 			selectedTrayGeometry = jscadToBufferGeometry(jscadSelectedTray);
 			selectedTrayCounters = getCounterPositions(tray.params, maxHeight, selectedSpacerHeight);
 
-			// Generate all trays at box height with floor spacers
+			// Generate all trays at box height with floor spacers (for selected box)
 			allTrayGeometries = placements.map((placement, index) => {
 				const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
 				const spacerHeight = spacer?.floorSpacerHeight ?? 0;
@@ -321,13 +344,67 @@
 				};
 			});
 
-			// Generate box with lid grooves
+			// Generate box with lid grooves (for selected box)
 			jscadBox = createBoxWithLidGrooves(box);
 			boxGeometry = jscadBox ? jscadToBufferGeometry(jscadBox) : null;
 
-			// Generate lid
+			// Generate lid (for selected box)
 			jscadLid = createLid(box);
 			lidGeometry = jscadLid ? jscadToBufferGeometry(jscadLid) : null;
+
+			// Generate geometries for ALL boxes (for all-no-lid view)
+			allBoxGeometries = project.boxes.map((projectBox) => {
+				// Validate box dimensions
+				const boxValidation = validateCustomDimensions(projectBox);
+				if (!boxValidation.valid) {
+					console.warn(`Box "${projectBox.name}" validation failed:`, boxValidation.errors);
+				}
+
+				// Generate box geometry
+				const boxJscad = createBoxWithLidGrooves(projectBox);
+				const boxBufferGeom = boxJscad ? jscadToBufferGeometry(boxJscad) : null;
+
+				// Get box dimensions
+				const boxDims = getBoxDimensions(projectBox);
+
+				// Generate tray placements and geometries for this box
+				const boxPlacements = arrangeTrays(projectBox.trays, {
+					customBoxWidth: projectBox.customWidth,
+					wallThickness: projectBox.wallThickness,
+					tolerance: projectBox.tolerance
+				});
+
+				const boxSpacerInfo = calculateTraySpacers(projectBox);
+				const boxMaxHeight = Math.max(...boxPlacements.map((p) => p.dimensions.height), 0);
+
+				const trayGeoms: TrayGeometryData[] = boxPlacements.map((placement, index) => {
+					const spacer = boxSpacerInfo.find((s) => s.trayId === placement.tray.id);
+					const spacerHeight = spacer?.floorSpacerHeight ?? 0;
+					const jscadGeom = createCounterTray(
+						placement.tray.params,
+						placement.tray.name,
+						boxMaxHeight,
+						spacerHeight
+					);
+					return {
+						trayId: placement.tray.id,
+						name: placement.tray.name,
+						geometry: jscadToBufferGeometry(jscadGeom),
+						jscadGeom,
+						placement,
+						counterStacks: getCounterPositions(placement.tray.params, boxMaxHeight, spacerHeight),
+						trayLetter: String.fromCharCode(65 + index)
+					};
+				});
+
+				return {
+					boxId: projectBox.id,
+					boxName: projectBox.name,
+					boxGeometry: boxBufferGeom,
+					trayGeometries: trayGeoms,
+					boxDimensions: boxDims ?? { width: 0, depth: 0, height: 0 }
+				};
+			});
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Unknown error';
 			console.error('Generation error:', e);
@@ -520,21 +597,22 @@
 		input.value = '';
 	}
 
-	// Create a hash of current state to detect changes
+	// Create a hash of current state to detect changes (includes all boxes for multi-box view)
 	let currentStateHash = $derived.by(() => {
-		if (!selectedBox || !selectedTray) return '';
+		const project = getProject();
+		if (project.boxes.length === 0) return '';
 		return JSON.stringify({
-			boxId: selectedBox.id,
-			box: {
-				tolerance: selectedBox.tolerance,
-				wallThickness: selectedBox.wallThickness,
-				floorThickness: selectedBox.floorThickness,
-				lidParams: selectedBox.lidParams,
-				customWidth: selectedBox.customWidth,
-				customBoxHeight: selectedBox.customBoxHeight,
-				fillSolidEmpty: selectedBox.fillSolidEmpty
-			},
-			trays: selectedBox.trays.map((t) => ({ id: t.id, params: t.params }))
+			boxes: project.boxes.map((box) => ({
+				id: box.id,
+				tolerance: box.tolerance,
+				wallThickness: box.wallThickness,
+				floorThickness: box.floorThickness,
+				lidParams: box.lidParams,
+				customWidth: box.customWidth,
+				customBoxHeight: box.customBoxHeight,
+				fillSolidEmpty: box.fillSolidEmpty,
+				trays: box.trays.map((t) => ({ id: t.id, params: t.params }))
+			}))
 		});
 	});
 
@@ -605,11 +683,13 @@
 							<TrayViewer
 								geometry={visibleGeometries.tray}
 								allTrays={visibleGeometries.allTrays}
+								allBoxes={visibleGeometries.allBoxes}
 								boxGeometry={visibleGeometries.box}
 								lidGeometry={visibleGeometries.lid}
 								{printBedSize}
 								exploded={visibleGeometries.exploded}
 								showAllTrays={visibleGeometries.showAllTrays}
+								showAllBoxes={visibleGeometries.showAllBoxes}
 								boxWallThickness={selectedBox?.wallThickness ?? 3}
 								boxTolerance={selectedBox?.tolerance ?? 0.5}
 								boxFloorThickness={selectedBox?.floorThickness ?? 2}
@@ -620,6 +700,7 @@
 								triangleCornerRadius={selectedTray?.params.triangleCornerRadius ?? 1.5}
 								{showReferenceLabels}
 								{hidePrintBed}
+								{viewTitle}
 								onCaptureReady={(fn) => (captureFunction = fn)}
 							/>
 						{/await}

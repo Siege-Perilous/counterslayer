@@ -757,3 +757,26 @@ export function calculateMinimumTotalHeight(box: Box): number {
 	const minimums = calculateMinimumBoxDimensions(box);
 	return minimums.minHeight + getLidHeight(box);
 }
+
+// Arrange multiple boxes in a row for the "all boxes" view
+// Returns X positions centered around origin
+export function arrangeBoxes(
+	boxes: { width: number; depth: number }[],
+	gap: number = 20
+): { x: number; totalWidth: number }[] {
+	if (boxes.length === 0) return [];
+
+	let currentX = 0;
+	const positions: { x: number; totalWidth: number }[] = [];
+
+	for (const box of boxes) {
+		positions.push({ x: currentX + box.width / 2, totalWidth: currentX + box.width });
+		currentX += box.width + gap;
+	}
+
+	// Center all boxes around origin
+	const totalWidth = currentX - gap;
+	const offset = totalWidth / 2;
+
+	return positions.map((p) => ({ ...p, x: p.x - offset }));
+}
