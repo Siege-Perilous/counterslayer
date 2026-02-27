@@ -1,21 +1,27 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { PaneGroup, Pane, PaneResizer } from 'paneforge';
+	import { PaneGroup, Pane, PaneResizer, type PaneAPI } from 'paneforge';
 	import {
 		Button,
 		IconButton,
 		Icon,
 		InputCheckbox,
 		Select,
-		RadioButton,
 		Popover,
 		Hr,
 		Link,
 		FormControl,
 		Loader
 	} from '@tableslayer/ui';
-	import { IconSun, IconMoon, IconChevronDown } from '@tabler/icons-svelte';
-	import Sidebar from '$lib/components/Sidebar.svelte';
+	import {
+		IconSun,
+		IconMoon,
+		IconChevronDown,
+		IconChevronLeft,
+		IconChevronRight
+	} from '@tabler/icons-svelte';
+	import NavigationMenu from '$lib/components/NavigationMenu.svelte';
+	import EditorPanel from '$lib/components/EditorPanel.svelte';
 	import {
 		createCounterTray,
 		getCounterPositions,
@@ -49,7 +55,8 @@
 	import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 	import { setContext } from 'svelte';
 
-	type ViewMode = 'tray' | 'all' | 'exploded';
+	type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid';
+	type SelectionType = 'dimensions' | 'box' | 'tray';
 
 	interface CommunityProject {
 		id: string;
@@ -96,7 +103,10 @@
 		toggle: toggleTheme
 	});
 
-	let viewMode = $state<ViewMode>('tray');
+	let viewMode = $state<ViewMode>('all-no-lid');
+	let selectionType = $state<SelectionType>('dimensions');
+	let isEditorCollapsed = $state(false);
+	let editorPane: PaneAPI;
 	let selectedTrayGeometry = $state<BufferGeometry | null>(null);
 	let selectedTrayCounters = $state<CounterStack[]>([]);
 	let allTrayGeometries = $state<TrayGeometryData[]>([]);
@@ -186,6 +196,13 @@
 				result.lid = lidGeometry;
 				result.showAllTrays = true;
 				break;
+			case 'all-no-lid':
+				// Show all boxes together without lids (default view / dimensions view)
+				result.allTrays = allTrayGeometries;
+				result.box = boxGeometry;
+				result.lid = null; // No lid
+				result.showAllTrays = true;
+				break;
 			case 'exploded':
 				result.allTrays = allTrayGeometries;
 				result.box = boxGeometry;
@@ -196,6 +213,38 @@
 		}
 		return result;
 	});
+
+	// Handle selection type changes - update view mode accordingly
+	function handleSelectionChange(type: SelectionType) {
+		selectionType = type;
+		switch (type) {
+			case 'dimensions':
+				viewMode = 'all-no-lid';
+				break;
+			case 'box':
+				viewMode = 'exploded';
+				break;
+			case 'tray':
+				viewMode = 'tray';
+				break;
+		}
+	}
+
+	function handleExpandPanel() {
+		if (isEditorCollapsed && editorPane) {
+			editorPane.expand();
+		}
+	}
+
+	function handleToggleCollapse() {
+		if (editorPane) {
+			if (isEditorCollapsed) {
+				editorPane.expand();
+			} else {
+				editorPane.collapse();
+			}
+		}
+	}
 
 	async function regenerate() {
 		if (!browser) return;
@@ -479,12 +528,6 @@
 			resetProject();
 		}
 	}
-
-	const viewModeOptions = [
-		{ value: 'tray', label: 'Current tray' },
-		{ value: 'all', label: 'Boxed' },
-		{ value: 'exploded', label: 'Exploded' }
-	];
 </script>
 
 <svelte:head>
@@ -515,192 +558,212 @@
 			</IconButton>
 		</div>
 	</div>
-	<PaneGroup direction="vertical" style="flex: 1; min-height: 0;">
-		<!-- Preview Pane -->
-		<Pane defaultSize={60} minSize={30} style="height: 100%; overflow: hidden;">
-			<main style="position: relative; height: 100%;">
-				{#if browser}
-					{#await import('$lib/components/TrayViewer.svelte') then { default: TrayViewer }}
-						<TrayViewer
-							geometry={visibleGeometries.tray}
-							allTrays={visibleGeometries.allTrays}
-							boxGeometry={visibleGeometries.box}
-							lidGeometry={visibleGeometries.lid}
-							{printBedSize}
-							exploded={visibleGeometries.exploded}
-							showAllTrays={visibleGeometries.showAllTrays}
-							boxWallThickness={selectedBox?.wallThickness ?? 3}
-							boxTolerance={selectedBox?.tolerance ?? 0.5}
-							boxFloorThickness={selectedBox?.floorThickness ?? 2}
-							{explosionAmount}
-							{showCounters}
-							{selectedTrayCounters}
-							{selectedTrayLetter}
-							triangleCornerRadius={selectedTray?.params.triangleCornerRadius ?? 1.5}
-							{showReferenceLabels}
-							{hidePrintBed}
-							onCaptureReady={(fn) => (captureFunction = fn)}
-						/>
-					{/await}
-				{/if}
 
-				{#if generating}
-					<div class="generatingOverlay">
-						<Loader />
-						<div class="generatingText">Generating geometry...</div>
-					</div>
-				{/if}
+	<div class="appContent">
+		<!-- Navigation Menu (floating top-left) -->
+		<NavigationMenu
+			{selectionType}
+			onSelectionChange={handleSelectionChange}
+			onExpandPanel={handleExpandPanel}
+		/>
 
-				<!-- View mode buttons -->
-				<div class="viewToolbar">
-					<RadioButton
-						selected={viewMode}
-						onSelectedChange={(val) => (viewMode = val as ViewMode)}
-						options={viewModeOptions}
-					/>
-					{#if viewMode === 'exploded'}
-						<div class="sliderContainer">
-							<span class="sliderLabel">Explode</span>
-							<input
-								type="range"
-								min="0"
-								max="100"
-								bind:value={explosionAmount}
-								class="rangeSlider"
+		<PaneGroup direction="horizontal" class="paneGroup">
+			<!-- Main 3D View Pane -->
+			<Pane defaultSize={75} minSize={40}>
+				<main class="mainView">
+					{#if browser}
+						{#await import('$lib/components/TrayViewer.svelte') then { default: TrayViewer }}
+							<TrayViewer
+								geometry={visibleGeometries.tray}
+								allTrays={visibleGeometries.allTrays}
+								boxGeometry={visibleGeometries.box}
+								lidGeometry={visibleGeometries.lid}
+								{printBedSize}
+								exploded={visibleGeometries.exploded}
+								showAllTrays={visibleGeometries.showAllTrays}
+								boxWallThickness={selectedBox?.wallThickness ?? 3}
+								boxTolerance={selectedBox?.tolerance ?? 0.5}
+								boxFloorThickness={selectedBox?.floorThickness ?? 2}
+								{explosionAmount}
+								{showCounters}
+								{selectedTrayCounters}
+								{selectedTrayLetter}
+								triangleCornerRadius={selectedTray?.params.triangleCornerRadius ?? 1.5}
+								{showReferenceLabels}
+								{hidePrintBed}
+								onCaptureReady={(fn) => (captureFunction = fn)}
 							/>
+						{/await}
+					{/if}
+
+					{#if generating}
+						<div class="generatingOverlay">
+							<Loader />
+							<div class="generatingText">Generating geometry...</div>
 						</div>
 					{/if}
-				</div>
 
-				<!-- Bottom toolbar -->
-				<div class="bottomToolbar">
-					<div class="toolbarLeft">
-						<Button
-							variant="primary"
-							onclick={regenerate}
-							isDisabled={generating}
-							isLoading={generating}
-						>
-							Regenerate
-						</Button>
-						<InputCheckbox
-							checked={showCounters}
-							onchange={(e) => (showCounters = e.currentTarget.checked)}
-							label="Preview counters"
-						/>
-						<InputCheckbox
-							checked={showReferenceLabels}
-							onchange={(e) => (showReferenceLabels = e.currentTarget.checked)}
-							label="Preview labels"
-						/>
-					</div>
-					<input
-						bind:this={jsonFileInput}
-						type="file"
-						accept=".json"
-						onchange={handleImportJson}
-						style="display: none;"
-					/>
-					<Popover positioning={{ placement: 'top-end' }}>
-						{#snippet trigger()}
-							<Button variant="special">
-								Import / Export
-								<Icon Icon={IconChevronDown} />
-							</Button>
-						{/snippet}
-						{#snippet content()}
-							<div class="popoverMenu">
-								{#if communityProjects.length > 0}
-									<FormControl label="Load community project" name="communityProject">
-										{#snippet input({ inputProps })}
-											<Select
-												selected={[]}
-												options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
-												onSelectedChange={(selected) => {
-													const project = communityProjects.find((p) => p.id === selected[0]);
-													if (project) {
-														loadCommunityProject(project);
-													}
-												}}
-												{...inputProps}
-											/>
-										{/snippet}
-									</FormControl>
-									<Hr />
-								{/if}
-								<Button
-									variant="ghost"
-									onclick={() => jsonFileInput?.click()}
-									style="width: 100%; justify-content: flex-start;"
-								>
-									Import project JSON
-								</Button>
-								<Button
-									variant="ghost"
-									onclick={handleExportJson}
-									style="width: 100%; justify-content: flex-start;"
-								>
-									Export project JSON
-								</Button>
-								<Hr />
-								<Button
-									variant="ghost"
-									onclick={handleExport}
-									disabled={generating || !jscadSelectedTray}
-									style="width: 100%; justify-content: flex-start;"
-								>
-									Export tray STL
-								</Button>
-								<Button
-									variant="ghost"
-									onclick={handleExportAll}
-									disabled={generating ||
-										(!jscadBox && !jscadLid && allTrayGeometries.length === 0)}
-									style="width: 100%; justify-content: flex-start;"
-								>
-									Export all STLs
-								</Button>
-								<Button
-									variant="ghost"
-									onclick={handleExportPdf}
-									disabled={getProject().boxes.length === 0 || exportingPdf}
-									isLoading={exportingPdf}
-									style="width: 100%; justify-content: flex-start;"
-								>
-									{exportingPdf ? 'Generating PDF...' : 'PDF reference'}
-								</Button>
-								<Hr />
-								<Button
-									variant="danger"
-									onclick={handleReset}
-									style="width: 100%; justify-content: flex-start;"
-								>
-									Clear current project
-								</Button>
+					<!-- Explosion slider (only visible when box is selected) -->
+					{#if viewMode === 'exploded'}
+						<div class="viewToolbar">
+							<div class="sliderContainer">
+								<span class="sliderLabel">Explode</span>
+								<input
+									type="range"
+									min="0"
+									max="100"
+									bind:value={explosionAmount}
+									class="rangeSlider"
+								/>
 							</div>
-						{/snippet}
-					</Popover>
-				</div>
+						</div>
+					{/if}
 
-				{#if error}
-					<div class="errorBanner">
-						{error}
+					<!-- Bottom toolbar -->
+					<div class="bottomToolbar">
+						<div class="toolbarLeft">
+							<Button
+								variant="primary"
+								onclick={regenerate}
+								isDisabled={generating}
+								isLoading={generating}
+							>
+								Regenerate
+							</Button>
+							<InputCheckbox
+								checked={showCounters}
+								onchange={(e) => (showCounters = e.currentTarget.checked)}
+								label="Preview counters"
+							/>
+							<InputCheckbox
+								checked={showReferenceLabels}
+								onchange={(e) => (showReferenceLabels = e.currentTarget.checked)}
+								label="Preview labels"
+							/>
+						</div>
+						<input
+							bind:this={jsonFileInput}
+							type="file"
+							accept=".json"
+							onchange={handleImportJson}
+							style="display: none;"
+						/>
+						<Popover positioning={{ placement: 'top-end' }}>
+							{#snippet trigger()}
+								<Button variant="special">
+									Import / Export
+									<Icon Icon={IconChevronDown} />
+								</Button>
+							{/snippet}
+							{#snippet content()}
+								<div class="popoverMenu">
+									{#if communityProjects.length > 0}
+										<FormControl label="Load community project" name="communityProject">
+											{#snippet input({ inputProps })}
+												<Select
+													selected={[]}
+													options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
+													onSelectedChange={(selected) => {
+														const project = communityProjects.find((p) => p.id === selected[0]);
+														if (project) {
+															loadCommunityProject(project);
+														}
+													}}
+													{...inputProps}
+												/>
+											{/snippet}
+										</FormControl>
+										<Hr />
+									{/if}
+									<Button
+										variant="ghost"
+										onclick={() => jsonFileInput?.click()}
+										style="width: 100%; justify-content: flex-start;"
+									>
+										Import project JSON
+									</Button>
+									<Button
+										variant="ghost"
+										onclick={handleExportJson}
+										style="width: 100%; justify-content: flex-start;"
+									>
+										Export project JSON
+									</Button>
+									<Hr />
+									<Button
+										variant="ghost"
+										onclick={handleExport}
+										disabled={generating || !jscadSelectedTray}
+										style="width: 100%; justify-content: flex-start;"
+									>
+										Export tray STL
+									</Button>
+									<Button
+										variant="ghost"
+										onclick={handleExportAll}
+										disabled={generating ||
+											(!jscadBox && !jscadLid && allTrayGeometries.length === 0)}
+										style="width: 100%; justify-content: flex-start;"
+									>
+										Export all STLs
+									</Button>
+									<Button
+										variant="ghost"
+										onclick={handleExportPdf}
+										disabled={getProject().boxes.length === 0 || exportingPdf}
+										isLoading={exportingPdf}
+										style="width: 100%; justify-content: flex-start;"
+									>
+										{exportingPdf ? 'Generating PDF...' : 'PDF reference'}
+									</Button>
+									<Hr />
+									<Button
+										variant="danger"
+										onclick={handleReset}
+										style="width: 100%; justify-content: flex-start;"
+									>
+										Clear current project
+									</Button>
+								</div>
+							{/snippet}
+						</Popover>
 					</div>
-				{/if}
-			</main>
-		</Pane>
 
-		<PaneResizer class="paneResizer paneResizer--vertical">
-			<div class="paneResizerHandle paneResizerHandle--vertical"></div>
-		</PaneResizer>
+					{#if error}
+						<div class="errorBanner">
+							{error}
+						</div>
+					{/if}
+				</main>
+			</Pane>
 
-		<!-- Controls Pane -->
-		<Pane defaultSize={40} minSize={20} style="height: 100%; overflow: hidden;">
-			<div style="height: 100%;">
-				<Sidebar />
-			</div>
-		</Pane>
-	</PaneGroup>
+			<!-- Resizer with collapse button -->
+			<PaneResizer class="resizer">
+				<button
+					class="resizer__handle"
+					aria-label={isEditorCollapsed ? 'Expand editor panel' : 'Collapse editor panel'}
+					title={isEditorCollapsed ? 'Expand editor panel' : 'Collapse editor panel'}
+					onclick={handleToggleCollapse}
+				>
+					<Icon Icon={isEditorCollapsed ? IconChevronLeft : IconChevronRight} />
+				</button>
+			</PaneResizer>
+
+			<!-- Editor Panel Pane (collapsible) -->
+			<Pane
+				defaultSize={25}
+				minSize={15}
+				maxSize={50}
+				collapsible={true}
+				collapsedSize={0}
+				bind:this={editorPane}
+				onCollapse={() => (isEditorCollapsed = true)}
+				onExpand={() => (isEditorCollapsed = false)}
+			>
+				<EditorPanel {selectionType} />
+			</Pane>
+		</PaneGroup>
+	</div>
 </div>
 
 <style>
@@ -720,6 +783,24 @@
 		border-bottom: var(--borderThin);
 		font-size: 0.875rem;
 		color: var(--fgMuted);
+		flex-shrink: 0;
+	}
+
+	.appContent {
+		display: flex;
+		flex: 1;
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	:global(.paneGroup) {
+		flex: 1;
+		min-height: 0;
+	}
+
+	.mainView {
+		height: 100%;
+		position: relative;
 	}
 
 	.viewToolbar {
@@ -804,39 +885,68 @@
 		font-size: 1.125rem;
 	}
 
-	:global(.paneResizer) {
+	/* Resizer styling */
+	:global(.resizer) {
 		position: relative;
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		justify-content: center;
-		background: var(--contrastEmpty);
-	}
-
-	:global(.paneResizer--horizontal) {
 		width: 1rem;
+		z-index: 2;
+		background: var(--contrastEmpty);
+		border-left: var(--borderThin);
 	}
 
-	:global(.paneResizer--vertical) {
-		height: 1rem;
-		border-top: var(--borderThin);
-	}
-
-	:global(.paneResizerHandle) {
-		border-radius: 9999px;
-		background: var(--contrastMedium);
-	}
-
-	:global(.paneResizerHandle--horizontal) {
+	.resizer__handle {
+		position: absolute;
+		right: 100%;
+		width: 100%;
 		height: 2rem;
-		width: 0.125rem;
+		cursor: pointer;
+		background: var(--contrastMedium);
+		margin-top: 1.5rem;
+		transition: background 0.2s;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		border: none;
+		color: var(--fgMuted);
 	}
 
-	:global(.paneResizerHandle--vertical) {
-		height: 0.125rem;
-		width: 3rem;
-	}
-
-	:global(.paneResizer:hover .paneResizerHandle) {
+	:global(.resizer:hover) .resizer__handle {
 		background: var(--fg);
+		color: var(--bg);
+	}
+
+	/* Mobile responsive styles */
+	@media (max-width: 768px) {
+		.appContent {
+			flex-direction: column;
+		}
+
+		.bottomToolbar {
+			left: 0.5rem;
+			right: 0.5rem;
+			flex-wrap: wrap;
+			gap: 0.5rem;
+		}
+
+		.toolbarLeft {
+			flex-wrap: wrap;
+		}
+
+		:global(.resizer) {
+			width: 100% !important;
+			height: 2rem !important;
+			flex-direction: row;
+		}
+
+		.resizer__handle {
+			width: 4rem !important;
+			height: 100% !important;
+			margin-top: 0 !important;
+			margin-left: 50%;
+			transform: translateX(-50%);
+		}
 	}
 </style>

@@ -204,10 +204,6 @@ export function updateTray(trayId: string, updates: Partial<Omit<Tray, 'id'>>): 
 // Global params that should be shared across all trays when changed
 const GLOBAL_PARAM_KEYS: (keyof CounterTrayParams)[] = [
 	'printBedSize',
-	'squareWidth',
-	'squareLength',
-	'hexFlatToFlat',
-	'circleDiameter',
 	'counterThickness',
 	'hexPointyTop',
 	'customShapes'

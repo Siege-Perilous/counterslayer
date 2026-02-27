@@ -8,10 +8,6 @@
           "id": "20zi1a1",
           "name": "Germans",
           "params": {
-            "squareWidth": 15.9,
-            "squareLength": 15.9,
-            "hexFlatToFlat": 15.9,
-            "circleDiameter": 15.9,
             "counterThickness": 1.8,
             "hexPointyTop": false,
             "clearance": 0.3,
@@ -24,84 +20,29 @@
             "extraTrayCols": 1,
             "extraTrayRows": 1,
             "topLoadedStacks": [
-              [
-                "square",
-                10,
-                "Infantry"
-              ],
-              [
-                "square",
-                10,
-                "Infantry"
-              ],
-              [
-                "square",
-                8,
-                "Infantry"
-              ],
-              [
-                "square",
-                12,
-                "Mobile Depth"
-              ],
-              [
-                "square",
-                12,
-                "Mobile Depth"
-              ],
-              [
-                "square",
-                9,
-                "WN Depth"
-              ],
-              [
-                "square",
-                9,
-                "WN Depth"
-              ],
-              [
-                "square",
-                8,
-                "Building Depth"
-              ],
-              [
-                "square",
-                4,
-                "Armor Depth"
-              ],
-              [
-                "square",
-                9,
-                "WN Crew"
-              ],
-              [
-                "square",
-                1,
-                "WN Crew with Rockect Artillery"
-              ],
-              [
-                "square",
-                8,
-                "WN Crew with Artillery"
-              ],
-              [
-                "square",
-                4,
-                "Off Map Arillery"
-              ],
-              [
-                "square",
-                4,
-                "Armor"
-              ],
-              [
-                "square",
-                8,
-                "Disrupted"
-              ]
+              ["custom:Square", 10, "Infantry"],
+              ["custom:Square", 10, "Infantry"],
+              ["custom:Square", 8, "Infantry"],
+              ["custom:Square", 12, "Mobile Depth"],
+              ["custom:Square", 12, "Mobile Depth"],
+              ["custom:Square", 9, "WN Depth"],
+              ["custom:Square", 9, "WN Depth"],
+              ["custom:Square", 8, "Building Depth"],
+              ["custom:Square", 4, "Armor Depth"],
+              ["custom:Square", 9, "WN Crew"],
+              ["custom:Square", 1, "WN Crew with Rockect Artillery"],
+              ["custom:Square", 8, "WN Crew with Artillery"],
+              ["custom:Square", 4, "Off Map Arillery"],
+              ["custom:Square", 4, "Armor"],
+              ["custom:Square", 8, "Disrupted"]
             ],
             "edgeLoadedStacks": [],
-            "customShapes": [],
+            "customShapes": [
+              { "name": "Square", "baseShape": "square", "width": 15.9, "length": 15.9 },
+              { "name": "Hex", "baseShape": "hex", "width": 15.9, "length": 15.9 },
+              { "name": "Circle", "baseShape": "circle", "width": 15.9, "length": 15.9 },
+              { "name": "Triangle", "baseShape": "triangle", "width": 15.9, "length": 15.9, "cornerRadius": 1.5 }
+            ],
             "printBedSize": 256
           }
         },
@@ -109,10 +50,6 @@
           "id": "l1nek3z",
           "name": "Markers",
           "params": {
-            "squareWidth": 15.9,
-            "squareLength": 15.9,
-            "hexFlatToFlat": 15.9,
-            "circleDiameter": 15.9,
             "counterThickness": 1.8,
             "hexPointyTop": false,
             "clearance": 0.3,
@@ -125,64 +62,25 @@
             "extraTrayCols": 1,
             "extraTrayRows": 1,
             "topLoadedStacks": [
-              [
-                "square",
-                2,
-                "Phase / Turn"
-              ],
-              [
-                "square",
-                2,
-                "Naval Gunfire"
-              ],
-              [
-                "square",
-                5,
-                "Climb"
-              ],
-              [
-                "square",
-                7,
-                "Clear"
-              ],
-              [
-                "square",
-                7,
-                "Clear"
-              ],
-              [
-                "square",
-                2,
-                "Smoke"
-              ],
-              [
-                "square",
-                3,
-                "Command Transfer"
-              ],
-              [
-                "square",
-                10,
-                "Garrison"
-              ],
-              [
-                "square",
-                10,
-                "Garrison"
-              ],
-              [
-                "square",
-                8,
-                "Garrison"
-              ],
-              [
-                "square",
-                8,
-                "Allies Disrupted"
-              ]
+              ["custom:Square", 2, "Phase / Turn"],
+              ["custom:Square", 2, "Naval Gunfire"],
+              ["custom:Square", 5, "Climb"],
+              ["custom:Square", 7, "Clear"],
+              ["custom:Square", 7, "Clear"],
+              ["custom:Square", 2, "Smoke"],
+              ["custom:Square", 3, "Command Transfer"],
+              ["custom:Square", 10, "Garrison"],
+              ["custom:Square", 10, "Garrison"],
+              ["custom:Square", 8, "Garrison"],
+              ["custom:Square", 8, "Allies Disrupted"]
             ],
             "edgeLoadedStacks": [],
-            "customShapes": [],
+            "customShapes": [
+              { "name": "Square", "baseShape": "square", "width": 15.9, "length": 15.9 },
+              { "name": "Hex", "baseShape": "hex", "width": 15.9, "length": 15.9 },
+              { "name": "Circle", "baseShape": "circle", "width": 15.9, "length": 15.9 },
+              { "name": "Triangle", "baseShape": "triangle", "width": 15.9, "length": 15.9, "cornerRadius": 1.5 }
+            ],
             "printBedSize": 256
           }
         },
@@ -190,10 +88,6 @@
           "id": "914nvd6",
           "name": "29th Division",
           "params": {
-            "squareWidth": 15.9,
-            "squareLength": 15.9,
-            "hexFlatToFlat": 15.9,
-            "circleDiameter": 15.9,
             "counterThickness": 1.8,
             "hexPointyTop": false,
             "clearance": 0.3,
@@ -206,114 +100,35 @@
             "extraTrayCols": 1,
             "extraTrayRows": 1,
             "topLoadedStacks": [
-              [
-                "square",
-                1,
-                "General"
-              ],
-              [
-                "square",
-                5,
-                "Hero"
-              ],
-              [
-                "square",
-                2,
-                "HQ"
-              ],
-              [
-                "square",
-                2,
-                "HQ Range"
-              ],
-              [
-                "square",
-                2,
-                "Range"
-              ],
-              [
-                "square",
-                2,
-                "Engineer Battalion"
-              ],
-              [
-                "square",
-                12,
-                "Infantry"
-              ],
-              [
-                "square",
-                12,
-                "Infantry"
-              ],
-              [
-                "square",
-                12,
-                "Replacement Infantry"
-              ],
-              [
-                "square",
-                12,
-                "Replacement Infantry"
-              ],
-              [
-                "square",
-                5,
-                "Ranger Infantry"
-              ],
-              [
-                "square",
-                1,
-                "Artillery"
-              ],
-              [
-                "square",
-                1,
-                "Self Propelled Artillery"
-              ],
-              [
-                "square",
-                1,
-                "Replacement Self Propelled Artillery"
-              ],
-              [
-                "square",
-                2,
-                "Anti-Aircraft Battery"
-              ],
-              [
-                "square",
-                2,
-                "Self Propelled Anti-Aircraft Battery"
-              ],
-              [
-                "square",
-                2,
-                "Antitank Company"
-              ],
-              [
-                "square",
-                2,
-                "Amphibious Artillery Battery"
-              ],
-              [
-                "square",
-                1,
-                "Replacement Amphibious Artillery Battery"
-              ],
-              [
-                "square",
-                6,
-                "Armor"
-              ],
-              [
-                "square",
-                4,
-                "Action taken"
-              ]
+              ["custom:Square", 1, "General"],
+              ["custom:Square", 5, "Hero"],
+              ["custom:Square", 2, "HQ"],
+              ["custom:Square", 2, "HQ Range"],
+              ["custom:Square", 2, "Range"],
+              ["custom:Square", 2, "Engineer Battalion"],
+              ["custom:Square", 12, "Infantry"],
+              ["custom:Square", 12, "Infantry"],
+              ["custom:Square", 12, "Replacement Infantry"],
+              ["custom:Square", 12, "Replacement Infantry"],
+              ["custom:Square", 5, "Ranger Infantry"],
+              ["custom:Square", 1, "Artillery"],
+              ["custom:Square", 1, "Self Propelled Artillery"],
+              ["custom:Square", 1, "Replacement Self Propelled Artillery"],
+              ["custom:Square", 2, "Anti-Aircraft Battery"],
+              ["custom:Square", 2, "Self Propelled Anti-Aircraft Battery"],
+              ["custom:Square", 2, "Antitank Company"],
+              ["custom:Square", 2, "Amphibious Artillery Battery"],
+              ["custom:Square", 1, "Replacement Amphibious Artillery Battery"],
+              ["custom:Square", 6, "Armor"],
+              ["custom:Square", 4, "Action taken"]
             ],
             "edgeLoadedStacks": [],
-            "customShapes": [],
+            "customShapes": [
+              { "name": "Square", "baseShape": "square", "width": 15.9, "length": 15.9 },
+              { "name": "Hex", "baseShape": "hex", "width": 15.9, "length": 15.9 },
+              { "name": "Circle", "baseShape": "circle", "width": 15.9, "length": 15.9 },
+              { "name": "Triangle", "baseShape": "triangle", "width": 15.9, "length": 15.9, "cornerRadius": 1.5 }
+            ],
             "printBedSize": 256
           }
         },
@@ -321,10 +136,6 @@
           "id": "5cdejlg",
           "name": "1st Division",
           "params": {
-            "squareWidth": 15.9,
-            "squareLength": 15.9,
-            "hexFlatToFlat": 15.9,
-            "circleDiameter": 15.9,
             "counterThickness": 1.8,
             "hexPointyTop": false,
             "clearance": 0.3,
@@ -337,109 +148,34 @@
             "extraTrayCols": 1,
             "extraTrayRows": 1,
             "topLoadedStacks": [
-              [
-                "square",
-                1,
-                "General"
-              ],
-              [
-                "square",
-                5,
-                "Hero"
-              ],
-              [
-                "square",
-                2,
-                "HQ"
-              ],
-              [
-                "square",
-                2,
-                "HQ Range"
-              ],
-              [
-                "square",
-                2,
-                "Range"
-              ],
-              [
-                "square",
-                2,
-                "Engineer Battalion"
-              ],
-              [
-                "square",
-                12,
-                "Infantry"
-              ],
-              [
-                "square",
-                12,
-                "Infantry"
-              ],
-              [
-                "square",
-                12,
-                "Replacement Infantry"
-              ],
-              [
-                "square",
-                12,
-                "Replacement Infantry"
-              ],
-              [
-                "square",
-                1,
-                "Artillery"
-              ],
-              [
-                "square",
-                1,
-                "Self Propelled Artillery"
-              ],
-              [
-                "square",
-                1,
-                "Replacement Self Propelled Artillery"
-              ],
-              [
-                "square",
-                1,
-                "AA Battery"
-              ],
-              [
-                "square",
-                2,
-                "Self Propelled Anti-Aircraft Battery"
-              ],
-              [
-                "square",
-                2,
-                "Anti-tank Company"
-              ],
-              [
-                "square",
-                2,
-                "Amphibious Artillery"
-              ],
-              [
-                "square",
-                1,
-                "Replacement Amphibious Artillery Battery"
-              ],
-              [
-                "square",
-                6,
-                "Armor"
-              ],
-              [
-                "square",
-                4,
-                "Action taken"
-              ]
+              ["custom:Square", 1, "General"],
+              ["custom:Square", 5, "Hero"],
+              ["custom:Square", 2, "HQ"],
+              ["custom:Square", 2, "HQ Range"],
+              ["custom:Square", 2, "Range"],
+              ["custom:Square", 2, "Engineer Battalion"],
+              ["custom:Square", 12, "Infantry"],
+              ["custom:Square", 12, "Infantry"],
+              ["custom:Square", 12, "Replacement Infantry"],
+              ["custom:Square", 12, "Replacement Infantry"],
+              ["custom:Square", 1, "Artillery"],
+              ["custom:Square", 1, "Self Propelled Artillery"],
+              ["custom:Square", 1, "Replacement Self Propelled Artillery"],
+              ["custom:Square", 1, "AA Battery"],
+              ["custom:Square", 2, "Self Propelled Anti-Aircraft Battery"],
+              ["custom:Square", 2, "Anti-tank Company"],
+              ["custom:Square", 2, "Amphibious Artillery"],
+              ["custom:Square", 1, "Replacement Amphibious Artillery Battery"],
+              ["custom:Square", 6, "Armor"],
+              ["custom:Square", 4, "Action taken"]
             ],
             "edgeLoadedStacks": [],
-            "customShapes": [],
+            "customShapes": [
+              { "name": "Square", "baseShape": "square", "width": 15.9, "length": 15.9 },
+              { "name": "Hex", "baseShape": "hex", "width": 15.9, "length": 15.9 },
+              { "name": "Circle", "baseShape": "circle", "width": 15.9, "length": 15.9 },
+              { "name": "Triangle", "baseShape": "triangle", "width": 15.9, "length": 15.9, "cornerRadius": 1.5 }
+            ],
             "printBedSize": 256
           }
         }

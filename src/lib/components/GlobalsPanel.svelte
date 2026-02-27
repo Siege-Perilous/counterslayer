@@ -44,7 +44,11 @@
 		});
 	}
 
-	function updateCustomShape(index: number, field: keyof CustomShape, value: string | number) {
+	function updateCustomShape(
+		index: number,
+		field: keyof CustomShape | 'cornerRadius',
+		value: string | number
+	) {
 		const newShapes = [...params.customShapes];
 		if (field === 'name') {
 			const newName = value as string;
@@ -74,7 +78,7 @@
 		if (field === 'baseShape') {
 			const baseShape = value as CustomBaseShape;
 			if (baseShape !== 'rectangle') {
-				// For square, circle, hex: set length = width
+				// For square, circle, hex, triangle: set length = width
 				newShapes[index] = { ...newShapes[index], baseShape, length: newShapes[index].width };
 			} else {
 				newShapes[index] = { ...newShapes[index], baseShape };
@@ -88,11 +92,18 @@
 			const shape = newShapes[index];
 			const baseShape = shape.baseShape ?? 'rectangle';
 			if (baseShape !== 'rectangle') {
-				// For square, circle, hex: length = width
+				// For square, circle, hex, triangle: length = width
 				newShapes[index] = { ...newShapes[index], width: value as number, length: value as number };
 			} else {
 				newShapes[index] = { ...newShapes[index], width: value as number };
 			}
+			onchange({ ...params, customShapes: newShapes });
+			return;
+		}
+
+		// Handle cornerRadius for triangles
+		if (field === 'cornerRadius') {
+			newShapes[index] = { ...newShapes[index], cornerRadius: value as number };
 			onchange({ ...params, customShapes: newShapes });
 			return;
 		}
@@ -108,10 +119,10 @@
 			...params,
 			customShapes: params.customShapes.filter((_, i) => i !== index),
 			topLoadedStacks: params.topLoadedStacks.map(([shape, count]) =>
-				shape === shapeRef ? ['square', count] : [shape, count]
+				shape === shapeRef ? ['custom:Square', count] : [shape, count]
 			),
 			edgeLoadedStacks: params.edgeLoadedStacks.map(([shape, count, orient]) =>
-				shape === shapeRef ? ['square', count, orient] : [shape, count, orient]
+				shape === shapeRef ? ['custom:Square', count, orient] : [shape, count, orient]
 			)
 		});
 	}
@@ -138,73 +149,9 @@
 	<Hr />
 
 	<section class="section">
-		<h3 class="sectionTitle">Simple Counters</h3>
+		<h3 class="sectionTitle">Counter Settings</h3>
 		<Spacer size="0.5rem" />
 		<div class="formGrid">
-			<FormControl label="Square" name="squareWidth">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="number"
-						step="0.1"
-						value={params.squareWidth}
-						onchange={(e) => {
-							const val = parseFloat(e.currentTarget.value);
-							onchange({ ...params, squareWidth: val, squareLength: val });
-						}}
-					/>
-				{/snippet}
-				{#snippet end()}mm{/snippet}
-			</FormControl>
-			<FormControl label="Hex (flat-to-flat)" name="hexFlatToFlat">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="number"
-						step="0.1"
-						value={params.hexFlatToFlat}
-						onchange={(e) => updateParam('hexFlatToFlat', parseFloat(e.currentTarget.value))}
-					/>
-				{/snippet}
-				{#snippet end()}mm{/snippet}
-			</FormControl>
-			<FormControl label="Circle diameter" name="circleDiameter">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="number"
-						step="0.1"
-						value={params.circleDiameter}
-						onchange={(e) => updateParam('circleDiameter', parseFloat(e.currentTarget.value))}
-					/>
-				{/snippet}
-				{#snippet end()}mm{/snippet}
-			</FormControl>
-			<FormControl label="Triangle (side)" name="triangleSide">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="number"
-						step="0.1"
-						value={params.triangleSide}
-						onchange={(e) => updateParam('triangleSide', parseFloat(e.currentTarget.value))}
-					/>
-				{/snippet}
-				{#snippet end()}mm{/snippet}
-			</FormControl>
-			<FormControl label="Triangle radius" name="triangleCornerRadius">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="number"
-						step="0.1"
-						min="0"
-						value={params.triangleCornerRadius}
-						onchange={(e) => updateParam('triangleCornerRadius', parseFloat(e.currentTarget.value))}
-					/>
-				{/snippet}
-				{#snippet end()}mm{/snippet}
-			</FormControl>
 			<FormControl label="Thickness" name="counterThickness">
 				{#snippet input({ inputProps })}
 					<Input
@@ -229,7 +176,7 @@
 	<Hr />
 
 	<section class="section">
-		<h3 class="sectionTitle">Custom Counters</h3>
+		<h3 class="sectionTitle">Counters</h3>
 		<Spacer size="0.5rem" />
 		<div class="customShapesList">
 			{#each params.customShapes as shape, index (shape.name)}
@@ -340,7 +287,7 @@
 								{#snippet end()}mm{/snippet}
 							</FormControl>
 						{:else if baseShape === 'triangle'}
-							<FormControl label="Side" name="side-{index}" class="formGrid__spanTwo">
+							<FormControl label="Side" name="side-{index}">
 								{#snippet input({ inputProps })}
 									<Input
 										{...inputProps}
@@ -350,6 +297,20 @@
 										value={shape.width}
 										onchange={(e) =>
 											updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Corner radius" name="cornerRadius-{index}">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										min="0"
+										value={shape.cornerRadius ?? 1.5}
+										onchange={(e) =>
+											updateCustomShape(index, 'cornerRadius', parseFloat(e.currentTarget.value))}
 									/>
 								{/snippet}
 								{#snippet end()}mm{/snippet}

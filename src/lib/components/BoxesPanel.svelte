@@ -11,9 +11,10 @@
 		onAddBox: () => void;
 		onDeleteBox: (boxId: string) => void;
 		onUpdateBox: (updates: Partial<Omit<Box, 'id' | 'trays'>>) => void;
+		hideList?: boolean;
 	}
 
-	let { project, selectedBox, onSelectBox, onAddBox, onDeleteBox, onUpdateBox }: Props = $props();
+	let { project, selectedBox, onSelectBox, onAddBox, onDeleteBox, onUpdateBox, hideList = false }: Props = $props();
 
 	const minimums = $derived(
 		selectedBox
@@ -35,181 +36,185 @@
 
 <div class="boxesPanel">
 	<!-- Box List -->
-	<div class="panelList">
-		<div class="panelListHeader">
-			<span class="panelListTitle">Boxes</span>
-			<IconButton onclick={onAddBox} title="Add new box" size="sm" variant="ghost">
-				<Icon Icon={IconPlus} />
-			</IconButton>
+	{#if !hideList}
+		<div class="panelList">
+			<div class="panelListHeader">
+				<span class="panelListTitle">Boxes</span>
+				<IconButton onclick={onAddBox} title="Add new box" size="sm" variant="ghost">
+					<Icon Icon={IconPlus} />
+				</IconButton>
+			</div>
+			<div class="panelListItems">
+				{#each project.boxes as box (box.id)}
+					<div
+						class="listItem {selectedBox?.id === box.id ? 'listItem--selected' : ''}"
+						onclick={() => onSelectBox(box)}
+						role="button"
+						tabindex="0"
+						onkeydown={(e) => e.key === 'Enter' && onSelectBox(box)}
+					>
+						<span style="overflow: hidden; text-overflow: ellipsis;">{box.name}</span>
+						{#if project.boxes.length > 1}
+							<IconButton
+								onclick={(e: MouseEvent) => {
+									e.stopPropagation();
+									onDeleteBox(box.id);
+								}}
+								title="Delete box"
+								size="sm"
+								variant="ghost"
+							>
+								<Icon color="var(--fgMuted)" Icon={IconX} />
+							</IconButton>
+						{/if}
+					</div>
+				{/each}
+			</div>
 		</div>
-		<div class="panelListItems">
-			{#each project.boxes as box (box.id)}
-				<div
-					class="listItem {selectedBox?.id === box.id ? 'listItem--selected' : ''}"
-					onclick={() => onSelectBox(box)}
-					role="button"
-					tabindex="0"
-					onkeydown={(e) => e.key === 'Enter' && onSelectBox(box)}
-				>
-					<span style="overflow: hidden; text-overflow: ellipsis;">{box.name}</span>
-					{#if project.boxes.length > 1}
-						<IconButton
-							onclick={(e: MouseEvent) => {
-								e.stopPropagation();
-								onDeleteBox(box.id);
-							}}
-							title="Delete box"
-							size="sm"
-							variant="ghost"
-						>
-							<Icon color="var(--fgMuted)" Icon={IconX} />
-						</IconButton>
-					{/if}
-				</div>
-			{/each}
-		</div>
-	</div>
+	{/if}
 
 	<!-- Box Settings -->
 	{#if selectedBox}
 		<div class="panelForm">
-			<FormControl label="Name" name="boxName">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="text"
-						value={selectedBox.name}
-						onchange={(e) => onUpdateBox({ name: (e.target as HTMLInputElement).value })}
-					/>
-				{/snippet}
-			</FormControl>
+			<div class="panelFormSection">
+				<FormControl label="Name" name="boxName">
+					{#snippet input({ inputProps })}
+						<Input
+							{...inputProps}
+							type="text"
+							value={selectedBox.name}
+							onchange={(e) => onUpdateBox({ name: (e.target as HTMLInputElement).value })}
+						/>
+					{/snippet}
+				</FormControl>
 
-			<Spacer size="0.75rem" />
+				<Spacer size="0.75rem" />
 
-			<div class="formGrid">
-				<FormControl label="Tolerance" name="tolerance">
-					{#snippet input({ inputProps })}
-						<Input
-							{...inputProps}
-							type="number"
-							step="0.1"
-							min="0"
-							value={selectedBox.tolerance}
-							onchange={(e) =>
-								onUpdateBox({ tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5 })}
-						/>
-					{/snippet}
-					{#snippet end()}mm{/snippet}
-				</FormControl>
-				<FormControl label="Wall" name="wallThickness">
-					{#snippet input({ inputProps })}
-						<Input
-							{...inputProps}
-							type="number"
-							step="0.5"
-							min="1"
-							value={selectedBox.wallThickness}
-							onchange={(e) =>
-								onUpdateBox({
-									wallThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
-								})}
-						/>
-					{/snippet}
-					{#snippet end()}mm{/snippet}
-				</FormControl>
-				<FormControl label="Floor" name="floorThickness" class="formGrid__spanTwo">
-					{#snippet input({ inputProps })}
-						<Input
-							{...inputProps}
-							type="number"
-							step="0.5"
-							min="1"
-							value={selectedBox.floorThickness}
-							onchange={(e) =>
-								onUpdateBox({
-									floorThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
-								})}
-						/>
-					{/snippet}
-					{#snippet end()}mm{/snippet}
-				</FormControl>
+				<div class="formGrid">
+					<FormControl label="Tolerance" name="tolerance">
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="0.1"
+								min="0"
+								value={selectedBox.tolerance}
+								onchange={(e) =>
+									onUpdateBox({ tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5 })}
+							/>
+						{/snippet}
+						{#snippet end()}mm{/snippet}
+					</FormControl>
+					<FormControl label="Wall" name="wallThickness">
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="0.5"
+								min="1"
+								value={selectedBox.wallThickness}
+								onchange={(e) =>
+									onUpdateBox({
+										wallThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
+									})}
+							/>
+						{/snippet}
+						{#snippet end()}mm{/snippet}
+					</FormControl>
+					<FormControl label="Floor" name="floorThickness" class="formGrid__spanTwo">
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="0.5"
+								min="1"
+								value={selectedBox.floorThickness}
+								onchange={(e) =>
+									onUpdateBox({
+										floorThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
+									})}
+							/>
+						{/snippet}
+						{#snippet end()}mm{/snippet}
+					</FormControl>
+				</div>
 			</div>
 
-			<Spacer size="0.75rem" />
 			<Hr />
-			<Spacer size="0.75rem" />
 
-			<!-- Custom Size -->
-			<h4 class="sectionTitle">Custom Size</h4>
-			<p class="sectionHint">Leave empty for auto-sizing.</p>
-			<Spacer size="0.5rem" />
+			<div class="panelFormSection">
+				<!-- Custom Size -->
+				<h4 class="sectionTitle">Custom Size</h4>
+				<p class="sectionHint">Leave empty for auto-sizing.</p>
+				<Spacer size="0.5rem" />
 
-			<div class="formGrid">
-				<FormControl label="Width (min: {minimums.minWidth.toFixed(1)})" name="customWidth">
-					{#snippet input({ inputProps })}
-						<Input
-							{...inputProps}
-							type="number"
-							step="0.5"
-							min={minimums.minWidth}
-							value={selectedBox.customWidth ?? ''}
-							onchange={(e) => {
-								const v = (e.target as HTMLInputElement).value.trim();
-								onUpdateBox({ customWidth: v ? parseFloat(v) : undefined });
-							}}
-							placeholder="Auto"
-						/>
-					{/snippet}
-					{#snippet end()}mm{/snippet}
-				</FormControl>
-				<FormControl label="Depth (min: {minimums.minDepth.toFixed(1)})" name="customDepth">
-					{#snippet input({ inputProps })}
-						<Input
-							{...inputProps}
-							type="number"
-							step="0.5"
-							min={minimums.minDepth}
-							value={selectedBox.customDepth ?? ''}
-							onchange={(e) => {
-								const v = (e.target as HTMLInputElement).value.trim();
-								onUpdateBox({ customDepth: v ? parseFloat(v) : undefined });
-							}}
-							placeholder="Auto"
-						/>
-					{/snippet}
-					{#snippet end()}mm{/snippet}
-				</FormControl>
-				<FormControl
-					label="Total Height (min: {minTotalHeight.toFixed(1)})"
-					name="customBoxHeight"
-					class="formGrid__spanTwo"
-				>
-					{#snippet input({ inputProps })}
-						<Input
-							{...inputProps}
-							type="number"
-							step="0.5"
-							min={minTotalHeight}
-							value={displayTotalHeight ?? ''}
-							onchange={(e) => {
-								const v = (e.target as HTMLInputElement).value.trim();
-								// Convert total height to box-only height by subtracting lid
-								const boxHeight = v ? parseFloat(v) - lidHeight : undefined;
-								onUpdateBox({ customBoxHeight: boxHeight });
-							}}
-							placeholder="Auto"
-						/>
-					{/snippet}
-					{#snippet end()}mm{/snippet}
-				</FormControl>
+				<div class="formGrid">
+					<FormControl label="Width (min: {minimums.minWidth.toFixed(1)})" name="customWidth">
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="0.5"
+								min={minimums.minWidth}
+								value={selectedBox.customWidth ?? ''}
+								onchange={(e) => {
+									const v = (e.target as HTMLInputElement).value.trim();
+									onUpdateBox({ customWidth: v ? parseFloat(v) : undefined });
+								}}
+								placeholder="Auto"
+							/>
+						{/snippet}
+						{#snippet end()}mm{/snippet}
+					</FormControl>
+					<FormControl label="Depth (min: {minimums.minDepth.toFixed(1)})" name="customDepth">
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="0.5"
+								min={minimums.minDepth}
+								value={selectedBox.customDepth ?? ''}
+								onchange={(e) => {
+									const v = (e.target as HTMLInputElement).value.trim();
+									onUpdateBox({ customDepth: v ? parseFloat(v) : undefined });
+								}}
+								placeholder="Auto"
+							/>
+						{/snippet}
+						{#snippet end()}mm{/snippet}
+					</FormControl>
+					<FormControl
+						label="Total Height (min: {minTotalHeight.toFixed(1)})"
+						name="customBoxHeight"
+						class="formGrid__spanTwo"
+					>
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="0.5"
+								min={minTotalHeight}
+								value={displayTotalHeight ?? ''}
+								onchange={(e) => {
+									const v = (e.target as HTMLInputElement).value.trim();
+									// Convert total height to box-only height by subtracting lid
+									const boxHeight = v ? parseFloat(v) - lidHeight : undefined;
+									onUpdateBox({ customBoxHeight: boxHeight });
+								}}
+								placeholder="Auto"
+							/>
+						{/snippet}
+						{#snippet end()}mm{/snippet}
+					</FormControl>
+				</div>
+
+				<Spacer size="0.5rem" />
+				<InputCheckbox
+					checked={selectedBox.fillSolidEmpty ?? false}
+					onchange={(e) => onUpdateBox({ fillSolidEmpty: (e.target as HTMLInputElement).checked })}
+					label="Fill empty space solid"
+				/>
 			</div>
-
-			<Spacer size="0.5rem" />
-			<InputCheckbox
-				checked={selectedBox.fillSolidEmpty ?? false}
-				onchange={(e) => onUpdateBox({ fillSolidEmpty: (e.target as HTMLInputElement).checked })}
-				label="Fill empty space solid"
-			/>
 		</div>
 	{:else}
 		<div class="emptyState">
@@ -278,10 +283,14 @@
 	.panelForm {
 		flex: 1;
 		overflow-y: auto;
-		padding: 0.75rem;
+		padding: 0.75rem 0;
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
+	}
+
+	.panelFormSection {
+		padding: 0 0.75rem;
 	}
 
 	.formGrid {
