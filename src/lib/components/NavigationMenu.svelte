@@ -11,6 +11,7 @@
 		deleteBox,
 		addTray,
 		deleteTray,
+		getCumulativeTrayLetter,
 		type Box,
 		type Tray
 	} from '$lib/stores/project.svelte';
@@ -101,7 +102,7 @@
 
 	<!-- Boxes and Trays -->
 	<div class="navTree">
-		{#each project.boxes as box (box.id)}
+		{#each project.boxes as box, boxIdx (box.id)}
 			{@const isBoxSelected = selectedBox?.id === box.id && selectionType === 'box'}
 
 			<div class="navBoxGroup">
@@ -140,7 +141,7 @@
 							selectedTray?.id === tray.id &&
 							selectedBox?.id === box.id &&
 							selectionType === 'tray'}
-						{@const letter = String.fromCharCode(65 + trayIdx)}
+						{@const letter = getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx)}
 						{@const stats = getTrayStats(tray)}
 
 						<div class="navItem navItem--tray {isTraySelected ? 'navItem--selected' : ''}">

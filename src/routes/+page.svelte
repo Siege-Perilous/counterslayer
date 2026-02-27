@@ -46,7 +46,8 @@
 		getSelectedBox,
 		getProject,
 		importProject,
-		resetProject
+		resetProject,
+		getCumulativeTrayLetter
 	} from '$lib/stores/project.svelte';
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
@@ -153,9 +154,12 @@
 	let selectedTrayLetter = $derived.by(() => {
 		// Use override during PDF capture
 		if (captureTrayLetter) return captureTrayLetter;
+		const proj = getProject();
 		if (!selectedBox || !selectedTray) return 'A';
-		const idx = selectedBox.trays.findIndex((t) => t.id === selectedTray.id);
-		return String.fromCharCode(65 + (idx >= 0 ? idx : 0));
+		const boxIdx = proj.boxes.findIndex((b: { id: string }) => b.id === selectedBox.id);
+		const trayIdx = selectedBox.trays.findIndex((t) => t.id === selectedTray.id);
+		if (boxIdx < 0 || trayIdx < 0) return 'A';
+		return getCumulativeTrayLetter(proj.boxes, boxIdx, trayIdx);
 	});
 
 	// Title for the print bed based on current view
@@ -402,7 +406,7 @@
 					const placement = placements[trayIdx];
 					const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
 					const spacerHeight = spacer?.floorSpacerHeight ?? 0;
-					const trayLetter = String.fromCharCode(65 + trayIdx);
+					const trayLetter = getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx);
 
 					// Generate geometry for this tray
 					const jscadGeom = createCounterTray(
@@ -445,7 +449,7 @@
 					screenshots.push({
 						boxIndex: boxIdx,
 						trayIndex: trayIdx,
-						trayLetter: String.fromCharCode(65 + trayIdx),
+						trayLetter,
 						dataUrl
 					});
 				}

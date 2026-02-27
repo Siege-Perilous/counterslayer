@@ -625,11 +625,12 @@
 			{@const placement = trayData.placement}
 			{@const trayX = xOffset - boxWidth / 2 + boxWallThickness + boxTolerance + placement.x}
 			{@const trayZ = zOffset + boxDepth / 2 - boxWallThickness - boxTolerance - placement.y}
+			{@const trayY = boxFloorThickness}
 			<T.Mesh
 				geometry={trayData.geometry}
 				rotation.x={-Math.PI / 2}
 				position.x={trayX}
-				position.y={boxFloorThickness}
+				position.y={trayY}
 				position.z={trayZ}
 			>
 				<T.MeshStandardMaterial
@@ -639,6 +640,188 @@
 					side={THREE.DoubleSide}
 				/>
 			</T.Mesh>
+
+			<!-- Counter previews for this tray -->
+			{#if showCounters && trayData.counterStacks}
+				{#each trayData.counterStacks as stack, stackIdx (stackIdx)}
+					{#if stack.isEdgeLoaded}
+						{#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
+							{@const effectiveShape =
+								stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
+							{@const standingHeight =
+								effectiveShape === 'triangle'
+									? stack.length
+									: stack.shape === 'custom'
+										? Math.min(stack.width, stack.length)
+										: Math.max(stack.width, stack.length)}
+							{@const counterY = trayY + stack.z + standingHeight / 2}
+							{@const isAlt = counterIdx % 2 === 1}
+							{@const counterColor = isAlt
+								? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
+								: stack.color}
+							{#if stack.edgeOrientation === 'lengthwise'}
+								{@const counterSpacing =
+									(stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
+								{@const posX = trayX + stack.x + (counterIdx + 0.5) * counterSpacing}
+								{@const posZ = trayZ - stack.y - (stack.slotDepth ?? stack.length) / 2}
+								{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
+									<T.Mesh position.x={posX} position.y={counterY} position.z={posZ}>
+										<T.BoxGeometry args={[stack.thickness, standingHeight, stack.length]} />
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{:else if effectiveShape === 'circle'}
+									<T.Mesh
+										position.x={posX}
+										position.y={counterY}
+										position.z={posZ}
+										rotation.z={Math.PI / 2}
+									>
+										<T.CylinderGeometry
+											args={[stack.width / 2, stack.width / 2, stack.thickness, 32]}
+										/>
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{:else if effectiveShape === 'hex'}
+									<T.Mesh
+										position.x={posX}
+										position.y={counterY}
+										position.z={posZ}
+										rotation.z={Math.PI / 2}
+										rotation.x={stack.hexPointyTop ? 0 : Math.PI / 6}
+									>
+										<T.CylinderGeometry
+											args={[stack.width / 2, stack.width / 2, stack.thickness, 6]}
+										/>
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{:else}
+									{@const triGeom = createRoundedTriangleGeometry(
+										stack.width,
+										stack.thickness,
+										triangleCornerRadius
+									)}
+									<T.Mesh
+										geometry={triGeom}
+										position.x={posX}
+										position.y={counterY}
+										position.z={posZ}
+										rotation.y={Math.PI / 2}
+										rotation.x={Math.PI}
+									>
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{/if}
+							{:else}
+								{@const counterSpacing =
+									(stack.slotDepth ?? stack.count * stack.thickness) / stack.count}
+								{@const posX = trayX + stack.x + (stack.slotWidth ?? stack.length) / 2}
+								{@const posZ = trayZ - stack.y - (counterIdx + 0.5) * counterSpacing}
+								{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
+									<T.Mesh position.x={posX} position.y={counterY} position.z={posZ}>
+										<T.BoxGeometry args={[stack.length, standingHeight, stack.thickness]} />
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{:else if effectiveShape === 'circle'}
+									<T.Mesh
+										position.x={posX}
+										position.y={counterY}
+										position.z={posZ}
+										rotation.x={Math.PI / 2}
+									>
+										<T.CylinderGeometry
+											args={[stack.width / 2, stack.width / 2, stack.thickness, 32]}
+										/>
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{:else if effectiveShape === 'hex'}
+									<T.Mesh
+										position.x={posX}
+										position.y={counterY}
+										position.z={posZ}
+										rotation.x={Math.PI / 2}
+										rotation.y={stack.hexPointyTop ? Math.PI / 6 : 0}
+									>
+										<T.CylinderGeometry
+											args={[stack.width / 2, stack.width / 2, stack.thickness, 6]}
+										/>
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{:else}
+									{@const triGeom = createRoundedTriangleGeometry(
+										stack.width,
+										stack.thickness,
+										triangleCornerRadius
+									)}
+									<T.Mesh
+										geometry={triGeom}
+										position.x={posX}
+										position.y={counterY}
+										position.z={posZ}
+										rotation.x={Math.PI}
+									>
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{/if}
+							{/if}
+						{/each}
+					{:else}
+						<!-- Top-loaded counters -->
+						{#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
+							{@const counterZ = stack.z + counterIdx * stack.thickness + stack.thickness / 2}
+							{@const posX = trayX + stack.x}
+							{@const posY = trayY + counterZ}
+							{@const posZ = trayZ - stack.y}
+							{@const isAlt = counterIdx % 2 === 1}
+							{@const counterColor = isAlt
+								? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
+								: stack.color}
+							{@const effectiveShape =
+								stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
+							{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
+								<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
+									<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
+									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+								</T.Mesh>
+							{:else if effectiveShape === 'circle'}
+								<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
+									<T.CylinderGeometry
+										args={[stack.width / 2, stack.width / 2, stack.thickness, 32]}
+									/>
+									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+								</T.Mesh>
+							{:else if effectiveShape === 'hex'}
+								<T.Mesh
+									position.x={posX}
+									position.y={posY}
+									position.z={posZ}
+									rotation.y={stack.hexPointyTop ? 0 : Math.PI / 6}
+								>
+									<T.CylinderGeometry
+										args={[stack.width / 2, stack.width / 2, stack.thickness, 6]}
+									/>
+									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+								</T.Mesh>
+							{:else}
+								{@const triGeom = createRoundedTriangleGeometry(
+									stack.width,
+									stack.thickness,
+									triangleCornerRadius
+								)}
+								<T.Mesh
+									geometry={triGeom}
+									position.x={posX}
+									position.y={posY}
+									position.z={posZ}
+									rotation.x={-Math.PI / 2}
+									rotation.y={Math.PI}
+								>
+									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+								</T.Mesh>
+							{/if}
+						{/each}
+					{/if}
+				{/each}
+			{/if}
 		{/each}
 	{/each}
 {/if}
@@ -1306,6 +1489,75 @@
 					hoveredLabel = null;
 				}}
 			/>
+		{/each}
+	{/each}
+{/if}
+
+<!-- Reference labels for multi-box (print) view -->
+{#if showReferenceLabels && showAllBoxes && allBoxes.length > 0}
+	{#each allBoxes as boxData, boxIndex (boxData.boxId)}
+		{@const boxPos = boxPositions[boxIndex]}
+		{@const boxWidth = boxData.boxDimensions.width}
+		{@const boxDepth = boxData.boxDimensions.depth}
+		{@const xOffset = boxPos?.x ?? 0}
+		{@const zOffset = printBedSize / 2}
+		{#each boxData.trayGeometries as trayData, trayIndex (trayData.trayId)}
+			{@const placement = trayData.placement}
+			{@const trayX = xOffset - boxWidth / 2 + boxWallThickness + boxTolerance + placement.x}
+			{@const trayZ = zOffset + boxDepth / 2 - boxWallThickness - boxTolerance - placement.y}
+			{@const trayY = boxFloorThickness}
+			{@const trayLetter = trayData.trayLetter ?? String.fromCharCode(65 + trayIndex)}
+			{@const maxStackHeight =
+				trayData.counterStacks.length > 0
+					? Math.max(
+							...trayData.counterStacks.map((stack) => {
+								const effectiveShape =
+									stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape;
+								return stack.isEdgeLoaded
+									? effectiveShape === 'triangle'
+										? stack.length
+										: stack.shape === 'custom'
+											? Math.min(stack.width, stack.length)
+											: Math.max(stack.width, stack.length)
+									: stack.z + stack.count * stack.thickness;
+							})
+						)
+					: 10}
+			{@const labelHeight = trayY + maxStackHeight + 5}
+			{#each trayData.counterStacks as stack, stackIdx (stackIdx)}
+				{@const refCode = `${trayLetter}${stackIdx + 1}`}
+				{@const posX = stack.isEdgeLoaded
+					? stack.edgeOrientation === 'lengthwise'
+						? trayX + stack.x + (stack.slotWidth ?? stack.count * stack.thickness) / 2
+						: trayX + stack.x + (stack.slotWidth ?? stack.length) / 2
+					: trayX + stack.x}
+				{@const posZ = stack.isEdgeLoaded
+					? stack.edgeOrientation === 'lengthwise'
+						? trayZ - stack.y - (stack.slotDepth ?? stack.length) / 2
+						: trayZ - stack.y - (stack.slotDepth ?? stack.count * stack.thickness) / 2
+					: trayZ - stack.y}
+				{@const stackLabel = getStackLabel(stack)}
+				{@const tooltipHeight = labelHeight + 6}
+				{@const isHovered = hoveredLabel?.refCode === refCode}
+				<Text
+					text={refCode}
+					font={monoFont}
+					fontSize={4}
+					position={[posX, labelHeight, posZ]}
+					quaternion={captureMode ? topDownQuaternion : labelQuaternion}
+					color={isHovered ? '#ffffff' : '#000000'}
+					anchorX="center"
+					anchorY="bottom"
+					outlineWidth="8%"
+					outlineColor={isHovered ? '#000000' : '#ffffff'}
+					onpointerenter={() => {
+						hoveredLabel = { refCode, text: stackLabel, position: [posX, tooltipHeight, posZ] };
+					}}
+					onpointerleave={() => {
+						hoveredLabel = null;
+					}}
+				/>
+			{/each}
 		{/each}
 	{/each}
 {/if}

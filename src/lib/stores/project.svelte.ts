@@ -10,6 +10,39 @@ function generateId(): string {
 	return Math.random().toString(36).substring(2, 9);
 }
 
+/**
+ * Generate a tray letter based on cumulative index across all boxes.
+ * A-Z for first 26, then AA, BB, CC... for 26+
+ */
+export function getTrayLetter(index: number): string {
+	if (index < 26) {
+		return String.fromCharCode(65 + index);
+	}
+	// For 26+, use AA, BB, CC, etc.
+	const letter = String.fromCharCode(65 + (index % 26));
+	const repeat = Math.floor(index / 26) + 1;
+	return letter.repeat(repeat);
+}
+
+/**
+ * Get cumulative tray index across all boxes up to (but not including) the given box,
+ * plus the tray index within that box.
+ */
+export function getCumulativeTrayIndex(boxes: Box[], boxIndex: number, trayIndex: number): number {
+	let cumulative = 0;
+	for (let i = 0; i < boxIndex; i++) {
+		cumulative += boxes[i].trays.length;
+	}
+	return cumulative + trayIndex;
+}
+
+/**
+ * Get tray letter for a specific tray, cumulative across all boxes.
+ */
+export function getCumulativeTrayLetter(boxes: Box[], boxIndex: number, trayIndex: number): string {
+	return getTrayLetter(getCumulativeTrayIndex(boxes, boxIndex, trayIndex));
+}
+
 function createDefaultTray(name: string): Tray {
 	return {
 		id: generateId(),

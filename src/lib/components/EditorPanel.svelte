@@ -10,6 +10,7 @@
 		updateBox,
 		updateTray,
 		updateTrayParams,
+		getCumulativeTrayLetter,
 		type Box,
 		type Tray
 	} from '$lib/stores/project.svelte';
@@ -50,9 +51,13 @@
 		const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
 		const edgeCount = tray.params.edgeLoadedStacks.reduce((sum, s) => sum + s[1], 0);
 		let letter = 'A';
+		const project = getProject();
 		if (selectedBox) {
-			const idx = selectedBox.trays.findIndex((t) => t.id === tray.id);
-			letter = String.fromCharCode(65 + (idx >= 0 ? idx : 0));
+			const boxIdx = project.boxes.findIndex((b) => b.id === selectedBox.id);
+			const trayIdx = selectedBox.trays.findIndex((t) => t.id === tray.id);
+			if (boxIdx >= 0 && trayIdx >= 0) {
+				letter = getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx);
+			}
 		}
 		return {
 			stacks: tray.params.topLoadedStacks.length + tray.params.edgeLoadedStacks.length,

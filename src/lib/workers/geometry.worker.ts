@@ -19,6 +19,30 @@ import type { Box } from '$lib/types/project';
 
 const { geom3 } = jscad.geometries;
 
+/**
+ * Generate a tray letter based on cumulative index across all boxes.
+ * A-Z for first 26, then AA, BB, CC... for 26+
+ */
+function getTrayLetter(index: number): string {
+	if (index < 26) {
+		return String.fromCharCode(65 + index);
+	}
+	const letter = String.fromCharCode(65 + (index % 26));
+	const repeat = Math.floor(index / 26) + 1;
+	return letter.repeat(repeat);
+}
+
+/**
+ * Get cumulative tray index across all boxes.
+ */
+function getCumulativeTrayIndex(boxes: Box[], boxIndex: number, trayIndex: number): number {
+	let cumulative = 0;
+	for (let i = 0; i < boxIndex; i++) {
+		cumulative += boxes[i].trays.length;
+	}
+	return cumulative + trayIndex;
+}
+
 // Message types
 interface GenerateMessage {
 	type: 'generate';
@@ -149,7 +173,8 @@ function handleGenerate(msg: GenerateMessage): void {
 	const { id, project, selectedBoxId, selectedTrayId } = msg;
 
 	try {
-		const box = project.boxes.find((b) => b.id === selectedBoxId);
+		const selectedBoxIndex = project.boxes.findIndex((b) => b.id === selectedBoxId);
+		const box = selectedBoxIndex >= 0 ? project.boxes[selectedBoxIndex] : undefined;
 		const tray = box?.trays.find((t) => t.id === selectedTrayId);
 
 		if (!box || !tray) {
@@ -211,7 +236,7 @@ function handleGenerate(msg: GenerateMessage): void {
 				geometry: jscadToArrays(jscadGeom),
 				placement,
 				counterStacks: getCounterPositions(placement.tray.params, maxHeight, spacerHeight),
-				trayLetter: String.fromCharCode(65 + index)
+				trayLetter: getTrayLetter(getCumulativeTrayIndex(project.boxes, selectedBoxIndex, index))
 			};
 		});
 
@@ -224,7 +249,7 @@ function handleGenerate(msg: GenerateMessage): void {
 		const lidGeometry = cachedLid ? jscadToArrays(cachedLid) : null;
 
 		// Generate geometries for ALL boxes (for all-no-lid view)
-		const allBoxGeometries: BoxGeometryResult[] = project.boxes.map((projectBox) => {
+		const allBoxGeometries: BoxGeometryResult[] = project.boxes.map((projectBox, boxIndex) => {
 			const boxValidation = validateCustomDimensions(projectBox);
 			if (!boxValidation.valid) {
 				console.warn(`Box "${projectBox.name}" validation failed:`, boxValidation.errors);
@@ -261,7 +286,7 @@ function handleGenerate(msg: GenerateMessage): void {
 					geometry: jscadToArrays(jscadGeom),
 					placement,
 					counterStacks: getCounterPositions(placement.tray.params, boxMaxHeight, spacerHeight),
-					trayLetter: String.fromCharCode(65 + index)
+					trayLetter: getTrayLetter(getCumulativeTrayIndex(project.boxes, boxIndex, index))
 				};
 			});
 

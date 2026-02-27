@@ -4,6 +4,7 @@
 	import type { Box, Tray } from '$lib/types/project';
 	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
 	import { getTrayDimensions } from '$lib/models/box';
+	import { getProject, getCumulativeTrayLetter } from '$lib/stores/project.svelte';
 
 	interface Props {
 		selectedBox: Box | null;
@@ -26,6 +27,13 @@
 		onUpdateParams,
 		hideList = false
 	}: Props = $props();
+
+	// Get current box index for cumulative tray letters
+	let currentBoxIdx = $derived.by(() => {
+		const project = getProject();
+		if (!selectedBox) return 0;
+		return project.boxes.findIndex((b) => b.id === selectedBox.id);
+	});
 
 	// Drag and drop state
 	let draggedIndex: number | null = $state(null);
@@ -95,11 +103,14 @@
 		return shapeRef;
 	}
 
-	// Get the tray letter (A, B, C...) based on position in box
+	// Get the tray letter based on cumulative position across all boxes
 	let trayLetter = $derived.by(() => {
+		const project = getProject();
 		if (!selectedBox || !selectedTray) return 'A';
-		const idx = selectedBox.trays.findIndex((t) => t.id === selectedTray.id);
-		return String.fromCharCode(65 + (idx >= 0 ? idx : 0));
+		const boxIdx = project.boxes.findIndex((b) => b.id === selectedBox.id);
+		const trayIdx = selectedBox.trays.findIndex((t) => t.id === selectedTray.id);
+		if (boxIdx < 0 || trayIdx < 0) return 'A';
+		return getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx);
 	});
 
 	// Get combined stack reference (top-loaded first, then edge-loaded)
@@ -217,7 +228,7 @@
 			<div class="panelListItems">
 				{#each selectedBox.trays as tray, trayIdx (tray.id)}
 					{@const stats = getTrayStats(tray)}
-					{@const letter = String.fromCharCode(65 + trayIdx)}
+					{@const letter = getCumulativeTrayLetter(getProject().boxes, currentBoxIdx, trayIdx)}
 					<div
 						class="listItem {selectedTray?.id === tray.id ? 'listItem--selected' : ''}"
 						onclick={() => onSelectTray(tray)}
