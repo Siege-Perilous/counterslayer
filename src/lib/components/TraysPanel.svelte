@@ -8,7 +8,9 @@
 		Link,
 		IconButton,
 		Icon,
-		ColorPicker
+		ColorPicker,
+		ColorPickerSwatch,
+		Popover
 	} from '@tableslayer/ui';
 	import { IconX, IconPlus, IconMenu } from '@tabler/icons-svelte';
 	import type { Box, Tray } from '$lib/types/project';
@@ -323,11 +325,25 @@
 
 				<!-- Color -->
 				<FormControl label="Color" name="trayColor">
-					{#snippet input()}
-						<ColorPicker
-							hex={selectedTray.color}
-							showInputs={false}
-							onUpdate={(payload) => handleColorUpdate(payload.hex)}
+					{#snippet start()}
+						<Popover>
+							{#snippet trigger()}
+								<ColorPickerSwatch color={selectedTray.color} />
+							{/snippet}
+							{#snippet content()}
+								<ColorPicker
+									showOpacity={false}
+									hex={selectedTray.color}
+									onUpdate={(colorData) => handleColorUpdate(colorData.hex)}
+								/>
+							{/snippet}
+						</Popover>
+					{/snippet}
+					{#snippet input({ inputProps })}
+						<Input
+							{...inputProps}
+							value={selectedTray.color}
+							oninput={(e) => handleColorUpdate(e.currentTarget.value)}
 						/>
 					{/snippet}
 				</FormControl>
