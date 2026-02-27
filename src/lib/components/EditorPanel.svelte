@@ -81,7 +81,9 @@
 				{panelTitle}
 			</Title>
 			{#if selectionType === 'box' && selectedBox}
-				<span class="headerStats">{selectedBox.trays.length} {selectedBox.trays.length === 1 ? 'tray' : 'trays'}</span>
+				<span class="headerStats"
+					>{selectedBox.trays.length} {selectedBox.trays.length === 1 ? 'tray' : 'trays'}</span
+				>
 			{:else if selectionType === 'tray' && selectedTray}
 				{@const stats = getTrayStats(selectedTray)}
 				<span class="headerStats">{stats.counters} counters in {stats.stacks} stacks</span>

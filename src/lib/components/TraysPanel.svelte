@@ -305,7 +305,8 @@
 									<Select
 										selected={[stack[0]]}
 										options={shapeOptions.map((s) => ({ value: s, label: getShapeDisplayName(s) }))}
-										onSelectedChange={(selected) => updateTopLoadedStack(index, 'shape', selected[0])}
+										onSelectedChange={(selected) =>
+											updateTopLoadedStack(index, 'shape', selected[0])}
 									/>
 								</div>
 								<Input

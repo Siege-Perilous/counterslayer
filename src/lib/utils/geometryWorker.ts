@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import type { CounterStack } from '$lib/models/counterTray';
 import type { TrayPlacement } from '$lib/models/box';
-import type { Box, Project } from '$lib/types/project';
+import type { Project } from '$lib/types/project';
 
 // Geometry data received from worker
 interface GeometryData {
@@ -99,10 +99,13 @@ function arrayToBufferGeometry(data: GeometryData): THREE.BufferGeometry {
 export class GeometryWorkerManager {
 	private worker: Worker | null = null;
 	private messageId = 0;
-	private pendingRequests = new Map<number, {
-		resolve: (value: unknown) => void;
-		reject: (reason: unknown) => void;
-	}>();
+	private pendingRequests = new Map<
+		number,
+		{
+			resolve: (value: unknown) => void;
+			reject: (reason: unknown) => void;
+		}
+	>();
 
 	/**
 	 * Initialize the worker
@@ -162,28 +165,20 @@ export class GeometryWorkerManager {
 					// Convert all geometry data to BufferGeometry
 					const selectedTrayGeometry = arrayToBufferGeometry(r.selectedTrayGeometry);
 
-					const allTrayGeometries: TrayGeometryData[] = r.allTrayGeometries.map(t => ({
+					const allTrayGeometries: TrayGeometryData[] = r.allTrayGeometries.map((t) => ({
 						...t,
 						geometry: arrayToBufferGeometry(t.geometry)
 					}));
 
-					const boxGeometry = r.boxGeometry
-						? arrayToBufferGeometry(r.boxGeometry)
-						: null;
+					const boxGeometry = r.boxGeometry ? arrayToBufferGeometry(r.boxGeometry) : null;
 
-					const lidGeometry = r.lidGeometry
-						? arrayToBufferGeometry(r.lidGeometry)
-						: null;
+					const lidGeometry = r.lidGeometry ? arrayToBufferGeometry(r.lidGeometry) : null;
 
-					const allBoxGeometries: BoxGeometryData[] = r.allBoxGeometries.map(b => ({
+					const allBoxGeometries: BoxGeometryData[] = r.allBoxGeometries.map((b) => ({
 						...b,
-						boxGeometry: b.boxGeometry
-							? arrayToBufferGeometry(b.boxGeometry)
-							: null,
-						lidGeometry: b.lidGeometry
-							? arrayToBufferGeometry(b.lidGeometry)
-							: null,
-						trayGeometries: b.trayGeometries.map(t => ({
+						boxGeometry: b.boxGeometry ? arrayToBufferGeometry(b.boxGeometry) : null,
+						lidGeometry: b.lidGeometry ? arrayToBufferGeometry(b.lidGeometry) : null,
+						trayGeometries: b.trayGeometries.map((t) => ({
 							...t,
 							geometry: arrayToBufferGeometry(t.geometry)
 						}))
@@ -202,9 +197,11 @@ export class GeometryWorkerManager {
 			});
 
 			// Deep clone to strip Svelte 5 Proxy wrappers (can't be cloned for postMessage)
-			const plainProject = JSON.parse(JSON.stringify({
-				boxes: project.boxes
-			}));
+			const plainProject = JSON.parse(
+				JSON.stringify({
+					boxes: project.boxes
+				})
+			);
 
 			this.worker!.postMessage({
 				type: 'generate',

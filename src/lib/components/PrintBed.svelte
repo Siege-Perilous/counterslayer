@@ -133,12 +133,7 @@
 <!-- Print bed surface with noise texture (reacts to lighting) -->
 <T.Mesh position={[posX, posY + 0.01, posZ]} rotation.x={-Math.PI / 2}>
 	<T.PlaneGeometry args={[size, size]} />
-	<T.MeshStandardMaterial
-		map={noiseTexture}
-		color="#3a3a3a"
-		roughness={0.8}
-		metalness={0.05}
-	/>
+	<T.MeshStandardMaterial map={noiseTexture} color="#3a3a3a" roughness={0.8} metalness={0.05} />
 </T.Mesh>
 
 <!-- Cell grid lines -->

@@ -356,12 +356,6 @@
 		return arrangeBoxes(bedDims, sideGap);
 	});
 
-	// Max depth is now print bed size for consistent alignment
-	let maxBoxDepth = $derived.by(() => {
-		if (!showAllBoxes || allBoxes.length === 0) return 0;
-		return printBedSize;
-	});
-
 	// Combined bounds for camera positioning
 	let allGeometries = $derived.by(() => {
 		const geoms: BufferGeometry[] = [];
@@ -602,7 +596,6 @@
 		{@const boxPos = boxPositions[boxIndex]}
 		{@const boxWidth = boxData.boxDimensions.width}
 		{@const boxDepth = boxData.boxDimensions.depth}
-		{@const boxHeight = boxData.boxDimensions.height}
 		{@const xOffset = boxPos?.x ?? 0}
 		{@const zOffset = printBedSize / 2}
 
@@ -631,8 +624,7 @@
 		{#each boxData.trayGeometries as trayData, trayIndex (trayData.trayId)}
 			{@const placement = trayData.placement}
 			{@const trayX = xOffset - boxWidth / 2 + boxWallThickness + boxTolerance + placement.x}
-			{@const trayZ =
-				zOffset + boxDepth / 2 - boxWallThickness - boxTolerance - placement.y}
+			{@const trayZ = zOffset + boxDepth / 2 - boxWallThickness - boxTolerance - placement.y}
 			<T.Mesh
 				geometry={trayData.geometry}
 				rotation.x={-Math.PI / 2}

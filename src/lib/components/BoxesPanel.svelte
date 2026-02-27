@@ -14,7 +14,15 @@
 		hideList?: boolean;
 	}
 
-	let { project, selectedBox, onSelectBox, onAddBox, onDeleteBox, onUpdateBox, hideList = false }: Props = $props();
+	let {
+		project,
+		selectedBox,
+		onSelectBox,
+		onAddBox,
+		onDeleteBox,
+		onUpdateBox,
+		hideList = false
+	}: Props = $props();
 
 	const minimums = $derived(
 		selectedBox
@@ -100,7 +108,9 @@
 								min="0"
 								value={selectedBox.tolerance}
 								onchange={(e) =>
-									onUpdateBox({ tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5 })}
+									onUpdateBox({
+										tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5
+									})}
 							/>
 						{/snippet}
 						{#snippet end()}mm{/snippet}

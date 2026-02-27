@@ -13,7 +13,6 @@
 		ConfirmActionButton
 	} from '@tableslayer/ui';
 	import {
-		IconX,
 		IconSquare,
 		IconCircle,
 		IconHexagon,
@@ -456,16 +455,6 @@
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
 		color: var(--fgMuted);
-	}
-
-	.formGrid {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
-	}
-
-	:global(.formGrid__spanTwo) {
-		grid-column: span 2;
 	}
 
 	.customShapesList {

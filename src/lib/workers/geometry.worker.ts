@@ -4,12 +4,18 @@
  */
 
 import jscad from '@jscad/modeling';
-import { createCounterTray, getCounterPositions, type CounterTrayParams, type CounterStack } from '$lib/models/counterTray';
+import { createCounterTray, getCounterPositions, type CounterStack } from '$lib/models/counterTray';
 import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
-import { arrangeTrays, calculateTraySpacers, getBoxDimensions, validateCustomDimensions, type TrayPlacement } from '$lib/models/box';
+import {
+	arrangeTrays,
+	calculateTraySpacers,
+	getBoxDimensions,
+	validateCustomDimensions,
+	type TrayPlacement
+} from '$lib/models/box';
 import stlSerializer from '@jscad/stl-serializer';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
-import type { Box, Tray } from '$lib/types/project';
+import type { Box } from '$lib/types/project';
 
 const { geom3 } = jscad.geometries;
 
@@ -143,8 +149,8 @@ function handleGenerate(msg: GenerateMessage): void {
 	const { id, project, selectedBoxId, selectedTrayId } = msg;
 
 	try {
-		const box = project.boxes.find(b => b.id === selectedBoxId);
-		const tray = box?.trays.find(t => t.id === selectedTrayId);
+		const box = project.boxes.find((b) => b.id === selectedBoxId);
+		const tray = box?.trays.find((t) => t.id === selectedTrayId);
 
 		if (!box || !tray) {
 			self.postMessage({
@@ -174,10 +180,10 @@ function handleGenerate(msg: GenerateMessage): void {
 		});
 
 		const spacerInfo = calculateTraySpacers(box);
-		const maxHeight = Math.max(...placements.map(p => p.dimensions.height));
+		const maxHeight = Math.max(...placements.map((p) => p.dimensions.height));
 
 		// Find spacer for selected tray
-		const selectedSpacer = spacerInfo.find(s => s.trayId === tray.id);
+		const selectedSpacer = spacerInfo.find((s) => s.trayId === tray.id);
 		const selectedSpacerHeight = selectedSpacer?.floorSpacerHeight ?? 0;
 
 		// Generate selected tray
@@ -188,9 +194,14 @@ function handleGenerate(msg: GenerateMessage): void {
 		// Generate all trays for selected box
 		cachedAllTrays = [];
 		const allTrayGeometries: TrayGeometryResult[] = placements.map((placement, index) => {
-			const spacer = spacerInfo.find(s => s.trayId === placement.tray.id);
+			const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
 			const spacerHeight = spacer?.floorSpacerHeight ?? 0;
-			const jscadGeom = createCounterTray(placement.tray.params, placement.tray.name, maxHeight, spacerHeight);
+			const jscadGeom = createCounterTray(
+				placement.tray.params,
+				placement.tray.name,
+				maxHeight,
+				spacerHeight
+			);
 
 			cachedAllTrays.push({ jscadGeom, name: placement.tray.name });
 
@@ -213,7 +224,7 @@ function handleGenerate(msg: GenerateMessage): void {
 		const lidGeometry = cachedLid ? jscadToArrays(cachedLid) : null;
 
 		// Generate geometries for ALL boxes (for all-no-lid view)
-		const allBoxGeometries: BoxGeometryResult[] = project.boxes.map(projectBox => {
+		const allBoxGeometries: BoxGeometryResult[] = project.boxes.map((projectBox) => {
 			const boxValidation = validateCustomDimensions(projectBox);
 			if (!boxValidation.valid) {
 				console.warn(`Box "${projectBox.name}" validation failed:`, boxValidation.errors);
@@ -232,12 +243,17 @@ function handleGenerate(msg: GenerateMessage): void {
 			});
 
 			const boxSpacerInfo = calculateTraySpacers(projectBox);
-			const boxMaxHeight = Math.max(...boxPlacements.map(p => p.dimensions.height), 0);
+			const boxMaxHeight = Math.max(...boxPlacements.map((p) => p.dimensions.height), 0);
 
 			const trayGeoms: TrayGeometryResult[] = boxPlacements.map((placement, index) => {
-				const spacer = boxSpacerInfo.find(s => s.trayId === placement.tray.id);
+				const spacer = boxSpacerInfo.find((s) => s.trayId === placement.tray.id);
 				const spacerHeight = spacer?.floorSpacerHeight ?? 0;
-				const jscadGeom = createCounterTray(placement.tray.params, placement.tray.name, boxMaxHeight, spacerHeight);
+				const jscadGeom = createCounterTray(
+					placement.tray.params,
+					placement.tray.name,
+					boxMaxHeight,
+					spacerHeight
+				);
 
 				return {
 					trayId: placement.tray.id,
@@ -360,13 +376,16 @@ function handleExportStl(msg: ExportStlMessage): void {
 		const blob = new Blob(stlData, { type: 'application/octet-stream' });
 
 		// Convert blob to ArrayBuffer
-		blob.arrayBuffer().then(buffer => {
-			self.postMessage({
-				type: 'export-stl-result',
-				id,
-				data: buffer,
-				filename
-			} as ExportStlResult, { transfer: [buffer] });
+		blob.arrayBuffer().then((buffer) => {
+			self.postMessage(
+				{
+					type: 'export-stl-result',
+					id,
+					data: buffer,
+					filename
+				} as ExportStlResult,
+				{ transfer: [buffer] }
+			);
 		});
 	} catch (e) {
 		self.postMessage({

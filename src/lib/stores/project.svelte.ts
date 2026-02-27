@@ -2,6 +2,7 @@ import { defaultParams, type CounterTrayParams } from '$lib/models/counterTray';
 import { defaultLidParams } from '$lib/models/lid';
 import { saveProject, loadProject, migrateProjectData } from '$lib/utils/storage';
 import type { Tray, Box, Project, LidParams } from '$lib/types/project';
+import { SvelteMap } from 'svelte/reactivity';
 
 export type { Tray, Box, Project, LidParams };
 
@@ -247,7 +248,7 @@ export function updateTrayParams(trayId: string, params: CounterTrayParams): voi
 	// Propagate changed global params to all other trays
 	if (Object.keys(changedGlobals).length > 0) {
 		// Detect shape renames by comparing old and new customShapes
-		const shapeRenames = new Map<string, string>(); // oldName -> newName
+		const shapeRenames = new SvelteMap<string, string>(); // oldName -> newName
 		if (changedGlobals.customShapes && oldParams.customShapes) {
 			const newShapes = changedGlobals.customShapes as typeof oldParams.customShapes;
 			// Match shapes by index (shapes are edited in place, not reordered)
@@ -272,18 +273,25 @@ export function updateTrayParams(trayId: string, params: CounterTrayParams): voi
 							topLoadedStacks: updatedParams.topLoadedStacks.map(([shape, count]) => {
 								for (const [oldName, newName] of shapeRenames) {
 									if (shape === `custom:${oldName}`) {
-										return [`custom:${newName}`, count] as typeof updatedParams.topLoadedStacks[0];
+										return [
+											`custom:${newName}`,
+											count
+										] as (typeof updatedParams.topLoadedStacks)[0];
 									}
 								}
-								return [shape, count] as typeof updatedParams.topLoadedStacks[0];
+								return [shape, count] as (typeof updatedParams.topLoadedStacks)[0];
 							}),
 							edgeLoadedStacks: updatedParams.edgeLoadedStacks.map(([shape, count, orient]) => {
 								for (const [oldName, newName] of shapeRenames) {
 									if (shape === `custom:${oldName}`) {
-										return [`custom:${newName}`, count, orient] as typeof updatedParams.edgeLoadedStacks[0];
+										return [
+											`custom:${newName}`,
+											count,
+											orient
+										] as (typeof updatedParams.edgeLoadedStacks)[0];
 									}
 								}
-								return [shape, count, orient] as typeof updatedParams.edgeLoadedStacks[0];
+								return [shape, count, orient] as (typeof updatedParams.edgeLoadedStacks)[0];
 							})
 						};
 					}

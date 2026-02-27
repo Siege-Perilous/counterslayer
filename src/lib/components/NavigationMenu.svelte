@@ -174,7 +174,10 @@
 					{/each}
 
 					<!-- Add Tray Button -->
-					<button class="navItem navItem--add navItem--tray" onclick={(e) => handleAddTray(box.id, e)}>
+					<button
+						class="navItem navItem--add navItem--tray"
+						onclick={(e) => handleAddTray(box.id, e)}
+					>
 						<span class="addIcon">+</span>
 						<span class="addLabel">Add tray</span>
 					</button>
@@ -308,7 +311,7 @@
 
 	/* Mobile styles */
 	@media (max-width: 768px) {
-		.navMenu {
+		:global(.navMenu) {
 			position: fixed;
 			top: auto;
 			bottom: 0;

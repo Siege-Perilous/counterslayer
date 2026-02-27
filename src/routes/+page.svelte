@@ -27,11 +27,7 @@
 		getCounterPositions,
 		type CounterStack
 	} from '$lib/models/counterTray';
-	import {
-		arrangeTrays,
-		calculateTraySpacers,
-		type TrayPlacement
-	} from '$lib/models/box';
+	import { arrangeTrays, calculateTraySpacers } from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 	import {
 		getGeometryWorker,
@@ -54,7 +50,7 @@
 	} from '$lib/stores/project.svelte';
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
-	import { setContext, onMount, onDestroy } from 'svelte';
+	import { setContext, onDestroy } from 'svelte';
 
 	type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid';
 	type SelectionType = 'dimensions' | 'box' | 'tray';
@@ -269,10 +265,10 @@
 		// If cache valid and not forced, try to use cached geometry
 		if (cacheValid && !force && allBoxGeometries.length > 0) {
 			// Find the selected box in the all-boxes cache
-			const cachedBox = allBoxGeometries.find(b => b.boxId === box.id);
+			const cachedBox = allBoxGeometries.find((b) => b.boxId === box.id);
 			if (cachedBox) {
 				// Find the selected tray within this box
-				const cachedTray = cachedBox.trayGeometries.find(t => t.trayId === tray.id);
+				const cachedTray = cachedBox.trayGeometries.find((t) => t.trayId === tray.id);
 				if (cachedTray) {
 					// Use cached data for this box
 					selectedTrayGeometry = cachedTray.geometry;
@@ -567,7 +563,7 @@
 	<!-- Header -->
 	<div class="appHeader">
 		<div style="display: flex; align-items: center; gap: 0.25rem;">
-			<h1 style="display: contents;">Counter Slayer</h1>
+			<h1 style="display: contents; font-weight: 600; color: var(--fg);">Counter Slayer</h1>
 			by
 			<Link href="https://davesnider.com" target="_blank" rel="noopener noreferrer"
 				>Dave Snider</Link
@@ -750,7 +746,9 @@
 								onchange={(e) => (showReferenceLabels = e.currentTarget.checked)}
 								label="Preview labels"
 							/>
-							<span class="regenerateButton {isDirty && !generating ? 'regenerateButton--dirty' : ''}">
+							<span
+								class="regenerateButton {isDirty && !generating ? 'regenerateButton--dirty' : ''}"
+							>
 								<Button
 									variant="primary"
 									onclick={() => regenerate(true)}

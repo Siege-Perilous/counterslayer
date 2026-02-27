@@ -140,14 +140,14 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	};
 
 	// Get actual counter dimensions (without clearance) for standing height
-	const getCounterWidth = (shape: string): number => {
+	const _getCounterWidth = (shape: string): number => {
 		const custom = getCustomShape(shape);
 		if (!custom) throw new Error(`Unknown shape: ${shape}`);
 		const [w, l] = getCustomEffectiveDims(custom);
 		return Math.max(w, l); // Longer side along X
 	};
 
-	const getCounterLength = (shape: string): number => {
+	const _getCounterLength = (shape: string): number => {
 		const custom = getCustomShape(shape);
 		if (!custom) throw new Error(`Unknown shape: ${shape}`);
 		const [w, l] = getCustomEffectiveDims(custom);
@@ -155,7 +155,7 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	};
 
 	// Get counter standing height (for edge-loaded stacks) - uses actual counter size, not pocket size
-	const getCounterStandingHeight = (shape: string): number => {
+	const _getCounterStandingHeight = (shape: string): number => {
 		const custom = getCustomShape(shape);
 		if (!custom) throw new Error(`Unknown shape: ${shape}`);
 		if (custom.baseShape === 'triangle') {
@@ -164,6 +164,10 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 		const [w, l] = getCustomEffectiveDims(custom);
 		return Math.max(w, l);
 	};
+	// Suppress unused warnings for future use
+	void _getCounterWidth;
+	void _getCounterLength;
+	void _getCounterStandingHeight;
 
 	// === TOP-LOADED STACK PLACEMENTS (greedy bin-packing) ===
 	interface TopLoadedPlacement {
@@ -220,14 +224,22 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 				const standingHeight = getStandingHeightLengthwise(stack[0]);
 				maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);
 				const slotDepthDim = getPocketLengthLengthwise(stack[0]);
-				edgeLoadedSlots.push({ slotDepth: slotDepthDim, slotWidth: counterSpan, orientation: 'lengthwise' });
+				edgeLoadedSlots.push({
+					slotDepth: slotDepthDim,
+					slotWidth: counterSpan,
+					orientation: 'lengthwise'
+				});
 			} else {
 				// For custom shapes: longer side along X (parallel to tray width), shorter side is height
 				const standingHeight = getStandingHeightCrosswise(stack[0]);
 				maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);
 				const slotWidthDim = getPocketWidth(stack[0]); // Longer side along X
 				crosswiseMaxDepth = Math.max(crosswiseMaxDepth, counterSpan);
-				edgeLoadedSlots.push({ slotWidth: slotWidthDim, slotDepth: counterSpan, orientation: 'crosswise' });
+				edgeLoadedSlots.push({
+					slotWidth: slotWidthDim,
+					slotDepth: counterSpan,
+					orientation: 'crosswise'
+				});
 			}
 		}
 	}

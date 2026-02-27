@@ -237,7 +237,7 @@ export function getCounterPositions(
 
 	// Standing height for edge-loaded counters
 	// For triangles standing with point down, height is the triangle's geometric height
-	const getStandingHeight = (shape: string): number => {
+	const _getStandingHeight = (shape: string): number => {
 		const custom = getCustomShape(shape);
 		if (!custom) throw new Error(`Unknown shape: ${shape}`);
 		if (custom.baseShape === 'triangle') {
@@ -246,6 +246,7 @@ export function getCounterPositions(
 		const [w, l] = getCustomEffectiveDims(custom);
 		return Math.max(w, l);
 	};
+	void _getStandingHeight; // Reserved for future use
 
 	// For lengthwise custom shapes: shorter dimension is height (longer runs along Y)
 	const getStandingHeightLengthwise = (shape: string): number => {
@@ -782,14 +783,14 @@ export function createCounterTray(
 	};
 
 	// Get actual counter dimensions (without clearance) for pocket depth calculations
-	const getCounterWidth = (shape: string): number => {
+	const _getCounterWidth = (shape: string): number => {
 		const custom = getCustomShape(shape);
 		if (!custom) throw new Error(`Unknown shape: ${shape}`);
 		const [w, l] = getCustomEffectiveDims(custom);
 		return Math.max(w, l); // Longer side along X
 	};
 
-	const getCounterLength = (shape: string): number => {
+	const _getCounterLength = (shape: string): number => {
 		const custom = getCustomShape(shape);
 		if (!custom) throw new Error(`Unknown shape: ${shape}`);
 		const [w, l] = getCustomEffectiveDims(custom);
@@ -798,7 +799,7 @@ export function createCounterTray(
 
 	// Standing height for edge-loaded counters (actual counter size, not pocket size)
 	// For triangles standing with point down, height is the triangle's geometric height
-	const getStandingHeight = (shape: string): number => {
+	const _getStandingHeight = (shape: string): number => {
 		const custom = getCustomShape(shape);
 		if (!custom) throw new Error(`Unknown shape: ${shape}`);
 		if (custom.baseShape === 'triangle') {
@@ -807,6 +808,10 @@ export function createCounterTray(
 		const [w, l] = getCustomEffectiveDims(custom);
 		return Math.max(w, l);
 	};
+	// Suppress unused warnings for future use
+	void _getCounterWidth;
+	void _getCounterLength;
+	void _getStandingHeight;
 
 	// For lengthwise custom shapes: shorter dimension is height (longer runs along Y)
 	const getStandingHeightLengthwise = (shape: string): number => {
