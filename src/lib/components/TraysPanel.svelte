@@ -1,5 +1,15 @@
 <script lang="ts">
-	import { Input, FormControl, Spacer, Hr, Select, Link, IconButton, Icon } from '@tableslayer/ui';
+	import {
+		Input,
+		FormControl,
+		Spacer,
+		Hr,
+		Select,
+		Link,
+		IconButton,
+		Icon,
+		ColorPicker
+	} from '@tableslayer/ui';
 	import { IconX, IconPlus, IconMenu } from '@tabler/icons-svelte';
 	import type { Box, Tray } from '$lib/types/project';
 	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
@@ -205,6 +215,18 @@
 		const newStacks = selectedTray.params.edgeLoadedStacks.filter((_, i) => i !== index);
 		onUpdateParams({ ...selectedTray.params, edgeLoadedStacks: newStacks });
 	}
+
+	// Debounced color update to avoid excessive saves during color picker drag
+	let colorUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
+	function handleColorUpdate(hex: string) {
+		if (colorUpdateTimeout) {
+			clearTimeout(colorUpdateTimeout);
+		}
+		colorUpdateTimeout = setTimeout(() => {
+			onUpdateTray({ color: hex });
+			colorUpdateTimeout = null;
+		}, 150);
+	}
 </script>
 
 <div class="traysPanel">
@@ -293,6 +315,19 @@
 									moveTray(selectedTray.id, selected[0]);
 								}
 							}}
+						/>
+					{/snippet}
+				</FormControl>
+
+				<Spacer size="1rem" />
+
+				<!-- Color -->
+				<FormControl label="Color" name="trayColor">
+					{#snippet input()}
+						<ColorPicker
+							hex={selectedTray.color}
+							showInputs={false}
+							onUpdate={(payload) => handleColorUpdate(payload.hex)}
 						/>
 					{/snippet}
 				</FormControl>

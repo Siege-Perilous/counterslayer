@@ -620,6 +620,7 @@
 								{showCounters}
 								{selectedTrayCounters}
 								{selectedTrayLetter}
+								selectedTrayId={selectedTray?.id ?? ''}
 								triangleCornerRadius={1.5}
 								{showReferenceLabels}
 								{hidePrintBed}

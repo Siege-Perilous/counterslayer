@@ -6,6 +6,7 @@ import {
 	type TopLoadedStackDef,
 	type EdgeLoadedStackDef
 } from '$lib/models/counterTray';
+import { TRAY_COLORS } from '$lib/stores/project.svelte';
 
 const STORAGE_KEY = 'counter-tray-project';
 
@@ -163,27 +164,35 @@ function migrateTrayParams(params: CounterTrayParams & LegacyTrayParams): Counte
 }
 
 // Migrate a tray to ensure all fields have valid values
-function migrateTray(tray: Tray): Tray {
+function migrateTray(tray: Tray, cumulativeIndex: number): Tray {
 	return {
 		...tray,
+		// Assign color if missing (for old data)
+		color: tray.color || TRAY_COLORS[cumulativeIndex % TRAY_COLORS.length],
 		params: migrateTrayParams(tray.params)
 	};
 }
 
 // Migrate a box to ensure all fields have valid values
-function migrateBox(box: Box): Box {
+function migrateBox(box: Box, cumulativeStartIndex: number): Box {
 	return {
 		...box,
-		trays: box.trays.map(migrateTray),
+		trays: box.trays.map((tray, idx) => migrateTray(tray, cumulativeStartIndex + idx)),
 		lidParams: migrateLidParams(box.lidParams)
 	};
 }
 
 // Migrate a full project to ensure all fields have valid values
 export function migrateProjectData(project: Project): Project {
+	let cumulativeIndex = 0;
+	const migratedBoxes = project.boxes.map((box) => {
+		const migratedBox = migrateBox(box, cumulativeIndex);
+		cumulativeIndex += box.trays.length;
+		return migratedBox;
+	});
 	return {
 		...project,
-		boxes: project.boxes.map(migrateBox)
+		boxes: migratedBoxes
 	};
 }
 

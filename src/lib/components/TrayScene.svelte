@@ -10,11 +10,12 @@
 	import { arrangeBoxes, type TrayPlacement } from '$lib/models/box';
 	import type { CounterStack } from '$lib/models/counterTray';
 	import { captureSceneToDataUrl, type CaptureOptions } from '$lib/utils/screenshotCapture';
-	import { getTrayLetter } from '$lib/stores/project.svelte';
+	import { getTrayLetter, getProject, TRAY_COLORS } from '$lib/stores/project.svelte';
 
 	interface TrayGeometryData {
 		trayId: string;
 		name: string;
+		color: string;
 		geometry: BufferGeometry;
 		placement: TrayPlacement;
 		counterStacks: CounterStack[];
@@ -47,6 +48,7 @@
 		showCounters?: boolean;
 		selectedTrayCounters?: CounterStack[];
 		selectedTrayLetter?: string;
+		selectedTrayId?: string;
 		triangleCornerRadius?: number;
 		showReferenceLabels?: boolean;
 		hidePrintBed?: boolean;
@@ -71,6 +73,7 @@
 		showCounters = false,
 		selectedTrayCounters = [],
 		selectedTrayLetter = 'A',
+		selectedTrayId = '',
 		triangleCornerRadius = 1.5,
 		showReferenceLabels = false,
 		hidePrintBed = false,
@@ -495,8 +498,15 @@
 		};
 	});
 
-	// Tray colors - harmonious with tableslayer/ui primary red
-	const trayColors = ['#c9503c', '#3d7a6a', '#d4956a', '#7c5c4a', '#a36b5a', '#5a7c6a'];
+	// Get live tray color from project store (for reactive updates)
+	function getTrayColor(trayId: string, fallbackIndex: number): string {
+		const project = getProject();
+		for (const box of project.boxes) {
+			const tray = box.trays.find((t) => t.id === trayId);
+			if (tray?.color) return tray.color;
+		}
+		return TRAY_COLORS[fallbackIndex % TRAY_COLORS.length];
+	}
 
 	// Debug logging
 	$effect(() => {
@@ -635,7 +645,7 @@
 				position.z={trayZ}
 			>
 				<T.MeshStandardMaterial
-					color={trayColors[trayIndex % trayColors.length]}
+					color={getTrayColor(trayData.trayId, trayIndex)}
 					roughness={0.6}
 					metalness={0.1}
 					side={THREE.DoubleSide}
@@ -869,7 +879,7 @@
 			position.z={zOffset}
 		>
 			<T.MeshStandardMaterial
-				color={trayColors[i % trayColors.length]}
+				color={getTrayColor(trayData.trayId, i)}
 				roughness={0.6}
 				metalness={0.1}
 				side={THREE.DoubleSide}
@@ -886,7 +896,7 @@
 		position.z={meshOffset.z}
 	>
 		<T.MeshStandardMaterial
-			color="#c9503c"
+			color={getTrayColor(selectedTrayId, 0)}
 			roughness={0.6}
 			metalness={0.1}
 			side={THREE.DoubleSide}

@@ -43,10 +43,22 @@ export function getCumulativeTrayLetter(boxes: Box[], boxIndex: number, trayInde
 	return getTrayLetter(getCumulativeTrayIndex(boxes, boxIndex, trayIndex));
 }
 
-function createDefaultTray(name: string): Tray {
+// Color palette for trays
+export const TRAY_COLORS = ['#c9503c', '#3d7a6a', '#d4956a', '#7c5c4a', '#a36b5a', '#5a7c6a'];
+
+/**
+ * Get the next color for a new tray based on total tray count across all boxes.
+ */
+function getNextTrayColor(boxes: Box[]): string {
+	const totalTrays = boxes.reduce((sum, box) => sum + box.trays.length, 0);
+	return TRAY_COLORS[totalTrays % TRAY_COLORS.length];
+}
+
+function createDefaultTray(name: string, color: string): Tray {
 	return {
 		id: generateId(),
 		name,
+		color,
 		params: { ...defaultParams }
 	};
 }
@@ -65,7 +77,7 @@ function createDefaultBox(name: string): Box {
 
 function createDefaultProject(): Project {
 	const box = createDefaultBox('Box 1');
-	const tray = createDefaultTray('Tray 1');
+	const tray = createDefaultTray('Tray 1', TRAY_COLORS[0]);
 	box.trays.push(tray);
 
 	return {
@@ -132,7 +144,7 @@ export function selectTray(trayId: string): void {
 export function addBox(): Box {
 	const boxNumber = project.boxes.length + 1;
 	const box = createDefaultBox(`Box ${boxNumber}`);
-	const tray = createDefaultTray('Tray 1');
+	const tray = createDefaultTray('Tray 1', getNextTrayColor(project.boxes));
 	// Inherit global params (including customShapes) from existing trays
 	const globalParams = getGlobalParamsFromExisting();
 	tray.params = { ...tray.params, ...globalParams };
@@ -193,7 +205,7 @@ export function addTray(boxId: string): Tray | null {
 	if (!box) return null;
 
 	const trayNumber = box.trays.length + 1;
-	const tray = createDefaultTray(`Tray ${trayNumber}`);
+	const tray = createDefaultTray(`Tray ${trayNumber}`, getNextTrayColor(project.boxes));
 	// Inherit global params (including customShapes) from existing trays
 	const globalParams = getGlobalParamsFromExisting();
 	tray.params = { ...tray.params, ...globalParams };

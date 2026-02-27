@@ -9,6 +9,7 @@
 	interface TrayGeometryData {
 		trayId: string;
 		name: string;
+		color: string;
 		geometry: BufferGeometry;
 		placement: TrayPlacement;
 		counterStacks: CounterStack[];
@@ -41,6 +42,7 @@
 		showCounters?: boolean;
 		selectedTrayCounters?: CounterStack[];
 		selectedTrayLetter?: string;
+		selectedTrayId?: string;
 		triangleCornerRadius?: number;
 		showReferenceLabels?: boolean;
 		hidePrintBed?: boolean;
@@ -65,6 +67,7 @@
 		showCounters = false,
 		selectedTrayCounters = [],
 		selectedTrayLetter = 'A',
+		selectedTrayId = '',
 		triangleCornerRadius = 1.5,
 		showReferenceLabels = false,
 		hidePrintBed = false,
@@ -92,6 +95,7 @@
 			{showCounters}
 			{selectedTrayCounters}
 			{selectedTrayLetter}
+			{selectedTrayId}
 			{triangleCornerRadius}
 			{showReferenceLabels}
 			{hidePrintBed}

@@ -17,6 +17,7 @@ interface GeometryData {
 interface TrayGeometryResult {
 	trayId: string;
 	name: string;
+	color: string;
 	geometry: GeometryData;
 	placement: TrayPlacement;
 	counterStacks: CounterStack[];
@@ -56,6 +57,7 @@ interface ExportStlResult {
 export interface TrayGeometryData {
 	trayId: string;
 	name: string;
+	color: string;
 	geometry: THREE.BufferGeometry;
 	placement: TrayPlacement;
 	counterStacks: CounterStack[];

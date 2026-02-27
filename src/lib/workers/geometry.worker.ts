@@ -72,6 +72,7 @@ interface GeometryData {
 interface TrayGeometryResult {
 	trayId: string;
 	name: string;
+	color: string;
 	geometry: GeometryData;
 	placement: TrayPlacement;
 	counterStacks: CounterStack[];
@@ -233,6 +234,7 @@ function handleGenerate(msg: GenerateMessage): void {
 			return {
 				trayId: placement.tray.id,
 				name: placement.tray.name,
+				color: placement.tray.color,
 				geometry: jscadToArrays(jscadGeom),
 				placement,
 				counterStacks: getCounterPositions(placement.tray.params, maxHeight, spacerHeight),
@@ -283,6 +285,7 @@ function handleGenerate(msg: GenerateMessage): void {
 				return {
 					trayId: placement.tray.id,
 					name: placement.tray.name,
+					color: placement.tray.color,
 					geometry: jscadToArrays(jscadGeom),
 					placement,
 					counterStacks: getCounterPositions(placement.tray.params, boxMaxHeight, spacerHeight),
