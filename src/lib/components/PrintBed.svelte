@@ -66,15 +66,15 @@
 		// Vertical cell lines (constant X)
 		for (let worldX = firstCellX; worldX <= worldXMax; worldX += cellSize) {
 			if (worldX % sectionSize === 0) continue;
-			cellLines.push(worldX, posY + 0.02, worldZMin);
-			cellLines.push(worldX, posY + 0.02, worldZMax);
+			cellLines.push(worldX, posY + 0.15, worldZMin);
+			cellLines.push(worldX, posY + 0.15, worldZMax);
 		}
 
 		// Horizontal cell lines (constant Z)
 		for (let worldZ = firstCellZ; worldZ <= worldZMax; worldZ += cellSize) {
 			if (worldZ % sectionSize === 0) continue;
-			cellLines.push(worldXMin, posY + 0.02, worldZ);
-			cellLines.push(worldXMax, posY + 0.02, worldZ);
+			cellLines.push(worldXMin, posY + 0.15, worldZ);
+			cellLines.push(worldXMax, posY + 0.15, worldZ);
 		}
 
 		if (cellLines.length === 0) return null;
@@ -97,14 +97,14 @@
 
 		// Vertical section lines
 		for (let worldX = firstSectionX; worldX <= worldXMax; worldX += sectionSize) {
-			sectionLines.push(worldX, posY + 0.03, worldZMin);
-			sectionLines.push(worldX, posY + 0.03, worldZMax);
+			sectionLines.push(worldX, posY + 0.2, worldZMin);
+			sectionLines.push(worldX, posY + 0.2, worldZMax);
 		}
 
 		// Horizontal section lines
 		for (let worldZ = firstSectionZ; worldZ <= worldZMax; worldZ += sectionSize) {
-			sectionLines.push(worldXMin, posY + 0.03, worldZ);
-			sectionLines.push(worldXMax, posY + 0.03, worldZ);
+			sectionLines.push(worldXMin, posY + 0.2, worldZ);
+			sectionLines.push(worldXMax, posY + 0.2, worldZ);
 		}
 
 		if (sectionLines.length === 0) return null;
@@ -151,7 +151,7 @@
 {/if}
 
 <!-- Print bed border -->
-<T.LineLoop position={[posX, posY + 0.02, posZ]}>
+<T.LineLoop position={[posX, posY + 0.15, posZ]}>
 	<T.BufferGeometry>
 		<T.BufferAttribute
 			attach="attributes-position"
