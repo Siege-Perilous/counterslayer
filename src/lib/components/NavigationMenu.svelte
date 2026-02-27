@@ -107,15 +107,23 @@
 
 			<div class="navBoxGroup">
 				<!-- Box Item -->
-				<div class="navItem navItem--box {isBoxSelected ? 'navItem--selected' : ''}">
+				<button
+					class="navItem navItem--box {isBoxSelected ? 'navItem--selected' : ''}"
+					onclick={() => handleBoxClick(box)}
+				>
 					<span class="navItemIcon">
 						<Icon Icon={IconPackage} size="1rem" />
 					</span>
-					<button class="navItemLabel" onclick={() => handleBoxClick(box)}>
+					<span class="navItemLabel">
 						{box.name}
-					</button>
+					</span>
 					{#if project.boxes.length > 1}
-						<span class="navItemDelete">
+						<span
+							class="navItemDelete"
+							role="none"
+							onclick={(e) => e.stopPropagation()}
+							onkeydown={(e) => e.stopPropagation()}
+						>
 							<ConfirmActionButton
 								action={() => handleDeleteBox(box.id)}
 								actionButtonText="Delete box"
@@ -132,7 +140,7 @@
 							</ConfirmActionButton>
 						</span>
 					{/if}
-				</div>
+				</button>
 
 				<!-- Trays within Box -->
 				<div class="navTrayList">
@@ -144,17 +152,22 @@
 						{@const letter = getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx)}
 						{@const stats = getTrayStats(tray)}
 
-						<div class="navItem navItem--tray {isTraySelected ? 'navItem--selected' : ''}">
-							<button
-								class="navItemLabel"
-								onclick={() => handleTrayClick(tray, box)}
-								title="{tray.name} ({letter}: {stats.counters}c in {stats.stacks}s)"
-							>
+						<button
+							class="navItem navItem--tray {isTraySelected ? 'navItem--selected' : ''}"
+							onclick={() => handleTrayClick(tray, box)}
+							title="{tray.name} ({letter}: {stats.counters}c in {stats.stacks}s)"
+						>
+							<span class="navItemLabel">
 								<span class="trayLetter">{letter}</span>
 								{tray.name}
-							</button>
+							</span>
 							{#if box.trays.length > 1}
-								<span class="navItemDelete">
+								<span
+									class="navItemDelete"
+									role="none"
+									onclick={(e) => e.stopPropagation()}
+									onkeydown={(e) => e.stopPropagation()}
+								>
 									<ConfirmActionButton
 										action={() => handleDeleteTray(box.id, tray.id)}
 										actionButtonText="Delete tray"
@@ -171,7 +184,7 @@
 									</ConfirmActionButton>
 								</span>
 							{/if}
-						</div>
+						</button>
 					{/each}
 
 					<!-- Add Tray Button -->
@@ -231,11 +244,7 @@
 
 	.navItem--selected {
 		background: var(--contrastMedium);
-		font-weight: 600;
-	}
-
-	.navItem--box {
-		font-weight: 500;
+		box-shadow: inset 3px 0 0 var(--fgPrimary);
 	}
 
 	.navItem--add {
@@ -268,12 +277,6 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		background: none;
-		border: none;
-		cursor: pointer;
-		color: inherit;
-		font: inherit;
-		text-align: left;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
