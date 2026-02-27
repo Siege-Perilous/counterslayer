@@ -6,6 +6,7 @@
 		IconButton,
 		Icon,
 		InputCheckbox,
+		InputSlider,
 		Select,
 		Popover,
 		Hr,
@@ -109,7 +110,7 @@
 	let isDirty = $state(false);
 	let lastGeneratedHash = $state('');
 	let jsonFileInput = $state<HTMLInputElement | null>(null);
-	let explosionAmount = $state(0);
+	let explosionAmount = $state(50);
 	let showCounters = $state(false);
 	let communityProjects = $state<CommunityProject[]>([]);
 	let showReferenceLabels = $state(false);
@@ -640,13 +641,7 @@
 						<div class="viewToolbar">
 							<div class="sliderContainer">
 								<span class="sliderLabel">Explode</span>
-								<input
-									type="range"
-									min="0"
-									max="100"
-									bind:value={explosionAmount}
-									class="rangeSlider"
-								/>
+								<InputSlider min={0} max={100} bind:value={explosionAmount} />
 							</div>
 						</div>
 					{/if}
@@ -861,15 +856,6 @@
 	.sliderLabel {
 		font-size: 0.75rem;
 		color: var(--fgMuted);
-	}
-
-	.rangeSlider {
-		height: 0.25rem;
-		width: 6rem;
-		appearance: none;
-		border-radius: 9999px;
-		background: var(--contrastMedium);
-		cursor: pointer;
 	}
 
 	.bottomToolbar {
