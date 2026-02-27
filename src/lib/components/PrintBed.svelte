@@ -11,37 +11,110 @@
 
 	let { size, title = '', position = [0, 0, 0] }: Props = $props();
 
-	const [posX, posY, posZ] = position;
+	// Make position values reactive
+	let posX = $derived(position[0]);
+	let posY = $derived(position[1]);
+	let posZ = $derived(position[2]);
 
-	// Create procedural texture for print bed
-	function createBedTexture(): THREE.CanvasTexture {
+	// Grid settings (must match background grid)
+	const cellSize = 10;
+	const sectionSize = 50;
+
+	// Create noise texture for the bed surface
+	function createNoiseTexture(): THREE.CanvasTexture {
+		const pixelsPerMm = 4;
+		const canvasSize = size * pixelsPerMm;
+
 		const canvas = document.createElement('canvas');
-		canvas.width = 256;
-		canvas.height = 256;
+		canvas.width = canvasSize;
+		canvas.height = canvasSize;
 		const ctx = canvas.getContext('2d')!;
 
-		// Dark base
-		ctx.fillStyle = '#0a0a0a';
-		ctx.fillRect(0, 0, 256, 256);
+		// Mid-gray base (will be tinted by material color)
+		ctx.fillStyle = '#808080';
+		ctx.fillRect(0, 0, canvasSize, canvasSize);
 
-		// Add some noise for texture
-		const imageData = ctx.getImageData(0, 0, 256, 256);
-		for (let i = 0; i < imageData.data.length; i += 4) {
-			const noise = (Math.random() - 0.5) * 10;
-			imageData.data[i] = Math.max(0, Math.min(255, imageData.data[i] + noise));
-			imageData.data[i + 1] = Math.max(0, Math.min(255, imageData.data[i + 1] + noise));
-			imageData.data[i + 2] = Math.max(0, Math.min(255, imageData.data[i + 2] + noise));
+		// Add subtle noise texture
+		const imageData = ctx.getImageData(0, 0, canvasSize, canvasSize);
+		const data = imageData.data;
+		for (let i = 0; i < data.length; i += 4) {
+			const noise = (Math.random() - 0.5) * 30;
+			data[i] = Math.max(0, Math.min(255, data[i] + noise));
+			data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
+			data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
 		}
 		ctx.putImageData(imageData, 0, 0);
 
 		const texture = new THREE.CanvasTexture(canvas);
 		texture.wrapS = THREE.RepeatWrapping;
 		texture.wrapT = THREE.RepeatWrapping;
-		texture.repeat.set(size / 50, size / 50);
 		return texture;
 	}
 
-	let bedTexture = $derived(createBedTexture());
+	// Generate grid line geometries
+	let cellGeometry = $derived.by(() => {
+		const worldXMin = posX - size / 2;
+		const worldXMax = posX + size / 2;
+		const worldZMin = posZ - size / 2;
+		const worldZMax = posZ + size / 2;
+
+		const firstCellX = Math.ceil(worldXMin / cellSize) * cellSize;
+		const firstCellZ = Math.ceil(worldZMin / cellSize) * cellSize;
+
+		const cellLines: number[] = [];
+
+		// Vertical cell lines (constant X)
+		for (let worldX = firstCellX; worldX <= worldXMax; worldX += cellSize) {
+			if (worldX % sectionSize === 0) continue;
+			cellLines.push(worldX, posY + 0.02, worldZMin);
+			cellLines.push(worldX, posY + 0.02, worldZMax);
+		}
+
+		// Horizontal cell lines (constant Z)
+		for (let worldZ = firstCellZ; worldZ <= worldZMax; worldZ += cellSize) {
+			if (worldZ % sectionSize === 0) continue;
+			cellLines.push(worldXMin, posY + 0.02, worldZ);
+			cellLines.push(worldXMax, posY + 0.02, worldZ);
+		}
+
+		if (cellLines.length === 0) return null;
+
+		const geometry = new THREE.BufferGeometry();
+		geometry.setAttribute('position', new THREE.Float32BufferAttribute(cellLines, 3));
+		return geometry;
+	});
+
+	let sectionGeometry = $derived.by(() => {
+		const worldXMin = posX - size / 2;
+		const worldXMax = posX + size / 2;
+		const worldZMin = posZ - size / 2;
+		const worldZMax = posZ + size / 2;
+
+		const firstSectionX = Math.ceil(worldXMin / sectionSize) * sectionSize;
+		const firstSectionZ = Math.ceil(worldZMin / sectionSize) * sectionSize;
+
+		const sectionLines: number[] = [];
+
+		// Vertical section lines
+		for (let worldX = firstSectionX; worldX <= worldXMax; worldX += sectionSize) {
+			sectionLines.push(worldX, posY + 0.03, worldZMin);
+			sectionLines.push(worldX, posY + 0.03, worldZMax);
+		}
+
+		// Horizontal section lines
+		for (let worldZ = firstSectionZ; worldZ <= worldZMax; worldZ += sectionSize) {
+			sectionLines.push(worldXMin, posY + 0.03, worldZ);
+			sectionLines.push(worldXMax, posY + 0.03, worldZ);
+		}
+
+		if (sectionLines.length === 0) return null;
+
+		const geometry = new THREE.BufferGeometry();
+		geometry.setAttribute('position', new THREE.Float32BufferAttribute(sectionLines, 3));
+		return geometry;
+	});
+
+	let noiseTexture = $derived.by(() => createNoiseTexture());
 
 	// Calculate label positions relative to bed center
 	let bedSizeLabelPos: [number, number, number] = $derived([
@@ -57,19 +130,33 @@
 	]);
 </script>
 
-<!-- Print bed surface -->
-<T.Mesh position={[posX, posY - 1, posZ]} rotation.x={-Math.PI / 2}>
+<!-- Print bed surface with noise texture (reacts to lighting) -->
+<T.Mesh position={[posX, posY + 0.01, posZ]} rotation.x={-Math.PI / 2}>
 	<T.PlaneGeometry args={[size, size]} />
 	<T.MeshStandardMaterial
-		map={bedTexture}
-		side={THREE.DoubleSide}
-		roughness={0.7}
-		metalness={0.1}
+		map={noiseTexture}
+		color="#3a3a3a"
+		roughness={0.8}
+		metalness={0.05}
 	/>
 </T.Mesh>
 
+<!-- Cell grid lines -->
+{#if cellGeometry}
+	<T.LineSegments geometry={cellGeometry}>
+		<T.LineBasicMaterial color="#4a4a4a" />
+	</T.LineSegments>
+{/if}
+
+<!-- Section grid lines -->
+{#if sectionGeometry}
+	<T.LineSegments geometry={sectionGeometry}>
+		<T.LineBasicMaterial color="#6a6a6a" />
+	</T.LineSegments>
+{/if}
+
 <!-- Print bed border -->
-<T.LineLoop position={[posX, posY - 0.5, posZ]}>
+<T.LineLoop position={[posX, posY + 0.02, posZ]}>
 	<T.BufferGeometry>
 		<T.BufferAttribute
 			attach="attributes-position"

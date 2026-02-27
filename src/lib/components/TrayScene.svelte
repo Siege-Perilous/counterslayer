@@ -398,6 +398,16 @@
 
 	// Camera target
 	let cameraTarget = $derived.by(() => {
+		// For multi-box view, center on the print beds
+		if (showAllBoxes && allBoxes.length > 0) {
+			const maxHeight = Math.max(...allBoxes.map((b) => b.boxDimensions.height));
+			return {
+				x: 0,
+				y: maxHeight / 2,
+				z: printBedSize / 2
+			};
+		}
+
 		if (!combinedBounds) return { x: 0, y: 0, z: 0 };
 		const height = combinedBounds.max.z - combinedBounds.min.z;
 		return {
@@ -571,17 +581,18 @@
 /><!-- Subtle backlight for rim definition -->
 <T.AmbientLight intensity={0.4} />
 
-<!-- Grid for multi-box view -->
+<!-- Background grid for multi-box view (subtle, at world origin for alignment) -->
 {#if showAllBoxes && !hidePrintBed}
 	<Grid
-		position.y={-0.01}
-		cellColor="#5a5a5a"
-		sectionColor="#8b4a3c"
-		sectionThickness={1.5}
+		position.y={-0.51}
+		cellColor="#2a2a2a"
+		sectionColor="#5a3530"
+		sectionThickness={1}
 		cellSize={10}
 		sectionSize={50}
 		gridSize={[2000, 2000]}
-		fadeDistance={500}
+		fadeDistance={1000}
+		fadeStrength={2}
 	/>
 {/if}
 
@@ -1130,16 +1141,16 @@
 {/if}
 
 {#if !hidePrintBed && !showAllBoxes}
-	<!-- Single box view: Grid and Print bed -->
+	<!-- Background grid for single box view (subtle) -->
 	<Grid
-		position.y={-0.01}
-		cellColor="#5a5a5a"
-		sectionColor="#8b4a3c"
-		sectionThickness={1.5}
+		position.y={-0.51}
+		cellColor="#2a2a2a"
+		sectionColor="#5a3530"
+		sectionThickness={1}
 		cellSize={10}
 		sectionSize={50}
 		gridSize={[2000, 2000]}
-		fadeDistance={500}
+		fadeDistance={800}
 	/>
 
 	<PrintBed size={printBedSize} title={viewTitle} position={[0, 0, 0]} />
