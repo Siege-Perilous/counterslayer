@@ -344,6 +344,62 @@ export function resetProject(): void {
 	autosave();
 }
 
+// Move a tray to a different box (or create a new box)
+export function moveTray(trayId: string, targetBoxId: string | 'new'): void {
+	// Find the tray and its current box
+	let sourceTray: Tray | null = null;
+	let sourceBox: Box | null = null;
+	let sourceIndex = -1;
+
+	for (const box of project.boxes) {
+		const trayIndex = box.trays.findIndex((t) => t.id === trayId);
+		if (trayIndex !== -1) {
+			sourceTray = box.trays[trayIndex];
+			sourceBox = box;
+			sourceIndex = trayIndex;
+			break;
+		}
+	}
+
+	if (!sourceTray || !sourceBox) return;
+
+	// Determine target box
+	let targetBox: Box;
+	if (targetBoxId === 'new') {
+		// Create a new box
+		const boxNumber = project.boxes.length + 1;
+		targetBox = {
+			id: generateId(),
+			name: `Box ${boxNumber}`,
+			trays: [],
+			tolerance: sourceBox.tolerance,
+			wallThickness: sourceBox.wallThickness,
+			floorThickness: sourceBox.floorThickness,
+			lidParams: { ...sourceBox.lidParams }
+		};
+		project.boxes.push(targetBox);
+	} else {
+		const found = project.boxes.find((b) => b.id === targetBoxId);
+		if (!found || found.id === sourceBox.id) return; // Can't move to same box
+		targetBox = found;
+	}
+
+	// Remove from source box
+	sourceBox.trays.splice(sourceIndex, 1);
+
+	// Add to target box
+	targetBox.trays.push(sourceTray);
+
+	// Update selection to follow the moved tray
+	project.selectedBoxId = targetBox.id;
+	project.selectedTrayId = sourceTray.id;
+
+	// If source box is now empty, we might want to select the target anyway (already done)
+	// But we should also handle if the user was viewing a different tray in source box
+
+	autosave();
+}
+
 // Import project from JSON data
 export function importProject(data: Project): void {
 	// Run migrations to ensure all fields have proper defaults (handles older exported files)

@@ -4,7 +4,7 @@
 	import type { Box, Tray } from '$lib/types/project';
 	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
 	import { getTrayDimensions } from '$lib/models/box';
-	import { getProject, getCumulativeTrayLetter } from '$lib/stores/project.svelte';
+	import { getProject, getCumulativeTrayLetter, moveTray } from '$lib/stores/project.svelte';
 
 	interface Props {
 		selectedBox: Box | null;
@@ -276,8 +276,31 @@
 					{/snippet}
 				</FormControl>
 
-				<Spacer size="0.75rem" />
+				<Spacer size="1rem" />
 
+				<!-- Move to Box -->
+				<FormControl label="Box" name="moveToBox">
+					{#snippet input({ inputProps })}
+						<Select
+							{...inputProps}
+							selected={selectedBox ? [selectedBox.id] : []}
+							options={[
+								...getProject().boxes.map((box) => ({ value: box.id, label: box.name })),
+								{ value: 'new', label: 'Create new box' }
+							]}
+							onSelectedChange={(selected) => {
+								if (selected[0] && selectedTray && selected[0] !== selectedBox?.id) {
+									moveTray(selectedTray.id, selected[0]);
+								}
+							}}
+						/>
+					{/snippet}
+				</FormControl>
+			</div>
+
+			<Hr />
+
+			<div class="panelFormSection">
 				<!-- Top-Loaded Stacks -->
 				<section class="section">
 					<h3 class="sectionTitle">Top-Loaded Stacks</h3>
