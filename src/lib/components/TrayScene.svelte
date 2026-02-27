@@ -10,6 +10,7 @@
 	import { arrangeBoxes, type TrayPlacement } from '$lib/models/box';
 	import type { CounterStack } from '$lib/models/counterTray';
 	import { captureSceneToDataUrl, type CaptureOptions } from '$lib/utils/screenshotCapture';
+	import { getTrayLetter } from '$lib/stores/project.svelte';
 
 	interface TrayGeometryData {
 		trayId: string;
@@ -1506,7 +1507,10 @@
 			{@const trayX = xOffset - boxWidth / 2 + boxWallThickness + boxTolerance + placement.x}
 			{@const trayZ = zOffset + boxDepth / 2 - boxWallThickness - boxTolerance - placement.y}
 			{@const trayY = boxFloorThickness}
-			{@const trayLetter = trayData.trayLetter ?? String.fromCharCode(65 + trayIndex)}
+			{@const cumulativeIdx =
+				allBoxes.slice(0, boxIndex).reduce((sum, b) => sum + b.trayGeometries.length, 0) +
+				trayIndex}
+			{@const trayLetter = trayData.trayLetter ?? getTrayLetter(cumulativeIdx)}
 			{@const maxStackHeight =
 				trayData.counterStacks.length > 0
 					? Math.max(
