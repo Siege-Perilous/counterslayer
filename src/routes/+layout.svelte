@@ -45,22 +45,23 @@
 	<!-- Header -->
 	<div class="appHeader">
 		<div style="display: flex; align-items: center; gap: 0.25rem;">
-			<a href={resolve('/')} class="appTitle">Counter Slayer</a>
+			<Link href={resolve('/')} color="fg" weight={600}>Counter Slayer</Link>
 			by
-			<Link href="https://davesnider.com" target="_blank" rel="noopener noreferrer"
+			<Link href="https://davesnider.com" target="_blank" rel="noopener noreferrer" color="fg"
 				>Dave Snider</Link
 			>
 		</div>
 		<div style="display: flex; align-items: center; gap: 0.75rem;">
 			<div class="headerLinks">
-				<Link href="/changelog">Changelog</Link>
-				<Link href="https://youtu.be/82d_-vjFpKw" target="_blank" rel="noopener noreferrer"
+				<Link href="/changelog" color="fg">Changelog</Link>
+				<Link href="https://youtu.be/82d_-vjFpKw" target="_blank" rel="noopener noreferrer" color="fg"
 					>Tutorial</Link
 				>
 				<Link
 					href="https://github.com/Siege-Perilous/counterslayer"
 					target="_blank"
-					rel="noopener noreferrer">GitHub</Link
+					rel="noopener noreferrer"
+					color="fg">GitHub</Link
 				>
 			</div>
 			<div class="headerMenu">
@@ -72,14 +73,15 @@
 					{/snippet}
 					{#snippet content()}
 						<div class="headerMenuContent">
-							<Link href="/changelog">Changelog</Link>
-							<Link href="https://youtu.be/82d_-vjFpKw" target="_blank" rel="noopener noreferrer"
+							<Link href="/changelog" color="fg">Changelog</Link>
+							<Link href="https://youtu.be/82d_-vjFpKw" target="_blank" rel="noopener noreferrer" color="fg"
 								>Tutorial</Link
 							>
 							<Link
 								href="https://github.com/Siege-Perilous/counterslayer"
 								target="_blank"
-								rel="noopener noreferrer">GitHub</Link
+								rel="noopener noreferrer"
+								color="fg">GitHub</Link
 							>
 						</div>
 					{/snippet}
@@ -116,13 +118,6 @@
 		font-size: 0.875rem;
 		color: var(--fgMuted);
 		flex-shrink: 0;
-	}
-
-	.appTitle {
-		display: contents;
-		font-weight: 600;
-		color: var(--fg);
-		text-decoration: none;
 	}
 
 	.appContent {
