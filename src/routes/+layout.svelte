@@ -54,8 +54,11 @@
 		<div style="display: flex; align-items: center; gap: 0.75rem;">
 			<div class="headerLinks">
 				<Link href="/changelog" color="fg">Changelog</Link>
-				<Link href="https://youtu.be/82d_-vjFpKw" target="_blank" rel="noopener noreferrer" color="fg"
-					>Tutorial</Link
+				<Link
+					href="https://youtu.be/82d_-vjFpKw"
+					target="_blank"
+					rel="noopener noreferrer"
+					color="fg">Tutorial</Link
 				>
 				<Link
 					href="https://github.com/Siege-Perilous/counterslayer"
@@ -74,8 +77,11 @@
 					{#snippet content()}
 						<div class="headerMenuContent">
 							<Link href="/changelog" color="fg">Changelog</Link>
-							<Link href="https://youtu.be/82d_-vjFpKw" target="_blank" rel="noopener noreferrer" color="fg"
-								>Tutorial</Link
+							<Link
+								href="https://youtu.be/82d_-vjFpKw"
+								target="_blank"
+								rel="noopener noreferrer"
+								color="fg">Tutorial</Link
 							>
 							<Link
 								href="https://github.com/Siege-Perilous/counterslayer"
