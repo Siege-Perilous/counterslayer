@@ -359,7 +359,9 @@
 					<div class="stackList">
 						{#each selectedTray.params.topLoadedStacks as stack, index (index)}
 							<div
-								class="stackRow {dragOverIndex === index && draggedType === 'top'
+								class="stackRow {draggedIndex === index && draggedType === 'top'
+									? 'stackRow--dragging'
+									: ''} {dragOverIndex === index && draggedType === 'top' && draggedIndex !== index
 									? 'stackRow--dragover'
 									: ''}"
 								role="listitem"
@@ -375,7 +377,7 @@
 									role="button"
 									tabindex="0"
 								>
-									<Icon Icon={IconMenu} size="sm" color="var(--fgMuted)" />
+									<Icon Icon={IconMenu} size="1rem" color="var(--fgMuted)" />
 								</span>
 								<div class="stackLabelInput">
 									<span class="stackRef">{getStackRef('top', index)}</span>
@@ -426,7 +428,9 @@
 					<div class="stackList">
 						{#each selectedTray.params.edgeLoadedStacks as stack, index (index)}
 							<div
-								class="stackRow {dragOverIndex === index && draggedType === 'edge'
+								class="stackRow {draggedIndex === index && draggedType === 'edge'
+									? 'stackRow--dragging'
+									: ''} {dragOverIndex === index && draggedType === 'edge' && draggedIndex !== index
 									? 'stackRow--dragover'
 									: ''}"
 								role="listitem"
@@ -743,20 +747,41 @@
 		padding: 0.25rem 0;
 		border-radius: var(--radius-2);
 		border: solid 1px transparent;
+		position: relative;
+	}
+
+	.stackRow--dragging {
+		opacity: 0.4;
+		background: var(--contrastLow);
+	}
+
+	.stackRow--dragover::before {
+		content: '';
+		position: absolute;
+		top: -2px;
+		left: 0;
+		right: 0;
+		height: 2px;
+		background: var(--fgPrimary);
+		border-radius: 1px;
 	}
 
 	.dragHandle {
 		display: flex;
 		cursor: grab;
 		color: var(--fgMuted);
-		width: 2rem;
-		min-width: 2rem;
+		width: 1rem;
+		min-width: 1rem;
 		min-height: 2rem;
-		padding: 0 0.5rem;
+		padding: 0.5rem;
+	}
+
+	.dragHandle:active {
+		cursor: grabbing;
 	}
 
 	.stackRow:has(.dragHandle:hover) {
-		border: dashed 1px var(--fgPrimary);
+		border: dashed 1px var(--contrastLow);
 		background: var(--contrastEmpty);
 	}
 
@@ -799,6 +824,9 @@
 		font-family: var(--font-mono);
 		font-size: 0.625rem;
 		color: var(--fgMuted);
+		width: 1.75rem;
+		text-align: right;
+		flex-shrink: 0;
 	}
 
 	.trayStats {
