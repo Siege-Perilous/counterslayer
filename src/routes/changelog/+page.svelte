@@ -1,32 +1,11 @@
 <script lang="ts">
-	import { Link, Text, Spacer, Title, Logo, IconButton, Icon } from '@tableslayer/ui';
-	import { IconSun, IconMoon } from '@tabler/icons-svelte';
+	import { Link, Text, Spacer, Title } from '@tableslayer/ui';
 	import { marked } from 'marked';
 	import type { PageData } from './$types';
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 
 	let { data } = $props<{ data: PageData }>();
-
-	// Theme state
-	let mode = $state<'light' | 'dark'>('dark');
-
-	// Initialize mode from localStorage
-	$effect(() => {
-		if (browser) {
-			const saved = localStorage.getItem('counterslayer-theme');
-			if (saved === 'light' || saved === 'dark') {
-				mode = saved;
-			}
-		}
-	});
-
-	function toggleTheme() {
-		mode = mode === 'dark' ? 'light' : 'dark';
-		if (browser) {
-			localStorage.setItem('counterslayer-theme', mode);
-		}
-	}
 
 	marked.setOptions({
 		breaks: true,
@@ -51,104 +30,66 @@
 	<meta name="description" content="Monthly updates and new features for Counter Slayer." />
 </svelte:head>
 
-<div class="appContainer {mode}">
-	<!-- Header -->
-	<div class="appHeader">
-		<div style="display: flex; align-items: center; gap: 0.25rem;">
-			<a href="/" style="display: contents; font-weight: 600; color: var(--fg); text-decoration: none;">Counter Slayer</a>
-			by
-			<Link href="https://davesnider.com" target="_blank" rel="noopener noreferrer">Dave Snider</Link>
-		</div>
-		<div style="display: flex; align-items: center; gap: 0.75rem;">
-			<Link href="/changelog">Changelog</Link>
-			<Link href="https://youtu.be/82d_-vjFpKw" target="_blank" rel="noopener noreferrer">Tutorial</Link>
-			<Link href="https://github.com/Siege-Perilous/counterslayer" target="_blank" rel="noopener noreferrer">GitHub</Link>
-			<IconButton variant="ghost" onclick={toggleTheme} size="sm">
-				<Icon Icon={mode === 'dark' ? IconSun : IconMoon} />
-			</IconButton>
-		</div>
-	</div>
+<div class="changelogPage">
+	<div class="container">
+		<div class="changelog__contentContainer">
+			<Title as="h1" size="md">Product updates</Title>
+			<Spacer size="0.5rem" />
+			<Text color="var(--fgMuted)">
+				Notable updates and improvements to Counter Slayer. A complete <Link
+					href="https://github.com/Siege-Perilous/counterslayer/pulls?q=is%3Apr+is%3Amerged"
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					history
+				</Link> is available on GitHub.
+			</Text>
+			<Spacer size="2rem" />
 
-	<div class="appContent">
-		<div class="container">
-			<div class="changelog__contentContainer">
-				<Title as="h1" size="md">Product updates</Title>
-				<Spacer size="0.5rem" />
-				<Text color="var(--fgMuted)">
-					Notable updates and improvements to Counter Slayer. A complete <Link
-						href="https://github.com/Siege-Perilous/counterslayer/pulls?q=is%3Apr+is%3Amerged"
-						target="_blank"
-						rel="noopener noreferrer"
-					>
-						history
-					</Link> is available on GitHub.
-				</Text>
-				<Spacer size="2rem" />
+			{#if data.entries.length > 0}
+				<Spacer size="3rem" />
 
-				{#if data.entries.length > 0}
-					<Spacer size="3rem" />
-
-					<div class="changelog__entries">
-						{#each data.entries as entry}
-							<div class="changelog__entry">
-								<Link id={entry.anchorId} class="changelog__entryDate" href="#{entry.anchorId}">
-									{entry.displayDate}
-								</Link>
-								<div class="changelog__content">
-									{@html marked.parse(entry.content)}
-								</div>
-							</div>
-							{#if entry !== data.entries[data.entries.length - 1]}
-								<Spacer size="8rem" />
-							{/if}
-						{/each}
-					</div>
-				{:else}
-					<Text>No changelog entries yet. Check back soon!</Text>
-				{/if}
-			</div>
-			<div class="changelog__toc">
-				<Text weight={600}>On this page</Text>
-				<Spacer size="0.5rem" />
-				<ul class="changelog__toc-list">
-					{#each data.entries as entry}
-						<li>
-							<a href="#{entry.anchorId}" class="changelog__toc-link">
+				<div class="changelog__entries">
+					{#each data.entries as entry (entry.anchorId)}
+						<div class="changelog__entry">
+							<Link id={entry.anchorId} class="changelog__entryDate" href="#{entry.anchorId}">
 								{entry.displayDate}
-							</a>
-						</li>
+							</Link>
+							<div class="changelog__content">
+								<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+								{@html marked.parse(entry.content)}
+							</div>
+						</div>
+						{#if entry !== data.entries[data.entries.length - 1]}
+							<Spacer size="8rem" />
+						{/if}
 					{/each}
-				</ul>
-			</div>
+				</div>
+			{:else}
+				<Text>No changelog entries yet. Check back soon!</Text>
+			{/if}
+		</div>
+		<div class="changelog__toc">
+			<Text weight={600}>On this page</Text>
+			<Spacer size="0.5rem" />
+			<ul class="changelog__toc-list">
+				{#each data.entries as entry (entry.anchorId)}
+					<li>
+						<a href="#{entry.anchorId}" class="changelog__toc-link">
+							{entry.displayDate}
+						</a>
+					</li>
+				{/each}
+			</ul>
 		</div>
 	</div>
 </div>
 
 <style>
-	.appContainer {
-		--header-height: 2.5rem;
-		min-height: 100vh;
-		background: var(--bg);
-		color: var(--fg);
-	}
-
-	.appHeader {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 0.5rem 0.75rem;
-		border-bottom: var(--borderThin);
-		font-size: 0.875rem;
-		color: var(--fgMuted);
-		position: sticky;
-		top: 0;
-		background: var(--bg);
-		z-index: 10;
-		height: var(--header-height);
-		box-sizing: border-box;
-	}
-
-	.appContent {
+	.changelogPage {
+		flex: 1;
+		overflow-y: auto;
+		overflow-x: hidden;
 	}
 
 	.container {
@@ -157,6 +98,7 @@
 		display: grid;
 		grid-template-columns: 1fr 260px;
 		gap: 2rem;
+		align-items: start;
 	}
 
 	.changelog__contentContainer {
@@ -165,13 +107,16 @@
 	}
 
 	.changelog__toc {
+		--header-height: calc(2.5rem + 1px);
 		border-left: var(--borderThin);
 		padding: 1.5rem;
 		padding-top: 3rem;
 		position: sticky;
-		top: var(--header-height);
+		top: 0;
 		height: calc(100vh - var(--header-height));
+		height: calc(100dvh - var(--header-height));
 		overflow-y: auto;
+		align-self: start;
 	}
 
 	.changelog__toc-list {
