@@ -3,20 +3,16 @@
 	import { PaneGroup, Pane, PaneResizer, type PaneAPI } from 'paneforge';
 	import {
 		Button,
-		IconButton,
 		Icon,
 		InputCheckbox,
 		InputSlider,
 		Select,
 		Popover,
 		Hr,
-		Link,
 		FormControl,
 		Loader
 	} from '@tableslayer/ui';
 	import {
-		IconSun,
-		IconMoon,
 		IconChevronDown,
 		IconChevronLeft,
 		IconChevronRight,
@@ -53,7 +49,7 @@
 	} from '$lib/stores/project.svelte';
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
-	import { setContext, onDestroy } from 'svelte';
+	import { onDestroy } from 'svelte';
 
 	type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid';
 	type SelectionType = 'dimensions' | 'box' | 'tray';
@@ -64,36 +60,6 @@
 		author: string;
 		file: string;
 	}
-
-	// TrayGeometryData and BoxGeometryData are imported from geometryWorker
-
-	// Theme state - get from context if available, otherwise use local state
-	let mode = $state<'light' | 'dark'>('dark');
-
-	// Initialize mode from localStorage
-	$effect(() => {
-		if (browser) {
-			const saved = localStorage.getItem('counterslayer-theme');
-			if (saved === 'light' || saved === 'dark') {
-				mode = saved;
-			}
-		}
-	});
-
-	function toggleTheme() {
-		mode = mode === 'dark' ? 'light' : 'dark';
-		if (browser) {
-			localStorage.setItem('counterslayer-theme', mode);
-		}
-	}
-
-	// Set context for child components
-	setContext('theme', {
-		get mode() {
-			return mode;
-		},
-		toggle: toggleTheme
-	});
 
 	// Mobile detection
 	$effect(() => {
@@ -620,468 +586,414 @@
 	<title>Counter Tray Generator</title>
 </svelte:head>
 
-<div class="appContainer {mode}">
-	<!-- Header -->
-	<div class="appHeader">
-		<div style="display: flex; align-items: center; gap: 0.25rem;">
-			<h1 style="display: contents; font-weight: 600; color: var(--fg);">Counter Slayer</h1>
-			by
-			<Link href="https://davesnider.com" target="_blank" rel="noopener noreferrer"
-				>Dave Snider</Link
-			>
-		</div>
-		<div style="display: flex; align-items: center; gap: 0.75rem;">
-			<Link href="https://youtu.be/82d_-vjFpKw" target="_blank" rel="noopener noreferrer"
-				>Tutorial</Link
-			>
-			<Link
-				href="https://github.com/Siege-Perilous/counterslayer"
-				target="_blank"
-				rel="noopener noreferrer">GitHub</Link
-			>
-			<IconButton variant="ghost" onclick={toggleTheme} size="sm">
-				<Icon Icon={mode === 'dark' ? IconSun : IconMoon} />
-			</IconButton>
-		</div>
-	</div>
+{#if isMobile}
+	<!-- MOBILE LAYOUT: Vertical PaneGroup with manual collapse control -->
+	<PaneGroup direction="vertical" class="paneGroup">
+		<!-- Mobile Nav Pane (top) -->
+		<Pane defaultSize={0} minSize={0} maxSize={50} bind:this={mobileNavPane}>
+			<div class="mobilePanelContent">
+				<NavigationMenu
+					{selectionType}
+					onSelectionChange={handleSelectionChange}
+					onExpandPanel={() => {}}
+					{isMobile}
+				/>
+			</div>
+		</Pane>
 
-	<div class="appContent">
-		{#if isMobile}
-			<!-- MOBILE LAYOUT: Vertical PaneGroup with manual collapse control -->
-			<PaneGroup direction="vertical" class="paneGroup">
-				<!-- Mobile Nav Pane (top) -->
-				<Pane defaultSize={0} minSize={0} maxSize={50} bind:this={mobileNavPane}>
-					<div class="mobilePanelContent">
-						<NavigationMenu
-							{selectionType}
-							onSelectionChange={handleSelectionChange}
-							onExpandPanel={() => {}}
-							{isMobile}
+		<!-- Nav Resizer -->
+		<PaneResizer class="resizer resizer--mobile">
+			<button
+				class="mobileCollapseBtn"
+				onclick={handleToggleMobileNav}
+				aria-label={isMobileNavCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+			>
+				<Icon Icon={isMobileNavCollapsed ? IconChevronDown : IconChevronUp} />
+			</button>
+		</PaneResizer>
+
+		<!-- Mobile Main View (center) -->
+		<Pane defaultSize={100} minSize={20}>
+			<main class="mainView">
+				{#if browser}
+					{#await import('$lib/components/TrayViewer.svelte') then { default: TrayViewer }}
+						<TrayViewer
+							geometry={visibleGeometries.tray}
+							allTrays={visibleGeometries.allTrays}
+							allBoxes={visibleGeometries.allBoxes}
+							boxGeometry={visibleGeometries.box}
+							lidGeometry={visibleGeometries.lid}
+							{printBedSize}
+							exploded={visibleGeometries.exploded}
+							showAllTrays={visibleGeometries.showAllTrays}
+							showAllBoxes={visibleGeometries.showAllBoxes}
+							boxWallThickness={selectedBox?.wallThickness ?? 3}
+							boxTolerance={selectedBox?.tolerance ?? 0.5}
+							boxFloorThickness={selectedBox?.floorThickness ?? 2}
+							{explosionAmount}
+							{showCounters}
+							{selectedTrayCounters}
+							{selectedTrayLetter}
+							selectedTrayId={selectedTray?.id ?? ''}
+							triangleCornerRadius={1.5}
+							{showReferenceLabels}
+							{hidePrintBed}
+							{viewTitle}
+							onCaptureReady={(fn) => (captureFunction = fn)}
 						/>
+					{/await}
+				{/if}
+
+				{#if generating}
+					<div class="generatingOverlay">
+						<Loader />
+						<div class="generatingText">Generating geometry...</div>
 					</div>
-				</Pane>
+				{/if}
 
-				<!-- Nav Resizer -->
-				<PaneResizer class="resizer resizer--mobile">
-					<button
-						class="mobileCollapseBtn"
-						onclick={handleToggleMobileNav}
-						aria-label={isMobileNavCollapsed ? 'Expand navigation' : 'Collapse navigation'}
-					>
-						<Icon Icon={isMobileNavCollapsed ? IconChevronDown : IconChevronUp} />
-					</button>
-				</PaneResizer>
-
-				<!-- Mobile Main View (center) -->
-				<Pane defaultSize={100} minSize={20}>
-					<main class="mainView">
-						{#if browser}
-							{#await import('$lib/components/TrayViewer.svelte') then { default: TrayViewer }}
-								<TrayViewer
-									geometry={visibleGeometries.tray}
-									allTrays={visibleGeometries.allTrays}
-									allBoxes={visibleGeometries.allBoxes}
-									boxGeometry={visibleGeometries.box}
-									lidGeometry={visibleGeometries.lid}
-									{printBedSize}
-									exploded={visibleGeometries.exploded}
-									showAllTrays={visibleGeometries.showAllTrays}
-									showAllBoxes={visibleGeometries.showAllBoxes}
-									boxWallThickness={selectedBox?.wallThickness ?? 3}
-									boxTolerance={selectedBox?.tolerance ?? 0.5}
-									boxFloorThickness={selectedBox?.floorThickness ?? 2}
-									{explosionAmount}
-									{showCounters}
-									{selectedTrayCounters}
-									{selectedTrayLetter}
-									selectedTrayId={selectedTray?.id ?? ''}
-									triangleCornerRadius={1.5}
-									{showReferenceLabels}
-									{hidePrintBed}
-									{viewTitle}
-									onCaptureReady={(fn) => (captureFunction = fn)}
-								/>
-							{/await}
-						{/if}
-
-						{#if generating}
-							<div class="generatingOverlay">
-								<Loader />
-								<div class="generatingText">Generating geometry...</div>
-							</div>
-						{/if}
-
-						{#if viewMode === 'exploded'}
-							<div class="viewToolbar">
-								<div class="sliderContainer">
-									<span class="sliderLabel">Explode</span>
-									<InputSlider min={0} max={100} bind:value={explosionAmount} />
-								</div>
-							</div>
-						{/if}
-
-						<div class="bottomToolbar">
-							<input
-								bind:this={jsonFileInput}
-								type="file"
-								accept=".json"
-								onchange={handleImportJson}
-								style="display: none;"
-							/>
-							<Popover positioning={{ placement: 'top-start' }}>
-								{#snippet trigger()}
-									<Button variant="special">
-										Import / Export
-										<Icon Icon={IconChevronDown} />
-									</Button>
-								{/snippet}
-								{#snippet content()}
-									<div class="popoverMenu">
-										{#if communityProjects.length > 0}
-											<FormControl label="Load community project" name="communityProject">
-												{#snippet input({ inputProps })}
-													<Select
-														selected={[]}
-														options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
-														onSelectedChange={(selected) => {
-															const project = communityProjects.find((p) => p.id === selected[0]);
-															if (project) {
-																loadCommunityProject(project);
-															}
-														}}
-														{...inputProps}
-													/>
-												{/snippet}
-											</FormControl>
-											<Hr />
-										{/if}
-										<Button
-											variant="ghost"
-											onclick={() => jsonFileInput?.click()}
-											style="width: 100%; justify-content: flex-start;"
-										>
-											Import project JSON
-										</Button>
-										<Button
-											variant="ghost"
-											onclick={handleExportJson}
-											style="width: 100%; justify-content: flex-start;"
-										>
-											Export project JSON
-										</Button>
-										<Hr />
-										<Button
-											variant="ghost"
-											onclick={handleExport}
-											disabled={generating || !selectedTrayGeometry}
-											style="width: 100%; justify-content: flex-start;"
-										>
-											Export tray STL
-										</Button>
-										<Button
-											variant="ghost"
-											onclick={handleExportAll}
-											disabled={generating ||
-												(!boxGeometry && !lidGeometry && allTrayGeometries.length === 0)}
-											style="width: 100%; justify-content: flex-start;"
-										>
-											Export all STLs
-										</Button>
-										<Button
-											variant="ghost"
-											onclick={handleExportPdf}
-											disabled={getProject().boxes.length === 0 || exportingPdf}
-											isLoading={exportingPdf}
-											style="width: 100%; justify-content: flex-start;"
-										>
-											{exportingPdf ? 'Generating PDF...' : 'PDF reference'}
-										</Button>
-										<Hr />
-										<Button
-											variant="danger"
-											onclick={handleReset}
-											style="width: 100%; justify-content: flex-start;"
-										>
-											Clear current project
-										</Button>
-									</div>
-								{/snippet}
-							</Popover>
-							<div class="toolbarRight">
-								<span
-									class="regenerateButton {isDirty && !generating ? 'regenerateButton--dirty' : ''}"
-								>
-									<Button
-										variant="primary"
-										onclick={() => regenerate(true)}
-										isDisabled={generating}
-										isLoading={generating}
-									>
-										Regenerate
-									</Button>
-								</span>
-							</div>
+				{#if viewMode === 'exploded'}
+					<div class="viewToolbar">
+						<div class="sliderContainer">
+							<span class="sliderLabel">Explode</span>
+							<InputSlider min={0} max={100} bind:value={explosionAmount} />
 						</div>
-
-						{#if error}
-							<div class="errorBanner">
-								{error}
-							</div>
-						{/if}
-					</main>
-				</Pane>
-
-				<!-- Editor Resizer -->
-				<PaneResizer class="resizer resizer--mobile resizer--bottom">
-					<button
-						class="mobileCollapseBtn"
-						onclick={handleToggleMobileEditor}
-						aria-label={isMobileEditorCollapsed ? 'Expand editor' : 'Collapse editor'}
-					>
-						<Icon Icon={isMobileEditorCollapsed ? IconChevronUp : IconChevronDown} />
-					</button>
-				</PaneResizer>
-
-				<!-- Mobile Editor Pane (bottom) -->
-				<Pane defaultSize={0} minSize={0} maxSize={60} bind:this={mobileEditorPane}>
-					<div class="mobilePanelContent">
-						<EditorPanel {selectionType} />
 					</div>
-				</Pane>
-			</PaneGroup>
-		{:else}
-			<!-- DESKTOP LAYOUT: PaneGroup with resizable panels -->
-			<NavigationMenu
-				{selectionType}
-				onSelectionChange={handleSelectionChange}
-				onExpandPanel={handleExpandPanel}
-				{isMobile}
-			/>
+				{/if}
 
-			<PaneGroup direction="horizontal" class="paneGroup">
-				<Pane defaultSize={75} minSize={30}>
-					<main class="mainView">
-						{#if browser}
-							{#await import('$lib/components/TrayViewer.svelte') then { default: TrayViewer }}
-								<TrayViewer
-									geometry={visibleGeometries.tray}
-									allTrays={visibleGeometries.allTrays}
-									allBoxes={visibleGeometries.allBoxes}
-									boxGeometry={visibleGeometries.box}
-									lidGeometry={visibleGeometries.lid}
-									{printBedSize}
-									exploded={visibleGeometries.exploded}
-									showAllTrays={visibleGeometries.showAllTrays}
-									showAllBoxes={visibleGeometries.showAllBoxes}
-									boxWallThickness={selectedBox?.wallThickness ?? 3}
-									boxTolerance={selectedBox?.tolerance ?? 0.5}
-									boxFloorThickness={selectedBox?.floorThickness ?? 2}
-									{explosionAmount}
-									{showCounters}
-									{selectedTrayCounters}
-									{selectedTrayLetter}
-									selectedTrayId={selectedTray?.id ?? ''}
-									triangleCornerRadius={1.5}
-									{showReferenceLabels}
-									{hidePrintBed}
-									{viewTitle}
-									onCaptureReady={(fn) => (captureFunction = fn)}
-								/>
-							{/await}
-						{/if}
-
-						{#if generating}
-							<div class="generatingOverlay">
-								<Loader />
-								<div class="generatingText">Generating geometry...</div>
-							</div>
-						{/if}
-
-						{#if viewMode === 'exploded'}
-							<div class="viewToolbar">
-								<div class="sliderContainer">
-									<span class="sliderLabel">Explode</span>
-									<InputSlider min={0} max={100} bind:value={explosionAmount} />
-								</div>
-							</div>
-						{/if}
-
-						<div class="bottomToolbar">
-							<input
-								bind:this={jsonFileInput}
-								type="file"
-								accept=".json"
-								onchange={handleImportJson}
-								style="display: none;"
-							/>
-							<Popover positioning={{ placement: 'top-start' }}>
-								{#snippet trigger()}
-									<Button variant="special">
-										Import / Export
-										<Icon Icon={IconChevronDown} />
-									</Button>
-								{/snippet}
-								{#snippet content()}
-									<div class="popoverMenu">
-										{#if communityProjects.length > 0}
-											<FormControl label="Load community project" name="communityProject">
-												{#snippet input({ inputProps })}
-													<Select
-														selected={[]}
-														options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
-														onSelectedChange={(selected) => {
-															const project = communityProjects.find((p) => p.id === selected[0]);
-															if (project) {
-																loadCommunityProject(project);
-															}
-														}}
-														{...inputProps}
-													/>
-												{/snippet}
-											</FormControl>
-											<Hr />
-										{/if}
-										<Button
-											variant="ghost"
-											onclick={() => jsonFileInput?.click()}
-											style="width: 100%; justify-content: flex-start;"
-										>
-											Import project JSON
-										</Button>
-										<Button
-											variant="ghost"
-											onclick={handleExportJson}
-											style="width: 100%; justify-content: flex-start;"
-										>
-											Export project JSON
-										</Button>
-										<Hr />
-										<Button
-											variant="ghost"
-											onclick={handleExport}
-											disabled={generating || !selectedTrayGeometry}
-											style="width: 100%; justify-content: flex-start;"
-										>
-											Export tray STL
-										</Button>
-										<Button
-											variant="ghost"
-											onclick={handleExportAll}
-											disabled={generating ||
-												(!boxGeometry && !lidGeometry && allTrayGeometries.length === 0)}
-											style="width: 100%; justify-content: flex-start;"
-										>
-											Export all STLs
-										</Button>
-										<Button
-											variant="ghost"
-											onclick={handleExportPdf}
-											disabled={getProject().boxes.length === 0 || exportingPdf}
-											isLoading={exportingPdf}
-											style="width: 100%; justify-content: flex-start;"
-										>
-											{exportingPdf ? 'Generating PDF...' : 'PDF reference'}
-										</Button>
-										<Hr />
-										<Button
-											variant="danger"
-											onclick={handleReset}
-											style="width: 100%; justify-content: flex-start;"
-										>
-											Clear current project
-										</Button>
-									</div>
-								{/snippet}
-							</Popover>
-							<div class="toolbarRight">
-								<InputCheckbox
-									checked={showCounters}
-									onchange={(e) => (showCounters = e.currentTarget.checked)}
-									label="Preview counters"
-								/>
-								<InputCheckbox
-									checked={showReferenceLabels}
-									onchange={(e) => (showReferenceLabels = e.currentTarget.checked)}
-									label="Preview labels"
-								/>
-								<span
-									class="regenerateButton {isDirty && !generating ? 'regenerateButton--dirty' : ''}"
+				<div class="bottomToolbar">
+					<input
+						bind:this={jsonFileInput}
+						type="file"
+						accept=".json"
+						onchange={handleImportJson}
+						style="display: none;"
+					/>
+					<Popover positioning={{ placement: 'top-start' }}>
+						{#snippet trigger()}
+							<Button variant="special">
+								Import / Export
+								<Icon Icon={IconChevronDown} />
+							</Button>
+						{/snippet}
+						{#snippet content()}
+							<div class="popoverMenu">
+								{#if communityProjects.length > 0}
+									<FormControl label="Load community project" name="communityProject">
+										{#snippet input({ inputProps })}
+											<Select
+												selected={[]}
+												options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
+												onSelectedChange={(selected) => {
+													const project = communityProjects.find((p) => p.id === selected[0]);
+													if (project) {
+														loadCommunityProject(project);
+													}
+												}}
+												{...inputProps}
+											/>
+										{/snippet}
+									</FormControl>
+									<Hr />
+								{/if}
+								<Button
+									variant="ghost"
+									onclick={() => jsonFileInput?.click()}
+									style="width: 100%; justify-content: flex-start;"
 								>
-									<Button
-										variant="primary"
-										onclick={() => regenerate(true)}
-										isDisabled={generating}
-										isLoading={generating}
-									>
-										Regenerate
-									</Button>
-								</span>
+									Import project JSON
+								</Button>
+								<Button
+									variant="ghost"
+									onclick={handleExportJson}
+									style="width: 100%; justify-content: flex-start;"
+								>
+									Export project JSON
+								</Button>
+								<Hr />
+								<Button
+									variant="ghost"
+									onclick={handleExport}
+									disabled={generating || !selectedTrayGeometry}
+									style="width: 100%; justify-content: flex-start;"
+								>
+									Export tray STL
+								</Button>
+								<Button
+									variant="ghost"
+									onclick={handleExportAll}
+									disabled={generating ||
+										(!boxGeometry && !lidGeometry && allTrayGeometries.length === 0)}
+									style="width: 100%; justify-content: flex-start;"
+								>
+									Export all STLs
+								</Button>
+								<Button
+									variant="ghost"
+									onclick={handleExportPdf}
+									disabled={getProject().boxes.length === 0 || exportingPdf}
+									isLoading={exportingPdf}
+									style="width: 100%; justify-content: flex-start;"
+								>
+									{exportingPdf ? 'Generating PDF...' : 'PDF reference'}
+								</Button>
+								<Hr />
+								<Button
+									variant="danger"
+									onclick={handleReset}
+									style="width: 100%; justify-content: flex-start;"
+								>
+									Clear current project
+								</Button>
 							</div>
+						{/snippet}
+					</Popover>
+					<div class="toolbarRight">
+						<span
+							class="regenerateButton {isDirty && !generating ? 'regenerateButton--dirty' : ''}"
+						>
+							<Button
+								variant="primary"
+								onclick={() => regenerate(true)}
+								isDisabled={generating}
+								isLoading={generating}
+							>
+								Regenerate
+							</Button>
+						</span>
+					</div>
+				</div>
+
+				{#if error}
+					<div class="errorBanner">
+						{error}
+					</div>
+				{/if}
+			</main>
+		</Pane>
+
+		<!-- Editor Resizer -->
+		<PaneResizer class="resizer resizer--mobile resizer--bottom">
+			<button
+				class="mobileCollapseBtn"
+				onclick={handleToggleMobileEditor}
+				aria-label={isMobileEditorCollapsed ? 'Expand editor' : 'Collapse editor'}
+			>
+				<Icon Icon={isMobileEditorCollapsed ? IconChevronUp : IconChevronDown} />
+			</button>
+		</PaneResizer>
+
+		<!-- Mobile Editor Pane (bottom) -->
+		<Pane defaultSize={0} minSize={0} maxSize={60} bind:this={mobileEditorPane}>
+			<div class="mobilePanelContent">
+				<EditorPanel {selectionType} />
+			</div>
+		</Pane>
+	</PaneGroup>
+{:else}
+	<!-- DESKTOP LAYOUT: PaneGroup with resizable panels -->
+	<NavigationMenu
+		{selectionType}
+		onSelectionChange={handleSelectionChange}
+		onExpandPanel={handleExpandPanel}
+		{isMobile}
+	/>
+
+	<PaneGroup direction="horizontal" class="paneGroup">
+		<Pane defaultSize={75} minSize={30}>
+			<main class="mainView">
+				{#if browser}
+					{#await import('$lib/components/TrayViewer.svelte') then { default: TrayViewer }}
+						<TrayViewer
+							geometry={visibleGeometries.tray}
+							allTrays={visibleGeometries.allTrays}
+							allBoxes={visibleGeometries.allBoxes}
+							boxGeometry={visibleGeometries.box}
+							lidGeometry={visibleGeometries.lid}
+							{printBedSize}
+							exploded={visibleGeometries.exploded}
+							showAllTrays={visibleGeometries.showAllTrays}
+							showAllBoxes={visibleGeometries.showAllBoxes}
+							boxWallThickness={selectedBox?.wallThickness ?? 3}
+							boxTolerance={selectedBox?.tolerance ?? 0.5}
+							boxFloorThickness={selectedBox?.floorThickness ?? 2}
+							{explosionAmount}
+							{showCounters}
+							{selectedTrayCounters}
+							{selectedTrayLetter}
+							selectedTrayId={selectedTray?.id ?? ''}
+							triangleCornerRadius={1.5}
+							{showReferenceLabels}
+							{hidePrintBed}
+							{viewTitle}
+							onCaptureReady={(fn) => (captureFunction = fn)}
+						/>
+					{/await}
+				{/if}
+
+				{#if generating}
+					<div class="generatingOverlay">
+						<Loader />
+						<div class="generatingText">Generating geometry...</div>
+					</div>
+				{/if}
+
+				{#if viewMode === 'exploded'}
+					<div class="viewToolbar">
+						<div class="sliderContainer">
+							<span class="sliderLabel">Explode</span>
+							<InputSlider min={0} max={100} bind:value={explosionAmount} />
 						</div>
+					</div>
+				{/if}
 
-						{#if error}
-							<div class="errorBanner">
-								{error}
+				<div class="bottomToolbar">
+					<input
+						bind:this={jsonFileInput}
+						type="file"
+						accept=".json"
+						onchange={handleImportJson}
+						style="display: none;"
+					/>
+					<Popover positioning={{ placement: 'top-start' }}>
+						{#snippet trigger()}
+							<Button variant="special">
+								Import / Export
+								<Icon Icon={IconChevronDown} />
+							</Button>
+						{/snippet}
+						{#snippet content()}
+							<div class="popoverMenu">
+								{#if communityProjects.length > 0}
+									<FormControl label="Load community project" name="communityProject">
+										{#snippet input({ inputProps })}
+											<Select
+												selected={[]}
+												options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
+												onSelectedChange={(selected) => {
+													const project = communityProjects.find((p) => p.id === selected[0]);
+													if (project) {
+														loadCommunityProject(project);
+													}
+												}}
+												{...inputProps}
+											/>
+										{/snippet}
+									</FormControl>
+									<Hr />
+								{/if}
+								<Button
+									variant="ghost"
+									onclick={() => jsonFileInput?.click()}
+									style="width: 100%; justify-content: flex-start;"
+								>
+									Import project JSON
+								</Button>
+								<Button
+									variant="ghost"
+									onclick={handleExportJson}
+									style="width: 100%; justify-content: flex-start;"
+								>
+									Export project JSON
+								</Button>
+								<Hr />
+								<Button
+									variant="ghost"
+									onclick={handleExport}
+									disabled={generating || !selectedTrayGeometry}
+									style="width: 100%; justify-content: flex-start;"
+								>
+									Export tray STL
+								</Button>
+								<Button
+									variant="ghost"
+									onclick={handleExportAll}
+									disabled={generating ||
+										(!boxGeometry && !lidGeometry && allTrayGeometries.length === 0)}
+									style="width: 100%; justify-content: flex-start;"
+								>
+									Export all STLs
+								</Button>
+								<Button
+									variant="ghost"
+									onclick={handleExportPdf}
+									disabled={getProject().boxes.length === 0 || exportingPdf}
+									isLoading={exportingPdf}
+									style="width: 100%; justify-content: flex-start;"
+								>
+									{exportingPdf ? 'Generating PDF...' : 'PDF reference'}
+								</Button>
+								<Hr />
+								<Button
+									variant="danger"
+									onclick={handleReset}
+									style="width: 100%; justify-content: flex-start;"
+								>
+									Clear current project
+								</Button>
 							</div>
-						{/if}
-					</main>
-				</Pane>
+						{/snippet}
+					</Popover>
+					<div class="toolbarRight">
+						<InputCheckbox
+							checked={showCounters}
+							onchange={(e) => (showCounters = e.currentTarget.checked)}
+							label="Preview counters"
+						/>
+						<InputCheckbox
+							checked={showReferenceLabels}
+							onchange={(e) => (showReferenceLabels = e.currentTarget.checked)}
+							label="Preview labels"
+						/>
+						<span
+							class="regenerateButton {isDirty && !generating ? 'regenerateButton--dirty' : ''}"
+						>
+							<Button
+								variant="primary"
+								onclick={() => regenerate(true)}
+								isDisabled={generating}
+								isLoading={generating}
+							>
+								Regenerate
+							</Button>
+						</span>
+					</div>
+				</div>
 
-				<PaneResizer class="resizer">
-					<button
-						class="resizer__handle"
-						aria-label={isEditorCollapsed ? 'Expand editor panel' : 'Collapse editor panel'}
-						title={isEditorCollapsed ? 'Expand editor panel' : 'Collapse editor panel'}
-						onclick={handleToggleCollapse}
-					>
-						<Icon Icon={isEditorCollapsed ? IconChevronLeft : IconChevronRight} />
-					</button>
-				</PaneResizer>
+				{#if error}
+					<div class="errorBanner">
+						{error}
+					</div>
+				{/if}
+			</main>
+		</Pane>
 
-				<Pane
-					defaultSize={25}
-					minSize={15}
-					maxSize={50}
-					collapsible={true}
-					collapsedSize={0}
-					bind:this={editorPane}
-					onCollapse={() => (isEditorCollapsed = true)}
-					onExpand={() => (isEditorCollapsed = false)}
-				>
-					<EditorPanel {selectionType} />
-				</Pane>
-			</PaneGroup>
-		{/if}
-	</div>
-</div>
+		<PaneResizer class="resizer">
+			<button
+				class="resizer__handle"
+				aria-label={isEditorCollapsed ? 'Expand editor panel' : 'Collapse editor panel'}
+				title={isEditorCollapsed ? 'Expand editor panel' : 'Collapse editor panel'}
+				onclick={handleToggleCollapse}
+			>
+				<Icon Icon={isEditorCollapsed ? IconChevronLeft : IconChevronRight} />
+			</button>
+		</PaneResizer>
+
+		<Pane
+			defaultSize={25}
+			minSize={15}
+			maxSize={50}
+			collapsible={true}
+			collapsedSize={0}
+			bind:this={editorPane}
+			onCollapse={() => (isEditorCollapsed = true)}
+			onExpand={() => (isEditorCollapsed = false)}
+		>
+			<EditorPanel {selectionType} />
+		</Pane>
+	</PaneGroup>
+{/if}
 
 <style>
-	.appContainer {
-		display: flex;
-		flex-direction: column;
-		height: 100vh;
-		background: var(--bg);
-		color: var(--fg);
-	}
-
-	.appHeader {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 0.5rem 0.75rem;
-		border-bottom: var(--borderThin);
-		font-size: 0.875rem;
-		color: var(--fgMuted);
-		flex-shrink: 0;
-	}
-
-	.appContent {
-		display: flex;
-		flex: 1;
-		min-height: 0;
-		overflow: hidden;
-	}
-
 	:global(.paneGroup) {
 		flex: 1;
 		min-height: 0;

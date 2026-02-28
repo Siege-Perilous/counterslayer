@@ -17,6 +17,7 @@
 	},
 	"dependencies": {
 		"@jscad/modeling": "^2.12.2",
+		"marked": "^17.0.2",
 		"@jscad/stl-serializer": "^2.1.17",
 		"@melt-ui/svelte": "^0.86.4",
 		"@tabler/icons-svelte": "^3.31.0",
