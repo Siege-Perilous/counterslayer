@@ -110,6 +110,8 @@
 	>(null);
 	let exportingPdf = $state(false);
 	let captureTrayLetter = $state<string | null>(null); // Override during PDF export
+	let debugExporting = $state(false);
+	let debugExportError = $state<string | null>(null);
 
 	// Initialize project from localStorage and fetch community projects
 	$effect(() => {
@@ -513,6 +515,122 @@
 		URL.revokeObjectURL(url);
 	}
 
+	async function handleDebugForClaude() {
+		const project = getProject();
+		const box = getSelectedBox();
+		const tray = getSelectedTray();
+
+		if (!box || !tray || !selectedTrayGeometry) {
+			debugExportError = 'No tray selected or geometry not generated';
+			return;
+		}
+
+		debugExporting = true;
+		debugExportError = null;
+
+		// Helper to convert ArrayBuffer to base64
+		const toBase64 = (data: ArrayBuffer) =>
+			btoa(new Uint8Array(data).reduce((acc, byte) => acc + String.fromCharCode(byte), ''));
+
+		try {
+			// Export all geometries for the current box
+			const stls: Record<string, string> = {};
+
+			// Export box
+			if (boxGeometry) {
+				const { data } = await geometryWorker.exportBoxStl();
+				stls['box'] = toBase64(data);
+			}
+
+			// Export lid
+			if (lidGeometry) {
+				const { data } = await geometryWorker.exportLidStl();
+				stls['lid'] = toBase64(data);
+			}
+
+			// Export all trays in the current box
+			const boxIndex = project.boxes.findIndex((b) => b.id === box.id);
+			for (let i = 0; i < allTrayGeometries.length; i++) {
+				const trayData = allTrayGeometries[i];
+				const { data } = await geometryWorker.exportTrayByIndexStl(i);
+				stls[`tray_${trayData.trayLetter}_${trayData.name}`] = toBase64(data);
+			}
+
+			// Build context with all tray info including counter stacks
+			const context = {
+				box_name: box.name,
+				box_id: box.id,
+				selected_tray_name: tray.name,
+				selected_tray_id: tray.id,
+				selected_tray_letter: selectedTrayLetter,
+				trays: allTrayGeometries.map((t) => ({
+					name: t.name,
+					letter: t.trayLetter,
+					id: t.trayId,
+					placement: t.placement,
+					stacks: t.counterStacks.map((stack, idx) => ({
+						ref: `${t.trayLetter}${idx + 1}`,
+						shape: stack.shape === 'custom' ? stack.customShapeName : stack.shape,
+						count: stack.count,
+						x: Math.round(stack.x * 10) / 10,
+						y: Math.round(stack.y * 10) / 10,
+						width: stack.width,
+						length: stack.length,
+						isEdgeLoaded: stack.isEdgeLoaded || false,
+						label: stack.label
+					}))
+				}))
+			};
+
+			// Capture Three.js screenshot if available (use current camera view)
+			let screenshot: string | null = null;
+			if (captureFunction) {
+				try {
+					// Capture at a reasonable size, preserving aspect ratio isn't critical
+					// since we're using the current camera position
+					screenshot = captureFunction({
+						width: 1280,
+						height: 960,
+						backgroundColor: '#1a1a1a'
+					});
+				} catch (e) {
+					console.warn('Screenshot capture failed:', e);
+				}
+			}
+
+			// POST to debug endpoint
+			const response = await fetch('/api/debug/analyze', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					project,
+					stls,
+					context,
+					screenshot
+				})
+			});
+
+			const result = await response.json();
+
+			if (!result.success) {
+				debugExportError = result.error || 'Analysis failed';
+				if (result.hint) {
+					debugExportError += '\n\nHint: ' + result.hint;
+				}
+				console.error('Debug export failed:', result);
+			} else {
+				// Success - briefly show in console
+				console.log('Debug analysis complete:', result.message);
+				console.log(result.output);
+			}
+		} catch (e) {
+			debugExportError = e instanceof Error ? e.message : 'Failed to export debug info';
+			console.error('Debug export error:', e);
+		} finally {
+			debugExporting = false;
+		}
+	}
+
 	async function handleImportJson(event: Event) {
 		const input = event.target as HTMLInputElement;
 		const file = input.files?.[0];
@@ -736,6 +854,18 @@
 								>
 									{exportingPdf ? 'Generating PDF...' : 'PDF reference'}
 								</Button>
+								{#if import.meta.env.DEV}
+									<Hr />
+									<Button
+										variant="ghost"
+										onclick={handleDebugForClaude}
+										disabled={!selectedTrayGeometry || debugExporting}
+										isLoading={debugExporting}
+										style="width: 100%; justify-content: flex-start;"
+									>
+										{debugExporting ? 'Analyzing...' : 'Debug for Claude'}
+									</Button>
+								{/if}
 								<Hr />
 								<Button
 									variant="danger"
@@ -763,9 +893,9 @@
 					</div>
 				</div>
 
-				{#if error}
+				{#if error || debugExportError}
 					<div class="errorBanner">
-						{error}
+						{error || debugExportError}
 					</div>
 				{/if}
 			</main>
@@ -922,6 +1052,18 @@
 								>
 									{exportingPdf ? 'Generating PDF...' : 'PDF reference'}
 								</Button>
+								{#if import.meta.env.DEV}
+									<Hr />
+									<Button
+										variant="ghost"
+										onclick={handleDebugForClaude}
+										disabled={!selectedTrayGeometry || debugExporting}
+										isLoading={debugExporting}
+										style="width: 100%; justify-content: flex-start;"
+									>
+										{debugExporting ? 'Analyzing...' : 'Debug for Claude'}
+									</Button>
+								{/if}
 								<Hr />
 								<Button
 									variant="danger"
@@ -959,9 +1101,9 @@
 					</div>
 				</div>
 
-				{#if error}
+				{#if error || debugExportError}
 					<div class="errorBanner">
-						{error}
+						{error || debugExportError}
 					</div>
 				{/if}
 			</main>

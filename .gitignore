@@ -25,3 +25,6 @@ vite.config.ts.timestamp-*
 
 # SQLite
 *.db
+
+# Mesh analysis debug output
+mesh-analysis/
