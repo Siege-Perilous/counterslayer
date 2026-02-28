@@ -45,7 +45,7 @@
 	<!-- Header -->
 	<div class="appHeader">
 		<div style="display: flex; align-items: center; gap: 0.25rem;">
-			<Link href={resolve('/')} color="fg" weight={600}>Counter Slayer</Link>
+			<Link href={resolve('/')} color="fg">Counter Slayer</Link>
 			by
 			<Link href="https://davesnider.com" target="_blank" rel="noopener noreferrer" color="fg"
 				>Dave Snider</Link
