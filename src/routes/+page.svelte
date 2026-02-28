@@ -295,7 +295,9 @@
 		if (mobileEditorPane) {
 			if (isMobileEditorCollapsed) {
 				// Expand: restore to default or last size
-				mobileEditorPane.resize(mobileEditorSize > 5 ? mobileEditorSize : MOBILE_PANEL_DEFAULT_SIZE);
+				mobileEditorPane.resize(
+					mobileEditorSize > 5 ? mobileEditorSize : MOBILE_PANEL_DEFAULT_SIZE
+				);
 				isMobileEditorCollapsed = false;
 			} else {
 				// Collapse: save current size, then resize to 0
@@ -648,12 +650,7 @@
 			<!-- MOBILE LAYOUT: Vertical PaneGroup with manual collapse control -->
 			<PaneGroup direction="vertical" class="paneGroup">
 				<!-- Mobile Nav Pane (top) -->
-				<Pane
-					defaultSize={0}
-					minSize={0}
-					maxSize={50}
-					bind:this={mobileNavPane}
-				>
+				<Pane defaultSize={0} minSize={0} maxSize={50} bind:this={mobileNavPane}>
 					<div class="mobilePanelContent">
 						<NavigationMenu
 							{selectionType}
@@ -846,12 +843,7 @@
 				</PaneResizer>
 
 				<!-- Mobile Editor Pane (bottom) -->
-				<Pane
-					defaultSize={0}
-					minSize={0}
-					maxSize={60}
-					bind:this={mobileEditorPane}
-				>
+				<Pane defaultSize={0} minSize={0} maxSize={60} bind:this={mobileEditorPane}>
 					<div class="mobilePanelContent">
 						<EditorPanel {selectionType} />
 					</div>
