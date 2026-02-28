@@ -22,9 +22,10 @@
 		selectionType: SelectionType;
 		onSelectionChange: (type: SelectionType) => void;
 		onExpandPanel: () => void;
+		isMobile?: boolean;
 	}
 
-	let { selectionType, onSelectionChange, onExpandPanel }: Props = $props();
+	let { selectionType, onSelectionChange, onExpandPanel, isMobile = false }: Props = $props();
 
 	let project = $derived(getProject());
 	let selectedBox = $derived(getSelectedBox());
@@ -87,7 +88,7 @@
 	}
 </script>
 
-<Panel class="navMenu">
+<Panel class="navMenu {isMobile ? 'navMenu--mobile' : ''}">
 	<!-- Dimensions (Globals) -->
 	<button
 		class="navItem navItem--dimensions {selectionType === 'dimensions' ? 'navItem--selected' : ''}"
@@ -313,18 +314,16 @@
 		flex: 1;
 	}
 
-	/* Mobile styles */
-	@media (max-width: 768px) {
-		:global(.navMenu) {
-			position: fixed;
-			top: auto;
-			bottom: 0;
-			left: 0;
-			right: 0;
-			max-width: none;
-			max-height: 40vh;
-			border-radius: var(--radius-2) var(--radius-2) 0 0;
-			border-bottom: none;
-		}
+	/* Mobile styles - inline nav panel, not fixed */
+	:global(.navMenu--mobile) {
+		position: relative;
+		top: auto;
+		left: auto;
+		max-width: none;
+		max-height: none;
+		border-radius: 0;
+		overflow-y: auto;
+		flex: 1;
+		min-height: 0;
 	}
 </style>
