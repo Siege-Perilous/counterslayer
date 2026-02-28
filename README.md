@@ -8,11 +8,13 @@ Counter Slayer is a small Svelte / JSCad application to help you build box and t
 
 [Dave Snider](https://davesnider.com) designs and builds Counter Slayer.
 
-## Mesh Analysis (Development)
+## Development
 
-For debugging 3D geometry during development, you can use the "Debug for Claude" feature which analyzes mesh files and generates reports that Claude can read.
+Counter Slayer uses typically Node / Svelte tooling with `pnpm`. Run `pnpm install`, then `pnpm run dev` or `pnpm run build` to start working.
 
-### Setup (one-time)
+### Optional Claude helper
+
+I use Claude to help build this project. Outside of the typical [Claude.md]() file, there's also some Python scripts to help generate feedback loops and programmatic debug information which Claude can read. This helps Claude understand what you (as a developer) are looking at on the screen, and helps better it better converse with context about the models being generated.
 
 Requires Python 3.8+:
 
@@ -30,12 +32,7 @@ pip install -r requirements.txt
 3. Click "Debug for Claude" in the Import/Export menu
 4. Analysis files are written to `mesh-analysis/`
 
-The generated files include:
-- `context.json` - What was selected (box/tray info)
-- `project.json` - Full project configuration
-- `current.stl` - The geometry file
-- `report.json` - Mesh analysis (vertices, faces, volume, validation)
-- `view-*.png` - Rendered views (top, front, side, isometric)
+You then can ask Claude questions, rerunning the debug whenever you make changes.
 
 ## Contributing
 
