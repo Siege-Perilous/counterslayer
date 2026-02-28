@@ -631,6 +631,7 @@
 			>
 		</div>
 		<div style="display: flex; align-items: center; gap: 0.75rem;">
+			<Link href="/changelog">Changelog</Link>
 			<Link href="https://youtu.be/82d_-vjFpKw" target="_blank" rel="noopener noreferrer"
 				>Tutorial</Link
 			>
