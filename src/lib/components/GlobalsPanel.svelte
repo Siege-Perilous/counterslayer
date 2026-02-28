@@ -10,7 +10,8 @@
 		Icon,
 		Panel,
 		Button,
-		ConfirmActionButton
+		ConfirmActionButton,
+		Text
 	} from '@tableslayer/ui';
 	import {
 		IconSquare,
@@ -20,6 +21,7 @@
 		IconRectangle
 	} from '@tabler/icons-svelte';
 	import type { CounterTrayParams, CustomShape, CustomBaseShape } from '$lib/models/counterTray';
+	import { getProject } from '$lib/stores/project.svelte';
 
 	interface Props {
 		params: CounterTrayParams;
@@ -168,12 +170,20 @@
 		onchange({ ...params, customShapes: newShapes });
 	}
 
-	// Count stacks using a given shape
+	// Count stacks using a given shape across ALL trays in the project
 	function countStacksUsingShape(shapeName: string): number {
 		const shapeRef = `custom:${shapeName}`;
-		const topCount = params.topLoadedStacks.filter(([shape]) => shape === shapeRef).length;
-		const edgeCount = params.edgeLoadedStacks.filter(([shape]) => shape === shapeRef).length;
-		return topCount + edgeCount;
+		const project = getProject();
+		let count = 0;
+
+		for (const box of project.boxes) {
+			for (const tray of box.trays) {
+				count += tray.params.topLoadedStacks.filter(([shape]) => shape === shapeRef).length;
+				count += tray.params.edgeLoadedStacks.filter(([shape]) => shape === shapeRef).length;
+			}
+		}
+
+		return count;
 	}
 
 	function removeCustomShape(index: number) {
@@ -391,16 +401,22 @@
 									<Button {...triggerProps} size="sm" variant="ghost">Delete</Button>
 								{/snippet}
 								{#snippet actionMessage()}
-									{#if stackCount > 0}
-										<p>
-											This will delete the "{shape.name}" counter and remove {stackCount} stack{stackCount ===
-											1
-												? ''
-												: 's'} using it.
-										</p>
-									{:else}
-										<p>Delete the "{shape.name}" counter?</p>
-									{/if}
+									<div style="max-width: 15rem;">
+										<Text weight={600} color="var(--fgDanger)">Warning</Text>
+										<Spacer size="0.5rem" />
+										{#if stackCount > 0}
+											<Text size="0.875rem">
+												Deleting the "{shape.name}" counter will also remove
+												<Text as="span" color="var(--fgDanger)">
+													{stackCount}
+													stack{stackCount === 1 ? '' : 's'}</Text
+												> using it.
+											</Text>
+										{:else}
+											<Text size="0.875rem">Delete the "{shape.name}" counter?</Text>
+										{/if}
+										<Spacer size="0.5rem" />
+									</div>
 								{/snippet}
 							</ConfirmActionButton>
 						</div>
