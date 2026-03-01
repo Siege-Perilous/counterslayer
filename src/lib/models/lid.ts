@@ -1235,7 +1235,6 @@ export function createLid(box: Box): Geom3 | null {
 				// X-slide: entry at low X (where there's no rail), exit at high X
 				// Front rail outer face at innerFrontY, back rail outer face at innerBackY
 				//
-				const rampTotalLength = rampLengthIn + rampLengthOut;
 				// Cutout extends through the rail thickness
 				const rampThickness = railThickness + 0.2; // Slightly larger to ensure clean cut
 				// Position cutout at TOP of rail (Z=topZ in lid coords = bottom when lid is flipped onto box)
@@ -1447,7 +1446,6 @@ export function createLid(box: Box): Geom3 | null {
 				// Left rail inner face at innerLeftX + railThickness
 				// Right rail inner face at innerRightX - railThickness
 				//
-				const rampTotalLength = rampLengthIn + rampLengthOut;
 				// Cutout extends through the rail thickness
 				const rampCutThickness = railThickness + 0.2;
 				// Position cutout at TOP of rail (bottom when lid is flipped onto box)

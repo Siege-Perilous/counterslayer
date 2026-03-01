@@ -2,7 +2,7 @@
 
 Counter Slayer is a small Svelte / JSCad application to help you build box and tray inserts for your war games. It generates clean STLs and even references which counters go where in a PDF you can include with your game. Try it out at [counterslayer.com](https://counteslayer.com).
 
-![Screenshot](https://snid.es/2026FEB/CpdqYcJ8zulClvzL.png)
+![Screenshot](https://github.com/Siege-Perilous/counterslayer/blob/main/screenshot.png)
 
 ## Credits
 
