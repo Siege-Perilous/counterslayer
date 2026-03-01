@@ -1226,6 +1226,39 @@ export function createLid(box: Box): Geom3 | null {
 				);
 
 				lid = subtract(lid, frontCutoutPositioned, backCutoutPositioned);
+
+				// Triangular lead-in at the END of the rail (entry side)
+				// This chamfers the bottom-inner corner so lid can ride up the box's ramp
+				// Triangle cuts from INNER FACE of rail (toward center of lid)
+				const leadInLength = rampHeight * 4; // Length along X
+				const leadInDepth = rampHeight; // Depth into rail (Y direction) - keep small
+
+				// Front rail: inner face is at Y = innerFrontY + railThickness
+				// Triangle in X-Y plane, cutting from inner face toward outer
+				const frontLeadIn = hull(
+					// Inner face points (triangle)
+					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerFrontY + railThickness, bottomZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [railStartX + leadInLength, innerFrontY + railThickness, bottomZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerFrontY + railThickness - leadInDepth, bottomZ], segments: 8 }),
+					// Extend up through rail height
+					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerFrontY + railThickness, topZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [railStartX + leadInLength, innerFrontY + railThickness, topZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerFrontY + railThickness - leadInDepth, topZ], segments: 8 })
+				);
+
+				// Back rail: inner face is at Y = innerBackY - railThickness
+				const backLeadIn = hull(
+					// Inner face points (triangle)
+					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerBackY - railThickness, bottomZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [railStartX + leadInLength, innerBackY - railThickness, bottomZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerBackY - railThickness + leadInDepth, bottomZ], segments: 8 }),
+					// Extend up through rail height
+					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerBackY - railThickness, topZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [railStartX + leadInLength, innerBackY - railThickness, topZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerBackY - railThickness + leadInDepth, topZ], segments: 8 })
+				);
+
+				lid = subtract(lid, frontLeadIn, backLeadIn);
 			} else {
 				// Cylindrical detent bump at entry (low X) - legacy behavior
 				const detentRadius = snapBumpHeight;
