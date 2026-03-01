@@ -127,8 +127,8 @@ async function main() {
 			{ cwd: join(MESH_ANALYSIS_DIR, '..'), encoding: 'utf-8', shell: '/bin/bash' }
 		);
 		console.log(result);
-	} catch (e: any) {
-		console.error('Error running mesh analyzer:', e.message);
+	} catch (e) {
+		console.error('Error running mesh analyzer:', e instanceof Error ? e.message : e);
 	}
 
 	// Extract and display ramp analysis

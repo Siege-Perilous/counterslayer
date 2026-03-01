@@ -6,9 +6,9 @@ import { arrangeTrays, getBoxInteriorDimensions, calculateMinimumBoxDimensions }
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
 const { hull } = jscad.hulls;
-const { translate, rotateX, rotateY, rotateZ, scale, mirrorX, mirrorY } = jscad.transforms;
+const { translate, rotateX, rotateY, rotateZ, scale, mirrorY } = jscad.transforms;
 const { vectorText } = jscad.text;
-const { path2, geom2 } = jscad.geometries;
+const { path2 } = jscad.geometries;
 const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
 
@@ -737,7 +737,6 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			// - Steep slope faces entry, gentle slope faces exit
 			// - This creates resistance when pulling lid out
 			//
-			const rampTotalLength = rampLengthIn + rampLengthOut;
 			const rampThickness = grooveHeight * 0.8;
 			// Position ramp at BOTTOM of groove channel (same approach for both X and Y slide)
 			const grooveBottomZ = notchZ - grooveHeight / 2;

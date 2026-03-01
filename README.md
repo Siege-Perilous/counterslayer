@@ -14,7 +14,7 @@ Counter Slayer uses typically Node / Svelte tooling with `pnpm`. Run `pnpm insta
 
 ### Optional Claude helper
 
-I use Claude to help build this project. Outside of the typical [Claude.md]() file, there's also some Python scripts to help generate feedback loops and programmatic debug information which Claude can read. This helps Claude understand what you (as a developer) are looking at on the screen, and helps better it better converse with context about the models being generated.
+I use Claude to help build this project. Outside of the typical [Claude.md](https://github.com/Siege-Perilous/counterslayer/blob/main/CLAUDE.md) file, there's also some Python scripts to help generate feedback loops and programmatic debug information which Claude can read. This helps Claude understand what you (as a developer) are looking at on the screen, and helps better it better converse with context about the models being generated.
 
 Requires Python 3.8+:
 

@@ -549,7 +549,6 @@
 			}
 
 			// Export all trays in the current box
-			const boxIndex = project.boxes.findIndex((b) => b.id === box.id);
 			for (let i = 0; i < allTrayGeometries.length; i++) {
 				const trayData = allTrayGeometries[i];
 				const { data } = await geometryWorker.exportTrayByIndexStl(i);
