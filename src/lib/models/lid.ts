@@ -719,9 +719,8 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 			//
 			const rampTotalLength = rampLengthIn + rampLengthOut;
 			const rampThickness = grooveHeight * 0.8;
-			// Position ramp at top of groove area so it protrudes above the support
-			const grooveTopZ = notchZ + grooveHeight / 2;
-			const rampZ = grooveTopZ;
+			// Position ramp at BOTTOM of groove channel (same approach for both X and Y slide)
+			const grooveBottomZ = notchZ - grooveHeight / 2;
 
 			if (slidesAlongX) {
 				// Ramps on front and back groove walls, near ENTRY (low X)
@@ -729,23 +728,22 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 				// The ramps lock the lid in place when pulled toward the opening
 				const rampStartX = wall + 2;
 
-				// Front groove ramp - protrudes toward -Y (outward from groove, toward front of box)
+				// Front groove ramp - positioned at INNER edge of groove, protrudes toward -Y (INTO the groove)
 				// Swap rampLengthOut/In so steep slope faces opening (low X), gentle slope faces interior
-				// Rotate 180° around X axis to flip protrusion direction outward
+				// Use mirrorY to flip protrusion from +Y to -Y, ramp extends upward in +Z
 				const frontGrooveRamp = createRampWedge(rampLengthOut, rampLengthIn, rampHeight, rampThickness);
-				const frontGrooveRampRotated = rotateX(Math.PI, frontGrooveRamp);
+				const frontGrooveRampMirrored = mirrorY(frontGrooveRamp);
 				const frontGrooveRampPositioned = translate(
-					[rampStartX, wall / 2, rampZ],
-					frontGrooveRampRotated
+					[rampStartX, wall / 2 + grooveDepth, grooveBottomZ],
+					frontGrooveRampMirrored
 				);
 
-				// Back groove ramp - protrudes toward +Y (outward from groove, toward back of box)
+				// Back groove ramp - positioned at INNER edge of groove, protrudes toward +Y (INTO the groove)
+				// No mirror needed - original wedge protrudes in +Y
 				const backGrooveRamp = createRampWedge(rampLengthOut, rampLengthIn, rampHeight, rampThickness);
-				// rotateX flips Y, then mirrorY flips it back to +Y direction
-				const backGrooveRampRotated = mirrorY(rotateX(Math.PI, backGrooveRamp));
 				const backGrooveRampPositioned = translate(
-					[rampStartX, extDepth - wall / 2, rampZ],
-					backGrooveRampRotated
+					[rampStartX, extDepth - wall / 2 - grooveDepth, grooveBottomZ],
+					backGrooveRamp
 				);
 
 				result = union(result, frontGrooveRampPositioned, backGrooveRampPositioned);
@@ -753,21 +751,22 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 				// Ramps on left and right groove walls, near ENTRY (low Y)
 				// Position at ENTRY end: start 2mm after the entry corner
 				const rampStartY = wall + 2;
+				// Position ramp at bottom of groove channel
+				const rampZYslide = notchZ - grooveHeight / 2;
 
-				// Left groove ramp - protrudes toward -X (outward from groove, toward left of box)
-				// Swap rampLengthOut/In so steep slope faces opening, gentle slope faces interior
+				// Left groove ramp - positioned at INNER edge of groove, protrudes toward -X (INTO the groove)
 				const leftGrooveRamp = createRampWedge(rampLengthOut, rampLengthIn, rampHeight, rampThickness);
-				const leftGrooveRampRotated = rotateZ(Math.PI / 2, rotateX(Math.PI, leftGrooveRamp));
+				const leftGrooveRampRotated = rotateZ(Math.PI / 2, leftGrooveRamp);
 				const leftGrooveRampPositioned = translate(
-					[wall / 2, rampStartY, rampZ],
+					[wall / 2 + grooveDepth, rampStartY, rampZYslide],
 					leftGrooveRampRotated
 				);
 
-				// Right groove ramp - protrudes toward +X (outward from groove, toward right of box)
+				// Right groove ramp - positioned at INNER edge of groove, protrudes toward +X (INTO the groove)
 				const rightGrooveRamp = createRampWedge(rampLengthOut, rampLengthIn, rampHeight, rampThickness);
-				const rightGrooveRampRotated = mirrorX(rotateZ(Math.PI / 2, rotateX(Math.PI, rightGrooveRamp)));
+				const rightGrooveRampRotated = rotateZ(Math.PI / 2, mirrorY(rightGrooveRamp));
 				const rightGrooveRampPositioned = translate(
-					[extWidth - wall / 2, rampStartY, rampZ],
+					[extWidth - wall / 2 - grooveDepth, rampStartY, rampZYslide],
 					rightGrooveRampRotated
 				);
 
@@ -1346,35 +1345,64 @@ export function createLid(box: Box): Geom3 | null {
 				// The lid rails need matching cutouts that mesh with those bumps.
 				//
 				// Y-slide: entry at low Y, exit at high Y
-				// Left rail outer face at innerLeftX, right rail outer face at innerRightX
+				// Left rail inner face at innerLeftX + railThickness
+				// Right rail inner face at innerRightX - railThickness
 				//
 				const rampTotalLength = rampLengthIn + rampLengthOut;
 				// Cutout extends through the rail thickness
-				const rampThickness = railThickness + 0.2;
-				// Position cutout at the bottom of the rail
-				const rampZ = bottomZ;
+				const rampCutThickness = railThickness + 0.2;
+				// Position cutout at TOP of rail (bottom when lid is flipped onto box)
+				const rampZ = topZ - rampCutThickness;
 
 				// ENTRY is at low Y (front). Position cutout to align with box's ramp.
-				const rampStartY = lipThicknessY + wall + 2;
+				const rampY = lipThicknessY + wall + 2;
 
-				// Left rail cutout - cuts into rail from outer face (toward +X)
-				// Match the box ramp slope orientation
-				const leftCutout = createRampWedge(rampLengthOut, rampLengthIn, rampHeight, rampThickness);
+				// Left rail cutout - cuts from inner face toward outer (-X direction)
+				// rotateZ(PI/2): ramp extends along +Y, peak toward -X
+				const leftCutout = createRampWedge(rampLengthOut, rampLengthIn, rampHeight, rampCutThickness);
 				const leftCutoutRotated = rotateZ(Math.PI / 2, leftCutout);
 				const leftCutoutPositioned = translate(
-					[innerLeftX, rampStartY, rampZ],
+					[innerLeftX + railThickness, rampY, rampZ],
 					leftCutoutRotated
 				);
 
-				// Right rail cutout - cuts into rail from outer face (toward -X)
-				const rightCutout = createRampWedge(rampLengthOut, rampLengthIn, rampHeight, rampThickness);
-				const rightCutoutRotated = mirrorX(rotateZ(Math.PI / 2, rightCutout));
+				// Right rail cutout - cuts from inner face toward outer (+X direction)
+				// mirrorY then rotateZ(PI/2): ramp extends along +Y, peak toward +X
+				const rightCutout = createRampWedge(rampLengthOut, rampLengthIn, rampHeight, rampCutThickness);
+				const rightCutoutRotated = rotateZ(Math.PI / 2, mirrorY(rightCutout));
 				const rightCutoutPositioned = translate(
-					[innerRightX, rampStartY, rampZ],
+					[innerRightX - railThickness, rampY, rampZ],
 					rightCutoutRotated
 				);
 
 				lid = subtract(lid, leftCutoutPositioned, rightCutoutPositioned);
+
+				// Triangular lead-in at the END of the rail (entry side)
+				// This chamfers the inner corner so lid can ride up the box's ramp
+				const leadInLength = rampHeight * 4; // Length along Y
+				const leadInDepth = rampHeight; // Depth into rail (X direction)
+
+				// Left rail lead-in: inner face at innerLeftX + railThickness
+				const leftLeadIn = hull(
+					cylinder({ radius: 0.01, height: 0.01, center: [innerLeftX + railThickness, railStartY, bottomZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [innerLeftX + railThickness, railStartY + leadInLength, bottomZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [innerLeftX + railThickness - leadInDepth, railStartY, bottomZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [innerLeftX + railThickness, railStartY, topZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [innerLeftX + railThickness, railStartY + leadInLength, topZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [innerLeftX + railThickness - leadInDepth, railStartY, topZ], segments: 8 })
+				);
+
+				// Right rail lead-in: inner face at innerRightX - railThickness
+				const rightLeadIn = hull(
+					cylinder({ radius: 0.01, height: 0.01, center: [innerRightX - railThickness, railStartY, bottomZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [innerRightX - railThickness, railStartY + leadInLength, bottomZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [innerRightX - railThickness + leadInDepth, railStartY, bottomZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [innerRightX - railThickness, railStartY, topZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [innerRightX - railThickness, railStartY + leadInLength, topZ], segments: 8 }),
+					cylinder({ radius: 0.01, height: 0.01, center: [innerRightX - railThickness + leadInDepth, railStartY, topZ], segments: 8 })
+				);
+
+				lid = subtract(lid, leftLeadIn, rightLeadIn);
 			} else {
 				// Cylindrical detent bump at entry (low Y) - legacy behavior
 				const detentRadius = snapBumpHeight;

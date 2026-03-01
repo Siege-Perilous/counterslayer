@@ -143,6 +143,82 @@ source .venv/bin/activate  # fish: source .venv/bin/activate.fish
 pip install -r requirements.txt
 ```
 
+## 3D Navigation for Claude
+
+Claude can navigate and inspect 3D geometry using `scripts/render-view.py`.
+
+### Basic Usage
+
+```bash
+# Activate Python environment first
+source scripts/.venv/bin/activate
+
+# View from preset angles
+python scripts/render-view.py --stl mesh-analysis/box.stl --angle iso
+python scripts/render-view.py --stl mesh-analysis/box.stl --angle left
+python scripts/render-view.py --stl mesh-analysis/box.stl --angle front
+
+# Zoom in (2x, 3x, etc.)
+python scripts/render-view.py --stl mesh-analysis/box.stl --angle left --zoom 3
+
+# Get coordinate bounds
+python scripts/render-view.py --stl mesh-analysis/box.stl --probe
+
+# Custom camera position
+python scripts/render-view.py --stl mesh-analysis/box.stl --pos "50,0,30" --look-at "5,10,20"
+```
+
+### Preset Angles
+
+| Angle | View |
+|-------|------|
+| `front` | Looking from -Y toward +Y |
+| `back` | Looking from +Y toward -Y |
+| `left` | Looking from -X toward +X |
+| `right` | Looking from +X toward -X |
+| `top` | Looking from +Z down |
+| `bottom` | Looking from -Z up |
+| `iso` | Isometric from front-right |
+| `iso-back` | Isometric from back-left |
+| `iso-left` | Isometric from front-left |
+| `iso-right` | Isometric from back-right |
+
+### Reference Markers
+
+Create a JSON file with colored markers at key positions:
+
+```json
+{
+  "groove_bottom": {"pos": [4.0, 10, 12], "color": "green"},
+  "ramp_position": {"pos": [4.0, 10, 15], "color": "red"},
+  "target_position": {"pos": [4.0, 10, 10], "color": "yellow"}
+}
+```
+
+Then render with markers:
+
+```bash
+python scripts/render-view.py --stl mesh-analysis/box.stl --markers markers.json --angle iso
+```
+
+Available colors: `red`, `green`, `blue`, `yellow`, `cyan`, `magenta`, `orange`, `white`
+
+### Workflow for Geometry Debugging
+
+1. **Generate geometry**: `npx tsx scripts/generate-geometry.ts`
+2. **Get bounds**: `python scripts/render-view.py --stl mesh-analysis/box.stl --probe`
+3. **Overview**: `python scripts/render-view.py --stl mesh-analysis/box.stl --angle iso`
+4. **Zoom to problem area**: Add `--zoom 3` or use custom `--pos` and `--look-at`
+5. **Add markers**: Create markers.json with calculated positions, render with `--markers`
+6. **Read the image**: Use Read tool on the output PNG
+
+### Coordinate System
+
+- X: Width (left/right)
+- Y: Depth (front/back)
+- Z: Height (bottom/top)
+- Origin (0,0,0) is at front-left-bottom corner of box
+
 ## Project Structure
 
 - `src/lib/models/` - Geometry generation (counterTray.ts, box.ts, lid.ts)
@@ -150,4 +226,5 @@ pip install -r requirements.txt
 - `src/lib/workers/geometry.worker.ts` - Web worker for non-blocking geometry generation
 - `src/lib/utils/geometryWorker.ts` - Worker manager and STL export
 - `scripts/mesh-analyzer.py` - Python mesh analysis
+- `scripts/render-view.py` - Scriptable 3D camera renderer
 - `mesh-analysis/` - Generated debug files (gitignored)
