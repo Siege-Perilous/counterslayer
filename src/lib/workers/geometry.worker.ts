@@ -155,7 +155,8 @@ function getTrayPositions(
 			thickness: stack.thickness,
 			count: stack.count,
 			hexPointyTop: false,
-			color: stack.color
+			color: stack.color,
+			slopeAngle: stack.slopeAngle
 		}));
 	}
 	// Default to counter tray

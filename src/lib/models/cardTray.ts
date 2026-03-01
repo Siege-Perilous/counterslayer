@@ -67,6 +67,7 @@ export interface CardStack {
 	thickness: number;
 	count: number;
 	color: string;
+	slopeAngle: number; // Radians - rotation around X axis to match floor slope
 }
 
 export function getCardTrayDimensions(params: CardTrayParams): {
@@ -108,15 +109,32 @@ export function getCardPositions(
 ): CardStack[] {
 	const { cardWidth, cardLength, cardThickness, cardCount, wallThickness, clearance, floorThickness } = params;
 
+	// Calculate tray depth and slope rise (same as in getCardTrayDimensions)
+	const interiorLength = cardLength + clearance * 2;
+	const trayDepth = interiorLength + wallThickness * 2;
+	const slopePercent = 0.04;
+	const slopeRise = trayDepth * slopePercent;
+
+	// Calculate slope angle (rotation around X axis, negated for correct direction)
+	const slopeAngle = -Math.atan(slopePercent);
+
+	// Card center Y position
+	const centerY = wallThickness + clearance + cardLength / 2;
+
+	// Height of slope at the card center position
+	// Slope goes from slopeRise at Y=0 to 0 at Y=trayDepth
+	const heightAtCenter = floorThickness + slopeRise * (1 - centerY / trayDepth);
+
 	return [{
 		x: wallThickness + clearance + cardWidth / 2,
-		y: wallThickness + clearance + cardLength / 2,
-		z: floorThickness,
+		y: centerY,
+		z: heightAtCenter,
 		width: cardWidth,
 		length: cardLength,
 		thickness: cardThickness,
 		count: cardCount,
-		color: '#4a90a4'
+		color: '#4a90a4',
+		slopeAngle
 	}];
 }
 

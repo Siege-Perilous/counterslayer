@@ -795,7 +795,12 @@
 							{@const effectiveShape =
 								stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 							{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
-								<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
+								<T.Mesh
+									position.x={posX}
+									position.y={posY}
+									position.z={posZ}
+									rotation.x={stack.slopeAngle ?? 0}
+								>
 									<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
 									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 								</T.Mesh>
@@ -819,11 +824,13 @@
 									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 								</T.Mesh>
 							{:else}
+								<!-- Back-row triangles need 180° rotation around Z to face their finger cutout -->
 								{@const triGeom = createRoundedTriangleGeometry(
 									stack.width,
 									stack.thickness,
 									triangleCornerRadius
 								)}
+								{@const isBackRow = stack.rowAssignment === 'back'}
 								<T.Mesh
 									geometry={triGeom}
 									position.x={posX}
@@ -831,6 +838,7 @@
 									position.z={posZ}
 									rotation.x={-Math.PI / 2}
 									rotation.y={Math.PI}
+									rotation.z={isBackRow ? Math.PI : 0}
 								>
 									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 								</T.Mesh>
@@ -956,7 +964,25 @@
 {#if showCounters && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
 	{#each selectedTrayCounters as stack, stackIdx (stackIdx)}
 		{#if !isCounterStack(stack)}
-			<!-- Skip CardStack - no counter visualization needed -->
+			<!-- CardStack: render cards with slope rotation -->
+			{#each Array(stack.count) as _cardItem, cardIdx (cardIdx)}
+				{@const cardZ = stack.z + cardIdx * stack.thickness + stack.thickness / 2}
+				{@const posX = meshOffset.x + stack.x}
+				{@const posY = cardZ}
+				{@const posZ = meshOffset.z - stack.y}
+				{@const isAlt = cardIdx % 2 === 1}
+				{@const cardColor = isAlt ? '#3a7a94' : stack.color}
+				<!-- Rotate around X axis to match floor slope -->
+				<T.Mesh
+					position.x={posX}
+					position.y={posY}
+					position.z={posZ}
+					rotation.x={stack.slopeAngle ?? 0}
+				>
+					<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
+					<T.MeshStandardMaterial color={cardColor} roughness={0.4} metalness={0.2} />
+				</T.Mesh>
+			{/each}
 		{:else if stack.isEdgeLoaded}
 			<!-- Edge-loaded: counters standing on edge like books -->
 			{#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
@@ -1091,7 +1117,12 @@
 				{@const effectiveShape =
 					stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 				{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
-					<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
+					<T.Mesh
+						position.x={posX}
+						position.y={posY}
+						position.z={posZ}
+						rotation.x={stack.slopeAngle ?? 0}
+					>
 						<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
 						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 					</T.Mesh>
@@ -1113,11 +1144,13 @@
 					</T.Mesh>
 				{:else}
 					<!-- triangle: rounded corners, geometry is centered -->
+					<!-- Back-row triangles need 180° rotation around Z to face their finger cutout -->
 					{@const triGeom = createRoundedTriangleGeometry(
 						stack.width,
 						stack.thickness,
 						triangleCornerRadius
 					)}
+					{@const isBackRow = stack.rowAssignment === 'back'}
 					<T.Mesh
 						geometry={triGeom}
 						position.x={posX}
@@ -1125,6 +1158,7 @@
 						position.z={posZ}
 						rotation.x={-Math.PI / 2}
 						rotation.y={Math.PI}
+						rotation.z={isBackRow ? Math.PI : 0}
 					>
 						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 					</T.Mesh>
@@ -1290,7 +1324,12 @@
 					{@const effectiveShape =
 						stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 					{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
-						<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
+						<T.Mesh
+							position.x={posX}
+							position.y={posY}
+							position.z={posZ}
+							rotation.x={stack.slopeAngle ?? 0}
+						>
 							<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>
@@ -1312,11 +1351,13 @@
 						</T.Mesh>
 					{:else}
 						<!-- triangle: rounded corners, geometry is centered -->
+						<!-- Back-row triangles need 180° rotation around Z to face their finger cutout -->
 						{@const triGeom = createRoundedTriangleGeometry(
 							stack.width,
 							stack.thickness,
 							triangleCornerRadius
 						)}
+						{@const isBackRow = stack.rowAssignment === 'back'}
 						<T.Mesh
 							geometry={triGeom}
 							position.x={posX}
@@ -1324,6 +1365,7 @@
 							position.z={posZ}
 							rotation.x={-Math.PI / 2}
 							rotation.y={Math.PI}
+							rotation.z={isBackRow ? Math.PI : 0}
 						>
 							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
 						</T.Mesh>

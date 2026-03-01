@@ -104,6 +104,8 @@ export interface CounterStack {
 	edgeOrientation?: 'lengthwise' | 'crosswise';
 	slotWidth?: number; // X dimension of the slot
 	slotDepth?: number; // Y dimension of the slot
+	rowAssignment?: 'front' | 'back'; // Which row the stack is in (for triangle orientation)
+	slopeAngle?: number; // Radians - rotation around X axis for sloped surfaces (card trays)
 }
 
 // Generate harmonious colors for counter stacks (warm earth tones matching primary red)
@@ -678,7 +680,8 @@ export function getCounterPositions(
 			count: placement.count,
 			hexPointyTop: customShape?.pointyTop ?? false,
 			color: generateStackColor(placement.originalIndex),
-			label: placement.label
+			label: placement.label,
+			rowAssignment: placement.rowAssignment
 		});
 	}
 
