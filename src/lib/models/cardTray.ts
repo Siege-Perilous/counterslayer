@@ -189,7 +189,7 @@ export function createCardTray(
 
 	// === FRONT FINGER CUTOUT ===
 	// Rounded rectangle cutout - straight sides with rounded back corners
-	const cutoutWidth = trayWidth / 2;
+	const cutoutWidth = trayWidth * (2 / 3);
 	const cutoutDepth = cutoutWidth / 2;
 	const cutoutHeight = trayHeight * 2;
 	const cornerRadius = 8;
