@@ -35,6 +35,7 @@ This reads `mesh-analysis/project.json` and regenerates STLs with the latest cod
 ### Initial Setup (User Must Do Once)
 
 The first time, or when switching projects, the user needs to:
+
 1. Run `npm run dev`
 2. Select a box/tray in the UI
 3. Click "Import / Export" → "Debug for Claude"
@@ -45,24 +46,26 @@ This creates the initial `project.json` that the CLI script reads from.
 
 ### Files in mesh-analysis/
 
-| File | Purpose |
-|------|---------|
-| `report.json` | Mesh stats, validation, spatial layout analysis |
-| `context.json` | Selected box/tray info, placement data |
-| `project.json` | Full project configuration |
-| `app-screenshot.png` | Three.js render (authoritative app view) |
-| `view-{name}.png` | Individual STL renders (what gets printed) |
-| `*.stl` | Raw geometry files |
+| File                 | Purpose                                         |
+| -------------------- | ----------------------------------------------- |
+| `report.json`        | Mesh stats, validation, spatial layout analysis |
+| `context.json`       | Selected box/tray info, placement data          |
+| `project.json`       | Full project configuration                      |
+| `app-screenshot.png` | Three.js render (authoritative app view)        |
+| `view-{name}.png`    | Individual STL renders (what gets printed)      |
+| `*.stl`              | Raw geometry files                              |
 
 ### Stack Reference Codes
 
 Each counter stack has a reference code like `D3`:
+
 - Letter = Tray letter (A, B, C, D...)
 - Number = Stack index within tray (1-based)
 
 Example: `D3` = Third stack in Tray D
 
 **context.json includes stacks for each tray:**
+
 ```json
 {
   "trays": [{
@@ -121,6 +124,7 @@ The `app-screenshot.png` captures your current camera view. To identify stacks:
 3. **Note tray placement** - Each tray's `placement.x` and `placement.y` show where it sits in the box
 
 Example workflow:
+
 - See a teal tray with small circles in the center of the screenshot
 - Find tray with color `#3d7a6a` in context.json → Tray H "Monsters / Magic"
 - Look at H's stacks, find ones near center based on x/y coords → H3 or H4
@@ -128,25 +132,30 @@ Example workflow:
 ### Common Debugging Scenarios
 
 **"Tray doesn't fit in box"**
+
 1. Check `spatial_layout.fit_check` - shows gaps and whether each dimension fits
 2. Compare `box_interior_mm` vs tray dimensions
 3. Check `box_params.tolerance` setting
 
 **"Cutout looks wrong"**
+
 1. Find the tray in `project.json` → look at `topLoadedStacks` or `edgeLoadedStacks`
 2. Check `customShapes` for the shape definition (width, length, baseShape)
 3. View the STL render (`view-tray_X_Name.png`) to see actual geometry
 
 **"Trays overlap or collide"**
+
 1. Check `spatial_layout.trays` for position and bounds of each tray
 2. Verify Y positions are sequential (tray 1 ends where tray 2 starts)
 3. Look at `combined_analysis.issues` for collision warnings
 
 **"Degenerate faces" errors**
+
 - Normal for CSG operations, won't affect printing
 - Only concern if count is very high (1000+)
 
 **"Not watertight" warnings**
+
 - Expected for trays, boxes, and lids (they have open tops/cavities)
 - Not an error
 
@@ -198,18 +207,18 @@ python scripts/render-view.py --stl mesh-analysis/box.stl --pos "50,0,30" --look
 
 ### Preset Angles
 
-| Angle | View |
-|-------|------|
-| `front` | Looking from -Y toward +Y |
-| `back` | Looking from +Y toward -Y |
-| `left` | Looking from -X toward +X |
-| `right` | Looking from +X toward -X |
-| `top` | Looking from +Z down |
-| `bottom` | Looking from -Z up |
-| `iso` | Isometric from front-right |
-| `iso-back` | Isometric from back-left |
-| `iso-left` | Isometric from front-left |
-| `iso-right` | Isometric from back-right |
+| Angle       | View                       |
+| ----------- | -------------------------- |
+| `front`     | Looking from -Y toward +Y  |
+| `back`      | Looking from +Y toward -Y  |
+| `left`      | Looking from -X toward +X  |
+| `right`     | Looking from +X toward -X  |
+| `top`       | Looking from +Z down       |
+| `bottom`    | Looking from -Z up         |
+| `iso`       | Isometric from front-right |
+| `iso-back`  | Isometric from back-left   |
+| `iso-left`  | Isometric from front-left  |
+| `iso-right` | Isometric from back-right  |
 
 ### Reference Markers
 
@@ -217,9 +226,9 @@ Create a JSON file with colored markers at key positions:
 
 ```json
 {
-  "groove_bottom": {"pos": [4.0, 10, 12], "color": "green"},
-  "ramp_position": {"pos": [4.0, 10, 15], "color": "red"},
-  "target_position": {"pos": [4.0, 10, 10], "color": "yellow"}
+	"groove_bottom": { "pos": [4.0, 10, 12], "color": "green" },
+	"ramp_position": { "pos": [4.0, 10, 15], "color": "red" },
+	"target_position": { "pos": [4.0, 10, 10], "color": "yellow" }
 }
 ```
 

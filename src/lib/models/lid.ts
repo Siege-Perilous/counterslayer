@@ -44,15 +44,30 @@ function createRampWedge(
 	const bottom1 = translate([0, 0, 0], cylinder({ radius: r, height: r, segments: 8 }));
 	const bottom2 = translate([totalLength, 0, 0], cylinder({ radius: r, height: r, segments: 8 }));
 	const bottom3 = translate([0, 0, thickness], cylinder({ radius: r, height: r, segments: 8 }));
-	const bottom4 = translate([totalLength, 0, thickness], cylinder({ radius: r, height: r, segments: 8 }));
+	const bottom4 = translate(
+		[totalLength, 0, thickness],
+		cylinder({ radius: r, height: r, segments: 8 })
+	);
 
 	// Flat top section (at Y=rampHeight) - two edges forming the plateau
 	// Start of flat top (end of entry ramp)
-	const top1 = translate([rampLengthIn, rampHeight, 0], cylinder({ radius: r, height: r, segments: 8 }));
-	const top2 = translate([rampLengthIn, rampHeight, thickness], cylinder({ radius: r, height: r, segments: 8 }));
+	const top1 = translate(
+		[rampLengthIn, rampHeight, 0],
+		cylinder({ radius: r, height: r, segments: 8 })
+	);
+	const top2 = translate(
+		[rampLengthIn, rampHeight, thickness],
+		cylinder({ radius: r, height: r, segments: 8 })
+	);
 	// End of flat top (start of exit ramp)
-	const top3 = translate([rampLengthIn + flatTopLength, rampHeight, 0], cylinder({ radius: r, height: r, segments: 8 }));
-	const top4 = translate([rampLengthIn + flatTopLength, rampHeight, thickness], cylinder({ radius: r, height: r, segments: 8 }));
+	const top3 = translate(
+		[rampLengthIn + flatTopLength, rampHeight, 0],
+		cylinder({ radius: r, height: r, segments: 8 })
+	);
+	const top4 = translate(
+		[rampLengthIn + flatTopLength, rampHeight, thickness],
+		cylinder({ radius: r, height: r, segments: 8 })
+	);
 
 	return hull(bottom1, bottom2, bottom3, bottom4, top1, top2, top3, top4);
 }
@@ -736,7 +751,12 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 				// Front groove ramp - positioned at INNER edge of groove, protrudes toward -Y (INTO the groove)
 				// Swap rampLengthOut/In so steep slope faces opening (low X), gentle slope faces interior
 				// Use mirrorY to flip protrusion from +Y to -Y, ramp extends upward in +Z
-				const frontGrooveRamp = createRampWedge(rampLengthOut, rampLengthIn, rampHeight, rampThickness);
+				const frontGrooveRamp = createRampWedge(
+					rampLengthOut,
+					rampLengthIn,
+					rampHeight,
+					rampThickness
+				);
 				const frontGrooveRampMirrored = mirrorY(frontGrooveRamp);
 				const frontGrooveRampPositioned = translate(
 					[rampStartX, wall / 2 + grooveDepth, grooveBottomZ],
@@ -745,7 +765,12 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 
 				// Back groove ramp - positioned at INNER edge of groove, protrudes toward +Y (INTO the groove)
 				// No mirror needed - original wedge protrudes in +Y
-				const backGrooveRamp = createRampWedge(rampLengthOut, rampLengthIn, rampHeight, rampThickness);
+				const backGrooveRamp = createRampWedge(
+					rampLengthOut,
+					rampLengthIn,
+					rampHeight,
+					rampThickness
+				);
 				const backGrooveRampPositioned = translate(
 					[rampStartX, extDepth - wall / 2 - grooveDepth, grooveBottomZ],
 					backGrooveRamp
@@ -760,7 +785,12 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 				const rampZYslide = notchZ - grooveHeight / 2;
 
 				// Left groove ramp - positioned at INNER edge of groove, protrudes toward -X (INTO the groove)
-				const leftGrooveRamp = createRampWedge(rampLengthOut, rampLengthIn, rampHeight, rampThickness);
+				const leftGrooveRamp = createRampWedge(
+					rampLengthOut,
+					rampLengthIn,
+					rampHeight,
+					rampThickness
+				);
 				const leftGrooveRampRotated = rotateZ(Math.PI / 2, leftGrooveRamp);
 				const leftGrooveRampPositioned = translate(
 					[wall / 2 + grooveDepth, rampStartY, rampZYslide],
@@ -768,7 +798,12 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 				);
 
 				// Right groove ramp - positioned at INNER edge of groove, protrudes toward +X (INTO the groove)
-				const rightGrooveRamp = createRampWedge(rampLengthOut, rampLengthIn, rampHeight, rampThickness);
+				const rightGrooveRamp = createRampWedge(
+					rampLengthOut,
+					rampLengthIn,
+					rampHeight,
+					rampThickness
+				);
 				const rightGrooveRampRotated = rotateZ(Math.PI / 2, mirrorY(rightGrooveRamp));
 				const rightGrooveRampPositioned = translate(
 					[extWidth - wall / 2 - grooveDepth, rampStartY, rampZYslide],
@@ -1241,25 +1276,85 @@ export function createLid(box: Box): Geom3 | null {
 				// Triangle in X-Y plane, cutting from inner face toward outer
 				const frontLeadIn = hull(
 					// Inner face points (triangle)
-					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerFrontY + railThickness, bottomZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [railStartX + leadInLength, innerFrontY + railThickness, bottomZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerFrontY + railThickness - leadInDepth, bottomZ], segments: 8 }),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [railStartX, innerFrontY + railThickness, bottomZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [railStartX + leadInLength, innerFrontY + railThickness, bottomZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [railStartX, innerFrontY + railThickness - leadInDepth, bottomZ],
+						segments: 8
+					}),
 					// Extend up through rail height
-					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerFrontY + railThickness, topZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [railStartX + leadInLength, innerFrontY + railThickness, topZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerFrontY + railThickness - leadInDepth, topZ], segments: 8 })
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [railStartX, innerFrontY + railThickness, topZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [railStartX + leadInLength, innerFrontY + railThickness, topZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [railStartX, innerFrontY + railThickness - leadInDepth, topZ],
+						segments: 8
+					})
 				);
 
 				// Back rail: inner face is at Y = innerBackY - railThickness
 				const backLeadIn = hull(
 					// Inner face points (triangle)
-					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerBackY - railThickness, bottomZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [railStartX + leadInLength, innerBackY - railThickness, bottomZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerBackY - railThickness + leadInDepth, bottomZ], segments: 8 }),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [railStartX, innerBackY - railThickness, bottomZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [railStartX + leadInLength, innerBackY - railThickness, bottomZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [railStartX, innerBackY - railThickness + leadInDepth, bottomZ],
+						segments: 8
+					}),
 					// Extend up through rail height
-					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerBackY - railThickness, topZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [railStartX + leadInLength, innerBackY - railThickness, topZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [railStartX, innerBackY - railThickness + leadInDepth, topZ], segments: 8 })
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [railStartX, innerBackY - railThickness, topZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [railStartX + leadInLength, innerBackY - railThickness, topZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [railStartX, innerBackY - railThickness + leadInDepth, topZ],
+						segments: 8
+					})
 				);
 
 				lid = subtract(lid, frontLeadIn, backLeadIn);
@@ -1364,7 +1459,12 @@ export function createLid(box: Box): Geom3 | null {
 
 				// Left rail cutout - cuts from inner face toward outer (-X direction)
 				// rotateZ(PI/2): ramp extends along +Y, peak toward -X
-				const leftCutout = createRampWedge(rampLengthOut, rampLengthIn, rampHeight, rampCutThickness);
+				const leftCutout = createRampWedge(
+					rampLengthOut,
+					rampLengthIn,
+					rampHeight,
+					rampCutThickness
+				);
 				const leftCutoutRotated = rotateZ(Math.PI / 2, leftCutout);
 				const leftCutoutPositioned = translate(
 					[innerLeftX + railThickness, rampY, rampZ],
@@ -1373,7 +1473,12 @@ export function createLid(box: Box): Geom3 | null {
 
 				// Right rail cutout - cuts from inner face toward outer (+X direction)
 				// mirrorY then rotateZ(PI/2): ramp extends along +Y, peak toward +X
-				const rightCutout = createRampWedge(rampLengthOut, rampLengthIn, rampHeight, rampCutThickness);
+				const rightCutout = createRampWedge(
+					rampLengthOut,
+					rampLengthIn,
+					rampHeight,
+					rampCutThickness
+				);
 				const rightCutoutRotated = rotateZ(Math.PI / 2, mirrorY(rightCutout));
 				const rightCutoutPositioned = translate(
 					[innerRightX - railThickness, rampY, rampZ],
@@ -1389,22 +1494,82 @@ export function createLid(box: Box): Geom3 | null {
 
 				// Left rail lead-in: inner face at innerLeftX + railThickness
 				const leftLeadIn = hull(
-					cylinder({ radius: 0.01, height: 0.01, center: [innerLeftX + railThickness, railStartY, bottomZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [innerLeftX + railThickness, railStartY + leadInLength, bottomZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [innerLeftX + railThickness - leadInDepth, railStartY, bottomZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [innerLeftX + railThickness, railStartY, topZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [innerLeftX + railThickness, railStartY + leadInLength, topZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [innerLeftX + railThickness - leadInDepth, railStartY, topZ], segments: 8 })
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [innerLeftX + railThickness, railStartY, bottomZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [innerLeftX + railThickness, railStartY + leadInLength, bottomZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [innerLeftX + railThickness - leadInDepth, railStartY, bottomZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [innerLeftX + railThickness, railStartY, topZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [innerLeftX + railThickness, railStartY + leadInLength, topZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [innerLeftX + railThickness - leadInDepth, railStartY, topZ],
+						segments: 8
+					})
 				);
 
 				// Right rail lead-in: inner face at innerRightX - railThickness
 				const rightLeadIn = hull(
-					cylinder({ radius: 0.01, height: 0.01, center: [innerRightX - railThickness, railStartY, bottomZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [innerRightX - railThickness, railStartY + leadInLength, bottomZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [innerRightX - railThickness + leadInDepth, railStartY, bottomZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [innerRightX - railThickness, railStartY, topZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [innerRightX - railThickness, railStartY + leadInLength, topZ], segments: 8 }),
-					cylinder({ radius: 0.01, height: 0.01, center: [innerRightX - railThickness + leadInDepth, railStartY, topZ], segments: 8 })
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [innerRightX - railThickness, railStartY, bottomZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [innerRightX - railThickness, railStartY + leadInLength, bottomZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [innerRightX - railThickness + leadInDepth, railStartY, bottomZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [innerRightX - railThickness, railStartY, topZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [innerRightX - railThickness, railStartY + leadInLength, topZ],
+						segments: 8
+					}),
+					cylinder({
+						radius: 0.01,
+						height: 0.01,
+						center: [innerRightX - railThickness + leadInDepth, railStartY, topZ],
+						segments: 8
+					})
 				);
 
 				lid = subtract(lid, leftLeadIn, rightLeadIn);

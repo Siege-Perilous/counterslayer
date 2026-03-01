@@ -37,7 +37,10 @@ async function main() {
 
 	if (!box) {
 		console.error(`Error: Box with ID "${boxId}" not found`);
-		console.error('Available boxes:', project.boxes?.map((b: Box) => `${b.id} (${b.name})`).join(', '));
+		console.error(
+			'Available boxes:',
+			project.boxes?.map((b: Box) => `${b.id} (${b.name})`).join(', ')
+		);
 		process.exit(1);
 	}
 
@@ -53,7 +56,10 @@ async function main() {
 		if (boxGeom) {
 			const boxStl = stlSerializer.serialize({ binary: true }, boxGeom);
 			const boxPath = join(MESH_ANALYSIS_DIR, 'box.stl');
-			writeFileSync(boxPath, Buffer.concat(boxStl.map((b: BlobPart) => Buffer.from(b as ArrayBuffer))));
+			writeFileSync(
+				boxPath,
+				Buffer.concat(boxStl.map((b: BlobPart) => Buffer.from(b as ArrayBuffer)))
+			);
 			console.log(`  Written: box.stl`);
 		} else {
 			console.log('  Warning: Box geometry is null');
@@ -69,7 +75,10 @@ async function main() {
 		if (lidGeom) {
 			const lidStl = stlSerializer.serialize({ binary: true }, lidGeom);
 			const lidPath = join(MESH_ANALYSIS_DIR, 'lid.stl');
-			writeFileSync(lidPath, Buffer.concat(lidStl.map((b: BlobPart) => Buffer.from(b as ArrayBuffer))));
+			writeFileSync(
+				lidPath,
+				Buffer.concat(lidStl.map((b: BlobPart) => Buffer.from(b as ArrayBuffer)))
+			);
 			console.log(`  Written: lid.stl`);
 		} else {
 			console.log('  Warning: Lid geometry is null');
@@ -97,7 +106,10 @@ async function main() {
 			if (trayGeom) {
 				const trayStl = stlSerializer.serialize({ binary: true }, trayGeom);
 				const trayPath = join(MESH_ANALYSIS_DIR, filename);
-				writeFileSync(trayPath, Buffer.concat(trayStl.map((b: BlobPart) => Buffer.from(b as ArrayBuffer))));
+				writeFileSync(
+					trayPath,
+					Buffer.concat(trayStl.map((b: BlobPart) => Buffer.from(b as ArrayBuffer)))
+				);
 				console.log(`  Written: ${filename}`);
 			} else {
 				console.log(`  Warning: Tray "${tray.name}" geometry is null/empty`);
