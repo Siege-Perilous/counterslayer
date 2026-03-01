@@ -96,13 +96,17 @@ function createDefaultBox(name: string): Box {
 
 function createDefaultProject(): Project {
 	const box = createDefaultBox('Box 1');
-	const tray = createDefaultTray('Tray 1', TRAY_COLORS[0]);
-	box.trays.push(tray);
+	const counterTray = createDefaultTray('Tray 1', TRAY_COLORS[0]);
+	const cardTray = createDefaultCardTray('Card Tray', TRAY_COLORS[1]);
+	// Set card tray to hold 25 cards
+	cardTray.params = { ...cardTray.params, cardCount: 25 };
+	box.trays.push(counterTray);
+	box.trays.push(cardTray);
 
 	return {
 		boxes: [box],
 		selectedBoxId: box.id,
-		selectedTrayId: tray.id
+		selectedTrayId: counterTray.id
 	};
 }
 

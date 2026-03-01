@@ -44,9 +44,30 @@
 		}
 	}
 
-	function handleCounterParamsChange(newParams: CounterTrayParams) {
+	// Find any counter tray in the project to get global params from
+	function findAnyCounterTray(): { trayId: string; params: CounterTrayParams } | null {
+		for (const box of project.boxes) {
+			for (const tray of box.trays) {
+				if (isCounterTray(tray)) {
+					return { trayId: tray.id, params: tray.params };
+				}
+			}
+		}
+		return null;
+	}
+
+	// Get global params - prefer selected tray if it's a counter tray, otherwise find any counter tray
+	let globalCounterParams = $derived.by(() => {
 		if (selectedTray && isCounterTray(selectedTray)) {
-			updateTrayParams(selectedTray.id, newParams);
+			return { trayId: selectedTray.id, params: selectedTray.params };
+		}
+		return findAnyCounterTray();
+	});
+
+	function handleCounterParamsChange(newParams: CounterTrayParams) {
+		// Use the tray we got the params from (could be selected or any counter tray)
+		if (globalCounterParams) {
+			updateTrayParams(globalCounterParams.trayId, newParams);
 		}
 	}
 
@@ -114,15 +135,11 @@
 		<!-- Content -->
 		<div class="panelContent">
 			{#if selectionType === 'dimensions'}
-				{#if selectedTray && isCounterTray(selectedTray)}
-					<GlobalsPanel params={selectedTray.params} onchange={handleCounterParamsChange} />
-				{:else if selectedTray && isCardTray(selectedTray)}
-					<div class="emptyState">
-						<p>Card trays don't have global dimensions settings</p>
-					</div>
+				{#if globalCounterParams}
+					<GlobalsPanel params={globalCounterParams.params} onchange={handleCounterParamsChange} />
 				{:else}
 					<div class="emptyState">
-						<p>No tray selected to edit globals</p>
+						<p>No counter trays in project</p>
 					</div>
 				{/if}
 			{:else if selectionType === 'box'}
