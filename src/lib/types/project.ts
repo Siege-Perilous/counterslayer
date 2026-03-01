@@ -20,6 +20,11 @@ export interface LidParams {
 	snapBumpHeight: number; // How far bump protrudes (0.4-0.5mm typical)
 	snapBumpWidth: number; // Width of bump along wall (3-5mm typical)
 	railEngagement: number; // Fraction of lip height used for rail (0.0-1.0, default 0.5)
+	// Ramp lock parameters (replaces cylindrical snap bump when enabled)
+	rampLockEnabled: boolean; // Use ramp lock instead of cylindrical snap bump
+	rampHeight: number; // Peak height in mm (default: 0.5)
+	rampLengthIn: number; // Entry slope length in mm (default: 4, longer = easier slide-in)
+	rampLengthOut: number; // Exit slope length in mm (default: 1.5, shorter = harder to remove)
 	// Text embossing
 	showName: boolean; // Emboss box name on lid top (default true)
 }
