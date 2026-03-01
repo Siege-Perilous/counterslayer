@@ -106,6 +106,8 @@ export interface CounterStack {
 	slotDepth?: number; // Y dimension of the slot
 	rowAssignment?: 'front' | 'back'; // Which row the stack is in (for triangle orientation)
 	slopeAngle?: number; // Radians - rotation around X axis for sloped surfaces (card trays)
+	innerWidth?: number; // Inner card width for sleeved card visualization
+	innerLength?: number; // Inner card length for sleeved card visualization
 }
 
 // Generate harmonious colors for counter stacks (warm earth tones matching primary red)

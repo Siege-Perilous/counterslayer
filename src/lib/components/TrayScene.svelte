@@ -794,16 +794,41 @@
 								: stack.color}
 							{@const effectiveShape =
 								stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
+							{@const isSleevedCard = stack.innerWidth && stack.innerLength}
 							{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
-								<T.Mesh
-									position.x={posX}
-									position.y={posY}
-									position.z={posZ}
-									rotation.x={stack.slopeAngle ?? 0}
-								>
-									<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
-									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-								</T.Mesh>
+								{#if isSleevedCard}
+									<!-- Sleeved card: transparent sleeve with inner card -->
+									{@const sleeveColor = isAlt ? '#88c8e8' : '#78b8d8'}
+									{@const innerCardColor = isAlt ? '#2a5a74' : '#1a4a64'}
+									<T.Mesh
+										position.x={posX}
+										position.y={posY}
+										position.z={posZ}
+										rotation.x={stack.slopeAngle ?? 0}
+									>
+										<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
+										<T.MeshStandardMaterial color={sleeveColor} transparent opacity={0.4} roughness={0.3} metalness={0.1} />
+									</T.Mesh>
+									<T.Mesh
+										position.x={posX}
+										position.y={posY}
+										position.z={posZ}
+										rotation.x={stack.slopeAngle ?? 0}
+									>
+										<T.BoxGeometry args={[stack.innerWidth, stack.thickness * 0.6, stack.innerLength]} />
+										<T.MeshStandardMaterial color={innerCardColor} roughness={0.5} metalness={0.1} />
+									</T.Mesh>
+								{:else}
+									<T.Mesh
+										position.x={posX}
+										position.y={posY}
+										position.z={posZ}
+										rotation.x={stack.slopeAngle ?? 0}
+									>
+										<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
+										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+									</T.Mesh>
+								{/if}
 							{:else if effectiveShape === 'circle'}
 								<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
 									<T.CylinderGeometry
@@ -964,15 +989,16 @@
 {#if showCounters && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
 	{#each selectedTrayCounters as stack, stackIdx (stackIdx)}
 		{#if !isCounterStack(stack)}
-			<!-- CardStack: render cards with slope rotation -->
+			<!-- CardStack: render sleeved cards with transparent sleeve and inner card -->
 			{#each Array(stack.count) as _cardItem, cardIdx (cardIdx)}
 				{@const cardZ = stack.z + cardIdx * stack.thickness + stack.thickness / 2}
 				{@const posX = meshOffset.x + stack.x}
 				{@const posY = cardZ}
 				{@const posZ = meshOffset.z - stack.y}
 				{@const isAlt = cardIdx % 2 === 1}
-				{@const cardColor = isAlt ? '#3a7a94' : stack.color}
-				<!-- Rotate around X axis to match floor slope -->
+				{@const innerCardColor = isAlt ? '#2a5a74' : '#1a4a64'}
+				{@const sleeveColor = isAlt ? '#88c8e8' : '#78b8d8'}
+				<!-- Outer sleeve (semi-transparent) -->
 				<T.Mesh
 					position.x={posX}
 					position.y={posY}
@@ -980,7 +1006,17 @@
 					rotation.x={stack.slopeAngle ?? 0}
 				>
 					<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
-					<T.MeshStandardMaterial color={cardColor} roughness={0.4} metalness={0.2} />
+					<T.MeshStandardMaterial color={sleeveColor} transparent opacity={0.4} roughness={0.3} metalness={0.1} />
+				</T.Mesh>
+				<!-- Inner card (opaque, slightly smaller) -->
+				<T.Mesh
+					position.x={posX}
+					position.y={posY}
+					position.z={posZ}
+					rotation.x={stack.slopeAngle ?? 0}
+				>
+					<T.BoxGeometry args={[stack.innerWidth, stack.thickness * 0.6, stack.innerLength]} />
+					<T.MeshStandardMaterial color={innerCardColor} roughness={0.5} metalness={0.1} />
 				</T.Mesh>
 			{/each}
 		{:else if stack.isEdgeLoaded}
@@ -1116,16 +1152,41 @@
 					: stack.color}
 				{@const effectiveShape =
 					stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
+				{@const isSleevedCard = stack.innerWidth && stack.innerLength}
 				{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
-					<T.Mesh
-						position.x={posX}
-						position.y={posY}
-						position.z={posZ}
-						rotation.x={stack.slopeAngle ?? 0}
-					>
-						<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
-						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-					</T.Mesh>
+					{#if isSleevedCard}
+						<!-- Sleeved card: transparent sleeve with inner card -->
+						{@const sleeveColor = isAlt ? '#88c8e8' : '#78b8d8'}
+						{@const innerCardColor = isAlt ? '#2a5a74' : '#1a4a64'}
+						<T.Mesh
+							position.x={posX}
+							position.y={posY}
+							position.z={posZ}
+							rotation.x={stack.slopeAngle ?? 0}
+						>
+							<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
+							<T.MeshStandardMaterial color={sleeveColor} transparent opacity={0.4} roughness={0.3} metalness={0.1} />
+						</T.Mesh>
+						<T.Mesh
+							position.x={posX}
+							position.y={posY}
+							position.z={posZ}
+							rotation.x={stack.slopeAngle ?? 0}
+						>
+							<T.BoxGeometry args={[stack.innerWidth, stack.thickness * 0.6, stack.innerLength]} />
+							<T.MeshStandardMaterial color={innerCardColor} roughness={0.5} metalness={0.1} />
+						</T.Mesh>
+					{:else}
+						<T.Mesh
+							position.x={posX}
+							position.y={posY}
+							position.z={posZ}
+							rotation.x={stack.slopeAngle ?? 0}
+						>
+							<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
+							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+						</T.Mesh>
+					{/if}
 				{:else if effectiveShape === 'circle'}
 					<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
 						<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
@@ -1323,16 +1384,41 @@
 						: stack.color}
 					{@const effectiveShape =
 						stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
+					{@const isSleevedCard = stack.innerWidth && stack.innerLength}
 					{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
-						<T.Mesh
-							position.x={posX}
-							position.y={posY}
-							position.z={posZ}
-							rotation.x={stack.slopeAngle ?? 0}
-						>
-							<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
-							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-						</T.Mesh>
+						{#if isSleevedCard}
+							<!-- Sleeved card: transparent sleeve with inner card -->
+							{@const sleeveColor = isAlt ? '#88c8e8' : '#78b8d8'}
+							{@const innerCardColor = isAlt ? '#2a5a74' : '#1a4a64'}
+							<T.Mesh
+								position.x={posX}
+								position.y={posY}
+								position.z={posZ}
+								rotation.x={stack.slopeAngle ?? 0}
+							>
+								<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
+								<T.MeshStandardMaterial color={sleeveColor} transparent opacity={0.4} roughness={0.3} metalness={0.1} />
+							</T.Mesh>
+							<T.Mesh
+								position.x={posX}
+								position.y={posY}
+								position.z={posZ}
+								rotation.x={stack.slopeAngle ?? 0}
+							>
+								<T.BoxGeometry args={[stack.innerWidth, stack.thickness * 0.6, stack.innerLength]} />
+								<T.MeshStandardMaterial color={innerCardColor} roughness={0.5} metalness={0.1} />
+							</T.Mesh>
+						{:else}
+							<T.Mesh
+								position.x={posX}
+								position.y={posY}
+								position.z={posZ}
+								rotation.x={stack.slopeAngle ?? 0}
+							>
+								<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
+								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
+							</T.Mesh>
+						{/if}
 					{:else if effectiveShape === 'circle'}
 						<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
 							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />

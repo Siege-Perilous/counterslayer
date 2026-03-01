@@ -62,8 +62,10 @@ export interface CardStack {
 	x: number;
 	y: number;
 	z: number;
-	width: number;
-	length: number;
+	width: number; // Sleeved card width
+	length: number; // Sleeved card length
+	innerWidth: number; // Unsleeved card width (for visual representation)
+	innerLength: number; // Unsleeved card length (for visual representation)
 	thickness: number;
 	count: number;
 	color: string;
@@ -125,12 +127,19 @@ export function getCardPositions(
 	// Slope goes from slopeRise at Y=0 to 0 at Y=trayDepth
 	const heightAtCenter = floorThickness + slopeRise * (1 - centerY / trayDepth);
 
+	// Inner card dimensions (unsleeved) - sleeves typically add ~3mm to each dimension
+	const sleeveOverhang = 3;
+	const innerWidth = cardWidth - sleeveOverhang;
+	const innerLength = cardLength - sleeveOverhang;
+
 	return [{
 		x: wallThickness + clearance + cardWidth / 2,
 		y: centerY,
 		z: heightAtCenter,
 		width: cardWidth,
 		length: cardLength,
+		innerWidth,
+		innerLength,
 		thickness: cardThickness,
 		count: cardCount,
 		color: '#4a90a4',
