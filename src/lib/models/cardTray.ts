@@ -3,7 +3,7 @@ import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
-const { translate } = jscad.transforms;
+const { translate, rotateY } = jscad.transforms;
 const { hull } = jscad.hulls;
 
 // Card size preset definition
@@ -165,27 +165,24 @@ export function createCardTray(
 	let tray = subtract(outerBox, innerCavity);
 
 	// === SLOPED FLOOR WEDGE ===
-	// 4% slope
+	// 4% slope - runs full width of tray
 	const slopePercent = 0.04;
 	const slopeRise = trayDepth * slopePercent;
 
-	// Back edge - thin strip at floor level
+	// Back edge - thin strip at floor level (full tray width)
 	const wedgeBack = translate(
 		[trayWidth / 2, trayDepth - wallThickness, floorThickness + 0.05],
-		cuboid({ size: [interiorWidth, 0.1, 0.1] })
+		cuboid({ size: [trayWidth, 0.1, 0.1] })
 	);
 
-	// Front edge - solid block from floor to slope height, extends to front of model (Y=0)
+	// Front edge - solid block from floor to slope height (full tray width)
 	const wedgeFront = translate(
 		[trayWidth / 2, 0, floorThickness + slopeRise / 2],
-		cuboid({ size: [interiorWidth, 0.1, slopeRise] })
+		cuboid({ size: [trayWidth, 0.1, slopeRise] })
 	);
 
-	// Create solid wedge using hull
+	// Create solid wedge using hull (added after cutouts)
 	const slopeWedge = hull(wedgeFront, wedgeBack);
-
-	// Add wedge to tray
-	tray = union(tray, slopeWedge);
 
 	// === FRONT FINGER CUTOUT ===
 	// Rounded rectangle cutout - straight sides with rounded back corners
@@ -212,7 +209,59 @@ export function createCardTray(
 	);
 
 	const fingerCutout = hull(cutoutFront, backLeftCorner, backRightCorner);
+
+	// === SIDE WALL CUTOUTS ===
+	// Cutout through side walls only, centered on length, 33% of tray length
+	const sideSlotLength = trayDepth * (1 / 3);
+	const sideSlotHeight = trayHeight - floorThickness;
+
+	// Left wall cutout
+	const leftWallCutout = translate(
+		[wallThickness / 2, trayDepth / 2, floorThickness + sideSlotHeight / 2],
+		cuboid({ size: [wallThickness + 0.2, sideSlotLength, sideSlotHeight] })
+	);
+
+	// Right wall cutout
+	const rightWallCutout = translate(
+		[trayWidth - wallThickness / 2, trayDepth / 2, floorThickness + sideSlotHeight / 2],
+		cuboid({ size: [wallThickness + 0.2, sideSlotLength, sideSlotHeight] })
+	);
+
+	tray = subtract(tray, leftWallCutout, rightWallCutout);
+
+	// Add wedge after side wall cutouts so it's not removed by them
+	tray = union(tray, slopeWedge);
+
+	// Subtract finger cutout after wedge so it cuts through wedge too
 	tray = subtract(tray, fingerCutout);
+
+	// === MAGNET HOLES ===
+	// 4 cylinder cutouts at bottom corners of side walls
+	const magnetDiameter = 6.1;
+	const magnetRadius = magnetDiameter / 2;
+	const magnetDepth = 3.1;
+	const magnetInset = 2; // 2mm from corner edges
+
+	// Cylinder oriented along X axis (into side walls)
+	const magnetHole = rotateY(
+		Math.PI / 2,
+		cylinder({ radius: magnetRadius, height: magnetDepth * 2, segments: 32 })
+	);
+
+	// Y and Z positions for hole centers (1mm + radius from edges)
+	const magnetY_front = magnetInset + magnetRadius;
+	const magnetY_back = trayDepth - magnetInset - magnetRadius;
+	const magnetZ = magnetInset + magnetRadius;
+
+	// Left wall holes (at X = 0)
+	const leftFrontMagnet = translate([0, magnetY_front, magnetZ], magnetHole);
+	const leftBackMagnet = translate([0, magnetY_back, magnetZ], magnetHole);
+
+	// Right wall holes (at X = trayWidth)
+	const rightFrontMagnet = translate([trayWidth, magnetY_front, magnetZ], magnetHole);
+	const rightBackMagnet = translate([trayWidth, magnetY_back, magnetZ], magnetHole);
+
+	tray = subtract(tray, leftFrontMagnet, leftBackMagnet, rightFrontMagnet, rightBackMagnet);
 
 	return tray;
 }
