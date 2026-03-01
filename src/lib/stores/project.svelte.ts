@@ -1,10 +1,13 @@
 import { defaultParams, type CounterTrayParams } from '$lib/models/counterTray';
+import { defaultCardTrayParams, type CardTrayParams } from '$lib/models/cardTray';
 import { defaultLidParams } from '$lib/models/lid';
 import { saveProject, loadProject, migrateProjectData } from '$lib/utils/storage';
-import type { Tray, Box, Project, LidParams } from '$lib/types/project';
+import type { Tray, Box, Project, LidParams, CounterTray, CardTray } from '$lib/types/project';
+import { isCounterTray, isCardTray } from '$lib/types/project';
 import { SvelteMap } from 'svelte/reactivity';
 
-export type { Tray, Box, Project, LidParams };
+export type { Tray, Box, Project, LidParams, CounterTray, CardTray };
+export { isCounterTray, isCardTray };
 
 function generateId(): string {
 	return Math.random().toString(36).substring(2, 9);
@@ -54,13 +57,29 @@ function getNextTrayColor(boxes: Box[]): string {
 	return TRAY_COLORS[totalTrays % TRAY_COLORS.length];
 }
 
-function createDefaultTray(name: string, color: string): Tray {
+function createDefaultCounterTray(name: string, color: string): CounterTray {
 	return {
 		id: generateId(),
+		type: 'counter',
 		name,
 		color,
 		params: { ...defaultParams }
 	};
+}
+
+function createDefaultCardTray(name: string, color: string): CardTray {
+	return {
+		id: generateId(),
+		type: 'card',
+		name,
+		color,
+		params: { ...defaultCardTrayParams }
+	};
+}
+
+// Backwards compatibility alias
+function createDefaultTray(name: string, color: string): CounterTray {
+	return createDefaultCounterTray(name, color);
 }
 
 function createDefaultBox(name: string): Box {
@@ -184,31 +203,44 @@ export function updateBox(boxId: string, updates: Partial<Omit<Box, 'id' | 'tray
 	}
 }
 
-// Get current global params from any existing tray
+// Get current global params from any existing counter tray
 function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
 	for (const box of project.boxes) {
-		if (box.trays.length > 0) {
-			const existingParams = box.trays[0].params;
-			const globalParams: Partial<CounterTrayParams> = {};
-			for (const key of GLOBAL_PARAM_KEYS) {
-				(globalParams as Record<string, unknown>)[key] = existingParams[key];
+		for (const tray of box.trays) {
+			if (isCounterTray(tray)) {
+				const existingParams = tray.params;
+				const globalParams: Partial<CounterTrayParams> = {};
+				for (const key of GLOBAL_PARAM_KEYS) {
+					(globalParams as Record<string, unknown>)[key] = existingParams[key];
+				}
+				return globalParams;
 			}
-			return globalParams;
 		}
 	}
 	return {};
 }
 
+// Tray type for addTray function
+export type TrayType = 'counter' | 'card';
+
 // Tray operations
-export function addTray(boxId: string): Tray | null {
+export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | null {
 	const box = project.boxes.find((b) => b.id === boxId);
 	if (!box) return null;
 
 	const trayNumber = box.trays.length + 1;
-	const tray = createDefaultTray(`Tray ${trayNumber}`, getNextTrayColor(project.boxes));
-	// Inherit global params (including customShapes) from existing trays
-	const globalParams = getGlobalParamsFromExisting();
-	tray.params = { ...tray.params, ...globalParams };
+	const color = getNextTrayColor(project.boxes);
+
+	let tray: Tray;
+	if (trayType === 'card') {
+		tray = createDefaultCardTray(`Card Tray ${trayNumber}`, color);
+	} else {
+		tray = createDefaultCounterTray(`Tray ${trayNumber}`, color);
+		// Inherit global params (including customShapes) from existing counter trays
+		const globalParams = getGlobalParamsFromExisting();
+		tray.params = { ...tray.params, ...globalParams };
+	}
+
 	box.trays.push(tray);
 	project.selectedTrayId = tray.id;
 	autosave();
@@ -254,18 +286,21 @@ const GLOBAL_PARAM_KEYS: (keyof CounterTrayParams)[] = [
 	'customShapes'
 ];
 
+// Update counter tray params (with global param propagation)
 export function updateTrayParams(trayId: string, params: CounterTrayParams): void {
 	// Find the tray being updated to get its old params
 	let oldParams: CounterTrayParams | null = null;
+	let targetTray: CounterTray | null = null;
 	for (const box of project.boxes) {
 		const tray = box.trays.find((t) => t.id === trayId);
-		if (tray) {
+		if (tray && isCounterTray(tray)) {
 			oldParams = tray.params;
+			targetTray = tray;
 			break;
 		}
 	}
 
-	if (!oldParams) return;
+	if (!oldParams || !targetTray) return;
 
 	// Detect which global params changed
 	const changedGlobals: Partial<CounterTrayParams> = {};
@@ -282,13 +317,7 @@ export function updateTrayParams(trayId: string, params: CounterTrayParams): voi
 	}
 
 	// Update the target tray with full new params
-	for (const box of project.boxes) {
-		const tray = box.trays.find((t) => t.id === trayId);
-		if (tray) {
-			tray.params = params;
-			break;
-		}
-	}
+	targetTray.params = params;
 
 	// Propagate changed global params to all other trays
 	if (Object.keys(changedGlobals).length > 0) {
@@ -308,7 +337,8 @@ export function updateTrayParams(trayId: string, params: CounterTrayParams): voi
 
 		for (const box of project.boxes) {
 			for (const tray of box.trays) {
-				if (tray.id !== trayId) {
+				// Only propagate to other counter trays
+				if (tray.id !== trayId && isCounterTray(tray)) {
 					let updatedParams = { ...tray.params, ...changedGlobals };
 
 					// Update stack references if shapes were renamed
@@ -348,6 +378,18 @@ export function updateTrayParams(trayId: string, params: CounterTrayParams): voi
 	}
 
 	autosave();
+}
+
+// Update card tray params
+export function updateCardTrayParams(trayId: string, params: CardTrayParams): void {
+	for (const box of project.boxes) {
+		const tray = box.trays.find((t) => t.id === trayId);
+		if (tray && isCardTray(tray)) {
+			tray.params = params;
+			autosave();
+			return;
+		}
+	}
 }
 
 // Reset project

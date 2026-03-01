@@ -10,11 +10,15 @@
 		updateBox,
 		updateTray,
 		updateTrayParams,
+		updateCardTrayParams,
 		getCumulativeTrayLetter,
+		isCounterTray,
+		isCardTray,
 		type Box,
 		type Tray
 	} from '$lib/stores/project.svelte';
 	import type { CounterTrayParams } from '$lib/models/counterTray';
+	import type { CardTrayParams } from '$lib/models/cardTray';
 
 	type SelectionType = 'dimensions' | 'box' | 'tray';
 
@@ -40,16 +44,33 @@
 		}
 	}
 
-	function handleParamsChange(newParams: CounterTrayParams) {
-		if (selectedTray) {
+	function handleCounterParamsChange(newParams: CounterTrayParams) {
+		if (selectedTray && isCounterTray(selectedTray)) {
 			updateTrayParams(selectedTray.id, newParams);
+		}
+	}
+
+	function handleCardParamsChange(newParams: CardTrayParams) {
+		if (selectedTray && isCardTray(selectedTray)) {
+			updateCardTrayParams(selectedTray.id, newParams);
 		}
 	}
 
 	// Get tray stats for display
 	function getTrayStats(tray: Tray): { stacks: number; counters: number; letter: string } {
-		const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
-		const edgeCount = tray.params.edgeLoadedStacks.reduce((sum, s) => sum + s[1], 0);
+		let stacks = 0;
+		let counters = 0;
+
+		if (isCounterTray(tray)) {
+			const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
+			const edgeCount = tray.params.edgeLoadedStacks.reduce((sum, s) => sum + s[1], 0);
+			stacks = tray.params.topLoadedStacks.length + tray.params.edgeLoadedStacks.length;
+			counters = topCount + edgeCount;
+		} else if (isCardTray(tray)) {
+			stacks = 1;
+			counters = tray.params.cardCount;
+		}
+
 		let letter = 'A';
 		const project = getProject();
 		if (selectedBox) {
@@ -59,11 +80,7 @@
 				letter = getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx);
 			}
 		}
-		return {
-			stacks: tray.params.topLoadedStacks.length + tray.params.edgeLoadedStacks.length,
-			counters: topCount + edgeCount,
-			letter
-		};
+		return { stacks, counters, letter };
 	}
 
 	let panelTitle = $derived.by(() => {
@@ -97,8 +114,12 @@
 		<!-- Content -->
 		<div class="panelContent">
 			{#if selectionType === 'dimensions'}
-				{#if selectedTray}
-					<GlobalsPanel params={selectedTray.params} onchange={handleParamsChange} />
+				{#if selectedTray && isCounterTray(selectedTray)}
+					<GlobalsPanel params={selectedTray.params} onchange={handleCounterParamsChange} />
+				{:else if selectedTray && isCardTray(selectedTray)}
+					<div class="emptyState">
+						<p>Card trays don't have global dimensions settings</p>
+					</div>
 				{:else}
 					<div class="emptyState">
 						<p>No tray selected to edit globals</p>
@@ -129,7 +150,8 @@
 						onAddTray={() => {}}
 						onDeleteTray={() => {}}
 						onUpdateTray={handleTrayUpdate}
-						onUpdateParams={handleParamsChange}
+						onUpdateCounterParams={handleCounterParamsChange}
+						onUpdateCardParams={handleCardParamsChange}
 						hideList={true}
 					/>
 				{:else}

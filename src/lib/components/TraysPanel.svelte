@@ -14,7 +14,10 @@
 	} from '@tableslayer/ui';
 	import { IconX, IconPlus, IconMenu } from '@tabler/icons-svelte';
 	import type { Box, Tray } from '$lib/types/project';
+	import { isCounterTray, isCardTray } from '$lib/types/project';
 	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
+	import type { CardTrayParams } from '$lib/models/cardTray';
+	import { CARD_SIZE_PRESETS } from '$lib/models/cardTray';
 	import { getTrayDimensions } from '$lib/models/box';
 	import { getProject, getCumulativeTrayLetter, moveTray } from '$lib/stores/project.svelte';
 
@@ -25,7 +28,8 @@
 		onAddTray: (boxId: string) => void;
 		onDeleteTray: (boxId: string, trayId: string) => void;
 		onUpdateTray: (updates: Partial<Omit<Tray, 'id'>>) => void;
-		onUpdateParams: (params: CounterTrayParams) => void;
+		onUpdateCounterParams?: (params: CounterTrayParams) => void;
+		onUpdateCardParams?: (params: CardTrayParams) => void;
 		hideList?: boolean;
 	}
 
@@ -36,7 +40,8 @@
 		onAddTray,
 		onDeleteTray,
 		onUpdateTray,
-		onUpdateParams,
+		onUpdateCounterParams,
+		onUpdateCardParams,
 		hideList = false
 	}: Props = $props();
 
@@ -77,34 +82,46 @@
 	function handleDrop(e: DragEvent, targetIndex: number, type: 'top' | 'edge') {
 		e.preventDefault();
 		if (draggedIndex === null || draggedType !== type || !selectedTray) return;
+		if (!isCounterTray(selectedTray) || !onUpdateCounterParams) return;
 
 		if (type === 'top') {
 			const newStacks = [...selectedTray.params.topLoadedStacks];
 			const [removed] = newStacks.splice(draggedIndex, 1);
 			newStacks.splice(targetIndex, 0, removed);
-			onUpdateParams({ ...selectedTray.params, topLoadedStacks: newStacks });
+			onUpdateCounterParams({ ...selectedTray.params, topLoadedStacks: newStacks });
 		} else {
 			const newStacks = [...selectedTray.params.edgeLoadedStacks];
 			const [removed] = newStacks.splice(draggedIndex, 1);
 			newStacks.splice(targetIndex, 0, removed);
-			onUpdateParams({ ...selectedTray.params, edgeLoadedStacks: newStacks });
+			onUpdateCounterParams({ ...selectedTray.params, edgeLoadedStacks: newStacks });
 		}
 
 		handleDragEnd();
 	}
 
 	let shapeOptions = $derived(
-		selectedTray?.params.customShapes.map((s) => `custom:${s.name}`) ?? []
+		selectedTray && isCounterTray(selectedTray)
+			? selectedTray.params.customShapes.map((s) => `custom:${s.name}`)
+			: []
 	);
 
 	const orientationOptions: EdgeOrientation[] = ['lengthwise', 'crosswise'];
 
-	function getTrayStats(tray: Tray): { stacks: number; counters: number } {
+	function getTrayStats(tray: Tray): { stacks: number; counters: number; isCardTray: boolean } {
+		if (isCardTray(tray)) {
+			return {
+				stacks: 1,
+				counters: tray.params.cardCount,
+				isCardTray: true
+			};
+		}
+		// Counter tray
 		const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
 		const edgeCount = tray.params.edgeLoadedStacks.reduce((sum, s) => sum + s[1], 0);
 		return {
 			stacks: tray.params.topLoadedStacks.length + tray.params.edgeLoadedStacks.length,
-			counters: topCount + edgeCount
+			counters: topCount + edgeCount,
+			isCardTray: false
 		};
 	}
 
@@ -127,33 +144,39 @@
 
 	// Get combined stack reference (top-loaded first, then edge-loaded)
 	function getStackRef(type: 'top' | 'edge', index: number): string {
-		if (!selectedTray) return '';
+		if (!selectedTray || !isCounterTray(selectedTray)) return '';
 		const topCount = selectedTray.params.topLoadedStacks.length;
 		const stackNum = type === 'top' ? index + 1 : topCount + index + 1;
 		return `${trayLetter}${stackNum}`;
 	}
 
-	function updateParam<K extends keyof CounterTrayParams>(key: K, value: CounterTrayParams[K]) {
-		if (selectedTray) {
-			onUpdateParams({ ...selectedTray.params, [key]: value });
+	function updateCounterParam<K extends keyof CounterTrayParams>(key: K, value: CounterTrayParams[K]) {
+		if (selectedTray && isCounterTray(selectedTray) && onUpdateCounterParams) {
+			onUpdateCounterParams({ ...selectedTray.params, [key]: value });
 		}
 	}
 
-	// Compute minimum tray width for display
+	function updateCardParam<K extends keyof CardTrayParams>(key: K, value: CardTrayParams[K]) {
+		if (selectedTray && isCardTray(selectedTray) && onUpdateCardParams) {
+			onUpdateCardParams({ ...selectedTray.params, [key]: value });
+		}
+	}
+
+	// Compute minimum tray width for display (counter trays only)
 	let minTrayWidth = $derived.by(() => {
-		if (!selectedTray) return 0;
+		if (!selectedTray || !isCounterTray(selectedTray)) return 0;
 		// Use trayWidthOverride=0 to get the auto-calculated width
 		const paramsWithoutOverride = { ...selectedTray.params, trayWidthOverride: 0 };
 		return getTrayDimensions(paramsWithoutOverride).width;
 	});
 
-	// Top-loaded stack handlers
+	// Top-loaded stack handlers (counter tray only)
 	function updateTopLoadedStack(
 		index: number,
 		field: 'shape' | 'count' | 'label',
 		value: string | number
 	) {
-		if (!selectedTray) return;
+		if (!selectedTray || !isCounterTray(selectedTray) || !onUpdateCounterParams) return;
 		const newStacks = [...selectedTray.params.topLoadedStacks];
 		const current = newStacks[index];
 		if (field === 'shape') {
@@ -163,30 +186,30 @@
 		} else {
 			newStacks[index] = [current[0], current[1], (value as string) || undefined];
 		}
-		onUpdateParams({ ...selectedTray.params, topLoadedStacks: newStacks });
+		onUpdateCounterParams({ ...selectedTray.params, topLoadedStacks: newStacks });
 	}
 
 	function addTopLoadedStack() {
-		if (!selectedTray) return;
-		onUpdateParams({
+		if (!selectedTray || !isCounterTray(selectedTray) || !onUpdateCounterParams) return;
+		onUpdateCounterParams({
 			...selectedTray.params,
 			topLoadedStacks: [...selectedTray.params.topLoadedStacks, ['custom:Square', 10, undefined]]
 		});
 	}
 
 	function removeTopLoadedStack(index: number) {
-		if (!selectedTray) return;
+		if (!selectedTray || !isCounterTray(selectedTray) || !onUpdateCounterParams) return;
 		const newStacks = selectedTray.params.topLoadedStacks.filter((_, i) => i !== index);
-		onUpdateParams({ ...selectedTray.params, topLoadedStacks: newStacks });
+		onUpdateCounterParams({ ...selectedTray.params, topLoadedStacks: newStacks });
 	}
 
-	// Edge-loaded stack handlers
+	// Edge-loaded stack handlers (counter tray only)
 	function updateEdgeLoadedStack(
 		index: number,
 		field: 'shape' | 'count' | 'orientation' | 'label',
 		value: string | number
 	) {
-		if (!selectedTray) return;
+		if (!selectedTray || !isCounterTray(selectedTray) || !onUpdateCounterParams) return;
 		const newStacks = [...selectedTray.params.edgeLoadedStacks];
 		const current = newStacks[index];
 		if (field === 'shape') {
@@ -198,12 +221,12 @@
 		} else {
 			newStacks[index] = [current[0], current[1], current[2], (value as string) || undefined];
 		}
-		onUpdateParams({ ...selectedTray.params, edgeLoadedStacks: newStacks });
+		onUpdateCounterParams({ ...selectedTray.params, edgeLoadedStacks: newStacks });
 	}
 
 	function addEdgeLoadedStack() {
-		if (!selectedTray) return;
-		onUpdateParams({
+		if (!selectedTray || !isCounterTray(selectedTray) || !onUpdateCounterParams) return;
+		onUpdateCounterParams({
 			...selectedTray.params,
 			edgeLoadedStacks: [
 				...selectedTray.params.edgeLoadedStacks,
@@ -213,9 +236,9 @@
 	}
 
 	function removeEdgeLoadedStack(index: number) {
-		if (!selectedTray) return;
+		if (!selectedTray || !isCounterTray(selectedTray) || !onUpdateCounterParams) return;
 		const newStacks = selectedTray.params.edgeLoadedStacks.filter((_, i) => i !== index);
-		onUpdateParams({ ...selectedTray.params, edgeLoadedStacks: newStacks });
+		onUpdateCounterParams({ ...selectedTray.params, edgeLoadedStacks: newStacks });
 	}
 
 	// Debounced color update to avoid excessive saves during color picker drag
@@ -259,11 +282,11 @@
 						role="button"
 						tabindex="0"
 						onkeydown={(e) => e.key === 'Enter' && onSelectTray(tray)}
-						title="{tray.name}, tray {letter}, {stats.counters} counters in {stats.stacks} stacks"
+						title="{tray.name}, tray {letter}, {stats.isCardTray ? stats.counters + ' cards' : stats.counters + ' counters in ' + stats.stacks + ' stacks'}"
 					>
 						<span style="overflow: hidden; text-overflow: ellipsis;">{tray.name}</span>
 						<span style="display: flex; align-items: center; gap: 0.25rem;">
-							<span class="trayStats">{letter}: {stats.counters}c in {stats.stacks}s</span>
+							<span class="trayStats">{letter}: {stats.isCardTray ? stats.counters + ' cards' : stats.counters + 'c in ' + stats.stacks + 's'}</span>
 							{#if selectedBox.trays.length > 1}
 								<IconButton
 									onclick={(e: MouseEvent) => {
@@ -351,6 +374,7 @@
 
 			<Hr />
 
+			{#if isCounterTray(selectedTray)}
 			<div class="panelFormSection">
 				<!-- Top-Loaded Stacks -->
 				<section class="section">
@@ -511,7 +535,7 @@
 									type="number"
 									step="0.1"
 									value={selectedTray.params.clearance}
-									onchange={(e) => updateParam('clearance', parseFloat(e.currentTarget.value))}
+									onchange={(e) => updateCounterParam('clearance', parseFloat(e.currentTarget.value))}
 								/>
 							{/snippet}
 							{#snippet end()}mm{/snippet}
@@ -523,7 +547,7 @@
 									type="number"
 									step="0.1"
 									value={selectedTray.params.wallThickness}
-									onchange={(e) => updateParam('wallThickness', parseFloat(e.currentTarget.value))}
+									onchange={(e) => updateCounterParam('wallThickness', parseFloat(e.currentTarget.value))}
 								/>
 							{/snippet}
 							{#snippet end()}mm{/snippet}
@@ -535,7 +559,7 @@
 									type="number"
 									step="0.1"
 									value={selectedTray.params.floorThickness}
-									onchange={(e) => updateParam('floorThickness', parseFloat(e.currentTarget.value))}
+									onchange={(e) => updateCounterParam('floorThickness', parseFloat(e.currentTarget.value))}
 								/>
 							{/snippet}
 							{#snippet end()}mm{/snippet}
@@ -547,7 +571,7 @@
 									type="number"
 									step="0.1"
 									value={selectedTray.params.rimHeight}
-									onchange={(e) => updateParam('rimHeight', parseFloat(e.currentTarget.value))}
+									onchange={(e) => updateCounterParam('rimHeight', parseFloat(e.currentTarget.value))}
 								/>
 							{/snippet}
 							{#snippet end()}mm{/snippet}
@@ -561,7 +585,7 @@
 									min="0"
 									max="1"
 									value={selectedTray.params.cutoutRatio}
-									onchange={(e) => updateParam('cutoutRatio', parseFloat(e.currentTarget.value))}
+									onchange={(e) => updateCounterParam('cutoutRatio', parseFloat(e.currentTarget.value))}
 								/>
 							{/snippet}
 						</FormControl>
@@ -572,7 +596,7 @@
 									type="number"
 									step="1"
 									value={selectedTray.params.cutoutMax}
-									onchange={(e) => updateParam('cutoutMax', parseFloat(e.currentTarget.value))}
+									onchange={(e) => updateCounterParam('cutoutMax', parseFloat(e.currentTarget.value))}
 								/>
 							{/snippet}
 							{#snippet end()}mm{/snippet}
@@ -601,7 +625,7 @@
 									value={selectedTray.params.trayWidthOverride || ''}
 									onchange={(e) => {
 										const val = e.currentTarget.value;
-										updateParam('trayWidthOverride', val === '' ? 0 : parseFloat(val));
+										updateCounterParam('trayWidthOverride', val === '' ? 0 : parseFloat(val));
 									}}
 								/>
 							{/snippet}
@@ -615,7 +639,7 @@
 									step="1"
 									min="1"
 									value={selectedTray.params.extraTrayCols}
-									onchange={(e) => updateParam('extraTrayCols', parseInt(e.currentTarget.value))}
+									onchange={(e) => updateCounterParam('extraTrayCols', parseInt(e.currentTarget.value))}
 								/>
 							{/snippet}
 						</FormControl>
@@ -627,13 +651,199 @@
 									step="1"
 									min="1"
 									value={selectedTray.params.extraTrayRows}
-									onchange={(e) => updateParam('extraTrayRows', parseInt(e.currentTarget.value))}
+									onchange={(e) => updateCounterParam('extraTrayRows', parseInt(e.currentTarget.value))}
 								/>
 							{/snippet}
 						</FormControl>
 					</div>
 				</section>
 			</div>
+			{:else if isCardTray(selectedTray)}
+			<!-- Card Tray Settings -->
+			<div class="panelFormSection">
+				<section class="section">
+					<h3 class="sectionTitle">Card Size</h3>
+					<Spacer size="0.5rem" />
+					<FormControl label="Preset" name="cardSizePreset">
+						{#snippet input({ inputProps })}
+							<Select
+								{...inputProps}
+								selected={[selectedTray.params.cardSizePreset]}
+								options={CARD_SIZE_PRESETS.map((p) => ({ value: p.name, label: p.name }))}
+								onSelectedChange={(selected) => {
+									const preset = CARD_SIZE_PRESETS.find((p) => p.name === selected[0]);
+									if (preset && !preset.isCustom) {
+										updateCardParam('cardSizePreset', preset.name);
+										updateCardParam('cardWidth', preset.width);
+										updateCardParam('cardLength', preset.length);
+									} else {
+										updateCardParam('cardSizePreset', 'Custom');
+									}
+								}}
+							/>
+						{/snippet}
+					</FormControl>
+					<Spacer size="0.5rem" />
+					<div class="formGrid">
+						<FormControl label="Card Width" name="cardWidth">
+							{#snippet input({ inputProps })}
+								<Input
+									{...inputProps}
+									type="number"
+									step="0.5"
+									value={selectedTray.params.cardWidth}
+									onchange={(e) => {
+										updateCardParam('cardWidth', parseFloat(e.currentTarget.value));
+										updateCardParam('cardSizePreset', 'Custom');
+									}}
+								/>
+							{/snippet}
+							{#snippet end()}mm{/snippet}
+						</FormControl>
+						<FormControl label="Card Length" name="cardLength">
+							{#snippet input({ inputProps })}
+								<Input
+									{...inputProps}
+									type="number"
+									step="0.5"
+									value={selectedTray.params.cardLength}
+									onchange={(e) => {
+										updateCardParam('cardLength', parseFloat(e.currentTarget.value));
+										updateCardParam('cardSizePreset', 'Custom');
+									}}
+								/>
+							{/snippet}
+							{#snippet end()}mm{/snippet}
+						</FormControl>
+					</div>
+				</section>
+
+				<Spacer size="0.5rem" />
+
+				<section class="section">
+					<h3 class="sectionTitle">Card Stack</h3>
+					<Spacer size="0.5rem" />
+					<div class="formGrid">
+						<FormControl label="Card Count" name="cardCount">
+							{#snippet input({ inputProps })}
+								<Input
+									{...inputProps}
+									type="number"
+									step="1"
+									min="1"
+									value={selectedTray.params.cardCount}
+									onchange={(e) => updateCardParam('cardCount', parseInt(e.currentTarget.value))}
+								/>
+							{/snippet}
+						</FormControl>
+						<FormControl label="Card Thickness" name="cardThickness">
+							{#snippet input({ inputProps })}
+								<Input
+									{...inputProps}
+									type="number"
+									step="0.1"
+									value={selectedTray.params.cardThickness}
+									onchange={(e) => updateCardParam('cardThickness', parseFloat(e.currentTarget.value))}
+								/>
+							{/snippet}
+							{#snippet end()}mm{/snippet}
+						</FormControl>
+					</div>
+				</section>
+
+				<Spacer size="0.5rem" />
+
+				<section class="section">
+					<h3 class="sectionTitle">Tray Settings</h3>
+					<Spacer size="0.5rem" />
+					<div class="formGrid">
+						<FormControl label="Wall" name="wallThickness">
+							{#snippet input({ inputProps })}
+								<Input
+									{...inputProps}
+									type="number"
+									step="0.1"
+									value={selectedTray.params.wallThickness}
+									onchange={(e) => updateCardParam('wallThickness', parseFloat(e.currentTarget.value))}
+								/>
+							{/snippet}
+							{#snippet end()}mm{/snippet}
+						</FormControl>
+						<FormControl label="Floor" name="floorThickness">
+							{#snippet input({ inputProps })}
+								<Input
+									{...inputProps}
+									type="number"
+									step="0.1"
+									value={selectedTray.params.floorThickness}
+									onchange={(e) => updateCardParam('floorThickness', parseFloat(e.currentTarget.value))}
+								/>
+							{/snippet}
+							{#snippet end()}mm{/snippet}
+						</FormControl>
+						<FormControl label="Clearance" name="clearance">
+							{#snippet input({ inputProps })}
+								<Input
+									{...inputProps}
+									type="number"
+									step="0.1"
+									value={selectedTray.params.clearance}
+									onchange={(e) => updateCardParam('clearance', parseFloat(e.currentTarget.value))}
+								/>
+							{/snippet}
+							{#snippet end()}mm{/snippet}
+						</FormControl>
+						<FormControl label="Slope Angle" name="floorSlopeAngle">
+							{#snippet input({ inputProps })}
+								<Input
+									{...inputProps}
+									type="number"
+									step="1"
+									min="0"
+									max="30"
+									value={selectedTray.params.floorSlopeAngle}
+									onchange={(e) => updateCardParam('floorSlopeAngle', parseInt(e.currentTarget.value))}
+								/>
+							{/snippet}
+							{#snippet end()}°{/snippet}
+						</FormControl>
+					</div>
+				</section>
+
+				<Spacer size="0.5rem" />
+
+				<section class="section">
+					<h3 class="sectionTitle">Magnet Holes</h3>
+					<Spacer size="0.5rem" />
+					<div class="formGrid">
+						<FormControl label="Diameter" name="magnetHoleDiameter">
+							{#snippet input({ inputProps })}
+								<Input
+									{...inputProps}
+									type="number"
+									step="0.5"
+									value={selectedTray.params.magnetHoleDiameter}
+									onchange={(e) => updateCardParam('magnetHoleDiameter', parseFloat(e.currentTarget.value))}
+								/>
+							{/snippet}
+							{#snippet end()}mm{/snippet}
+						</FormControl>
+						<FormControl label="Depth" name="magnetHoleDepth">
+							{#snippet input({ inputProps })}
+								<Input
+									{...inputProps}
+									type="number"
+									step="0.1"
+									value={selectedTray.params.magnetHoleDepth}
+									onchange={(e) => updateCardParam('magnetHoleDepth', parseFloat(e.currentTarget.value))}
+								/>
+							{/snippet}
+							{#snippet end()}mm{/snippet}
+						</FormControl>
+					</div>
+				</section>
+			</div>
+			{/if}
 		</div>
 	{:else}
 		<div class="emptyState">

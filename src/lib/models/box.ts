@@ -1,7 +1,9 @@
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
-import type { Box, Tray } from '$lib/types/project';
+import type { Box, Tray, CounterTray, CardTray } from '$lib/types/project';
+import { isCounterTray, isCardTray } from '$lib/types/project';
 import type { CounterTrayParams } from './counterTray';
+import { getCardTrayDimensions } from './cardTray';
 
 const { cylinder } = jscad.primitives;
 const { subtract } = jscad.booleans;
@@ -39,8 +41,17 @@ export interface TraySpacerInfo {
 	floorSpacerHeight: number; // Additional solid material under tray floor
 }
 
-// Calculate tray dimensions from params (same logic as counterTray.ts)
-export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
+// Get dimensions for any tray type (dispatches based on tray type)
+export function getTrayDimensionsForTray(tray: Tray): TrayDimensions {
+	if (isCardTray(tray)) {
+		return getCardTrayDimensions(tray.params);
+	}
+	// Default to counter tray
+	return getCounterTrayDimensions(tray.params);
+}
+
+// Calculate counter tray dimensions from params (same logic as counterTray.ts)
+export function getCounterTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const {
 		counterThickness,
 		clearance,
@@ -397,6 +408,9 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	};
 }
 
+// Backwards compatibility alias for counter tray dimensions
+export const getTrayDimensions = getCounterTrayDimensions;
+
 // Arrange trays in a box layout with bin-packing
 // Smaller trays can share a row if their combined width fits within the max tray width
 // If customBoxWidth is provided, use interior width (minus walls/tolerance) for packing
@@ -409,7 +423,7 @@ export function arrangeTrays(
 	// Calculate dimensions for all trays
 	const trayDims = trays.map((tray) => ({
 		tray,
-		dimensions: getTrayDimensions(tray.params)
+		dimensions: getTrayDimensionsForTray(tray)
 	}));
 
 	// Sort by width (X dimension) descending so widest trays are first

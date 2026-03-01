@@ -21,7 +21,7 @@
 		IconRectangle
 	} from '@tabler/icons-svelte';
 	import type { CounterTrayParams, CustomShape, CustomBaseShape } from '$lib/models/counterTray';
-	import { getProject } from '$lib/stores/project.svelte';
+	import { getProject, isCounterTray } from '$lib/stores/project.svelte';
 
 	interface Props {
 		params: CounterTrayParams;
@@ -170,7 +170,7 @@
 		onchange({ ...params, customShapes: newShapes });
 	}
 
-	// Count stacks using a given shape across ALL trays in the project
+	// Count stacks using a given shape across ALL counter trays in the project
 	function countStacksUsingShape(shapeName: string): number {
 		const shapeRef = `custom:${shapeName}`;
 		const project = getProject();
@@ -178,8 +178,10 @@
 
 		for (const box of project.boxes) {
 			for (const tray of box.trays) {
-				count += tray.params.topLoadedStacks.filter(([shape]) => shape === shapeRef).length;
-				count += tray.params.edgeLoadedStacks.filter(([shape]) => shape === shapeRef).length;
+				if (isCounterTray(tray)) {
+					count += tray.params.topLoadedStacks.filter((stack) => stack[0] === shapeRef).length;
+					count += tray.params.edgeLoadedStacks.filter((stack) => stack[0] === shapeRef).length;
+				}
 			}
 		}
 

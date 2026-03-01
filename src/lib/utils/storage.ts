@@ -165,12 +165,26 @@ function migrateTrayParams(params: CounterTrayParams & LegacyTrayParams): Counte
 
 // Migrate a tray to ensure all fields have valid values
 function migrateTray(tray: Tray, cumulativeIndex: number): Tray {
+	// Check if tray already has a type (new format) or needs migration (old format)
+	const trayType = (tray as { type?: string }).type;
+
+	if (trayType === 'card') {
+		// Card tray - preserve as-is with color migration
+		return {
+			...tray,
+			type: 'card',
+			color: tray.color || TRAY_COLORS[cumulativeIndex % TRAY_COLORS.length]
+		} as Tray;
+	}
+
+	// Counter tray (either explicit or migrated from old format)
 	return {
 		...tray,
+		type: 'counter',
 		// Assign color if missing (for old data)
 		color: tray.color || TRAY_COLORS[cumulativeIndex % TRAY_COLORS.length],
-		params: migrateTrayParams(tray.params)
-	};
+		params: migrateTrayParams((tray as { params: CounterTrayParams }).params)
+	} as Tray;
 }
 
 // Migrate a box to ensure all fields have valid values

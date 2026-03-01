@@ -5,6 +5,7 @@
 
 import jscad from '@jscad/modeling';
 import { createCounterTray, getCounterPositions, type CounterStack } from '$lib/models/counterTray';
+import { createCardTray, getCardPositions, type CardStack } from '$lib/models/cardTray';
 import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
 import {
 	arrangeTrays,
@@ -15,7 +16,8 @@ import {
 } from '$lib/models/box';
 import stlSerializer from '@jscad/stl-serializer';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
-import type { Box } from '$lib/types/project';
+import type { Box, Tray } from '$lib/types/project';
+import { isCounterTray, isCardTray } from '$lib/types/project';
 
 const { geom3 } = jscad.geometries;
 
@@ -116,6 +118,51 @@ let cachedAllTrays: { jscadGeom: Geom3; name: string }[] = [];
 let cachedBoxName = '';
 
 /**
+ * Create tray geometry based on tray type
+ */
+function createTrayGeometry(
+	tray: Tray,
+	maxHeight: number,
+	spacerHeight: number
+): Geom3 {
+	if (isCardTray(tray)) {
+		return createCardTray(tray.params, tray.name, maxHeight, spacerHeight);
+	}
+	// Default to counter tray
+	return createCounterTray(tray.params, tray.name, maxHeight, spacerHeight);
+}
+
+/**
+ * Get stack positions based on tray type (returns CounterStack[] for compatibility)
+ */
+function getTrayPositions(
+	tray: Tray,
+	maxHeight: number,
+	spacerHeight: number
+): CounterStack[] {
+	if (isCardTray(tray)) {
+		// Convert CardStack to CounterStack format for visualization
+		const cardStacks = getCardPositions(tray.params, maxHeight, spacerHeight);
+		return cardStacks.map((stack) => ({
+			shape: 'custom' as const,
+			customShapeName: 'Card',
+			customBaseShape: 'rectangle' as const,
+			x: stack.x,
+			y: stack.y,
+			z: stack.z,
+			width: stack.width,
+			length: stack.length,
+			thickness: stack.thickness,
+			count: stack.count,
+			hexPointyTop: false,
+			color: stack.color
+		}));
+	}
+	// Default to counter tray
+	return getCounterPositions(tray.params, maxHeight, spacerHeight);
+}
+
+/**
  * Convert JSCAD geometry to raw position and normal arrays
  */
 function jscadToArrays(jscadGeom: Geom3): GeometryData {
@@ -213,21 +260,16 @@ function handleGenerate(msg: GenerateMessage): void {
 		const selectedSpacerHeight = selectedSpacer?.floorSpacerHeight ?? 0;
 
 		// Generate selected tray
-		cachedSelectedTray = createCounterTray(tray.params, tray.name, maxHeight, selectedSpacerHeight);
+		cachedSelectedTray = createTrayGeometry(tray, maxHeight, selectedSpacerHeight);
 		const selectedTrayGeometry = jscadToArrays(cachedSelectedTray);
-		const selectedTrayCounters = getCounterPositions(tray.params, maxHeight, selectedSpacerHeight);
+		const selectedTrayCounters = getTrayPositions(tray, maxHeight, selectedSpacerHeight);
 
 		// Generate all trays for selected box
 		cachedAllTrays = [];
 		const allTrayGeometries: TrayGeometryResult[] = placements.map((placement, index) => {
 			const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
 			const spacerHeight = spacer?.floorSpacerHeight ?? 0;
-			const jscadGeom = createCounterTray(
-				placement.tray.params,
-				placement.tray.name,
-				maxHeight,
-				spacerHeight
-			);
+			const jscadGeom = createTrayGeometry(placement.tray, maxHeight, spacerHeight);
 
 			cachedAllTrays.push({ jscadGeom, name: placement.tray.name });
 
@@ -237,7 +279,7 @@ function handleGenerate(msg: GenerateMessage): void {
 				color: placement.tray.color,
 				geometry: jscadToArrays(jscadGeom),
 				placement,
-				counterStacks: getCounterPositions(placement.tray.params, maxHeight, spacerHeight),
+				counterStacks: getTrayPositions(placement.tray, maxHeight, spacerHeight),
 				trayLetter: getTrayLetter(getCumulativeTrayIndex(project.boxes, selectedBoxIndex, index))
 			};
 		});
@@ -275,12 +317,7 @@ function handleGenerate(msg: GenerateMessage): void {
 			const trayGeoms: TrayGeometryResult[] = boxPlacements.map((placement, index) => {
 				const spacer = boxSpacerInfo.find((s) => s.trayId === placement.tray.id);
 				const spacerHeight = spacer?.floorSpacerHeight ?? 0;
-				const jscadGeom = createCounterTray(
-					placement.tray.params,
-					placement.tray.name,
-					boxMaxHeight,
-					spacerHeight
-				);
+				const jscadGeom = createTrayGeometry(placement.tray, boxMaxHeight, spacerHeight);
 
 				return {
 					trayId: placement.tray.id,
@@ -288,7 +325,7 @@ function handleGenerate(msg: GenerateMessage): void {
 					color: placement.tray.color,
 					geometry: jscadToArrays(jscadGeom),
 					placement,
-					counterStacks: getCounterPositions(placement.tray.params, boxMaxHeight, spacerHeight),
+					counterStacks: getTrayPositions(placement.tray, boxMaxHeight, spacerHeight),
 					trayLetter: getTrayLetter(getCumulativeTrayIndex(project.boxes, boxIndex, index))
 				};
 			});

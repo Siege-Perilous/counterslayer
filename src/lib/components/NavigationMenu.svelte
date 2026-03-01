@@ -12,8 +12,11 @@
 		addTray,
 		deleteTray,
 		getCumulativeTrayLetter,
+		isCounterTray,
+		isCardTray,
 		type Box,
-		type Tray
+		type Tray,
+		type TrayType
 	} from '$lib/stores/project.svelte';
 
 	type SelectionType = 'dimensions' | 'box' | 'tray';
@@ -55,9 +58,9 @@
 		onExpandPanel();
 	}
 
-	function handleAddTray(boxId: string, e: Event) {
+	function handleAddTray(boxId: string, trayType: TrayType, e: Event) {
 		e.stopPropagation();
-		addTray(boxId);
+		addTray(boxId, trayType);
 		onSelectionChange('tray');
 		onExpandPanel();
 	}
@@ -78,12 +81,20 @@
 		}
 	}
 
-	function getTrayStats(tray: Tray): { stacks: number; counters: number } {
+	function getTrayStats(tray: Tray): { stacks: number; counters: number; isCardTray: boolean } {
+		if (isCardTray(tray)) {
+			return {
+				stacks: 1,
+				counters: tray.params.cardCount,
+				isCardTray: true
+			};
+		}
 		const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
 		const edgeCount = tray.params.edgeLoadedStacks.reduce((sum, s) => sum + s[1], 0);
 		return {
 			stacks: tray.params.topLoadedStacks.length + tray.params.edgeLoadedStacks.length,
-			counters: topCount + edgeCount
+			counters: topCount + edgeCount,
+			isCardTray: false
 		};
 	}
 </script>
@@ -156,7 +167,7 @@
 						<button
 							class="navItem navItem--tray {isTraySelected ? 'navItem--selected' : ''}"
 							onclick={() => handleTrayClick(tray, box)}
-							title="{tray.name} ({letter}: {stats.counters}c in {stats.stacks}s)"
+							title="{tray.name} ({letter}: {stats.isCardTray ? stats.counters + ' cards' : stats.counters + 'c in ' + stats.stacks + 's'})"
 						>
 							<span class="navItemLabel">
 								<span class="trayLetter">{letter}</span>
@@ -188,13 +199,20 @@
 						</button>
 					{/each}
 
-					<!-- Add Tray Button -->
+					<!-- Add Tray Buttons -->
 					<button
 						class="navItem navItem--add navItem--tray"
-						onclick={(e) => handleAddTray(box.id, e)}
+						onclick={(e) => handleAddTray(box.id, 'counter', e)}
 					>
 						<span class="addIcon">+</span>
-						<span class="addLabel">Add tray</span>
+						<span class="addLabel">Counter tray</span>
+					</button>
+					<button
+						class="navItem navItem--add navItem--tray"
+						onclick={(e) => handleAddTray(box.id, 'card', e)}
+					>
+						<span class="addIcon">+</span>
+						<span class="addLabel">Card tray</span>
 					</button>
 				</div>
 				<Hr />

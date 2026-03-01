@@ -9,7 +9,13 @@
 	import * as THREE from 'three';
 	import { arrangeBoxes, type TrayPlacement } from '$lib/models/box';
 	import type { CounterStack } from '$lib/models/counterTray';
+	import type { CardStack } from '$lib/models/cardTray';
 	import { captureSceneToDataUrl, type CaptureOptions } from '$lib/utils/screenshotCapture';
+
+	// Type guard to check if a stack is a CounterStack (has shape property)
+	function isCounterStack(stack: CounterStack | CardStack): stack is CounterStack {
+		return 'shape' in stack;
+	}
 	import { getTrayLetter, getProject, TRAY_COLORS } from '$lib/stores/project.svelte';
 
 	interface TrayGeometryData {
@@ -46,7 +52,7 @@
 		boxFloorThickness?: number;
 		explosionAmount?: number;
 		showCounters?: boolean;
-		selectedTrayCounters?: CounterStack[];
+		selectedTrayCounters?: (CounterStack | CardStack)[];
 		selectedTrayLetter?: string;
 		selectedTrayId?: string;
 		triangleCornerRadius?: number;
@@ -949,7 +955,9 @@
 <!-- Counter preview for single tray view (only when tray geometry is visible) -->
 {#if showCounters && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
 	{#each selectedTrayCounters as stack, stackIdx (stackIdx)}
-		{#if stack.isEdgeLoaded}
+		{#if !isCounterStack(stack)}
+			<!-- Skip CardStack - no counter visualization needed -->
+		{:else if stack.isEdgeLoaded}
 			<!-- Edge-loaded: counters standing on edge like books -->
 			{#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
 				{@const effectiveShape =
@@ -1344,8 +1352,9 @@
 
 <!-- Reference labels for PDF capture - single tray view -->
 {#if showReferenceLabels && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
-	{@const maxStackHeight = Math.max(
-		...selectedTrayCounters.map((stack) => {
+	{@const counterStacks = selectedTrayCounters.filter(isCounterStack)}
+	{@const maxStackHeight = counterStacks.length > 0 ? Math.max(
+		...counterStacks.map((stack) => {
 			const effectiveShape =
 				stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape;
 			return stack.isEdgeLoaded
@@ -1356,9 +1365,9 @@
 						: Math.max(stack.width, stack.length)
 				: stack.z + stack.count * stack.thickness;
 		})
-	)}
+	) : 20}
 	{@const labelHeight = maxStackHeight + 5}
-	{#each selectedTrayCounters as stack, stackIdx (stackIdx)}
+	{#each counterStacks as stack, stackIdx (stackIdx)}
 		{@const refCode = `${selectedTrayLetter}${stackIdx + 1}`}
 		{@const posX = stack.isEdgeLoaded
 			? stack.edgeOrientation === 'lengthwise'
