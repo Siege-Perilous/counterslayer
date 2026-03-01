@@ -13,7 +13,8 @@ import { execSync } from 'child_process';
 
 // Import geometry modules
 import { createBoxWithLidGrooves, createLid } from '../src/lib/models/lid.js';
-import type { Box } from '../src/lib/types/project.js';
+import { createCounterTray } from '../src/lib/models/counterTray.js';
+import type { Box, Tray } from '../src/lib/types/project.js';
 import stlSerializer from '@jscad/stl-serializer';
 
 const MESH_ANALYSIS_DIR = join(import.meta.dirname, '..', 'mesh-analysis');
@@ -75,6 +76,35 @@ async function main() {
 		}
 	} catch (e) {
 		console.error('  Error generating lid:', e);
+	}
+
+	// Generate tray geometries
+	console.log('Generating tray geometries...');
+	const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+	// Calculate max tray height (same as worker does)
+	const boxInnerHeight = box.exteriorHeight - box.floorThickness;
+	const maxHeight = boxInnerHeight - (box.lidParams?.thickness || 2);
+
+	for (let i = 0; i < box.trays.length; i++) {
+		const tray: Tray = box.trays[i];
+		const letter = letters[i] || `T${i}`;
+		const safeName = tray.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+		const filename = `tray_${letter}_${safeName}.stl`;
+
+		try {
+			// createCounterTray returns a single geometry, not an array
+			const trayGeom = createCounterTray(tray.params, tray.name, maxHeight, 0);
+			if (trayGeom) {
+				const trayStl = stlSerializer.serialize({ binary: true }, trayGeom);
+				const trayPath = join(MESH_ANALYSIS_DIR, filename);
+				writeFileSync(trayPath, Buffer.concat(trayStl.map((b: BlobPart) => Buffer.from(b as ArrayBuffer))));
+				console.log(`  Written: ${filename}`);
+			} else {
+				console.log(`  Warning: Tray "${tray.name}" geometry is null/empty`);
+			}
+		} catch (e) {
+			console.error(`  Error generating tray "${tray.name}":`, e);
+		}
 	}
 
 	// Run mesh analyzer

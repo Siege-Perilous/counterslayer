@@ -30,26 +30,31 @@ function createRampWedge(
 	rampLengthIn: number,
 	rampLengthOut: number,
 	rampHeight: number,
-	rampDepth: number
+	rampDepth: number,
+	flatTopLength: number = 1.0 // Length of flat section at peak
 ): Geom3 {
-	// Create wedge using hull of cylinders at the 6 corners of a triangular prism
-	// Triangle profile: gentle slope from X=0 to peak at X=rampLengthIn, steep drop to X=totalLength
+	// Create wedge using hull of cylinders - trapezoid profile with flat top
+	// Profile: gentle slope from X=0 up to flat top, then steep drop
 	// Protrusion is in +Y direction, thickness in Z
 	const r = 0.01; // Tiny radius for corner cylinders
-	const totalLength = rampLengthIn + rampLengthOut;
+	const totalLength = rampLengthIn + flatTopLength + rampLengthOut;
 	const thickness = rampDepth; // Z thickness of the ramp
 
-	// Bottom face (Z=0) - base of triangle extruded
+	// Bottom face (Z=0) - base rectangle
 	const bottom1 = translate([0, 0, 0], cylinder({ radius: r, height: r, segments: 8 }));
 	const bottom2 = translate([totalLength, 0, 0], cylinder({ radius: r, height: r, segments: 8 }));
 	const bottom3 = translate([0, 0, thickness], cylinder({ radius: r, height: r, segments: 8 }));
 	const bottom4 = translate([totalLength, 0, thickness], cylinder({ radius: r, height: r, segments: 8 }));
 
-	// Peak edge (at Y=rampHeight) - the ridge of the wedge
-	const peak1 = translate([rampLengthIn, rampHeight, 0], cylinder({ radius: r, height: r, segments: 8 }));
-	const peak2 = translate([rampLengthIn, rampHeight, thickness], cylinder({ radius: r, height: r, segments: 8 }));
+	// Flat top section (at Y=rampHeight) - two edges forming the plateau
+	// Start of flat top (end of entry ramp)
+	const top1 = translate([rampLengthIn, rampHeight, 0], cylinder({ radius: r, height: r, segments: 8 }));
+	const top2 = translate([rampLengthIn, rampHeight, thickness], cylinder({ radius: r, height: r, segments: 8 }));
+	// End of flat top (start of exit ramp)
+	const top3 = translate([rampLengthIn + flatTopLength, rampHeight, 0], cylinder({ radius: r, height: r, segments: 8 }));
+	const top4 = translate([rampLengthIn + flatTopLength, rampHeight, thickness], cylinder({ radius: r, height: r, segments: 8 }));
 
-	return hull(bottom1, bottom2, bottom3, bottom4, peak1, peak2);
+	return hull(bottom1, bottom2, bottom3, bottom4, top1, top2, top3, top4);
 }
 
 export const defaultLidParams: LidParams = {

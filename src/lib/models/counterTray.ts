@@ -1595,10 +1595,24 @@ export function createCounterTray(
 		const pocketFloorZ = trayHeight - rimHeight - pocketDepth;
 
 		// Create pocket shape for this placement
-		const pocketShape = createPocketShape(placement.shapeRef, pocketDepth + rimHeight + 1);
+		let pocketShape = createPocketShape(placement.shapeRef, pocketDepth + rimHeight + 1);
 
 		// Calculate Y offset based on row assignment
 		const isFrontRow = placement.rowAssignment === 'front';
+
+		// Rotate triangles so flat side faces the finger cutout (at the tray edge)
+		// Front row: cutout at Y=0, flat side should face low Y (default orientation)
+		// Back row: cutout at Y=trayDepth, flat side should face high Y (rotate 180°)
+		const custom = getCustomShape(placement.shapeRef);
+		if (custom?.baseShape === 'triangle' && !isFrontRow) {
+			// Rotate around the pocket center so it stays in place
+			const pw = placement.pocketWidth;
+			const pl = placement.pocketLength;
+			pocketShape = translate(
+				[pw / 2, pl / 2, 0],
+				rotateZ(Math.PI, translate([-pw / 2, -pl / 2, 0], pocketShape))
+			);
+		}
 		const rowDepth = isFrontRow ? effectiveFrontRowDepth : effectiveBackRowDepth;
 		const yOffset = isFrontRow ? 0 : rowDepth - placement.pocketLength;
 		const yStart = isFrontRow ? topLoadedYStart : effectiveBackRowYStart;

@@ -4,18 +4,46 @@
 
 Counterslayer is a Svelte/JSCad application for generating 3D-printable counter tray inserts for board games. It creates STL files for trays, boxes, and lids.
 
-## Debugging 3D Geometry
+## Geometry Iteration Workflow
 
-When debugging geometry issues, use the "Debug for Claude" feature to generate analysis files.
+When making geometry changes, use this self-contained loop to iterate without user intervention:
 
-### How to Trigger
+### The Loop
 
+```
+1. Make code changes to geometry (lid.ts, counterTray.ts, box.ts)
+2. Regenerate STLs:     npx tsx scripts/generate-geometry.ts
+3. Verify with renders: python scripts/render-view.py --stl mesh-analysis/box.stl --angle iso
+4. Add markers at key positions to understand coordinates
+5. Check multiple angles, zoom into problem areas
+6. If not correct, go back to step 1
+7. When satisfied, inform the user
+```
+
+### Regenerating Geometry
+
+```bash
+# Regenerate all STLs from project.json (box, lid, and all trays)
+npx tsx scripts/generate-geometry.ts
+
+# Optionally specify a box ID
+npx tsx scripts/generate-geometry.ts <boxId>
+```
+
+This reads `mesh-analysis/project.json` and regenerates STLs with the latest code changes. You can iterate on geometry code without asking the user to manually trigger exports.
+
+### Initial Setup (User Must Do Once)
+
+The first time, or when switching projects, the user needs to:
 1. Run `npm run dev`
 2. Select a box/tray in the UI
 3. Click "Import / Export" → "Debug for Claude"
-4. Files are written to `mesh-analysis/`
 
-### Generated Files
+This creates the initial `project.json` that the CLI script reads from.
+
+## Debug Files Reference
+
+### Files in mesh-analysis/
 
 | File | Purpose |
 |------|---------|
@@ -205,12 +233,24 @@ Available colors: `red`, `green`, `blue`, `yellow`, `cyan`, `magenta`, `orange`,
 
 ### Workflow for Geometry Debugging
 
-1. **Generate geometry**: `npx tsx scripts/generate-geometry.ts`
-2. **Get bounds**: `python scripts/render-view.py --stl mesh-analysis/box.stl --probe`
-3. **Overview**: `python scripts/render-view.py --stl mesh-analysis/box.stl --angle iso`
-4. **Zoom to problem area**: Add `--zoom 3` or use custom `--pos` and `--look-at`
-5. **Add markers**: Create markers.json with calculated positions, render with `--markers`
-6. **Read the image**: Use Read tool on the output PNG
+**Always iterate independently until the problem is solved:**
+
+1. **Make code changes** to geometry files
+2. **Regenerate**: `npx tsx scripts/generate-geometry.ts`
+3. **Probe coordinates**: `python scripts/render-view.py --stl mesh-analysis/box.stl --probe`
+4. **Render overview**: `python scripts/render-view.py --stl mesh-analysis/box.stl --angle iso --out mesh-analysis/view.png`
+5. **Read the image**: Use Read tool on mesh-analysis/view.png
+6. **Add markers** to understand positions:
+   ```bash
+   # Create mesh-analysis/test-markers.json with positions to check
+   echo '{"current": {"pos": [5, 2, 21], "color": "red"}, "target": {"pos": [5, 3, 21], "color": "green"}}' > mesh-analysis/test-markers.json
+   python scripts/render-view.py --stl mesh-analysis/box.stl --markers mesh-analysis/test-markers.json --pos "10,0,24" --look-at "5,2,21"
+   ```
+7. **Check multiple angles** - top, front, iso, custom positions
+8. **If not correct**: Go back to step 1, make more changes
+9. **When solved**: Inform the user with verification images
+
+**Key principle**: Don't wait for the user to manually trigger exports. Iterate on your own until satisfied, then show the results.
 
 ### Coordinate System
 
