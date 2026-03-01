@@ -6,7 +6,17 @@ Counter Slayer is a small Svelte / JSCad application to help you build box and t
 
 ## Credits
 
-[Dave Snider](https://davesnider.com) designs and builds Counter Slayer.
+[Dave Snider](https://davesnider.com) designs and builds Counter Slayer. You might also enjoy [Table Slayer](https://tableslayer.com), a tool to create animated battle maps for in person RPG games.
+
+## Features
+
+- Layout individual trays with stacks of counters.
+- Layout stacks as top-loading, edge-crosswise, or edge-lengthwize across a tray.
+- Counters can be custom sized in hex, square, rectangle, circle and triangles.
+- Generate boxes for groups of trays with "snap to close" lids.
+- Bin-packing autosorts for the counters and trays so you don't need to think too much about layouts.
+- Generate a PDF reference diagram to let you know which counters go in which stack.
+- Export printable STLs with built in tolerances to make sure everything fits together well.
 
 ## Development
 
