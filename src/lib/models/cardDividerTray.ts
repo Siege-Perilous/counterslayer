@@ -486,7 +486,10 @@ export function createCardDividerTray(
 
 			const fingerCutout = translate(
 				[stackCenterX, trayDepth / 2, cutoutCenterZ],
-				rotateX(Math.PI / 2, cylinder({ radius: cutoutRadius, height: cutoutLength, segments: 128 }))
+				rotateX(
+					Math.PI / 2,
+					cylinder({ radius: cutoutRadius, height: cutoutLength, segments: 128 })
+				)
 			);
 			tray = subtract(tray, fingerCutout);
 
