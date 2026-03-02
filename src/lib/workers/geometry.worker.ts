@@ -10,7 +10,8 @@ import {
 	type CounterStack,
 	type CustomCardSize
 } from '$lib/models/counterTray';
-import { createCardTray, getCardPositions } from '$lib/models/cardTray';
+import { createCardDrawTray, getCardDrawPositions } from '$lib/models/cardTray';
+import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
 import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
 import {
 	arrangeTrays,
@@ -23,7 +24,7 @@ import {
 import stlSerializer from '@jscad/stl-serializer';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { Box, Tray } from '$lib/types/project';
-import { isCardTray } from '$lib/types/project';
+import { isCardTray, isCardDividerTray } from '$lib/types/project';
 
 const { geom3 } = jscad.geometries;
 
@@ -132,8 +133,11 @@ function createTrayGeometry(
 	maxHeight: number,
 	spacerHeight: number
 ): Geom3 {
+	if (isCardDividerTray(tray)) {
+		return createCardDividerTray(tray.params, customCardSizes, tray.name, maxHeight, spacerHeight);
+	}
 	if (isCardTray(tray)) {
-		return createCardTray(tray.params, customCardSizes, tray.name, maxHeight, spacerHeight);
+		return createCardDrawTray(tray.params, customCardSizes, tray.name, maxHeight, spacerHeight);
 	}
 	// Default to counter tray
 	return createCounterTray(tray.params, tray.name, maxHeight, spacerHeight);
@@ -148,9 +152,58 @@ function getTrayPositions(
 	maxHeight: number,
 	spacerHeight: number
 ): CounterStack[] {
+	if (isCardDividerTray(tray)) {
+		// Convert CardDividerStackPosition to CounterStack format for visualization
+		const dividerStacks = getCardDividerPositions(tray.params, customCardSizes, maxHeight, spacerHeight);
+		return dividerStacks.map((stack) => {
+			// For card divider: cards stand on edge
+			// vertical orientation: cards stand with long edge up (cardLength is height)
+			// horizontal orientation: cards stand with short edge up (cardWidth is height)
+			const isVertical = stack.orientation === 'vertical';
+
+			// For vertical: standingHeight=cardLength, frontWidth=cardWidth
+			// For horizontal: standingHeight=cardWidth, frontWidth=cardLength
+			const standingHeight = isVertical ? stack.cardLength : stack.cardWidth;
+			const frontWidth = isVertical ? stack.cardWidth : stack.cardLength;
+
+			// getCardDividerPositions returns CENTER positions, but TrayScene expects:
+			// - x to be the LEFT EDGE of the slot
+			// - y to be the FRONT EDGE of the slot
+			// Convert from center to edge positions
+			const edgeX = stack.x - stack.slotWidth / 2;
+			const edgeY = stack.y - stack.slotDepth / 2;
+
+			return {
+				shape: 'custom' as const,
+				customShapeName: stack.label ?? 'Card',
+				customBaseShape: 'rectangle' as const,
+				x: edgeX,
+				y: edgeY,
+				z: stack.z,
+				// For card dividers with crosswise orientation:
+				// Box geometry args = [length, standingHeight, thickness]
+				// length = X dimension (front-facing width of card)
+				// width = not directly used, but set for consistency
+				width: frontWidth,
+				length: frontWidth,
+				thickness: stack.cardThickness,
+				count: stack.count,
+				hexPointyTop: false,
+				color: stack.color,
+				// For card divider: cards are standing on edge
+				isEdgeLoaded: true,
+				edgeOrientation: 'crosswise' as const,
+				slotWidth: stack.slotWidth,
+				slotDepth: stack.slotDepth,
+				// Mark as card divider so TrayScene uses cardDividerHeight for Y
+				isCardDivider: true,
+				cardDividerHeight: standingHeight
+			};
+		});
+	}
 	if (isCardTray(tray)) {
 		// Convert CardStack to CounterStack format for visualization
-		const cardStacks = getCardPositions(tray.params, customCardSizes, maxHeight, spacerHeight);
+		const cardStacks = getCardDrawPositions(tray.params, customCardSizes, maxHeight, spacerHeight);
 		return cardStacks.map((stack) => ({
 			shape: 'custom' as const,
 			customShapeName: 'Card',

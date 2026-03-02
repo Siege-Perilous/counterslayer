@@ -13,6 +13,7 @@
 		deleteTray,
 		getCumulativeTrayLetter,
 		isCardTray,
+		isCardDividerTray,
 		type Box,
 		type Tray,
 		type TrayType
@@ -80,12 +81,22 @@
 		}
 	}
 
-	function getTrayStats(tray: Tray): { stacks: number; counters: number; isCardTray: boolean } {
+	function getTrayStats(tray: Tray): { stacks: number; counters: number; isCardTray: boolean; isCardDivider: boolean } {
+		if (isCardDividerTray(tray)) {
+			const totalCards = tray.params.stacks.reduce((sum, s) => sum + s.count, 0);
+			return {
+				stacks: tray.params.stacks.length,
+				counters: totalCards,
+				isCardTray: false,
+				isCardDivider: true
+			};
+		}
 		if (isCardTray(tray)) {
 			return {
 				stacks: 1,
 				counters: tray.params.cardCount,
-				isCardTray: true
+				isCardTray: true,
+				isCardDivider: false
 			};
 		}
 		const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
@@ -93,7 +104,8 @@
 		return {
 			stacks: tray.params.topLoadedStacks.length + tray.params.edgeLoadedStacks.length,
 			counters: topCount + edgeCount,
-			isCardTray: false
+			isCardTray: false,
+			isCardDivider: false
 		};
 	}
 </script>
@@ -169,7 +181,9 @@
 							onclick={() => handleTrayClick(tray, box)}
 							title="{tray.name} ({letter}: {stats.isCardTray
 								? stats.counters + ' cards'
-								: stats.counters + 'c in ' + stats.stacks + 's'})"
+								: stats.isCardDivider
+									? stats.counters + ' cards/' + stats.stacks + 's'
+									: stats.counters + 'c in ' + stats.stacks + 's'})"
 						>
 							<span class="navItemLabel">
 								<span class="trayLetter">{letter}</span>
@@ -212,10 +226,17 @@
 					</button>
 					<button
 						class="navItem navItem--add navItem--tray"
-						onclick={(e) => handleAddTray(box.id, 'card', e)}
+						onclick={(e) => handleAddTray(box.id, 'cardDraw', e)}
 					>
 						<span class="addIcon">+</span>
-						<span class="addLabel">Card tray</span>
+						<span class="addLabel">Card draw tray</span>
+					</button>
+					<button
+						class="navItem navItem--add navItem--tray"
+						onclick={(e) => handleAddTray(box.id, 'cardDivider', e)}
+					>
+						<span class="addIcon">+</span>
+						<span class="addLabel">Card divider tray</span>
 					</button>
 				</div>
 				<Hr />

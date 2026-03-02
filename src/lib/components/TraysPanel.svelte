@@ -14,9 +14,10 @@
 	} from '@tableslayer/ui';
 	import { IconX, IconPlus, IconMenu } from '@tabler/icons-svelte';
 	import type { Box, Tray } from '$lib/types/project';
-	import { isCounterTray, isCardTray } from '$lib/types/project';
+	import { isCounterTray, isCardTray, isCardDividerTray } from '$lib/types/project';
 	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
-	import type { CardTrayParams } from '$lib/models/cardTray';
+	import type { CardDrawTrayParams } from '$lib/models/cardTray';
+	import type { CardDividerTrayParams, CardDividerStack } from '$lib/models/cardDividerTray';
 	import { getTrayDimensions, getCustomCardSizesFromBox } from '$lib/models/box';
 	import {
 		getProject,
@@ -33,7 +34,8 @@
 		onDeleteTray: (boxId: string, trayId: string) => void;
 		onUpdateTray: (updates: Partial<Omit<Tray, 'id'>>) => void;
 		onUpdateCounterParams?: (params: CounterTrayParams) => void;
-		onUpdateCardParams?: (params: CardTrayParams) => void;
+		onUpdateCardParams?: (params: CardDrawTrayParams) => void;
+		onUpdateCardDividerParams?: (params: CardDividerTrayParams) => void;
 		hideList?: boolean;
 	}
 
@@ -46,6 +48,7 @@
 		onUpdateTray,
 		onUpdateCounterParams,
 		onUpdateCardParams,
+		onUpdateCardDividerParams,
 		hideList = false
 	}: Props = $props();
 
@@ -111,12 +114,22 @@
 
 	const orientationOptions: EdgeOrientation[] = ['lengthwise', 'crosswise'];
 
-	function getTrayStats(tray: Tray): { stacks: number; counters: number; isCardTray: boolean } {
+	function getTrayStats(tray: Tray): { stacks: number; counters: number; isCardTray: boolean; isCardDivider: boolean } {
+		if (isCardDividerTray(tray)) {
+			const totalCards = tray.params.stacks.reduce((sum, s) => sum + s.count, 0);
+			return {
+				stacks: tray.params.stacks.length,
+				counters: totalCards,
+				isCardTray: false,
+				isCardDivider: true
+			};
+		}
 		if (isCardTray(tray)) {
 			return {
 				stacks: 1,
 				counters: tray.params.cardCount,
-				isCardTray: true
+				isCardTray: true,
+				isCardDivider: false
 			};
 		}
 		// Counter tray
@@ -125,7 +138,8 @@
 		return {
 			stacks: tray.params.topLoadedStacks.length + tray.params.edgeLoadedStacks.length,
 			counters: topCount + edgeCount,
-			isCardTray: false
+			isCardTray: false,
+			isCardDivider: false
 		};
 	}
 
@@ -163,10 +177,49 @@
 		}
 	}
 
-	function updateCardParam<K extends keyof CardTrayParams>(key: K, value: CardTrayParams[K]) {
+	function updateCardParam<K extends keyof CardDrawTrayParams>(key: K, value: CardDrawTrayParams[K]) {
 		if (selectedTray && isCardTray(selectedTray) && onUpdateCardParams) {
 			onUpdateCardParams({ ...selectedTray.params, [key]: value });
 		}
+	}
+
+	function updateCardDividerParam<K extends keyof CardDividerTrayParams>(key: K, value: CardDividerTrayParams[K]) {
+		if (selectedTray && isCardDividerTray(selectedTray) && onUpdateCardDividerParams) {
+			onUpdateCardDividerParams({ ...selectedTray.params, [key]: value });
+		}
+	}
+
+	// Card divider stack handlers
+	function updateCardDividerStack(
+		index: number,
+		field: 'cardSizeName' | 'count' | 'label',
+		value: string | number
+	) {
+		if (!selectedTray || !isCardDividerTray(selectedTray) || !onUpdateCardDividerParams) return;
+		const newStacks = [...selectedTray.params.stacks];
+		const current = newStacks[index];
+		if (field === 'cardSizeName') {
+			newStacks[index] = { ...current, cardSizeName: value as string };
+		} else if (field === 'count') {
+			newStacks[index] = { ...current, count: value as number };
+		} else {
+			newStacks[index] = { ...current, label: (value as string) || undefined };
+		}
+		onUpdateCardDividerParams({ ...selectedTray.params, stacks: newStacks });
+	}
+
+	function addCardDividerStack() {
+		if (!selectedTray || !isCardDividerTray(selectedTray) || !onUpdateCardDividerParams) return;
+		onUpdateCardDividerParams({
+			...selectedTray.params,
+			stacks: [...selectedTray.params.stacks, { cardSizeName: 'Standard', count: 30, label: undefined }]
+		});
+	}
+
+	function removeCardDividerStack(index: number) {
+		if (!selectedTray || !isCardDividerTray(selectedTray) || !onUpdateCardDividerParams) return;
+		const newStacks = selectedTray.params.stacks.filter((_, i) => i !== index);
+		onUpdateCardDividerParams({ ...selectedTray.params, stacks: newStacks });
 	}
 
 	// Compute minimum tray width for display (counter trays only)
@@ -291,14 +344,18 @@
 						onkeydown={(e) => e.key === 'Enter' && onSelectTray(tray)}
 						title="{tray.name}, tray {letter}, {stats.isCardTray
 							? stats.counters + ' cards'
-							: stats.counters + ' counters in ' + stats.stacks + ' stacks'}"
+							: stats.isCardDivider
+								? stats.counters + ' cards in ' + stats.stacks + ' stacks'
+								: stats.counters + ' counters in ' + stats.stacks + ' stacks'}"
 					>
 						<span style="overflow: hidden; text-overflow: ellipsis;">{tray.name}</span>
 						<span style="display: flex; align-items: center; gap: 0.25rem;">
 							<span class="trayStats"
 								>{letter}: {stats.isCardTray
 									? stats.counters + ' cards'
-									: stats.counters + 'c in ' + stats.stacks + 's'}</span
+									: stats.isCardDivider
+										? stats.counters + ' cards/' + stats.stacks + 's'
+										: stats.counters + 'c in ' + stats.stacks + 's'}</span
 							>
 							{#if selectedBox.trays.length > 1}
 								<IconButton
@@ -713,8 +770,164 @@
 						</div>
 					</section>
 				</div>
+			{:else if isCardDividerTray(selectedTray)}
+				<!-- Card Divider Tray Settings -->
+				{@const customCardSizes = selectedBox ? getCustomCardSizesFromBox(selectedBox) : []}
+				<div class="panelFormSection">
+					<section class="section">
+						<h3 class="sectionTitle">Layout</h3>
+						<Spacer size="0.5rem" />
+						<FormControl label="Card orientation" name="cardOrientation">
+							{#snippet input({ inputProps })}
+								<Select
+									{...inputProps}
+									selected={[selectedTray.params.orientation]}
+									options={[
+										{ value: 'vertical', label: 'Vertical (tall cards)' },
+										{ value: 'horizontal', label: 'Horizontal (wide cards)' }
+									]}
+									onSelectedChange={(selected) => {
+										if (selected[0]) {
+											updateCardDividerParam('orientation', selected[0] as 'vertical' | 'horizontal');
+										}
+									}}
+								/>
+							{/snippet}
+						</FormControl>
+						<Spacer size="1rem" />
+						<FormControl label="Stack arrangement" name="stackDirection">
+							{#snippet input({ inputProps })}
+								<Select
+									{...inputProps}
+									selected={[selectedTray.params.stackDirection]}
+									options={[
+										{ value: 'sideBySide', label: 'Side by side' },
+										{ value: 'frontToBack', label: 'Front to back' }
+									]}
+									onSelectedChange={(selected) => {
+										if (selected[0]) {
+											updateCardDividerParam('stackDirection', selected[0] as 'sideBySide' | 'frontToBack');
+										}
+									}}
+								/>
+							{/snippet}
+						</FormControl>
+					</section>
+
+					<Spacer size="0.5rem" />
+
+					<section class="section">
+						<h3 class="sectionTitle">Card Stacks</h3>
+						<Spacer size="0.5rem" />
+						<div class="stackList">
+							{#each selectedTray.params.stacks as stack, index (index)}
+								<div class="stackRow" role="listitem">
+									<span class="stackRef">{index + 1}</span>
+									<div class="stackLabelInput">
+										<Input
+											type="text"
+											placeholder="Label"
+											value={stack.label ?? ''}
+											onchange={(e) => updateCardDividerStack(index, 'label', e.currentTarget.value)}
+										/>
+									</div>
+									<div class="stackSelect">
+										<Select
+											selected={[stack.cardSizeName]}
+											options={customCardSizes.map((s) => ({
+												value: s.name,
+												label: s.name
+											}))}
+											onSelectedChange={(selected) =>
+												updateCardDividerStack(index, 'cardSizeName', selected[0])}
+										/>
+									</div>
+									<Input
+										type="number"
+										min="1"
+										value={stack.count}
+										onchange={(e) =>
+											updateCardDividerStack(index, 'count', parseInt(e.currentTarget.value))}
+										style="width: 3.5rem;"
+									/>
+									<IconButton
+										variant="ghost"
+										onclick={() => removeCardDividerStack(index)}
+										title="Remove stack"
+										color="var(--fgMuted)"
+									>
+										<Icon Icon={IconX} color="var(--fgMuted)" />
+									</IconButton>
+								</div>
+							{/each}
+							<Spacer size="0.5rem" />
+							<Link as="button" onclick={addCardDividerStack}>Add card stack</Link>
+						</div>
+					</section>
+
+					<Spacer size="0.5rem" />
+
+					<section class="section">
+						<h3 class="sectionTitle">Tray Settings</h3>
+						<Spacer size="0.5rem" />
+						<div class="formGrid">
+							<FormControl label="Wall" name="wallThickness">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										value={selectedTray.params.wallThickness}
+										onchange={(e) =>
+											updateCardDividerParam('wallThickness', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Floor" name="floorThickness">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										value={selectedTray.params.floorThickness}
+										onchange={(e) =>
+											updateCardDividerParam('floorThickness', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Clearance" name="clearance">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										value={selectedTray.params.clearance}
+										onchange={(e) =>
+											updateCardDividerParam('clearance', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Rim" name="rimHeight">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										value={selectedTray.params.rimHeight}
+										onchange={(e) =>
+											updateCardDividerParam('rimHeight', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+						</div>
+					</section>
+				</div>
 			{:else if isCardTray(selectedTray)}
-				<!-- Card Tray Settings -->
+				<!-- Card Draw Tray Settings -->
 				{@const customCardSizes = selectedBox ? getCustomCardSizesFromBox(selectedBox) : []}
 				{@const selectedCardSize = customCardSizes.find(
 					(s) => s.name === selectedTray.params.cardSizeName
@@ -723,7 +936,7 @@
 					<section class="section">
 						<h3 class="sectionTitle">Card Size</h3>
 						<Spacer size="0.5rem" />
-						<FormControl label="Card Size" name="cardSizeName">
+						<FormControl label="Card size" name="cardSizeName">
 							{#snippet input({ inputProps })}
 								<Select
 									{...inputProps}
@@ -754,7 +967,7 @@
 					<section class="section">
 						<h3 class="sectionTitle">Card Stack</h3>
 						<Spacer size="0.5rem" />
-						<FormControl label="Card Count" name="cardCount">
+						<FormControl label="Card count" name="cardCount">
 							{#snippet input({ inputProps })}
 								<Input
 									{...inputProps}
@@ -813,7 +1026,7 @@
 								{/snippet}
 								{#snippet end()}mm{/snippet}
 							</FormControl>
-							<FormControl label="Slope Angle" name="floorSlopeAngle">
+							<FormControl label="Slope angle" name="floorSlopeAngle">
 								{#snippet input({ inputProps })}
 									<Input
 										{...inputProps}

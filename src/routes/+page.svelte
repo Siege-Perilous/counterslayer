@@ -25,7 +25,8 @@
 		getCounterPositions,
 		type CounterStack
 	} from '$lib/models/counterTray';
-	import { createCardTray, getCardPositions, type CardStack } from '$lib/models/cardTray';
+	import { createCardDrawTray, getCardDrawPositions, type CardStack } from '$lib/models/cardTray';
+	import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
 	import { arrangeTrays, calculateTraySpacers, getCustomCardSizesFromBox } from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 	import {
@@ -47,7 +48,9 @@
 		importProject,
 		resetProject,
 		getCumulativeTrayLetter,
-		isCounterTray
+		isCounterTray,
+		isCardTray,
+		isCardDividerTray
 	} from '$lib/stores/project.svelte';
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
@@ -453,20 +456,33 @@
 							maxHeight,
 							spacerHeight
 						);
-					} else {
-						jscadGeom = createCardTray(
+					} else if (isCardDividerTray(placement.tray)) {
+						jscadGeom = createCardDividerTray(
 							placement.tray.params,
 							customCardSizes,
 							placement.tray.name,
 							maxHeight,
 							spacerHeight
 						);
-						selectedTrayCounters = getCardPositions(
+						// Card divider positions are converted to CounterStack format in worker
+						selectedTrayCounters = [];
+					} else if (isCardTray(placement.tray)) {
+						jscadGeom = createCardDrawTray(
+							placement.tray.params,
+							customCardSizes,
+							placement.tray.name,
+							maxHeight,
+							spacerHeight
+						);
+						selectedTrayCounters = getCardDrawPositions(
 							placement.tray.params,
 							customCardSizes,
 							maxHeight,
 							spacerHeight
 						);
+					} else {
+						// Fallback - shouldn't happen
+						continue;
 					}
 
 					// Set up scene for this tray

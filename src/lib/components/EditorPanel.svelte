@@ -11,14 +11,17 @@
 		updateTray,
 		updateTrayParams,
 		updateCardTrayParams,
+		updateCardDividerTrayParams,
 		getCumulativeTrayLetter,
 		isCounterTray,
 		isCardTray,
+		isCardDividerTray,
 		type Box,
 		type Tray
 	} from '$lib/stores/project.svelte';
 	import type { CounterTrayParams } from '$lib/models/counterTray';
-	import type { CardTrayParams } from '$lib/models/cardTray';
+	import type { CardDrawTrayParams } from '$lib/models/cardTray';
+	import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
 
 	type SelectionType = 'dimensions' | 'box' | 'tray';
 
@@ -71,18 +74,29 @@
 		}
 	}
 
-	function handleCardParamsChange(newParams: CardTrayParams) {
+	function handleCardParamsChange(newParams: CardDrawTrayParams) {
 		if (selectedTray && isCardTray(selectedTray)) {
 			updateCardTrayParams(selectedTray.id, newParams);
 		}
 	}
 
+	function handleCardDividerParamsChange(newParams: CardDividerTrayParams) {
+		if (selectedTray && isCardDividerTray(selectedTray)) {
+			updateCardDividerTrayParams(selectedTray.id, newParams);
+		}
+	}
+
 	// Get tray stats for display
-	function getTrayStats(tray: Tray): { stacks: number; counters: number; letter: string } {
+	function getTrayStats(tray: Tray): { stacks: number; counters: number; letter: string; isCards: boolean } {
 		let stacks = 0;
 		let counters = 0;
+		let isCards = false;
 
-		if (isCounterTray(tray)) {
+		if (isCardDividerTray(tray)) {
+			stacks = tray.params.stacks.length;
+			counters = tray.params.stacks.reduce((sum, s) => sum + s.count, 0);
+			isCards = true;
+		} else if (isCounterTray(tray)) {
 			const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
 			const edgeCount = tray.params.edgeLoadedStacks.reduce((sum, s) => sum + s[1], 0);
 			stacks = tray.params.topLoadedStacks.length + tray.params.edgeLoadedStacks.length;
@@ -90,6 +104,7 @@
 		} else if (isCardTray(tray)) {
 			stacks = 1;
 			counters = tray.params.cardCount;
+			isCards = true;
 		}
 
 		let letter = 'A';
@@ -101,7 +116,7 @@
 				letter = getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx);
 			}
 		}
-		return { stacks, counters, letter };
+		return { stacks, counters, letter, isCards };
 	}
 
 	let panelTitle = $derived.by(() => {
@@ -129,7 +144,7 @@
 				>
 			{:else if selectionType === 'tray' && selectedTray}
 				{@const stats = getTrayStats(selectedTray)}
-				<span class="headerStats">{stats.counters} counters in {stats.stacks} stacks</span>
+				<span class="headerStats">{stats.counters} {stats.isCards ? 'cards' : 'counters'} in {stats.stacks} stacks</span>
 			{/if}
 		</div>
 		<!-- Content -->
@@ -169,6 +184,7 @@
 						onUpdateTray={handleTrayUpdate}
 						onUpdateCounterParams={handleCounterParamsChange}
 						onUpdateCardParams={handleCardParamsChange}
+						onUpdateCardDividerParams={handleCardDividerParamsChange}
 						hideList={true}
 					/>
 				{:else}

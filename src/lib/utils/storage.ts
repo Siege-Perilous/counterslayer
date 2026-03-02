@@ -182,10 +182,28 @@ function migrateTray(tray: Tray, cumulativeIndex: number): Tray {
 	const trayType = (tray as { type?: string }).type;
 
 	if (trayType === 'card') {
-		// Card tray - preserve as-is with color migration
+		// Legacy 'card' type - migrate to 'cardDraw' with color migration
 		return {
 			...tray,
-			type: 'card',
+			type: 'cardDraw',
+			color: tray.color || TRAY_COLORS[cumulativeIndex % TRAY_COLORS.length]
+		} as Tray;
+	}
+
+	if (trayType === 'cardDraw') {
+		// Card draw tray - preserve with color migration
+		return {
+			...tray,
+			type: 'cardDraw',
+			color: tray.color || TRAY_COLORS[cumulativeIndex % TRAY_COLORS.length]
+		} as Tray;
+	}
+
+	if (trayType === 'cardDivider') {
+		// Card divider tray - preserve with color migration
+		return {
+			...tray,
+			type: 'cardDivider',
 			color: tray.color || TRAY_COLORS[cumulativeIndex % TRAY_COLORS.length]
 		} as Tray;
 	}

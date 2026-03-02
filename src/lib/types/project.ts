@@ -1,5 +1,6 @@
 import type { CounterTrayParams } from '$lib/models/counterTray';
-import type { CardTrayParams } from '$lib/models/cardTray';
+import type { CardDrawTrayParams } from '$lib/models/cardTray';
+import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
 
 // Base tray interface shared by all tray types
 interface BaseTray {
@@ -15,22 +16,40 @@ export interface CounterTray extends BaseTray {
 	params: CounterTrayParams;
 }
 
-// Card tray for playing cards
-export interface CardTray extends BaseTray {
-	type: 'card';
-	params: CardTrayParams;
+// Card draw tray for drawing cards (face down, sloped floor, finger cutout)
+export interface CardDrawTray extends BaseTray {
+	type: 'cardDraw';
+	params: CardDrawTrayParams;
 }
 
+// Card divider tray for card storage (cards standing on edge in multiple stacks)
+export interface CardDividerTray extends BaseTray {
+	type: 'cardDivider';
+	params: CardDividerTrayParams;
+}
+
+// Legacy alias for backwards compatibility
+export type CardTray = CardDrawTray;
+
 // Discriminated union of all tray types
-export type Tray = CounterTray | CardTray;
+export type Tray = CounterTray | CardDrawTray | CardDividerTray;
 
 // Type guards for tray types
 export function isCounterTray(tray: Tray): tray is CounterTray {
 	return tray.type === 'counter';
 }
 
-export function isCardTray(tray: Tray): tray is CardTray {
-	return tray.type === 'card';
+export function isCardDrawTray(tray: Tray): tray is CardDrawTray {
+	return tray.type === 'cardDraw';
+}
+
+export function isCardDividerTray(tray: Tray): tray is CardDividerTray {
+	return tray.type === 'cardDivider';
+}
+
+// Legacy alias - also matches old 'card' type for migration
+export function isCardTray(tray: Tray): tray is CardDrawTray {
+	return tray.type === 'cardDraw' || (tray as { type: string }).type === 'card';
 }
 
 export interface LidParams {

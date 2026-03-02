@@ -13,7 +13,7 @@ const { extrudeLinear } = jscad.extrusions;
 // Import CustomCardSize type from counterTray for type safety
 import type { CustomCardSize } from './counterTray';
 
-export interface CardTrayParams {
+export interface CardDrawTrayParams {
 	cardSizeName: string; // Reference to a CustomCardSize by name
 	cardCount: number;
 	wallThickness: number;
@@ -24,7 +24,10 @@ export interface CardTrayParams {
 	magnetHoleDepth: number;
 }
 
-export const defaultCardTrayParams: CardTrayParams = {
+// Legacy alias for backwards compatibility
+export type CardTrayParams = CardDrawTrayParams;
+
+export const defaultCardDrawTrayParams: CardDrawTrayParams = {
 	cardSizeName: 'Standard',
 	cardCount: 50,
 	wallThickness: 4.0,
@@ -35,6 +38,9 @@ export const defaultCardTrayParams: CardTrayParams = {
 	magnetHoleDepth: 2.5
 };
 
+// Legacy alias for backwards compatibility
+export const defaultCardTrayParams = defaultCardDrawTrayParams;
+
 // Helper to get card dimensions from global card sizes
 export function getCardSize(
 	cardSizeName: string,
@@ -43,7 +49,7 @@ export function getCardSize(
 	return customCardSizes.find((s) => s.name === cardSizeName) || null;
 }
 
-export interface CardStack {
+export interface CardDrawStack {
 	x: number;
 	y: number;
 	z: number;
@@ -57,8 +63,11 @@ export interface CardStack {
 	slopeAngle: number; // Radians - rotation around X axis to match floor slope
 }
 
-export function getCardTrayDimensions(
-	params: CardTrayParams,
+// Legacy alias for backwards compatibility
+export type CardStack = CardDrawStack;
+
+export function getCardDrawTrayDimensions(
+	params: CardDrawTrayParams,
 	customCardSizes: CustomCardSize[]
 ): {
 	width: number;
@@ -92,12 +101,15 @@ export function getCardTrayDimensions(
 	return { width, depth, height };
 }
 
-export function getCardPositions(
-	params: CardTrayParams,
+// Legacy alias for backwards compatibility
+export const getCardTrayDimensions = getCardDrawTrayDimensions;
+
+export function getCardDrawPositions(
+	params: CardDrawTrayParams,
 	customCardSizes: CustomCardSize[],
 	_targetHeight?: number,
 	_spacerHeight?: number
-): CardStack[] {
+): CardDrawStack[] {
 	const { cardSizeName, cardCount, wallThickness, clearance, floorThickness } = params;
 
 	// Look up card size from global card sizes
@@ -146,8 +158,11 @@ export function getCardPositions(
 	];
 }
 
-export function createCardTray(
-	params: CardTrayParams,
+// Legacy alias for backwards compatibility
+export const getCardPositions = getCardDrawPositions;
+
+export function createCardDrawTray(
+	params: CardDrawTrayParams,
 	customCardSizes: CustomCardSize[],
 	_trayName?: string,
 	targetHeight?: number,
@@ -422,3 +437,6 @@ export function createCardTray(
 
 	return tray;
 }
+
+// Legacy alias for backwards compatibility
+export const createCardTray = createCardDrawTray;

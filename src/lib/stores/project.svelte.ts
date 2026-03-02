@@ -1,13 +1,14 @@
 import { defaultParams, type CounterTrayParams } from '$lib/models/counterTray';
-import { defaultCardTrayParams, type CardTrayParams } from '$lib/models/cardTray';
+import { defaultCardDrawTrayParams, type CardDrawTrayParams } from '$lib/models/cardTray';
+import { defaultCardDividerTrayParams, type CardDividerTrayParams } from '$lib/models/cardDividerTray';
 import { defaultLidParams } from '$lib/models/lid';
 import { saveProject, loadProject, migrateProjectData } from '$lib/utils/storage';
-import type { Tray, Box, Project, LidParams, CounterTray, CardTray } from '$lib/types/project';
-import { isCounterTray, isCardTray } from '$lib/types/project';
+import type { Tray, Box, Project, LidParams, CounterTray, CardDrawTray, CardDividerTray, CardTray } from '$lib/types/project';
+import { isCounterTray, isCardTray, isCardDrawTray, isCardDividerTray } from '$lib/types/project';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
-export type { Tray, Box, Project, LidParams, CounterTray, CardTray };
-export { isCounterTray, isCardTray };
+export type { Tray, Box, Project, LidParams, CounterTray, CardDrawTray, CardDividerTray, CardTray };
+export { isCounterTray, isCardTray, isCardDrawTray, isCardDividerTray };
 
 function generateId(): string {
 	return Math.random().toString(36).substring(2, 9);
@@ -68,15 +69,31 @@ function createDefaultCounterTray(name: string, color: string): CounterTray {
 	};
 }
 
-function createDefaultCardTray(name: string, color: string): CardTray {
+function createDefaultCardDrawTray(name: string, color: string): CardDrawTray {
 	return {
 		id: generateId(),
-		type: 'card',
+		type: 'cardDraw',
 		name,
 		color,
 		rotationOverride: 'auto',
-		params: { ...defaultCardTrayParams }
+		params: { ...defaultCardDrawTrayParams }
 	};
+}
+
+function createDefaultCardDividerTray(name: string, color: string): CardDividerTray {
+	return {
+		id: generateId(),
+		type: 'cardDivider',
+		name,
+		color,
+		rotationOverride: 'auto',
+		params: { ...defaultCardDividerTrayParams }
+	};
+}
+
+// Legacy alias for backwards compatibility
+function createDefaultCardTray(name: string, color: string): CardDrawTray {
+	return createDefaultCardDrawTray(name, color);
 }
 
 // Backwards compatibility alias
@@ -100,11 +117,11 @@ function createDefaultBox(name: string): Box {
 function createDefaultProject(): Project {
 	const box = createDefaultBox('Box 1');
 	const counterTray = createDefaultTray('Tray 1', TRAY_COLORS[0]);
-	const cardTray = createDefaultCardTray('Card Tray', TRAY_COLORS[1]);
-	// Set card tray to hold 25 cards
-	cardTray.params = { ...cardTray.params, cardCount: 25 };
+	const cardDrawTray = createDefaultCardDrawTray('Card Draw', TRAY_COLORS[1]);
+	// Set card draw tray to hold 25 cards
+	cardDrawTray.params = { ...cardDrawTray.params, cardCount: 25 };
 	box.trays.push(counterTray);
-	box.trays.push(cardTray);
+	box.trays.push(cardDrawTray);
 
 	return {
 		boxes: [box],
@@ -228,7 +245,7 @@ function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
 }
 
 // Tray type for addTray function
-export type TrayType = 'counter' | 'card';
+export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'card';
 
 // Tray operations
 export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | null {
@@ -239,8 +256,10 @@ export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | n
 	const color = getNextTrayColor(project.boxes);
 
 	let tray: Tray;
-	if (trayType === 'card') {
-		tray = createDefaultCardTray(`Card Tray ${trayNumber}`, color);
+	if (trayType === 'cardDraw' || trayType === 'card') {
+		tray = createDefaultCardDrawTray(`Card Draw ${trayNumber}`, color);
+	} else if (trayType === 'cardDivider') {
+		tray = createDefaultCardDividerTray(`Card Divider ${trayNumber}`, color);
 	} else {
 		tray = createDefaultCounterTray(`Tray ${trayNumber}`, color);
 		// Inherit global params (including customShapes) from existing counter trays
@@ -444,11 +463,26 @@ export function updateTrayParams(trayId: string, params: CounterTrayParams): voi
 	autosave();
 }
 
-// Update card tray params
-export function updateCardTrayParams(trayId: string, params: CardTrayParams): void {
+// Update card draw tray params
+export function updateCardDrawTrayParams(trayId: string, params: CardDrawTrayParams): void {
 	for (const box of project.boxes) {
 		const tray = box.trays.find((t) => t.id === trayId);
-		if (tray && isCardTray(tray)) {
+		if (tray && isCardDrawTray(tray)) {
+			tray.params = params;
+			autosave();
+			return;
+		}
+	}
+}
+
+// Legacy alias for backwards compatibility
+export const updateCardTrayParams = updateCardDrawTrayParams;
+
+// Update card divider tray params
+export function updateCardDividerTrayParams(trayId: string, params: CardDividerTrayParams): void {
+	for (const box of project.boxes) {
+		const tray = box.trays.find((t) => t.id === trayId);
+		if (tray && isCardDividerTray(tray)) {
 			tray.params = params;
 			autosave();
 			return;
