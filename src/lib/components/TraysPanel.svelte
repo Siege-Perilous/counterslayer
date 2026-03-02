@@ -18,7 +18,7 @@
 	import type { CounterTrayParams, EdgeOrientation, CustomCardSize } from '$lib/models/counterTray';
 	import type { CardTrayParams } from '$lib/models/cardTray';
 	import { getTrayDimensions, getCustomCardSizesFromBox } from '$lib/models/box';
-	import { getProject, getCumulativeTrayLetter, moveTray } from '$lib/stores/project.svelte';
+	import { getProject, getCumulativeTrayLetter, moveTray, setTrayRotation } from '$lib/stores/project.svelte';
 
 	interface Props {
 		selectedBox: Box | null;
@@ -366,6 +366,30 @@
 							{...inputProps}
 							value={selectedTray.color}
 							oninput={(e) => handleColorUpdate(e.currentTarget.value)}
+						/>
+					{/snippet}
+				</FormControl>
+
+				<Spacer size="1rem" />
+
+				<!-- Rotation -->
+				<FormControl label="Rotation" name="trayRotation">
+					{#snippet input({ inputProps })}
+						<Select
+							{...inputProps}
+							selected={[String(selectedTray.rotationOverride ?? 'auto')]}
+							options={[
+								{ value: 'auto', label: 'Auto (recommended)' },
+								{ value: '0', label: 'No rotation (0°)' },
+								{ value: '90', label: 'Rotated (90°)' }
+							]}
+							onSelectedChange={(selected) => {
+								if (selected[0] && selectedTray) {
+									const val = selected[0];
+									const rotation = val === 'auto' ? 'auto' : (parseInt(val) as 0 | 90);
+									setTrayRotation(selectedTray.id, rotation);
+								}
+							}}
 						/>
 					{/snippet}
 				</FormControl>

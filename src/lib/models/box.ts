@@ -21,6 +21,7 @@ export interface TrayPlacement {
 	dimensions: TrayDimensions;
 	x: number;
 	y: number;
+	rotated: boolean; // true if tray is rotated 90° for better packing
 }
 
 export interface BoxMinimumDimensions {
@@ -435,31 +436,49 @@ export const getTrayDimensions = getCounterTrayDimensions;
 // Arrange trays in a box layout with bin-packing
 // Smaller trays can share a row if their combined width fits within the max tray width
 // If customBoxWidth is provided, use interior width (minus walls/tolerance) for packing
+// Supports tray rotation: trays can be rotated 90° for more efficient packing
 export function arrangeTrays(
 	trays: Tray[],
 	options?: { customBoxWidth?: number; wallThickness?: number; tolerance?: number; customCardSizes?: CustomCardSize[] }
 ): TrayPlacement[] {
 	if (trays.length === 0) return [];
 
-	// Calculate dimensions for all trays
-	const trayDims = trays.map((tray) => ({
-		tray,
-		dimensions: getTrayDimensionsForTray(tray, options?.customCardSizes)
-	}));
-
-	// Sort by width (X dimension) descending so widest trays are first
-	trayDims.sort((a, b) => b.dimensions.width - a.dimensions.width);
-
-	// Use custom box interior width if provided, otherwise use widest tray
-	const widestTrayWidth = trayDims[0].dimensions.width;
-	let maxRowWidth = widestTrayWidth;
-
-	if (options?.customBoxWidth) {
-		const wallThickness = options.wallThickness ?? 3;
-		const tolerance = options.tolerance ?? 0.5;
-		const interiorWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
-		maxRowWidth = Math.max(interiorWidth, widestTrayWidth);
+	// Calculate dimensions for each tray with both orientations
+	interface TrayOption {
+		tray: Tray;
+		dims: TrayDimensions;
+		rotated: boolean;
 	}
+
+	const trayOptions: TrayOption[][] = trays.map((tray) => {
+		const dims = getTrayDimensionsForTray(tray, options?.customCardSizes);
+		const rotatedDims: TrayDimensions = {
+			width: dims.depth,
+			depth: dims.width,
+			height: dims.height
+		};
+
+		// Respect user override
+		const override = tray.rotationOverride;
+		if (override === 0) {
+			return [{ tray, dims, rotated: false }];
+		}
+		if (override === 90) {
+			return [{ tray, dims: rotatedDims, rotated: true }];
+		}
+		// Auto: consider both orientations
+		return [
+			{ tray, dims, rotated: false },
+			{ tray, dims: rotatedDims, rotated: true }
+		];
+	});
+
+	// Sort trays by area (largest first) for better packing
+	// Use the first (normal) orientation for sorting
+	const sortedIndices = trayOptions
+		.map((opts, i) => ({ index: i, area: opts[0].dims.width * opts[0].dims.depth }))
+		.sort((a, b) => b.area - a.area)
+		.map((item) => item.index);
 
 	// Track rows: each row has a Y position, current X fill, and max depth
 	interface Row {
@@ -467,7 +486,6 @@ export function arrangeTrays(
 		currentX: number;
 		depth: number;
 	}
-	const rows: Row[] = [];
 
 	// Track which row each placement belongs to
 	interface PlacementWithRow {
@@ -475,41 +493,105 @@ export function arrangeTrays(
 		dimensions: TrayDimensions;
 		x: number;
 		rowIndex: number;
+		rotated: boolean;
 	}
-	const placementsWithRow: PlacementWithRow[] = [];
 
-	for (const { tray, dimensions } of trayDims) {
+	// Helper function to calculate total footprint for a given arrangement
+	function calculateFootprint(placements: PlacementWithRow[], rows: Row[]): { width: number; depth: number } {
+		if (placements.length === 0 || rows.length === 0) {
+			return { width: 0, depth: 0 };
+		}
+		const maxX = Math.max(...placements.map(p => p.x + p.dimensions.width));
+		const maxY = rows.reduce((sum, row) => sum + row.depth, 0);
+		return { width: maxX, depth: maxY };
+	}
+
+	// Try to place a tray with given dimensions and return the resulting placement
+	function tryPlace(
+		dims: TrayDimensions,
+		rows: Row[],
+		maxRowWidth: number
+	): { rowIndex: number; x: number; isNewRow: boolean } | null {
 		// Try to find an existing row where this tray fits
-		let placed = false;
 		for (let i = 0; i < rows.length; i++) {
 			const row = rows[i];
-			if (row.currentX + dimensions.width <= maxRowWidth) {
-				// Fits in this row
-				placementsWithRow.push({
-					tray,
-					dimensions,
-					x: row.currentX,
-					rowIndex: i
-				});
-				row.currentX += dimensions.width;
-				row.depth = Math.max(row.depth, dimensions.depth);
-				placed = true;
-				break;
+			if (row.currentX + dims.width <= maxRowWidth) {
+				return { rowIndex: i, x: row.currentX, isNewRow: false };
+			}
+		}
+		// Need a new row
+		return { rowIndex: rows.length, x: 0, isNewRow: true };
+	}
+
+	// Calculate max row width
+	let maxRowWidth = Math.max(...trayOptions.map(opts => Math.max(...opts.map(o => o.dims.width))));
+
+	if (options?.customBoxWidth) {
+		const wallThickness = options.wallThickness ?? 3;
+		const tolerance = options.tolerance ?? 0.5;
+		const interiorWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
+		maxRowWidth = Math.max(interiorWidth, maxRowWidth);
+	}
+
+	// Greedy algorithm: place each tray, choosing the best orientation
+	const rows: Row[] = [];
+	const placementsWithRow: PlacementWithRow[] = [];
+
+	for (const trayIndex of sortedIndices) {
+		const opts = trayOptions[trayIndex];
+
+		let bestOption: TrayOption | null = null;
+		let bestPlacement: { rowIndex: number; x: number; isNewRow: boolean } | null = null;
+		let bestScore = -Infinity;
+
+		for (const opt of opts) {
+			const placement = tryPlace(opt.dims, rows, maxRowWidth);
+			if (!placement) continue;
+
+			// Score this option: prefer orientations that
+			// 1. Fit in existing rows (avoid new rows)
+			// 2. Match existing row depth better (reduce wasted space)
+			// 3. Result in smaller total width increase
+			let score = 0;
+
+			// Strongly prefer fitting in existing rows
+			if (!placement.isNewRow) {
+				score += 1000;
+				// Prefer matching row depth
+				const rowDepth = rows[placement.rowIndex].depth;
+				const depthDiff = Math.abs(rowDepth - opt.dims.depth);
+				score -= depthDiff; // Penalize depth mismatch
+			} else {
+				// For new rows, prefer smaller depth (less total box depth)
+				score -= opt.dims.depth;
+			}
+
+			if (score > bestScore) {
+				bestScore = score;
+				bestOption = opt;
+				bestPlacement = placement;
 			}
 		}
 
-		if (!placed) {
-			// Create a new row (Y will be calculated after all placements)
-			rows.push({
-				y: 0, // Placeholder, will be recalculated
-				currentX: dimensions.width,
-				depth: dimensions.depth
-			});
+		if (bestOption && bestPlacement) {
+			if (bestPlacement.isNewRow) {
+				rows.push({
+					y: 0, // Will be recalculated
+					currentX: bestOption.dims.width,
+					depth: bestOption.dims.depth
+				});
+			} else {
+				const row = rows[bestPlacement.rowIndex];
+				row.currentX += bestOption.dims.width;
+				row.depth = Math.max(row.depth, bestOption.dims.depth);
+			}
+
 			placementsWithRow.push({
-				tray,
-				dimensions,
-				x: 0,
-				rowIndex: rows.length - 1
+				tray: bestOption.tray,
+				dimensions: bestOption.dims,
+				x: bestPlacement.x,
+				rowIndex: bestPlacement.rowIndex,
+				rotated: bestOption.rotated
 			});
 		}
 	}
@@ -537,7 +619,8 @@ export function arrangeTrays(
 			tray: p.tray,
 			dimensions: p.dimensions,
 			x: p.x,
-			y
+			y,
+			rotated: p.rotated
 		};
 	});
 

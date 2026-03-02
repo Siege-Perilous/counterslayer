@@ -6,6 +6,7 @@ interface BaseTray {
 	id: string;
 	name: string;
 	color: string;
+	rotationOverride?: 'auto' | 0 | 90; // User can force rotation: 'auto' = algorithm decides, 0 = no rotation, 90 = rotated
 }
 
 // Counter tray for cardboard counter tokens

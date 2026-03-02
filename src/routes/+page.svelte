@@ -683,7 +683,7 @@
 				customWidth: box.customWidth,
 				customBoxHeight: box.customBoxHeight,
 				fillSolidEmpty: box.fillSolidEmpty,
-				trays: box.trays.map((t) => ({ id: t.id, params: t.params }))
+				trays: box.trays.map((t) => ({ id: t.id, params: t.params, rotationOverride: t.rotationOverride }))
 			}))
 		});
 	});

@@ -63,6 +63,7 @@ function createDefaultCounterTray(name: string, color: string): CounterTray {
 		type: 'counter',
 		name,
 		color,
+		rotationOverride: 'auto',
 		params: { ...defaultParams }
 	};
 }
@@ -73,6 +74,7 @@ function createDefaultCardTray(name: string, color: string): CardTray {
 		type: 'card',
 		name,
 		color,
+		rotationOverride: 'auto',
 		params: { ...defaultCardTrayParams }
 	};
 }
@@ -277,6 +279,18 @@ export function updateTray(trayId: string, updates: Partial<Omit<Tray, 'id'>>): 
 		const tray = box.trays.find((t) => t.id === trayId);
 		if (tray) {
 			Object.assign(tray, updates);
+			autosave();
+			return;
+		}
+	}
+}
+
+// Set tray rotation override ('auto' | 0 | 90)
+export function setTrayRotation(trayId: string, rotation: 'auto' | 0 | 90): void {
+	for (const box of project.boxes) {
+		const tray = box.trays.find((t) => t.id === trayId);
+		if (tray) {
+			tray.rotationOverride = rotation;
 			autosave();
 			return;
 		}
