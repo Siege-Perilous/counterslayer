@@ -4,7 +4,7 @@ import { defaultLidParams } from '$lib/models/lid';
 import { saveProject, loadProject, migrateProjectData } from '$lib/utils/storage';
 import type { Tray, Box, Project, LidParams, CounterTray, CardTray } from '$lib/types/project';
 import { isCounterTray, isCardTray } from '$lib/types/project';
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 export type { Tray, Box, Project, LidParams, CounterTray, CardTray };
 export { isCounterTray, isCardTray };
@@ -341,16 +341,31 @@ export function updateTrayParams(trayId: string, params: CounterTrayParams): voi
 
 	// Propagate changed global params to all other trays
 	if (Object.keys(changedGlobals).length > 0) {
-		// Detect shape renames by comparing old and new customShapes
+		// Detect shape renames and deletions by comparing old and new customShapes by name
 		const shapeRenames = new SvelteMap<string, string>(); // oldName -> newName
+		const deletedShapes = new SvelteSet<string>(); // names of shapes that were deleted
+
 		if (changedGlobals.customShapes && oldParams.customShapes) {
 			const newShapes = changedGlobals.customShapes as typeof oldParams.customShapes;
-			// Match shapes by index (shapes are edited in place, not reordered)
+			const newShapeNames = new SvelteSet(newShapes.map((s) => s.name));
+			const oldShapeNames = new SvelteSet(oldParams.customShapes.map((s) => s.name));
+
+			// Find deleted shapes (in old but not in new)
+			for (const oldShape of oldParams.customShapes) {
+				if (!newShapeNames.has(oldShape.name)) {
+					deletedShapes.add(oldShape.name);
+				}
+			}
+
+			// Find renames: shapes at same index with different names, where the old name
+			// no longer exists and the new name didn't exist before
 			for (let i = 0; i < Math.min(oldParams.customShapes.length, newShapes.length); i++) {
 				const oldName = oldParams.customShapes[i].name;
 				const newName = newShapes[i].name;
-				if (oldName !== newName) {
+				if (oldName !== newName && !newShapeNames.has(oldName) && !oldShapeNames.has(newName)) {
+					// This is a genuine rename, not a deletion causing index shift
 					shapeRenames.set(oldName, newName);
+					deletedShapes.delete(oldName); // It was renamed, not deleted
 				}
 			}
 		}
@@ -361,33 +376,62 @@ export function updateTrayParams(trayId: string, params: CounterTrayParams): voi
 				if (tray.id !== trayId && isCounterTray(tray)) {
 					let updatedParams = { ...tray.params, ...changedGlobals };
 
-					// Update stack references if shapes were renamed
-					if (shapeRenames.size > 0) {
+					// Filter out stacks referencing deleted shapes and update renamed shapes
+					if (shapeRenames.size > 0 || deletedShapes.size > 0) {
 						updatedParams = {
 							...updatedParams,
-							topLoadedStacks: updatedParams.topLoadedStacks.map(([shape, count]) => {
-								for (const [oldName, newName] of shapeRenames) {
-									if (shape === `custom:${oldName}`) {
-										return [
-											`custom:${newName}`,
-											count
-										] as (typeof updatedParams.topLoadedStacks)[0];
+							topLoadedStacks: updatedParams.topLoadedStacks
+								.filter(([shape]) => {
+									// Remove stacks referencing deleted shapes
+									for (const deletedName of deletedShapes) {
+										if (shape === `custom:${deletedName}`) {
+											return false;
+										}
 									}
-								}
-								return [shape, count] as (typeof updatedParams.topLoadedStacks)[0];
-							}),
-							edgeLoadedStacks: updatedParams.edgeLoadedStacks.map(([shape, count, orient]) => {
-								for (const [oldName, newName] of shapeRenames) {
-									if (shape === `custom:${oldName}`) {
-										return [
-											`custom:${newName}`,
-											count,
-											orient
-										] as (typeof updatedParams.edgeLoadedStacks)[0];
+									return true;
+								})
+								.map(([shape, count, label]) => {
+									// Update renamed shape references, preserving label
+									for (const [oldName, newName] of shapeRenames) {
+										if (shape === `custom:${oldName}`) {
+											return [
+												`custom:${newName}`,
+												count,
+												label
+											] as (typeof updatedParams.topLoadedStacks)[0];
+										}
 									}
-								}
-								return [shape, count, orient] as (typeof updatedParams.edgeLoadedStacks)[0];
-							})
+									return [shape, count, label] as (typeof updatedParams.topLoadedStacks)[0];
+								}),
+							edgeLoadedStacks: updatedParams.edgeLoadedStacks
+								.filter(([shape]) => {
+									// Remove stacks referencing deleted shapes
+									for (const deletedName of deletedShapes) {
+										if (shape === `custom:${deletedName}`) {
+											return false;
+										}
+									}
+									return true;
+								})
+								.map(([shape, count, orient, label]) => {
+									// Update renamed shape references, preserving label
+									for (const [oldName, newName] of shapeRenames) {
+										if (shape === `custom:${oldName}`) {
+											return [
+												`custom:${newName}`,
+												count,
+												orient,
+												label
+											] as (typeof updatedParams.edgeLoadedStacks)[0];
+										}
+									}
+									return [
+										shape,
+										count,
+										orient,
+										label
+									] as (typeof updatedParams.edgeLoadedStacks)[0];
+								})
 						};
 					}
 
