@@ -822,7 +822,7 @@
 						<div class="stackList">
 							{#each selectedTray.params.stacks as stack, index (index)}
 								<div class="stackRow" role="listitem">
-									<span class="stackRef">{index + 1}</span>
+									<span class="stackRef">{trayLetter}{index + 1}</span>
 									<div class="stackLabelInput">
 										<Input
 											type="text"

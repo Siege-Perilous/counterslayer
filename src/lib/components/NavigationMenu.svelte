@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { IconButton, Icon, ConfirmActionButton, Hr, Panel } from '@tableslayer/ui';
+	import { IconButton, Icon, ConfirmActionButton, Hr, Panel, Popover, Text } from '@tableslayer/ui';
 	import { IconX, IconPackage, IconRuler } from '@tabler/icons-svelte';
 	import {
 		getProject,
@@ -81,7 +81,12 @@
 		}
 	}
 
-	function getTrayStats(tray: Tray): { stacks: number; counters: number; isCardTray: boolean; isCardDivider: boolean } {
+	function getTrayStats(tray: Tray): {
+		stacks: number;
+		counters: number;
+		isCardTray: boolean;
+		isCardDivider: boolean;
+	} {
 		if (isCardDividerTray(tray)) {
 			const totalCards = tray.params.stacks.reduce((sum, s) => sum + s.count, 0);
 			return {
@@ -216,28 +221,40 @@
 						</button>
 					{/each}
 
-					<!-- Add Tray Buttons -->
-					<button
-						class="navItem navItem--add navItem--tray"
-						onclick={(e) => handleAddTray(box.id, 'counter', e)}
+					<!-- Add Tray Button with Popover -->
+					<Popover
+						positioning={{ placement: 'right-start' }}
+						portal=".appContainer"
+						contentClass="trayTypePopover"
 					>
-						<span class="addIcon">+</span>
-						<span class="addLabel">Counter tray</span>
-					</button>
-					<button
-						class="navItem navItem--add navItem--tray"
-						onclick={(e) => handleAddTray(box.id, 'cardDraw', e)}
-					>
-						<span class="addIcon">+</span>
-						<span class="addLabel">Card draw tray</span>
-					</button>
-					<button
-						class="navItem navItem--add navItem--tray"
-						onclick={(e) => handleAddTray(box.id, 'cardDivider', e)}
-					>
-						<span class="addIcon">+</span>
-						<span class="addLabel">Card divider tray</span>
-					</button>
+						{#snippet trigger()}
+							<button class="navItem navItem--add navItem--tray">
+								<span class="addIcon">+</span>
+								<span class="addLabel">Add tray</span>
+							</button>
+						{/snippet}
+						{#snippet content()}
+							<button class="trayTypeOption" onclick={(e) => handleAddTray(box.id, 'counter', e)}>
+								<Text weight={500}>Counters</Text>
+								<Text size="0.75rem" color="var(--fgMuted)">Stacks of geometric tokens</Text>
+							</button>
+							<button class="trayTypeOption" onclick={(e) => handleAddTray(box.id, 'cardDraw', e)}>
+								<Text weight={500}>Card draw</Text>
+								<Text size="0.75rem" color="var(--fgMuted)"
+									>Single stack of cards, draw from top</Text
+								>
+							</button>
+							<button
+								class="trayTypeOption"
+								onclick={(e) => handleAddTray(box.id, 'cardDivider', e)}
+							>
+								<Text weight={500}>Card divider</Text>
+								<Text size="0.75rem" color="var(--fgMuted)"
+									>Divided stacks of cards, divided by walls</Text
+								>
+							</button>
+						{/snippet}
+					</Popover>
 				</div>
 				<Hr />
 			</div>
@@ -367,5 +384,35 @@
 		overflow-y: auto;
 		flex: 1;
 		min-height: 0;
+	}
+
+	/* Tray type popover */
+	:global(.popContent.trayTypePopover) {
+		display: flex;
+		flex-direction: column;
+		min-width: 14rem;
+		padding: 0 !important;
+		background: var(--contrastLowest) !important;
+	}
+
+	:global(.trayTypeOption) {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		padding: 0.5rem 1rem;
+		border: none;
+		border-radius: 0;
+		background: transparent;
+		cursor: pointer;
+		text-align: left;
+		transition: background 0.15s ease;
+	}
+
+	:global(.trayTypeOption:not(:last-child)) {
+		border-bottom: var(--borderThin);
+	}
+
+	:global(.trayTypeOption:hover) {
+		background: var(--contrastLow);
 	}
 </style>

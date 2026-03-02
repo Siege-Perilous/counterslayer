@@ -54,7 +54,7 @@
 	} from '$lib/stores/project.svelte';
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 
 	type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid';
 	type SelectionType = 'dimensions' | 'box' | 'tray';
@@ -730,15 +730,26 @@
 
 	// Generate on mount (forced) and when structure changes (selection, add/delete)
 	let hasInitialized = false;
+	let lastStructuralHash = '';
 	$effect(() => {
-		// Track structuralHash so we regenerate on selection change or add/delete,
-		// but not on every param edit
-		if (browser && structuralHash && selectedTray && selectedBox) {
-			if (!hasInitialized) {
-				hasInitialized = true;
-				regenerate(true); // Force on initial load
-			} else {
-				regenerate(); // Use cache if not dirty
+		// Only track structuralHash - use untrack for selectedTray/selectedBox
+		// to avoid regenerating on every param edit
+		const hash = structuralHash;
+		if (browser && hash) {
+			// Read these without creating dependencies
+			const hasTray = untrack(() => selectedTray);
+			const hasBox = untrack(() => selectedBox);
+			if (hasTray && hasBox) {
+				// Only regenerate if structural hash actually changed
+				const structureChanged = hash !== lastStructuralHash;
+				lastStructuralHash = hash;
+
+				if (!hasInitialized) {
+					hasInitialized = true;
+					regenerate(true); // Force on initial load
+				} else if (structureChanged) {
+					regenerate(); // Structure changed (selection, add/delete tray)
+				}
 			}
 		}
 	});

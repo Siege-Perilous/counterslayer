@@ -165,6 +165,15 @@ export function getCardDividerPositions(
 	const extraHeight = trayHeight - dims.height;
 	const effectiveFloorHeight = floorThickness + extraHeight;
 
+	// Calculate max slot height across all stacks for floor adjustment
+	let maxSlotHeight = 0;
+	for (const stack of stacks) {
+		const cardSize = getCardSize(stack.cardSizeName, customCardSizes);
+		if (!cardSize) continue;
+		const slotHeight = orientation === 'vertical' ? cardSize.length : cardSize.width;
+		maxSlotHeight = Math.max(maxSlotHeight, slotHeight);
+	}
+
 	if (stackDirection === 'sideBySide') {
 		// Stacks arranged horizontally (side by side along X)
 		let currentX = wallThickness;
@@ -189,6 +198,9 @@ export function getCardDividerPositions(
 
 			const slotDepth = stack.count * cardThickness + clearance * 2;
 
+			// Raise floor for shorter cards so tops are accessible
+			const stackFloorHeight = effectiveFloorHeight + (maxSlotHeight - slotHeight);
+
 			// Center the slot in Y (all slots share the same Y position, centered)
 			const slotY = dims.depth / 2;
 			const slotX = currentX + slotWidth / 2;
@@ -196,7 +208,7 @@ export function getCardDividerPositions(
 			positions.push({
 				x: slotX,
 				y: slotY,
-				z: effectiveFloorHeight,
+				z: stackFloorHeight,
 				slotWidth,
 				slotDepth,
 				slotHeight,
@@ -247,6 +259,9 @@ export function getCardDividerPositions(
 
 			const slotDepth = stack.count * cardThickness + clearance * 2;
 
+			// Raise floor for shorter cards so tops are accessible
+			const stackFloorHeight = effectiveFloorHeight + (maxSlotHeight - slotHeight);
+
 			// Center the slot in X (all slots share the same X position, centered)
 			const slotX = dims.width / 2;
 			const slotY = currentY + slotDepth / 2;
@@ -254,7 +269,7 @@ export function getCardDividerPositions(
 			positions.push({
 				x: slotX,
 				y: slotY,
-				z: effectiveFloorHeight,
+				z: stackFloorHeight,
 				slotWidth,
 				slotDepth,
 				slotHeight,
@@ -318,6 +333,15 @@ export function createCardDividerTray(
 	// Subtract individual slot cavities
 	let tray = outerBox;
 
+	// Calculate max slot height for per-stack floor adjustment
+	let maxSlotHeight = 0;
+	for (const stack of stacks) {
+		const cardSize = getCardSize(stack.cardSizeName, customCardSizes);
+		if (!cardSize) continue;
+		const slotHeight = orientation === 'vertical' ? cardSize.length : cardSize.width;
+		maxSlotHeight = Math.max(maxSlotHeight, slotHeight);
+	}
+
 	if (stackDirection === 'sideBySide') {
 		// Stacks arranged horizontally (side by side along X)
 		let currentX = wallThickness;
@@ -329,24 +353,30 @@ export function createCardDividerTray(
 			const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
 
 			let slotWidth: number;
+			let slotHeight: number;
 
 			if (orientation === 'vertical') {
 				slotWidth = cardWidth + clearance * 2;
+				slotHeight = cardLength;
 			} else {
 				slotWidth = cardLength + clearance * 2;
+				slotHeight = cardWidth;
 			}
 
 			const slotDepth = stack.count * cardThickness + clearance * 2;
 
+			// Raise floor for shorter cards so tops are accessible
+			const stackFloorHeight = effectiveFloorHeight + (maxSlotHeight - slotHeight);
+
 			// Cavity goes from raised floor to top (open top)
-			const cavityHeight = trayHeight - effectiveFloorHeight + 0.1;
+			const cavityHeight = trayHeight - stackFloorHeight + 0.1;
 
 			// Create slot cavity - centered in Y, at currentX position
 			const slotCavity = translate(
 				[
 					currentX + slotWidth / 2,
 					trayDepth / 2,
-					effectiveFloorHeight + cavityHeight / 2
+					stackFloorHeight + cavityHeight / 2
 				],
 				cuboid({ size: [slotWidth, slotDepth, cavityHeight] })
 			);
@@ -377,24 +407,30 @@ export function createCardDividerTray(
 			const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
 
 			let slotWidth: number;
+			let slotHeight: number;
 
 			if (orientation === 'vertical') {
 				slotWidth = cardWidth + clearance * 2;
+				slotHeight = cardLength;
 			} else {
 				slotWidth = cardLength + clearance * 2;
+				slotHeight = cardWidth;
 			}
 
 			const slotDepth = stack.count * cardThickness + clearance * 2;
 
+			// Raise floor for shorter cards so tops are accessible
+			const stackFloorHeight = effectiveFloorHeight + (maxSlotHeight - slotHeight);
+
 			// Cavity goes from raised floor to top (open top)
-			const cavityHeight = trayHeight - effectiveFloorHeight + 0.1;
+			const cavityHeight = trayHeight - stackFloorHeight + 0.1;
 
 			// Create slot cavity - centered in X, at currentY position
 			const slotCavity = translate(
 				[
 					trayWidth / 2,
 					currentY + slotDepth / 2,
-					effectiveFloorHeight + cavityHeight / 2
+					stackFloorHeight + cavityHeight / 2
 				],
 				cuboid({ size: [slotWidth, slotDepth, cavityHeight] })
 			);
