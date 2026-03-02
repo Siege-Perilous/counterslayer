@@ -548,23 +548,22 @@ export function arrangeTrays(
 			const placement = tryPlace(opt.dims, rows, maxRowWidth);
 			if (!placement) continue;
 
-			// Score this option: prefer orientations that
-			// 1. Fit in existing rows (avoid new rows)
-			// 2. Match existing row depth better (reduce wasted space)
-			// 3. Result in smaller total width increase
-			let score = 0;
+			// Score based on how much this placement increases total box depth
+			// Lower depth increase = better score
+			let depthIncrease: number;
 
-			// Strongly prefer fitting in existing rows
 			if (!placement.isNewRow) {
-				score += 1000;
-				// Prefer matching row depth
+				// Fitting in existing row: only increases depth if tray is deeper than row
 				const rowDepth = rows[placement.rowIndex].depth;
-				const depthDiff = Math.abs(rowDepth - opt.dims.depth);
-				score -= depthDiff; // Penalize depth mismatch
+				depthIncrease = Math.max(0, opt.dims.depth - rowDepth);
 			} else {
-				// For new rows, prefer smaller depth (less total box depth)
-				score -= opt.dims.depth;
+				// New row: adds full depth to box
+				depthIncrease = opt.dims.depth;
 			}
+
+			// Score is negative of depth increase (less increase = higher score)
+			// Add small bonus for fitting in existing rows when depth increase is equal
+			const score = -depthIncrease + (placement.isNewRow ? 0 : 0.1);
 
 			if (score > bestScore) {
 				bestScore = score;

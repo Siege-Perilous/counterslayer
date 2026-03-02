@@ -387,7 +387,7 @@
 				<Spacer size="1rem" />
 
 				<!-- Rotation -->
-				<FormControl label="Rotation" name="trayRotation">
+				<FormControl label="Rotation within box" name="trayRotation">
 					{#snippet input({ inputProps })}
 						<Select
 							{...inputProps}
