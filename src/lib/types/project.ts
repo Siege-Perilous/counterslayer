@@ -68,7 +68,7 @@ export interface Box {
 	customDepth?: number; // Exterior Y dimension
 	customBoxHeight?: number; // Exterior Z dimension (box only, excludes lid; UI shows total height)
 	// Gap-filling behavior
-	fillSolidEmpty?: boolean; // false = walls only (default), true = solid fill
+	fillSolidEmpty?: boolean; // true = solid fill (default), false = walls only
 }
 
 export interface Project {

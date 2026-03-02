@@ -92,6 +92,7 @@ function createDefaultBox(name: string): Box {
 		tolerance: 0.5,
 		wallThickness: 3.0,
 		floorThickness: 2.0,
+		fillSolidEmpty: true,
 		lidParams: { ...defaultLidParams }
 	};
 }
