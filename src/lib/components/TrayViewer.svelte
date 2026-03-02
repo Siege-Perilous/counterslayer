@@ -4,6 +4,7 @@
 	import type { BufferGeometry } from 'three';
 	import type { TrayPlacement } from '$lib/models/box';
 	import type { CounterStack } from '$lib/models/counterTray';
+	import type { CardStack } from '$lib/models/cardTray';
 	import type { CaptureOptions } from '$lib/utils/screenshotCapture';
 
 	interface TrayGeometryData {
@@ -40,7 +41,7 @@
 		boxFloorThickness?: number;
 		explosionAmount?: number;
 		showCounters?: boolean;
-		selectedTrayCounters?: CounterStack[];
+		selectedTrayCounters?: (CounterStack | CardStack)[];
 		selectedTrayLetter?: string;
 		selectedTrayId?: string;
 		triangleCornerRadius?: number;

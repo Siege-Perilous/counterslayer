@@ -1,7 +1,9 @@
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { Box, Tray } from '$lib/types/project';
-import type { CounterTrayParams } from './counterTray';
+import { isCounterTray, isCardTray } from '$lib/types/project';
+import type { CounterTrayParams, CustomCardSize } from './counterTray';
+import { getCardTrayDimensions } from './cardTray';
 
 const { cylinder } = jscad.primitives;
 const { subtract } = jscad.booleans;
@@ -19,6 +21,7 @@ export interface TrayPlacement {
 	dimensions: TrayDimensions;
 	x: number;
 	y: number;
+	rotated: boolean; // true if tray is rotated 90° for better packing
 }
 
 export interface BoxMinimumDimensions {
@@ -39,8 +42,41 @@ export interface TraySpacerInfo {
 	floorSpacerHeight: number; // Additional solid material under tray floor
 }
 
-// Calculate tray dimensions from params (same logic as counterTray.ts)
-export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
+// Extract customCardSizes from the first counter tray in a box
+// (customCardSizes is a global param stored in CounterTrayParams)
+export function getCustomCardSizesFromBox(box: Box): CustomCardSize[] {
+	for (const tray of box.trays) {
+		if (isCounterTray(tray) && tray.params.customCardSizes) {
+			return tray.params.customCardSizes;
+		}
+	}
+	// Return default card sizes if no counter tray found
+	return [
+		{ name: 'Standard', width: 66, length: 91, thickness: 0.5 },
+		{ name: 'Mini American', width: 44, length: 66, thickness: 0.5 },
+		{ name: 'Mini European', width: 47, length: 71, thickness: 0.5 },
+		{ name: 'Euro', width: 62, length: 95, thickness: 0.5 },
+		{ name: 'Japanese', width: 62, length: 89, thickness: 0.5 },
+		{ name: 'Tarot', width: 73, length: 123, thickness: 0.5 },
+		{ name: 'Square', width: 73, length: 73, thickness: 0.5 }
+	];
+}
+
+// Get dimensions for any tray type (dispatches based on tray type)
+export function getTrayDimensionsForTray(
+	tray: Tray,
+	customCardSizes?: CustomCardSize[]
+): TrayDimensions {
+	if (isCardTray(tray)) {
+		// Use provided customCardSizes or fall back to empty array (will throw if card size not found)
+		return getCardTrayDimensions(tray.params, customCardSizes ?? []);
+	}
+	// Default to counter tray
+	return getCounterTrayDimensions(tray.params);
+}
+
+// Calculate counter tray dimensions from params (same logic as counterTray.ts)
+export function getCounterTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	const {
 		counterThickness,
 		clearance,
@@ -397,34 +433,60 @@ export function getTrayDimensions(params: CounterTrayParams): TrayDimensions {
 	};
 }
 
+// Backwards compatibility alias for counter tray dimensions
+export const getTrayDimensions = getCounterTrayDimensions;
+
 // Arrange trays in a box layout with bin-packing
 // Smaller trays can share a row if their combined width fits within the max tray width
 // If customBoxWidth is provided, use interior width (minus walls/tolerance) for packing
+// Supports tray rotation: trays can be rotated 90° for more efficient packing
 export function arrangeTrays(
 	trays: Tray[],
-	options?: { customBoxWidth?: number; wallThickness?: number; tolerance?: number }
+	options?: {
+		customBoxWidth?: number;
+		wallThickness?: number;
+		tolerance?: number;
+		customCardSizes?: CustomCardSize[];
+	}
 ): TrayPlacement[] {
 	if (trays.length === 0) return [];
 
-	// Calculate dimensions for all trays
-	const trayDims = trays.map((tray) => ({
-		tray,
-		dimensions: getTrayDimensions(tray.params)
-	}));
-
-	// Sort by width (X dimension) descending so widest trays are first
-	trayDims.sort((a, b) => b.dimensions.width - a.dimensions.width);
-
-	// Use custom box interior width if provided, otherwise use widest tray
-	const widestTrayWidth = trayDims[0].dimensions.width;
-	let maxRowWidth = widestTrayWidth;
-
-	if (options?.customBoxWidth) {
-		const wallThickness = options.wallThickness ?? 3;
-		const tolerance = options.tolerance ?? 0.5;
-		const interiorWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
-		maxRowWidth = Math.max(interiorWidth, widestTrayWidth);
+	// Calculate dimensions for each tray with both orientations
+	interface TrayOption {
+		tray: Tray;
+		dims: TrayDimensions;
+		rotated: boolean;
 	}
+
+	const trayOptions: TrayOption[][] = trays.map((tray) => {
+		const dims = getTrayDimensionsForTray(tray, options?.customCardSizes);
+		const rotatedDims: TrayDimensions = {
+			width: dims.depth,
+			depth: dims.width,
+			height: dims.height
+		};
+
+		// Respect user override
+		const override = tray.rotationOverride;
+		if (override === 0) {
+			return [{ tray, dims, rotated: false }];
+		}
+		if (override === 90) {
+			return [{ tray, dims: rotatedDims, rotated: true }];
+		}
+		// Auto: consider both orientations
+		return [
+			{ tray, dims, rotated: false },
+			{ tray, dims: rotatedDims, rotated: true }
+		];
+	});
+
+	// Sort trays by area (largest first) for better packing
+	// Use the first (normal) orientation for sorting
+	const sortedIndices = trayOptions
+		.map((opts, i) => ({ index: i, area: opts[0].dims.width * opts[0].dims.depth }))
+		.sort((a, b) => b.area - a.area)
+		.map((item) => item.index);
 
 	// Track rows: each row has a Y position, current X fill, and max depth
 	interface Row {
@@ -432,7 +494,6 @@ export function arrangeTrays(
 		currentX: number;
 		depth: number;
 	}
-	const rows: Row[] = [];
 
 	// Track which row each placement belongs to
 	interface PlacementWithRow {
@@ -440,41 +501,96 @@ export function arrangeTrays(
 		dimensions: TrayDimensions;
 		x: number;
 		rowIndex: number;
+		rotated: boolean;
 	}
-	const placementsWithRow: PlacementWithRow[] = [];
 
-	for (const { tray, dimensions } of trayDims) {
+	// Try to place a tray with given dimensions and return the resulting placement
+	function tryPlace(
+		dims: TrayDimensions,
+		rows: Row[],
+		maxRowWidth: number
+	): { rowIndex: number; x: number; isNewRow: boolean } | null {
 		// Try to find an existing row where this tray fits
-		let placed = false;
 		for (let i = 0; i < rows.length; i++) {
 			const row = rows[i];
-			if (row.currentX + dimensions.width <= maxRowWidth) {
-				// Fits in this row
-				placementsWithRow.push({
-					tray,
-					dimensions,
-					x: row.currentX,
-					rowIndex: i
-				});
-				row.currentX += dimensions.width;
-				row.depth = Math.max(row.depth, dimensions.depth);
-				placed = true;
-				break;
+			if (row.currentX + dims.width <= maxRowWidth) {
+				return { rowIndex: i, x: row.currentX, isNewRow: false };
+			}
+		}
+		// Need a new row
+		return { rowIndex: rows.length, x: 0, isNewRow: true };
+	}
+
+	// Calculate max row width
+	let maxRowWidth = Math.max(
+		...trayOptions.map((opts) => Math.max(...opts.map((o) => o.dims.width)))
+	);
+
+	if (options?.customBoxWidth) {
+		const wallThickness = options.wallThickness ?? 3;
+		const tolerance = options.tolerance ?? 0.5;
+		const interiorWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
+		maxRowWidth = Math.max(interiorWidth, maxRowWidth);
+	}
+
+	// Greedy algorithm: place each tray, choosing the best orientation
+	const rows: Row[] = [];
+	const placementsWithRow: PlacementWithRow[] = [];
+
+	for (const trayIndex of sortedIndices) {
+		const opts = trayOptions[trayIndex];
+
+		let bestOption: TrayOption | null = null;
+		let bestPlacement: { rowIndex: number; x: number; isNewRow: boolean } | null = null;
+		let bestScore = -Infinity;
+
+		for (const opt of opts) {
+			const placement = tryPlace(opt.dims, rows, maxRowWidth);
+			if (!placement) continue;
+
+			// Score based on how much this placement increases total box depth
+			// Lower depth increase = better score
+			let depthIncrease: number;
+
+			if (!placement.isNewRow) {
+				// Fitting in existing row: only increases depth if tray is deeper than row
+				const rowDepth = rows[placement.rowIndex].depth;
+				depthIncrease = Math.max(0, opt.dims.depth - rowDepth);
+			} else {
+				// New row: adds full depth to box
+				depthIncrease = opt.dims.depth;
+			}
+
+			// Score is negative of depth increase (less increase = higher score)
+			// Add small bonus for fitting in existing rows when depth increase is equal
+			const score = -depthIncrease + (placement.isNewRow ? 0 : 0.1);
+
+			if (score > bestScore) {
+				bestScore = score;
+				bestOption = opt;
+				bestPlacement = placement;
 			}
 		}
 
-		if (!placed) {
-			// Create a new row (Y will be calculated after all placements)
-			rows.push({
-				y: 0, // Placeholder, will be recalculated
-				currentX: dimensions.width,
-				depth: dimensions.depth
-			});
+		if (bestOption && bestPlacement) {
+			if (bestPlacement.isNewRow) {
+				rows.push({
+					y: 0, // Will be recalculated
+					currentX: bestOption.dims.width,
+					depth: bestOption.dims.depth
+				});
+			} else {
+				const row = rows[bestPlacement.rowIndex];
+				row.currentX += bestOption.dims.width;
+				row.depth = Math.max(row.depth, bestOption.dims.depth);
+			}
+
 			placementsWithRow.push({
-				tray,
-				dimensions,
-				x: 0,
-				rowIndex: rows.length - 1
+				tray: bestOption.tray,
+				dimensions: bestOption.dims,
+				x: bestPlacement.x,
+				rowIndex: bestPlacement.rowIndex,
+				rotated: bestOption.rotated
 			});
 		}
 	}
@@ -502,7 +618,8 @@ export function arrangeTrays(
 			tray: p.tray,
 			dimensions: p.dimensions,
 			x: p.x,
-			y
+			y,
+			rotated: p.rotated
 		};
 	});
 
@@ -583,10 +700,12 @@ const POKE_HOLE_DIAMETER = 15;
 export function createBox(box: Box): Geom3 | null {
 	if (box.trays.length === 0) return null;
 
+	const customCardSizes = getCustomCardSizesFromBox(box);
 	const placements = arrangeTrays(box.trays, {
 		customBoxWidth: box.customWidth,
 		wallThickness: box.wallThickness,
-		tolerance: box.tolerance
+		tolerance: box.tolerance,
+		customCardSizes
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
@@ -644,10 +763,12 @@ export function calculateMinimumBoxDimensions(box: Box): BoxMinimumDimensions {
 		return { minWidth: 0, minDepth: 0, minHeight: 0 };
 	}
 
+	const customCardSizes = getCustomCardSizesFromBox(box);
 	const placements = arrangeTrays(box.trays, {
 		customBoxWidth: box.customWidth,
 		wallThickness: box.wallThickness,
-		tolerance: box.tolerance
+		tolerance: box.tolerance,
+		customCardSizes
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
@@ -690,10 +811,12 @@ export function validateCustomDimensions(box: Box): ValidationResult {
 export function calculateTraySpacers(box: Box): TraySpacerInfo[] {
 	if (box.trays.length === 0) return [];
 
+	const customCardSizes = getCustomCardSizesFromBox(box);
 	const placements = arrangeTrays(box.trays, {
 		customBoxWidth: box.customWidth,
 		wallThickness: box.wallThickness,
-		tolerance: box.tolerance
+		tolerance: box.tolerance,
+		customCardSizes
 	});
 	const minimums = calculateMinimumBoxDimensions(box);
 

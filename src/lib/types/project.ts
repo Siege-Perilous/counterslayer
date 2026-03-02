@@ -1,10 +1,36 @@
 import type { CounterTrayParams } from '$lib/models/counterTray';
+import type { CardTrayParams } from '$lib/models/cardTray';
 
-export interface Tray {
+// Base tray interface shared by all tray types
+interface BaseTray {
 	id: string;
 	name: string;
 	color: string;
+	rotationOverride?: 'auto' | 0 | 90; // User can force rotation: 'auto' = algorithm decides, 0 = no rotation, 90 = rotated
+}
+
+// Counter tray for cardboard counter tokens
+export interface CounterTray extends BaseTray {
+	type: 'counter';
 	params: CounterTrayParams;
+}
+
+// Card tray for playing cards
+export interface CardTray extends BaseTray {
+	type: 'card';
+	params: CardTrayParams;
+}
+
+// Discriminated union of all tray types
+export type Tray = CounterTray | CardTray;
+
+// Type guards for tray types
+export function isCounterTray(tray: Tray): tray is CounterTray {
+	return tray.type === 'counter';
+}
+
+export function isCardTray(tray: Tray): tray is CardTray {
+	return tray.type === 'card';
 }
 
 export interface LidParams {
@@ -42,7 +68,7 @@ export interface Box {
 	customDepth?: number; // Exterior Y dimension
 	customBoxHeight?: number; // Exterior Z dimension (box only, excludes lid; UI shows total height)
 	// Gap-filling behavior
-	fillSolidEmpty?: boolean; // false = walls only (default), true = solid fill
+	fillSolidEmpty?: boolean; // true = solid fill (default), false = walls only
 }
 
 export interface Project {

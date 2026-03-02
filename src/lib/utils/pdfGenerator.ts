@@ -1,12 +1,14 @@
 import { jsPDF } from 'jspdf';
-import { arrangeTrays } from '$lib/models/box';
+import { arrangeTrays, getCustomCardSizesFromBox } from '$lib/models/box';
 import {
 	getCounterPositions,
 	type CounterStack,
 	type TopLoadedStackDef,
 	type EdgeLoadedStackDef
 } from '$lib/models/counterTray';
+import { getCardPositions } from '$lib/models/cardTray';
 import type { Box, Project } from '$lib/types/project';
+import { isCardTray } from '$lib/types/project';
 
 /**
  * Generate a tray letter based on cumulative index across all boxes.
@@ -139,12 +141,14 @@ export function extractPdfData(project: Project): PdfData {
 
 	for (let boxIndex = 0; boxIndex < project.boxes.length; boxIndex++) {
 		const box = project.boxes[boxIndex];
+		const customCardSizes = getCustomCardSizesFromBox(box);
 
 		// Get tray placements
 		const placements = arrangeTrays(box.trays, {
 			customBoxWidth: box.customWidth,
 			wallThickness: box.wallThickness,
-			tolerance: box.tolerance
+			tolerance: box.tolerance,
+			customCardSizes
 		});
 
 		// Calculate box dimensions
@@ -161,7 +165,35 @@ export function extractPdfData(project: Project): PdfData {
 			const placement = placements[trayIndex];
 			const tray = placement.tray;
 			const trayLetter = getTrayLetter(getCumulativeTrayIndex(project.boxes, boxIndex, trayIndex));
-			const counterPositions = getCounterPositions(tray.params);
+
+			// Get counter positions based on tray type
+			let counterPositions: CounterStack[];
+			let topLoadedStacks: TopLoadedStackDef[] = [];
+			let edgeLoadedStacks: EdgeLoadedStackDef[] = [];
+
+			if (isCardTray(tray)) {
+				// Convert card positions to CounterStack format for PDF generation
+				const cardStacks = getCardPositions(tray.params, customCardSizes);
+				counterPositions = cardStacks.map((stack) => ({
+					shape: 'custom' as const,
+					customShapeName: 'Card',
+					customBaseShape: 'rectangle' as const,
+					x: stack.x,
+					y: stack.y,
+					z: stack.z,
+					width: stack.width,
+					length: stack.length,
+					thickness: stack.thickness,
+					count: stack.count,
+					hexPointyTop: false,
+					color: stack.color
+				}));
+			} else {
+				counterPositions = getCounterPositions(tray.params);
+				topLoadedStacks = tray.params.topLoadedStacks || [];
+				edgeLoadedStacks = tray.params.edgeLoadedStacks || [];
+			}
+
 			const stacks: PdfStackData[] = [];
 
 			// Track which stack definitions have been used
@@ -173,8 +205,8 @@ export function extractPdfData(project: Project): PdfData {
 			for (const counterStack of counterPositions) {
 				const { label } = findStackLabel(
 					counterStack,
-					tray.params.topLoadedStacks || [],
-					tray.params.edgeLoadedStacks || [],
+					topLoadedStacks,
+					edgeLoadedStacks,
 					usedTopIndices,
 					usedEdgeIndices
 				);

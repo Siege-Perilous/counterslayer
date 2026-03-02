@@ -10,11 +10,15 @@
 		updateBox,
 		updateTray,
 		updateTrayParams,
+		updateCardTrayParams,
 		getCumulativeTrayLetter,
+		isCounterTray,
+		isCardTray,
 		type Box,
 		type Tray
 	} from '$lib/stores/project.svelte';
 	import type { CounterTrayParams } from '$lib/models/counterTray';
+	import type { CardTrayParams } from '$lib/models/cardTray';
 
 	type SelectionType = 'dimensions' | 'box' | 'tray';
 
@@ -40,16 +44,54 @@
 		}
 	}
 
-	function handleParamsChange(newParams: CounterTrayParams) {
-		if (selectedTray) {
-			updateTrayParams(selectedTray.id, newParams);
+	// Find any counter tray in the project to get global params from
+	function findAnyCounterTray(): { trayId: string; params: CounterTrayParams } | null {
+		for (const box of project.boxes) {
+			for (const tray of box.trays) {
+				if (isCounterTray(tray)) {
+					return { trayId: tray.id, params: tray.params };
+				}
+			}
+		}
+		return null;
+	}
+
+	// Get global params - prefer selected tray if it's a counter tray, otherwise find any counter tray
+	let globalCounterParams = $derived.by(() => {
+		if (selectedTray && isCounterTray(selectedTray)) {
+			return { trayId: selectedTray.id, params: selectedTray.params };
+		}
+		return findAnyCounterTray();
+	});
+
+	function handleCounterParamsChange(newParams: CounterTrayParams) {
+		// Use the tray we got the params from (could be selected or any counter tray)
+		if (globalCounterParams) {
+			updateTrayParams(globalCounterParams.trayId, newParams);
+		}
+	}
+
+	function handleCardParamsChange(newParams: CardTrayParams) {
+		if (selectedTray && isCardTray(selectedTray)) {
+			updateCardTrayParams(selectedTray.id, newParams);
 		}
 	}
 
 	// Get tray stats for display
 	function getTrayStats(tray: Tray): { stacks: number; counters: number; letter: string } {
-		const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
-		const edgeCount = tray.params.edgeLoadedStacks.reduce((sum, s) => sum + s[1], 0);
+		let stacks = 0;
+		let counters = 0;
+
+		if (isCounterTray(tray)) {
+			const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
+			const edgeCount = tray.params.edgeLoadedStacks.reduce((sum, s) => sum + s[1], 0);
+			stacks = tray.params.topLoadedStacks.length + tray.params.edgeLoadedStacks.length;
+			counters = topCount + edgeCount;
+		} else if (isCardTray(tray)) {
+			stacks = 1;
+			counters = tray.params.cardCount;
+		}
+
 		let letter = 'A';
 		const project = getProject();
 		if (selectedBox) {
@@ -59,11 +101,7 @@
 				letter = getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx);
 			}
 		}
-		return {
-			stacks: tray.params.topLoadedStacks.length + tray.params.edgeLoadedStacks.length,
-			counters: topCount + edgeCount,
-			letter
-		};
+		return { stacks, counters, letter };
 	}
 
 	let panelTitle = $derived.by(() => {
@@ -97,11 +135,11 @@
 		<!-- Content -->
 		<div class="panelContent">
 			{#if selectionType === 'dimensions'}
-				{#if selectedTray}
-					<GlobalsPanel params={selectedTray.params} onchange={handleParamsChange} />
+				{#if globalCounterParams}
+					<GlobalsPanel params={globalCounterParams.params} onchange={handleCounterParamsChange} />
 				{:else}
 					<div class="emptyState">
-						<p>No tray selected to edit globals</p>
+						<p>No counter trays in project</p>
 					</div>
 				{/if}
 			{:else if selectionType === 'box'}
@@ -129,7 +167,8 @@
 						onAddTray={() => {}}
 						onDeleteTray={() => {}}
 						onUpdateTray={handleTrayUpdate}
-						onUpdateParams={handleParamsChange}
+						onUpdateCounterParams={handleCounterParamsChange}
+						onUpdateCardParams={handleCardParamsChange}
 						hideList={true}
 					/>
 				{:else}

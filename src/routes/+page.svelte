@@ -25,7 +25,8 @@
 		getCounterPositions,
 		type CounterStack
 	} from '$lib/models/counterTray';
-	import { arrangeTrays, calculateTraySpacers } from '$lib/models/box';
+	import { createCardTray, getCardPositions, type CardStack } from '$lib/models/cardTray';
+	import { arrangeTrays, calculateTraySpacers, getCustomCardSizesFromBox } from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 	import {
 		getGeometryWorker,
@@ -45,7 +46,8 @@
 		getProject,
 		importProject,
 		resetProject,
-		getCumulativeTrayLetter
+		getCumulativeTrayLetter,
+		isCounterTray
 	} from '$lib/stores/project.svelte';
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
@@ -88,7 +90,7 @@
 	let mobileEditorSize = $state(0); // Track editor size for restore
 	const MOBILE_PANEL_DEFAULT_SIZE = 25;
 	let selectedTrayGeometry = $state<BufferGeometry | null>(null);
-	let selectedTrayCounters = $state<CounterStack[]>([]);
+	let selectedTrayCounters = $state<(CounterStack | CardStack)[]>([]);
 	let allTrayGeometries = $state<TrayGeometryData[]>([]);
 	let allBoxGeometries = $state<BoxGeometryData[]>([]);
 	let boxGeometry = $state<BufferGeometry | null>(null);
@@ -143,7 +145,9 @@
 
 	let selectedTray = $derived(getSelectedTray());
 	let selectedBox = $derived(getSelectedBox());
-	let printBedSize = $derived(selectedTray?.params.printBedSize ?? 256);
+	let printBedSize = $derived(
+		selectedTray && isCounterTray(selectedTray) ? selectedTray.params.printBedSize : 256
+	);
 	let selectedTrayLetter = $derived.by(() => {
 		// Use override during PDF capture
 		if (captureTrayLetter) return captureTrayLetter;
@@ -419,10 +423,12 @@
 			// Capture each tray
 			for (let boxIdx = 0; boxIdx < project.boxes.length; boxIdx++) {
 				const box = project.boxes[boxIdx];
+				const customCardSizes = getCustomCardSizesFromBox(box);
 				const placements = arrangeTrays(box.trays, {
 					customBoxWidth: box.customWidth,
 					wallThickness: box.wallThickness,
-					tolerance: box.tolerance
+					tolerance: box.tolerance,
+					customCardSizes
 				});
 				const spacerInfo = calculateTraySpacers(box);
 				const maxHeight = Math.max(...placements.map((p) => p.dimensions.height));
@@ -433,21 +439,38 @@
 					const spacerHeight = spacer?.floorSpacerHeight ?? 0;
 					const trayLetter = getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx);
 
-					// Generate geometry for this tray
-					const jscadGeom = createCounterTray(
-						placement.tray.params,
-						placement.tray.name,
-						maxHeight,
-						spacerHeight
-					);
+					// Generate geometry for this tray based on tray type
+					let jscadGeom;
+					if (isCounterTray(placement.tray)) {
+						jscadGeom = createCounterTray(
+							placement.tray.params,
+							placement.tray.name,
+							maxHeight,
+							spacerHeight
+						);
+						selectedTrayCounters = getCounterPositions(
+							placement.tray.params,
+							maxHeight,
+							spacerHeight
+						);
+					} else {
+						jscadGeom = createCardTray(
+							placement.tray.params,
+							customCardSizes,
+							placement.tray.name,
+							maxHeight,
+							spacerHeight
+						);
+						selectedTrayCounters = getCardPositions(
+							placement.tray.params,
+							customCardSizes,
+							maxHeight,
+							spacerHeight
+						);
+					}
 
 					// Set up scene for this tray
 					selectedTrayGeometry = jscadToBufferGeometry(jscadGeom);
-					selectedTrayCounters = getCounterPositions(
-						placement.tray.params,
-						maxHeight,
-						spacerHeight
-					);
 					captureTrayLetter = trayLetter;
 
 					// Enable capture mode for fixed top-down label rotation
@@ -662,7 +685,11 @@
 				customWidth: box.customWidth,
 				customBoxHeight: box.customBoxHeight,
 				fillSolidEmpty: box.fillSolidEmpty,
-				trays: box.trays.map((t) => ({ id: t.id, params: t.params }))
+				trays: box.trays.map((t) => ({
+					id: t.id,
+					params: t.params,
+					rotationOverride: t.rotationOverride
+				}))
 			}))
 		});
 	});

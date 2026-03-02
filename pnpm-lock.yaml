@@ -21,8 +21,8 @@ importers:
         specifier: ^3.31.0
         version: 3.37.1(svelte@5.53.3)
       '@tableslayer/ui':
-        specifier: ^0.1.7
-        version: 0.1.7(@melt-ui/svelte@0.86.6(svelte@5.53.3))(@sveltejs/kit@2.53.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)
+        specifier: 0.1.8
+        version: 0.1.8(@melt-ui/svelte@0.86.6(svelte@5.53.3))(@sveltejs/kit@2.53.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)
       '@threlte/core':
         specifier: ^8.0.0
         version: 8.3.1(svelte@5.53.3)(three@0.170.0)
@@ -591,8 +591,8 @@ packages:
   '@tabler/icons@3.37.1':
     resolution: {integrity: sha512-neLCWkuyNHEPXCyYu6nbN4S3g/59BTa4qyITAugYVpq1YzYNDOZooW7/vRWH98ZItXAudxdKU8muFT7y1PqzuA==}
 
-  '@tableslayer/ui@0.1.7':
-    resolution: {integrity: sha512-HgdtU/G9qzimuusnbISMqv6trz0BBNPUVKzoq+3zmdaIxY13YmH1DBgLT9Zf0+rYZgRkrs02V2eyqA47NchZfw==}
+  '@tableslayer/ui@0.1.8':
+    resolution: {integrity: sha512-NuZCbkproG3j4bF9LsYzPhu5/FHR03D/Oins70D/0Lx6VFLhdW4xHHqbuFtwSo2y3BnUAInSbABMl3LSMN5nmw==}
     peerDependencies:
       '@melt-ui/svelte': ^0.86.2
       '@sveltejs/kit': ^2.16.0
@@ -2329,7 +2329,7 @@ snapshots:
 
   '@tabler/icons@3.37.1': {}
 
-  '@tableslayer/ui@0.1.7(@melt-ui/svelte@0.86.6(svelte@5.53.3))(@sveltejs/kit@2.53.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)':
+  '@tableslayer/ui@0.1.8(@melt-ui/svelte@0.86.6(svelte@5.53.3))(@sveltejs/kit@2.53.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)':
     dependencies:
       '@floating-ui/dom': 1.7.5
       '@melt-ui/svelte': 0.86.6(svelte@5.53.3)

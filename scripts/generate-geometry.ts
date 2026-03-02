@@ -14,8 +14,11 @@ import { execSync } from 'child_process';
 // Import geometry modules
 import { createBoxWithLidGrooves, createLid } from '../src/lib/models/lid.js';
 import { createCounterTray } from '../src/lib/models/counterTray.js';
+import { createCardTray } from '../src/lib/models/cardTray.js';
 import type { Box, Tray } from '../src/lib/types/project.js';
+import { isCounterTray, isCardTray } from '../src/lib/types/project.js';
 import stlSerializer from '@jscad/stl-serializer';
+import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
 const MESH_ANALYSIS_DIR = join(import.meta.dirname, '..', 'mesh-analysis');
 
@@ -101,8 +104,22 @@ async function main() {
 		const filename = `tray_${letter}_${safeName}.stl`;
 
 		try {
-			// createCounterTray returns a single geometry, not an array
-			const trayGeom = createCounterTray(tray.params, tray.name, maxHeight, 0);
+			// Dispatch to appropriate geometry generator based on tray type
+			let trayGeom: Geom3 | null = null;
+			if (isCardTray(tray)) {
+				trayGeom = createCardTray(tray.params, tray.name, maxHeight, 0);
+			} else if (isCounterTray(tray)) {
+				trayGeom = createCounterTray(tray.params, tray.name, maxHeight, 0);
+			} else {
+				// Default to counter tray for backwards compatibility
+				trayGeom = createCounterTray(
+					tray.params as Parameters<typeof createCounterTray>[0],
+					tray.name,
+					maxHeight,
+					0
+				);
+			}
+
 			if (trayGeom) {
 				const trayStl = stlSerializer.serialize({ binary: true }, trayGeom);
 				const trayPath = join(MESH_ANALYSIS_DIR, filename);

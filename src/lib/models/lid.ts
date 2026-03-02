@@ -1,7 +1,12 @@
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { Box, LidParams } from '$lib/types/project';
-import { arrangeTrays, getBoxInteriorDimensions, calculateMinimumBoxDimensions } from './box';
+import {
+	arrangeTrays,
+	getBoxInteriorDimensions,
+	calculateMinimumBoxDimensions,
+	getCustomCardSizesFromBox
+} from './box';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
@@ -110,10 +115,12 @@ export const defaultLidParams: LidParams = {
 export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	if (box.trays.length === 0) return null;
 
+	const customCardSizes = getCustomCardSizesFromBox(box);
 	const placements = arrangeTrays(box.trays, {
 		customBoxWidth: box.customWidth,
 		wallThickness: box.wallThickness,
-		tolerance: box.tolerance
+		tolerance: box.tolerance,
+		customCardSizes
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
@@ -999,10 +1006,12 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 export function createLid(box: Box): Geom3 | null {
 	if (box.trays.length === 0) return null;
 
+	const customCardSizes = getCustomCardSizesFromBox(box);
 	const placements = arrangeTrays(box.trays, {
 		customBoxWidth: box.customWidth,
 		wallThickness: box.wallThickness,
-		tolerance: box.tolerance
+		tolerance: box.tolerance,
+		customCardSizes
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 

@@ -21,7 +21,7 @@
 		"@jscad/stl-serializer": "^2.1.17",
 		"@melt-ui/svelte": "^0.86.4",
 		"@tabler/icons-svelte": "^3.31.0",
-		"@tableslayer/ui": "^0.1.7",
+		"@tableslayer/ui": "0.1.8",
 		"@threlte/core": "^8.0.0",
 		"@threlte/extras": "^9.0.0",
 		"jspdf": "^4.1.0",

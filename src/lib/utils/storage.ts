@@ -60,6 +60,19 @@ function migrateTrayParams(params: CounterTrayParams & LegacyTrayParams): Counte
 		migrated.customShapes = [];
 	}
 
+	// Ensure customCardSizes exists with defaults
+	if (!migrated.customCardSizes || migrated.customCardSizes.length === 0) {
+		migrated.customCardSizes = [
+			{ name: 'Standard', width: 66, length: 91, thickness: 0.5 },
+			{ name: 'Mini American', width: 44, length: 66, thickness: 0.5 },
+			{ name: 'Mini European', width: 47, length: 71, thickness: 0.5 },
+			{ name: 'Euro', width: 62, length: 95, thickness: 0.5 },
+			{ name: 'Japanese', width: 62, length: 89, thickness: 0.5 },
+			{ name: 'Tarot', width: 73, length: 123, thickness: 0.5 },
+			{ name: 'Square', width: 73, length: 73, thickness: 0.5 }
+		];
+	}
+
 	// Detect old format: has squareWidth but customShapes don't include default shapes
 	const hasOldFormat = params.squareWidth !== undefined;
 	const hasDefaultShapes = migrated.customShapes.some((s) =>
@@ -165,12 +178,26 @@ function migrateTrayParams(params: CounterTrayParams & LegacyTrayParams): Counte
 
 // Migrate a tray to ensure all fields have valid values
 function migrateTray(tray: Tray, cumulativeIndex: number): Tray {
+	// Check if tray already has a type (new format) or needs migration (old format)
+	const trayType = (tray as { type?: string }).type;
+
+	if (trayType === 'card') {
+		// Card tray - preserve as-is with color migration
+		return {
+			...tray,
+			type: 'card',
+			color: tray.color || TRAY_COLORS[cumulativeIndex % TRAY_COLORS.length]
+		} as Tray;
+	}
+
+	// Counter tray (either explicit or migrated from old format)
 	return {
 		...tray,
+		type: 'counter',
 		// Assign color if missing (for old data)
 		color: tray.color || TRAY_COLORS[cumulativeIndex % TRAY_COLORS.length],
-		params: migrateTrayParams(tray.params)
-	};
+		params: migrateTrayParams((tray as { params: CounterTrayParams }).params)
+	} as Tray;
 }
 
 // Migrate a box to ensure all fields have valid values

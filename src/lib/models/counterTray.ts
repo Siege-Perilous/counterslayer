@@ -31,6 +31,14 @@ export interface CustomShape {
 	pointyTop?: boolean; // For hex shapes: pointy top orientation
 }
 
+// Custom card size definition (sleeved dimensions)
+export interface CustomCardSize {
+	name: string;
+	width: number; // Sleeved width in mm
+	length: number; // Sleeved length in mm
+	thickness: number; // Sleeved thickness in mm (card + sleeve)
+}
+
 export interface CounterTrayParams {
 	counterThickness: number;
 	clearance: number;
@@ -45,6 +53,7 @@ export interface CounterTrayParams {
 	topLoadedStacks: TopLoadedStackDef[];
 	edgeLoadedStacks: EdgeLoadedStackDef[];
 	customShapes: CustomShape[];
+	customCardSizes: CustomCardSize[];
 	printBedSize: number;
 }
 
@@ -81,6 +90,16 @@ export const defaultParams: CounterTrayParams = {
 		{ name: 'Circle', baseShape: 'circle', width: 15.9, length: 15.9 },
 		{ name: 'Triangle', baseShape: 'triangle', width: 15.9, length: 15.9, cornerRadius: 1.5 }
 	],
+	// Card sizes are sleeved dimensions (card + sleeve)
+	customCardSizes: [
+		{ name: 'Standard', width: 66, length: 91, thickness: 0.5 },
+		{ name: 'Mini American', width: 44, length: 66, thickness: 0.5 },
+		{ name: 'Mini European', width: 47, length: 71, thickness: 0.5 },
+		{ name: 'Euro', width: 62, length: 95, thickness: 0.5 },
+		{ name: 'Japanese', width: 62, length: 89, thickness: 0.5 },
+		{ name: 'Tarot', width: 73, length: 123, thickness: 0.5 },
+		{ name: 'Square', width: 73, length: 73, thickness: 0.5 }
+	],
 	printBedSize: 256
 };
 
@@ -104,6 +123,10 @@ export interface CounterStack {
 	edgeOrientation?: 'lengthwise' | 'crosswise';
 	slotWidth?: number; // X dimension of the slot
 	slotDepth?: number; // Y dimension of the slot
+	rowAssignment?: 'front' | 'back'; // Which row the stack is in (for triangle orientation)
+	slopeAngle?: number; // Radians - rotation around X axis for sloped surfaces (card trays)
+	innerWidth?: number; // Inner card width for sleeved card visualization
+	innerLength?: number; // Inner card length for sleeved card visualization
 }
 
 // Generate harmonious colors for counter stacks (warm earth tones matching primary red)
@@ -678,7 +701,8 @@ export function getCounterPositions(
 			count: placement.count,
 			hexPointyTop: customShape?.pointyTop ?? false,
 			color: generateStackColor(placement.originalIndex),
-			label: placement.label
+			label: placement.label,
+			rowAssignment: placement.rowAssignment
 		});
 	}
 
