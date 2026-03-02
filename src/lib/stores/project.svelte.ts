@@ -1,9 +1,21 @@
 import { defaultParams, type CounterTrayParams } from '$lib/models/counterTray';
 import { defaultCardDrawTrayParams, type CardDrawTrayParams } from '$lib/models/cardTray';
-import { defaultCardDividerTrayParams, type CardDividerTrayParams } from '$lib/models/cardDividerTray';
+import {
+	defaultCardDividerTrayParams,
+	type CardDividerTrayParams
+} from '$lib/models/cardDividerTray';
 import { defaultLidParams } from '$lib/models/lid';
 import { saveProject, loadProject, migrateProjectData } from '$lib/utils/storage';
-import type { Tray, Box, Project, LidParams, CounterTray, CardDrawTray, CardDividerTray, CardTray } from '$lib/types/project';
+import type {
+	Tray,
+	Box,
+	Project,
+	LidParams,
+	CounterTray,
+	CardDrawTray,
+	CardDividerTray,
+	CardTray
+} from '$lib/types/project';
 import { isCounterTray, isCardTray, isCardDrawTray, isCardDividerTray } from '$lib/types/project';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
@@ -92,7 +104,7 @@ function createDefaultCardDividerTray(name: string, color: string): CardDividerT
 }
 
 // Legacy alias for backwards compatibility
-function createDefaultCardTray(name: string, color: string): CardDrawTray {
+function _createDefaultCardTray(name: string, color: string): CardDrawTray {
 	return createDefaultCardDrawTray(name, color);
 }
 

@@ -17,7 +17,7 @@
 	import { isCounterTray, isCardTray, isCardDividerTray } from '$lib/types/project';
 	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
 	import type { CardDrawTrayParams } from '$lib/models/cardTray';
-	import type { CardDividerTrayParams, CardDividerStack } from '$lib/models/cardDividerTray';
+	import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
 	import { getTrayDimensions, getCustomCardSizesFromBox } from '$lib/models/box';
 	import {
 		getProject,
@@ -114,7 +114,12 @@
 
 	const orientationOptions: EdgeOrientation[] = ['lengthwise', 'crosswise'];
 
-	function getTrayStats(tray: Tray): { stacks: number; counters: number; isCardTray: boolean; isCardDivider: boolean } {
+	function getTrayStats(tray: Tray): {
+		stacks: number;
+		counters: number;
+		isCardTray: boolean;
+		isCardDivider: boolean;
+	} {
 		if (isCardDividerTray(tray)) {
 			const totalCards = tray.params.stacks.reduce((sum, s) => sum + s.count, 0);
 			return {
@@ -177,13 +182,19 @@
 		}
 	}
 
-	function updateCardParam<K extends keyof CardDrawTrayParams>(key: K, value: CardDrawTrayParams[K]) {
+	function updateCardParam<K extends keyof CardDrawTrayParams>(
+		key: K,
+		value: CardDrawTrayParams[K]
+	) {
 		if (selectedTray && isCardTray(selectedTray) && onUpdateCardParams) {
 			onUpdateCardParams({ ...selectedTray.params, [key]: value });
 		}
 	}
 
-	function updateCardDividerParam<K extends keyof CardDividerTrayParams>(key: K, value: CardDividerTrayParams[K]) {
+	function updateCardDividerParam<K extends keyof CardDividerTrayParams>(
+		key: K,
+		value: CardDividerTrayParams[K]
+	) {
 		if (selectedTray && isCardDividerTray(selectedTray) && onUpdateCardDividerParams) {
 			onUpdateCardDividerParams({ ...selectedTray.params, [key]: value });
 		}
@@ -212,7 +223,10 @@
 		if (!selectedTray || !isCardDividerTray(selectedTray) || !onUpdateCardDividerParams) return;
 		onUpdateCardDividerParams({
 			...selectedTray.params,
-			stacks: [...selectedTray.params.stacks, { cardSizeName: 'Standard', count: 30, label: undefined }]
+			stacks: [
+				...selectedTray.params.stacks,
+				{ cardSizeName: 'Standard', count: 30, label: undefined }
+			]
 		});
 	}
 
@@ -788,7 +802,10 @@
 									]}
 									onSelectedChange={(selected) => {
 										if (selected[0]) {
-											updateCardDividerParam('orientation', selected[0] as 'vertical' | 'horizontal');
+											updateCardDividerParam(
+												'orientation',
+												selected[0] as 'vertical' | 'horizontal'
+											);
 										}
 									}}
 								/>
@@ -806,7 +823,10 @@
 									]}
 									onSelectedChange={(selected) => {
 										if (selected[0]) {
-											updateCardDividerParam('stackDirection', selected[0] as 'sideBySide' | 'frontToBack');
+											updateCardDividerParam(
+												'stackDirection',
+												selected[0] as 'sideBySide' | 'frontToBack'
+											);
 										}
 									}}
 								/>
@@ -828,7 +848,8 @@
 											type="text"
 											placeholder="Label"
 											value={stack.label ?? ''}
-											onchange={(e) => updateCardDividerStack(index, 'label', e.currentTarget.value)}
+											onchange={(e) =>
+												updateCardDividerStack(index, 'label', e.currentTarget.value)}
 										/>
 									</div>
 									<div class="stackSelect">

@@ -3,7 +3,7 @@ import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
-const { translate, scale, mirrorY, rotateX, rotateY } = jscad.transforms;
+const { translate, scale, mirrorY, rotateX } = jscad.transforms;
 const { vectorText } = jscad.text;
 const { path2 } = jscad.geometries;
 const { expand } = jscad.expansions;
@@ -77,7 +77,15 @@ export function getCardDividerTrayDimensions(
 	depth: number;
 	height: number;
 } {
-	const { stacks, orientation, stackDirection, wallThickness, floorThickness, clearance, rimHeight } = params;
+	const {
+		stacks,
+		orientation,
+		stackDirection,
+		wallThickness,
+		floorThickness,
+		clearance,
+		rimHeight
+	} = params;
 
 	if (stacks.length === 0) {
 		return { width: wallThickness * 2, depth: wallThickness * 2, height: floorThickness };
@@ -123,7 +131,7 @@ export function getCardDividerTrayDimensions(
 		// Width = sum of all slot widths + walls between
 		// Depth = max slot depth + front/back walls
 		const totalSlotWidth = slotDimensions.reduce((sum, d) => sum + d.slotWidth, 0);
-		const maxSlotDepth = Math.max(...slotDimensions.map(d => d.slotDepth));
+		const maxSlotDepth = Math.max(...slotDimensions.map((d) => d.slotDepth));
 
 		trayWidth = wallThickness + totalSlotWidth + wallThickness * stacks.length;
 		trayDepth = wallThickness * 2 + maxSlotDepth;
@@ -131,7 +139,7 @@ export function getCardDividerTrayDimensions(
 		// Stacks arranged vertically (front to back along Y)
 		// Width = max slot width + left/right walls
 		// Depth = sum of all slot depths + walls between
-		const maxSlotWidth = Math.max(...slotDimensions.map(d => d.slotWidth));
+		const maxSlotWidth = Math.max(...slotDimensions.map((d) => d.slotWidth));
 		const totalSlotDepth = slotDimensions.reduce((sum, d) => sum + d.slotDepth, 0);
 
 		trayWidth = wallThickness * 2 + maxSlotWidth;
@@ -233,9 +241,10 @@ export function getCardDividerPositions(
 		for (const stack of stacks) {
 			const cardSize = getCardSize(stack.cardSizeName, customCardSizes);
 			if (!cardSize) continue;
-			const slotWidth = orientation === 'vertical'
-				? cardSize.width + clearance * 2
-				: cardSize.length + clearance * 2;
+			const slotWidth =
+				orientation === 'vertical'
+					? cardSize.width + clearance * 2
+					: cardSize.length + clearance * 2;
 			maxSlotWidth = Math.max(maxSlotWidth, slotWidth);
 		}
 
@@ -373,11 +382,7 @@ export function createCardDividerTray(
 
 			// Create slot cavity - centered in Y, at currentX position
 			const slotCavity = translate(
-				[
-					currentX + slotWidth / 2,
-					trayDepth / 2,
-					stackFloorHeight + cavityHeight / 2
-				],
+				[currentX + slotWidth / 2, trayDepth / 2, stackFloorHeight + cavityHeight / 2],
 				cuboid({ size: [slotWidth, slotDepth, cavityHeight] })
 			);
 
@@ -394,9 +399,10 @@ export function createCardDividerTray(
 		for (const stack of stacks) {
 			const cardSize = getCardSize(stack.cardSizeName, customCardSizes);
 			if (!cardSize) continue;
-			const slotWidth = orientation === 'vertical'
-				? cardSize.width + clearance * 2
-				: cardSize.length + clearance * 2;
+			const slotWidth =
+				orientation === 'vertical'
+					? cardSize.width + clearance * 2
+					: cardSize.length + clearance * 2;
 			maxSlotWidth = Math.max(maxSlotWidth, slotWidth);
 		}
 
@@ -427,11 +433,7 @@ export function createCardDividerTray(
 
 			// Create slot cavity - centered in X, at currentY position
 			const slotCavity = translate(
-				[
-					trayWidth / 2,
-					currentY + slotDepth / 2,
-					stackFloorHeight + cavityHeight / 2
-				],
+				[trayWidth / 2, currentY + slotDepth / 2, stackFloorHeight + cavityHeight / 2],
 				cuboid({ size: [slotWidth, slotDepth, cavityHeight] })
 			);
 
@@ -476,9 +478,8 @@ export function createCardDividerTray(
 			if (!cardSize) continue;
 
 			const { width: cardWidth, length: cardLength } = cardSize;
-			const slotWidth = orientation === 'vertical'
-				? cardWidth + clearance * 2
-				: cardLength + clearance * 2;
+			const slotWidth =
+				orientation === 'vertical' ? cardWidth + clearance * 2 : cardLength + clearance * 2;
 
 			// Cutout centered on this stack
 			const stackCenterX = currentX + slotWidth / 2;

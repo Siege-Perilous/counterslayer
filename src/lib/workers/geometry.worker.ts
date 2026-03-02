@@ -154,7 +154,12 @@ function getTrayPositions(
 ): CounterStack[] {
 	if (isCardDividerTray(tray)) {
 		// Convert CardDividerStackPosition to CounterStack format for visualization
-		const dividerStacks = getCardDividerPositions(tray.params, customCardSizes, maxHeight, spacerHeight);
+		const dividerStacks = getCardDividerPositions(
+			tray.params,
+			customCardSizes,
+			maxHeight,
+			spacerHeight
+		);
 		return dividerStacks.map((stack) => {
 			// For card divider: cards stand on edge
 			// vertical orientation: cards stand with long edge up (cardLength is height)

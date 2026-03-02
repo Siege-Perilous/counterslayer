@@ -26,7 +26,7 @@
 		type CounterStack
 	} from '$lib/models/counterTray';
 	import { createCardDrawTray, getCardDrawPositions, type CardStack } from '$lib/models/cardTray';
-	import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
+	import { createCardDividerTray } from '$lib/models/cardDividerTray';
 	import { arrangeTrays, calculateTraySpacers, getCustomCardSizesFromBox } from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 	import {

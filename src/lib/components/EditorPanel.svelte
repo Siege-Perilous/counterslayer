@@ -87,7 +87,12 @@
 	}
 
 	// Get tray stats for display
-	function getTrayStats(tray: Tray): { stacks: number; counters: number; letter: string; isCards: boolean } {
+	function getTrayStats(tray: Tray): {
+		stacks: number;
+		counters: number;
+		letter: string;
+		isCards: boolean;
+	} {
 		let stacks = 0;
 		let counters = 0;
 		let isCards = false;
@@ -144,7 +149,9 @@
 				>
 			{:else if selectionType === 'tray' && selectedTray}
 				{@const stats = getTrayStats(selectedTray)}
-				<span class="headerStats">{stats.counters} {stats.isCards ? 'cards' : 'counters'} in {stats.stacks} stacks</span>
+				<span class="headerStats"
+					>{stats.counters} {stats.isCards ? 'cards' : 'counters'} in {stats.stacks} stacks</span
+				>
 			{/if}
 		</div>
 		<!-- Content -->
