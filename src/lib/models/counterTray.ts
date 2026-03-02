@@ -127,6 +127,9 @@ export interface CounterStack {
 	slopeAngle?: number; // Radians - rotation around X axis for sloped surfaces (card trays)
 	innerWidth?: number; // Inner card width for sleeved card visualization
 	innerLength?: number; // Inner card length for sleeved card visualization
+	// Card divider specific fields
+	isCardDivider?: boolean; // True if this is a card divider stack
+	cardDividerHeight?: number; // Standing height for card divider cards
 }
 
 // Generate harmonious colors for counter stacks (warm earth tones matching primary red)

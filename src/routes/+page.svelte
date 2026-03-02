@@ -25,7 +25,8 @@
 		getCounterPositions,
 		type CounterStack
 	} from '$lib/models/counterTray';
-	import { createCardTray, getCardPositions, type CardStack } from '$lib/models/cardTray';
+	import { createCardDrawTray, getCardDrawPositions, type CardStack } from '$lib/models/cardTray';
+	import { createCardDividerTray } from '$lib/models/cardDividerTray';
 	import { arrangeTrays, calculateTraySpacers, getCustomCardSizesFromBox } from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 	import {
@@ -47,11 +48,13 @@
 		importProject,
 		resetProject,
 		getCumulativeTrayLetter,
-		isCounterTray
+		isCounterTray,
+		isCardTray,
+		isCardDividerTray
 	} from '$lib/stores/project.svelte';
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 
 	type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid';
 	type SelectionType = 'dimensions' | 'box' | 'tray';
@@ -453,20 +456,33 @@
 							maxHeight,
 							spacerHeight
 						);
-					} else {
-						jscadGeom = createCardTray(
+					} else if (isCardDividerTray(placement.tray)) {
+						jscadGeom = createCardDividerTray(
 							placement.tray.params,
 							customCardSizes,
 							placement.tray.name,
 							maxHeight,
 							spacerHeight
 						);
-						selectedTrayCounters = getCardPositions(
+						// Card divider positions are converted to CounterStack format in worker
+						selectedTrayCounters = [];
+					} else if (isCardTray(placement.tray)) {
+						jscadGeom = createCardDrawTray(
+							placement.tray.params,
+							customCardSizes,
+							placement.tray.name,
+							maxHeight,
+							spacerHeight
+						);
+						selectedTrayCounters = getCardDrawPositions(
 							placement.tray.params,
 							customCardSizes,
 							maxHeight,
 							spacerHeight
 						);
+					} else {
+						// Fallback - shouldn't happen
+						continue;
 					}
 
 					// Set up scene for this tray
@@ -714,15 +730,26 @@
 
 	// Generate on mount (forced) and when structure changes (selection, add/delete)
 	let hasInitialized = false;
+	let lastStructuralHash = '';
 	$effect(() => {
-		// Track structuralHash so we regenerate on selection change or add/delete,
-		// but not on every param edit
-		if (browser && structuralHash && selectedTray && selectedBox) {
-			if (!hasInitialized) {
-				hasInitialized = true;
-				regenerate(true); // Force on initial load
-			} else {
-				regenerate(); // Use cache if not dirty
+		// Only track structuralHash - use untrack for selectedTray/selectedBox
+		// to avoid regenerating on every param edit
+		const hash = structuralHash;
+		if (browser && hash) {
+			// Read these without creating dependencies
+			const hasTray = untrack(() => selectedTray);
+			const hasBox = untrack(() => selectedBox);
+			if (hasTray && hasBox) {
+				// Only regenerate if structural hash actually changed
+				const structureChanged = hash !== lastStructuralHash;
+				lastStructuralHash = hash;
+
+				if (!hasInitialized) {
+					hasInitialized = true;
+					regenerate(true); // Force on initial load
+				} else if (structureChanged) {
+					regenerate(); // Structure changed (selection, add/delete tray)
+				}
 			}
 		}
 	});

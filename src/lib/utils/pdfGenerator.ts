@@ -6,9 +6,10 @@ import {
 	type TopLoadedStackDef,
 	type EdgeLoadedStackDef
 } from '$lib/models/counterTray';
-import { getCardPositions } from '$lib/models/cardTray';
+import { getCardDrawPositions } from '$lib/models/cardTray';
+import { getCardDividerPositions } from '$lib/models/cardDividerTray';
 import type { Box, Project } from '$lib/types/project';
-import { isCardTray } from '$lib/types/project';
+import { isCardTray, isCardDividerTray, isCounterTray } from '$lib/types/project';
 
 /**
  * Generate a tray letter based on cumulative index across all boxes.
@@ -167,13 +168,33 @@ export function extractPdfData(project: Project): PdfData {
 			const trayLetter = getTrayLetter(getCumulativeTrayIndex(project.boxes, boxIndex, trayIndex));
 
 			// Get counter positions based on tray type
-			let counterPositions: CounterStack[];
+			let counterPositions: CounterStack[] = [];
 			let topLoadedStacks: TopLoadedStackDef[] = [];
 			let edgeLoadedStacks: EdgeLoadedStackDef[] = [];
 
-			if (isCardTray(tray)) {
-				// Convert card positions to CounterStack format for PDF generation
-				const cardStacks = getCardPositions(tray.params, customCardSizes);
+			if (isCardDividerTray(tray)) {
+				// Convert card divider positions to CounterStack format for PDF generation
+				const dividerStacks = getCardDividerPositions(tray.params, customCardSizes);
+				counterPositions = dividerStacks.map((stack) => ({
+					shape: 'custom' as const,
+					customShapeName: stack.label ?? 'Cards',
+					customBaseShape: 'rectangle' as const,
+					x: stack.x,
+					y: stack.y,
+					z: stack.z,
+					width: stack.slotWidth,
+					length: stack.slotDepth,
+					thickness: stack.cardThickness,
+					count: stack.count,
+					hexPointyTop: false,
+					color: stack.color,
+					isEdgeLoaded: true,
+					slotWidth: stack.slotWidth,
+					slotDepth: stack.slotDepth
+				}));
+			} else if (isCardTray(tray)) {
+				// Convert card draw positions to CounterStack format for PDF generation
+				const cardStacks = getCardDrawPositions(tray.params, customCardSizes);
 				counterPositions = cardStacks.map((stack) => ({
 					shape: 'custom' as const,
 					customShapeName: 'Card',
@@ -188,7 +209,7 @@ export function extractPdfData(project: Project): PdfData {
 					hexPointyTop: false,
 					color: stack.color
 				}));
-			} else {
+			} else if (isCounterTray(tray)) {
 				counterPositions = getCounterPositions(tray.params);
 				topLoadedStacks = tray.params.topLoadedStacks || [];
 				edgeLoadedStacks = tray.params.edgeLoadedStacks || [];

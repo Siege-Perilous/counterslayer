@@ -677,11 +677,13 @@
 								{@const effectiveShape =
 									stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 								{@const standingHeight =
-									effectiveShape === 'triangle'
-										? stack.length
-										: stack.shape === 'custom'
-											? Math.min(stack.width, stack.length)
-											: Math.max(stack.width, stack.length)}
+									stack.isCardDivider && stack.cardDividerHeight
+										? stack.cardDividerHeight
+										: effectiveShape === 'triangle'
+											? stack.length
+											: stack.shape === 'custom'
+												? Math.min(stack.width, stack.length)
+												: Math.max(stack.width, stack.length)}
 								{@const counterY = stack.z + standingHeight / 2}
 								{@const isAlt = counterIdx % 2 === 1}
 								{@const counterColor = isAlt
@@ -1099,11 +1101,13 @@
 				{@const effectiveShape =
 					stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 				{@const standingHeight =
-					effectiveShape === 'triangle'
-						? stack.length // Triangle geometric height (point down)
-						: stack.shape === 'custom'
-							? Math.min(stack.width, stack.length)
-							: Math.max(stack.width, stack.length)}
+					stack.isCardDivider && stack.cardDividerHeight
+						? stack.cardDividerHeight
+						: effectiveShape === 'triangle'
+							? stack.length // Triangle geometric height (point down)
+							: stack.shape === 'custom'
+								? Math.min(stack.width, stack.length)
+								: Math.max(stack.width, stack.length)}
 				{@const triangleLift = 0}
 				{@const counterY = stack.z + standingHeight / 2 + triangleLift}
 				{@const isAlt = counterIdx % 2 === 1}
@@ -1346,11 +1350,13 @@
 						{@const effectiveShape =
 							stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 						{@const standingHeight =
-							effectiveShape === 'triangle'
-								? stack.length
-								: stack.shape === 'custom'
-									? Math.min(stack.width, stack.length)
-									: Math.max(stack.width, stack.length)}
+							stack.isCardDivider && stack.cardDividerHeight
+								? stack.cardDividerHeight
+								: effectiveShape === 'triangle'
+									? stack.length
+									: stack.shape === 'custom'
+										? Math.min(stack.width, stack.length)
+										: Math.max(stack.width, stack.length)}
 						{@const counterY = stack.z + standingHeight / 2}
 						{@const isAlt = counterIdx % 2 === 1}
 						{@const counterColor = isAlt
