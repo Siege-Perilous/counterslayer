@@ -46,8 +46,17 @@ jobs:
             [[ "$line" =~ ^[[:space:]]*$ ]] && continue
             [[ "$line" =~ "Checking" ]] && continue
             [[ "$line" =~ "Run" ]] && continue
+<<<<<<< Updated upstream
 
             if [[ "$line" =~ ([0-9]+)\.[0-9]+\.[0-9]+.*→.*[\^~]?([0-9]+)\.[0-9]+\.[0-9]+ ]]; then
+=======
+            [[ "$line" =~ "Upgrading" ]] && continue
+            [[ "$line" =~ "Using" ]] && continue
+
+            # Match: package-name    ^1.2.3  →  ^2.0.0
+            # Capture old major (group 1) and new major (group 2)
+            if [[ "$line" =~ [[:space:]][\^~]?([0-9]+)\.[0-9]+\.[0-9]+[[:space:]]+→[[:space:]]+[\^~]?([0-9]+)\.[0-9]+\.[0-9]+ ]]; then
+>>>>>>> Stashed changes
               OLD_MAJOR="${BASH_REMATCH[1]}"
               NEW_MAJOR="${BASH_REMATCH[2]}"
 
