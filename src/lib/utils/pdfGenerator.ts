@@ -8,7 +8,7 @@ import {
 } from '$lib/models/counterTray';
 import { getCardPositions } from '$lib/models/cardTray';
 import type { Box, Project } from '$lib/types/project';
-import { isCounterTray, isCardTray } from '$lib/types/project';
+import { isCardTray } from '$lib/types/project';
 
 /**
  * Generate a tray letter based on cumulative index across all boxes.

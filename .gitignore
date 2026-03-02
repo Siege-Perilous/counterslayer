@@ -28,3 +28,7 @@ vite.config.ts.timestamp-*
 
 # Mesh analysis debug output
 mesh-analysis/
+
+# Python virtual environments
+.venv/
+scripts/.venv/

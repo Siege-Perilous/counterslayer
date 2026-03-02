@@ -12,7 +12,6 @@
 		addTray,
 		deleteTray,
 		getCumulativeTrayLetter,
-		isCounterTray,
 		isCardTray,
 		type Box,
 		type Tray,
@@ -168,7 +167,9 @@
 						<button
 							class="navItem navItem--tray {isTraySelected ? 'navItem--selected' : ''}"
 							onclick={() => handleTrayClick(tray, box)}
-							title="{tray.name} ({letter}: {stats.isCardTray ? stats.counters + ' cards' : stats.counters + 'c in ' + stats.stacks + 's'})"
+							title="{tray.name} ({letter}: {stats.isCardTray
+								? stats.counters + ' cards'
+								: stats.counters + 'c in ' + stats.stacks + 's'})"
 						>
 							<span class="navItemLabel">
 								<span class="trayLetter">{letter}</span>

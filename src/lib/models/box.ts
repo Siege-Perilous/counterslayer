@@ -1,6 +1,6 @@
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
-import type { Box, Tray, CounterTray, CardTray } from '$lib/types/project';
+import type { Box, Tray } from '$lib/types/project';
 import { isCounterTray, isCardTray } from '$lib/types/project';
 import type { CounterTrayParams, CustomCardSize } from './counterTray';
 import { getCardTrayDimensions } from './cardTray';
@@ -63,7 +63,10 @@ export function getCustomCardSizesFromBox(box: Box): CustomCardSize[] {
 }
 
 // Get dimensions for any tray type (dispatches based on tray type)
-export function getTrayDimensionsForTray(tray: Tray, customCardSizes?: CustomCardSize[]): TrayDimensions {
+export function getTrayDimensionsForTray(
+	tray: Tray,
+	customCardSizes?: CustomCardSize[]
+): TrayDimensions {
 	if (isCardTray(tray)) {
 		// Use provided customCardSizes or fall back to empty array (will throw if card size not found)
 		return getCardTrayDimensions(tray.params, customCardSizes ?? []);
@@ -439,7 +442,12 @@ export const getTrayDimensions = getCounterTrayDimensions;
 // Supports tray rotation: trays can be rotated 90° for more efficient packing
 export function arrangeTrays(
 	trays: Tray[],
-	options?: { customBoxWidth?: number; wallThickness?: number; tolerance?: number; customCardSizes?: CustomCardSize[] }
+	options?: {
+		customBoxWidth?: number;
+		wallThickness?: number;
+		tolerance?: number;
+		customCardSizes?: CustomCardSize[];
+	}
 ): TrayPlacement[] {
 	if (trays.length === 0) return [];
 
@@ -496,16 +504,6 @@ export function arrangeTrays(
 		rotated: boolean;
 	}
 
-	// Helper function to calculate total footprint for a given arrangement
-	function calculateFootprint(placements: PlacementWithRow[], rows: Row[]): { width: number; depth: number } {
-		if (placements.length === 0 || rows.length === 0) {
-			return { width: 0, depth: 0 };
-		}
-		const maxX = Math.max(...placements.map(p => p.x + p.dimensions.width));
-		const maxY = rows.reduce((sum, row) => sum + row.depth, 0);
-		return { width: maxX, depth: maxY };
-	}
-
 	// Try to place a tray with given dimensions and return the resulting placement
 	function tryPlace(
 		dims: TrayDimensions,
@@ -524,7 +522,9 @@ export function arrangeTrays(
 	}
 
 	// Calculate max row width
-	let maxRowWidth = Math.max(...trayOptions.map(opts => Math.max(...opts.map(o => o.dims.width))));
+	let maxRowWidth = Math.max(
+		...trayOptions.map((opts) => Math.max(...opts.map((o) => o.dims.width)))
+	);
 
 	if (options?.customBoxWidth) {
 		const wallThickness = options.wallThickness ?? 3;

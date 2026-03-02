@@ -15,10 +15,15 @@
 	import { IconX, IconPlus, IconMenu } from '@tabler/icons-svelte';
 	import type { Box, Tray } from '$lib/types/project';
 	import { isCounterTray, isCardTray } from '$lib/types/project';
-	import type { CounterTrayParams, EdgeOrientation, CustomCardSize } from '$lib/models/counterTray';
+	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
 	import type { CardTrayParams } from '$lib/models/cardTray';
 	import { getTrayDimensions, getCustomCardSizesFromBox } from '$lib/models/box';
-	import { getProject, getCumulativeTrayLetter, moveTray, setTrayRotation } from '$lib/stores/project.svelte';
+	import {
+		getProject,
+		getCumulativeTrayLetter,
+		moveTray,
+		setTrayRotation
+	} from '$lib/stores/project.svelte';
 
 	interface Props {
 		selectedBox: Box | null;
@@ -149,7 +154,10 @@
 		return `${trayLetter}${stackNum}`;
 	}
 
-	function updateCounterParam<K extends keyof CounterTrayParams>(key: K, value: CounterTrayParams[K]) {
+	function updateCounterParam<K extends keyof CounterTrayParams>(
+		key: K,
+		value: CounterTrayParams[K]
+	) {
 		if (selectedTray && isCounterTray(selectedTray) && onUpdateCounterParams) {
 			onUpdateCounterParams({ ...selectedTray.params, [key]: value });
 		}
@@ -281,11 +289,17 @@
 						role="button"
 						tabindex="0"
 						onkeydown={(e) => e.key === 'Enter' && onSelectTray(tray)}
-						title="{tray.name}, tray {letter}, {stats.isCardTray ? stats.counters + ' cards' : stats.counters + ' counters in ' + stats.stacks + ' stacks'}"
+						title="{tray.name}, tray {letter}, {stats.isCardTray
+							? stats.counters + ' cards'
+							: stats.counters + ' counters in ' + stats.stacks + ' stacks'}"
 					>
 						<span style="overflow: hidden; text-overflow: ellipsis;">{tray.name}</span>
 						<span style="display: flex; align-items: center; gap: 0.25rem;">
-							<span class="trayStats">{letter}: {stats.isCardTray ? stats.counters + ' cards' : stats.counters + 'c in ' + stats.stacks + 's'}</span>
+							<span class="trayStats"
+								>{letter}: {stats.isCardTray
+									? stats.counters + ' cards'
+									: stats.counters + 'c in ' + stats.stacks + 's'}</span
+							>
 							{#if selectedBox.trays.length > 1}
 								<IconButton
 									onclick={(e: MouseEvent) => {
@@ -398,430 +412,460 @@
 			<Hr />
 
 			{#if isCounterTray(selectedTray)}
-			<div class="panelFormSection">
-				<!-- Top-Loaded Stacks -->
-				<section class="section">
-					<h3 class="sectionTitle">Top-Loaded Stacks</h3>
-					<Spacer size="0.5rem" />
-					<div class="stackList">
-						{#each selectedTray.params.topLoadedStacks as stack, index (index)}
-							<div
-								class="stackRow {draggedIndex === index && draggedType === 'top'
-									? 'stackRow--dragging'
-									: ''} {dragOverIndex === index && draggedType === 'top' && draggedIndex !== index
-									? 'stackRow--dragover'
-									: ''}"
-								role="listitem"
-								ondragover={(e) => handleDragOver(e, index, 'top')}
-								ondrop={(e) => handleDrop(e, index, 'top')}
-							>
-								<span
-									class="dragHandle"
-									title="Drag to reorder"
-									draggable="true"
-									ondragstart={(e) => handleDragStart(e, index, 'top')}
-									ondragend={handleDragEnd}
-									role="button"
-									tabindex="0"
-								>
-									<Icon Icon={IconMenu} size="1rem" color="var(--fgMuted)" />
-								</span>
-								<div class="stackLabelInput">
-									<span class="stackRef">{getStackRef('top', index)}</span>
-									<Input
-										type="text"
-										placeholder="Label"
-										value={stack[2] ?? ''}
-										onchange={(e) => updateTopLoadedStack(index, 'label', e.currentTarget.value)}
-									/>
-								</div>
-								<div class="stackSelect">
-									<Select
-										selected={[stack[0]]}
-										options={shapeOptions.map((s) => ({ value: s, label: getShapeDisplayName(s) }))}
-										onSelectedChange={(selected) =>
-											updateTopLoadedStack(index, 'shape', selected[0])}
-									/>
-								</div>
-								<Input
-									type="number"
-									min="1"
-									value={stack[1]}
-									onchange={(e) =>
-										updateTopLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
-									style="width: 3.5rem;"
-								/>
-								<IconButton
-									variant="ghost"
-									onclick={() => removeTopLoadedStack(index)}
-									title="Remove stack"
-									color="var(--fgMuted)"
-								>
-									<Icon Icon={IconX} color="var(--fgMuted)" />
-								</IconButton>
-							</div>
-						{/each}
+				<div class="panelFormSection">
+					<!-- Top-Loaded Stacks -->
+					<section class="section">
+						<h3 class="sectionTitle">Top-Loaded Stacks</h3>
 						<Spacer size="0.5rem" />
-						<Link as="button" onclick={addTopLoadedStack}>Add top-loaded stack</Link>
-					</div>
-				</section>
-
-				<Spacer size="0.5rem" />
-
-				<!-- Edge-Loaded Stacks -->
-				<section class="section">
-					<h3 class="sectionTitle">Edge-Loaded Stacks</h3>
-					<Spacer size="0.5rem" />
-					<div class="stackList">
-						{#each selectedTray.params.edgeLoadedStacks as stack, index (index)}
-							<div
-								class="stackRow {draggedIndex === index && draggedType === 'edge'
-									? 'stackRow--dragging'
-									: ''} {dragOverIndex === index && draggedType === 'edge' && draggedIndex !== index
-									? 'stackRow--dragover'
-									: ''}"
-								role="listitem"
-								ondragover={(e) => handleDragOver(e, index, 'edge')}
-								ondrop={(e) => handleDrop(e, index, 'edge')}
-							>
-								<span
-									class="dragHandle"
-									title="Drag to reorder"
-									draggable="true"
-									ondragstart={(e) => handleDragStart(e, index, 'edge')}
-									ondragend={handleDragEnd}
-									role="button"
-									tabindex="0"
+						<div class="stackList">
+							{#each selectedTray.params.topLoadedStacks as stack, index (index)}
+								<div
+									class="stackRow {draggedIndex === index && draggedType === 'top'
+										? 'stackRow--dragging'
+										: ''} {dragOverIndex === index &&
+									draggedType === 'top' &&
+									draggedIndex !== index
+										? 'stackRow--dragover'
+										: ''}"
+									role="listitem"
+									ondragover={(e) => handleDragOver(e, index, 'top')}
+									ondrop={(e) => handleDrop(e, index, 'top')}
 								>
-									<Icon Icon={IconMenu} size="sm" color="var(--fgMuted)" />
-								</span>
-								<div class="stackLabelInput">
-									<span class="stackRef">{getStackRef('edge', index)}</span>
+									<span
+										class="dragHandle"
+										title="Drag to reorder"
+										draggable="true"
+										ondragstart={(e) => handleDragStart(e, index, 'top')}
+										ondragend={handleDragEnd}
+										role="button"
+										tabindex="0"
+									>
+										<Icon Icon={IconMenu} size="1rem" color="var(--fgMuted)" />
+									</span>
+									<div class="stackLabelInput">
+										<span class="stackRef">{getStackRef('top', index)}</span>
+										<Input
+											type="text"
+											placeholder="Label"
+											value={stack[2] ?? ''}
+											onchange={(e) => updateTopLoadedStack(index, 'label', e.currentTarget.value)}
+										/>
+									</div>
+									<div class="stackSelect">
+										<Select
+											selected={[stack[0]]}
+											options={shapeOptions.map((s) => ({
+												value: s,
+												label: getShapeDisplayName(s)
+											}))}
+											onSelectedChange={(selected) =>
+												updateTopLoadedStack(index, 'shape', selected[0])}
+										/>
+									</div>
 									<Input
-										type="text"
-										placeholder="Label"
-										value={stack[3] ?? ''}
-										onchange={(e) => updateEdgeLoadedStack(index, 'label', e.currentTarget.value)}
+										type="number"
+										min="1"
+										value={stack[1]}
+										onchange={(e) =>
+											updateTopLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
+										style="width: 3.5rem;"
 									/>
+									<IconButton
+										variant="ghost"
+										onclick={() => removeTopLoadedStack(index)}
+										title="Remove stack"
+										color="var(--fgMuted)"
+									>
+										<Icon Icon={IconX} color="var(--fgMuted)" />
+									</IconButton>
 								</div>
-								<div class="stackSelect">
-									<Select
-										selected={[stack[0]]}
-										options={shapeOptions.map((s) => ({ value: s, label: getShapeDisplayName(s) }))}
-										onSelectedChange={(selected) =>
-											updateEdgeLoadedStack(index, 'shape', selected[0])}
-									/>
-								</div>
-								<Input
-									type="number"
-									min="1"
-									value={stack[1]}
-									onchange={(e) =>
-										updateEdgeLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
-									style="width: 3rem;"
-								/>
-								<div class="stackSelectSmall">
-									<Select
-										selected={[stack[2] ?? 'lengthwise']}
-										options={orientationOptions.map((o) => ({ value: o, label: o.slice(0, 6) }))}
-										onSelectedChange={(selected) =>
-											updateEdgeLoadedStack(index, 'orientation', selected[0])}
-									/>
-								</div>
-								<IconButton
-									onclick={() => removeEdgeLoadedStack(index)}
-									title="Remove stack"
-									variant="ghost"
-								>
-									<Icon Icon={IconX} color="var(--fgMuted)" />
-								</IconButton>
-							</div>
-						{/each}
+							{/each}
+							<Spacer size="0.5rem" />
+							<Link as="button" onclick={addTopLoadedStack}>Add top-loaded stack</Link>
+						</div>
+					</section>
+
+					<Spacer size="0.5rem" />
+
+					<!-- Edge-Loaded Stacks -->
+					<section class="section">
+						<h3 class="sectionTitle">Edge-Loaded Stacks</h3>
 						<Spacer size="0.5rem" />
-						<Link as="button" onclick={addEdgeLoadedStack}>Add edge-loaded stack</Link>
-					</div>
-				</section>
-			</div>
+						<div class="stackList">
+							{#each selectedTray.params.edgeLoadedStacks as stack, index (index)}
+								<div
+									class="stackRow {draggedIndex === index && draggedType === 'edge'
+										? 'stackRow--dragging'
+										: ''} {dragOverIndex === index &&
+									draggedType === 'edge' &&
+									draggedIndex !== index
+										? 'stackRow--dragover'
+										: ''}"
+									role="listitem"
+									ondragover={(e) => handleDragOver(e, index, 'edge')}
+									ondrop={(e) => handleDrop(e, index, 'edge')}
+								>
+									<span
+										class="dragHandle"
+										title="Drag to reorder"
+										draggable="true"
+										ondragstart={(e) => handleDragStart(e, index, 'edge')}
+										ondragend={handleDragEnd}
+										role="button"
+										tabindex="0"
+									>
+										<Icon Icon={IconMenu} size="sm" color="var(--fgMuted)" />
+									</span>
+									<div class="stackLabelInput">
+										<span class="stackRef">{getStackRef('edge', index)}</span>
+										<Input
+											type="text"
+											placeholder="Label"
+											value={stack[3] ?? ''}
+											onchange={(e) => updateEdgeLoadedStack(index, 'label', e.currentTarget.value)}
+										/>
+									</div>
+									<div class="stackSelect">
+										<Select
+											selected={[stack[0]]}
+											options={shapeOptions.map((s) => ({
+												value: s,
+												label: getShapeDisplayName(s)
+											}))}
+											onSelectedChange={(selected) =>
+												updateEdgeLoadedStack(index, 'shape', selected[0])}
+										/>
+									</div>
+									<Input
+										type="number"
+										min="1"
+										value={stack[1]}
+										onchange={(e) =>
+											updateEdgeLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
+										style="width: 3rem;"
+									/>
+									<div class="stackSelectSmall">
+										<Select
+											selected={[stack[2] ?? 'lengthwise']}
+											options={orientationOptions.map((o) => ({ value: o, label: o.slice(0, 6) }))}
+											onSelectedChange={(selected) =>
+												updateEdgeLoadedStack(index, 'orientation', selected[0])}
+										/>
+									</div>
+									<IconButton
+										onclick={() => removeEdgeLoadedStack(index)}
+										title="Remove stack"
+										variant="ghost"
+									>
+										<Icon Icon={IconX} color="var(--fgMuted)" />
+									</IconButton>
+								</div>
+							{/each}
+							<Spacer size="0.5rem" />
+							<Link as="button" onclick={addEdgeLoadedStack}>Add edge-loaded stack</Link>
+						</div>
+					</section>
+				</div>
 
-			<Hr />
+				<Hr />
 
-			<div class="panelFormSection">
-				<!-- Tray Settings -->
-				<section class="section">
-					<h3 class="sectionTitle">Tray Settings</h3>
+				<div class="panelFormSection">
+					<!-- Tray Settings -->
+					<section class="section">
+						<h3 class="sectionTitle">Tray Settings</h3>
+						<Spacer size="0.5rem" />
+						<div class="formGrid">
+							<FormControl label="Clearance" name="clearance">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										value={selectedTray.params.clearance}
+										onchange={(e) =>
+											updateCounterParam('clearance', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Wall" name="wallThickness">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										value={selectedTray.params.wallThickness}
+										onchange={(e) =>
+											updateCounterParam('wallThickness', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Floor" name="floorThickness">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										value={selectedTray.params.floorThickness}
+										onchange={(e) =>
+											updateCounterParam('floorThickness', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Rim" name="rimHeight">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										value={selectedTray.params.rimHeight}
+										onchange={(e) =>
+											updateCounterParam('rimHeight', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Cutout %" name="cutoutRatio">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.05"
+										min="0"
+										max="1"
+										value={selectedTray.params.cutoutRatio}
+										onchange={(e) =>
+											updateCounterParam('cutoutRatio', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+							</FormControl>
+							<FormControl label="Cutout max" name="cutoutMax">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="1"
+										value={selectedTray.params.cutoutMax}
+										onchange={(e) =>
+											updateCounterParam('cutoutMax', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+						</div>
+					</section>
+
 					<Spacer size="0.5rem" />
-					<div class="formGrid">
-						<FormControl label="Clearance" name="clearance">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="0.1"
-									value={selectedTray.params.clearance}
-									onchange={(e) => updateCounterParam('clearance', parseFloat(e.currentTarget.value))}
-								/>
-							{/snippet}
-							{#snippet end()}mm{/snippet}
-						</FormControl>
-						<FormControl label="Wall" name="wallThickness">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="0.1"
-									value={selectedTray.params.wallThickness}
-									onchange={(e) => updateCounterParam('wallThickness', parseFloat(e.currentTarget.value))}
-								/>
-							{/snippet}
-							{#snippet end()}mm{/snippet}
-						</FormControl>
-						<FormControl label="Floor" name="floorThickness">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="0.1"
-									value={selectedTray.params.floorThickness}
-									onchange={(e) => updateCounterParam('floorThickness', parseFloat(e.currentTarget.value))}
-								/>
-							{/snippet}
-							{#snippet end()}mm{/snippet}
-						</FormControl>
-						<FormControl label="Rim" name="rimHeight">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="0.1"
-									value={selectedTray.params.rimHeight}
-									onchange={(e) => updateCounterParam('rimHeight', parseFloat(e.currentTarget.value))}
-								/>
-							{/snippet}
-							{#snippet end()}mm{/snippet}
-						</FormControl>
-						<FormControl label="Cutout %" name="cutoutRatio">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="0.05"
-									min="0"
-									max="1"
-									value={selectedTray.params.cutoutRatio}
-									onchange={(e) => updateCounterParam('cutoutRatio', parseFloat(e.currentTarget.value))}
-								/>
-							{/snippet}
-						</FormControl>
-						<FormControl label="Cutout max" name="cutoutMax">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="1"
-									value={selectedTray.params.cutoutMax}
-									onchange={(e) => updateCounterParam('cutoutMax', parseFloat(e.currentTarget.value))}
-								/>
-							{/snippet}
-							{#snippet end()}mm{/snippet}
-						</FormControl>
-					</div>
-				</section>
 
-				<Spacer size="0.5rem" />
-
-				<!-- Custom Width -->
-				<section class="section">
-					<h3 class="sectionTitle">Custom width</h3>
-					<Spacer size="0.5rem" />
-					<div class="formGrid">
-						<FormControl
-							label="Tray width (min: {minTrayWidth.toFixed(1)})"
-							name="trayWidthOverride"
-							class="formGrid__spanTwo"
-						>
+					<!-- Custom Width -->
+					<section class="section">
+						<h3 class="sectionTitle">Custom width</h3>
+						<Spacer size="0.5rem" />
+						<div class="formGrid">
+							<FormControl
+								label="Tray width (min: {minTrayWidth.toFixed(1)})"
+								name="trayWidthOverride"
+								class="formGrid__spanTwo"
+							>
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="1"
+										placeholder="Auto"
+										value={selectedTray.params.trayWidthOverride || ''}
+										onchange={(e) => {
+											const val = e.currentTarget.value;
+											updateCounterParam('trayWidthOverride', val === '' ? 0 : parseFloat(val));
+										}}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Extra cols" name="extraTrayCols">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="1"
+										min="1"
+										value={selectedTray.params.extraTrayCols}
+										onchange={(e) =>
+											updateCounterParam('extraTrayCols', parseInt(e.currentTarget.value))}
+									/>
+								{/snippet}
+							</FormControl>
+							<FormControl label="Extra rows" name="extraTrayRows">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="1"
+										min="1"
+										value={selectedTray.params.extraTrayRows}
+										onchange={(e) =>
+											updateCounterParam('extraTrayRows', parseInt(e.currentTarget.value))}
+									/>
+								{/snippet}
+							</FormControl>
+						</div>
+					</section>
+				</div>
+			{:else if isCardTray(selectedTray)}
+				<!-- Card Tray Settings -->
+				{@const customCardSizes = selectedBox ? getCustomCardSizesFromBox(selectedBox) : []}
+				{@const selectedCardSize = customCardSizes.find(
+					(s) => s.name === selectedTray.params.cardSizeName
+				)}
+				<div class="panelFormSection">
+					<section class="section">
+						<h3 class="sectionTitle">Card Size</h3>
+						<Spacer size="0.5rem" />
+						<FormControl label="Card Size" name="cardSizeName">
 							{#snippet input({ inputProps })}
-								<Input
+								<Select
 									{...inputProps}
-									type="number"
-									step="1"
-									placeholder="Auto"
-									value={selectedTray.params.trayWidthOverride || ''}
-									onchange={(e) => {
-										const val = e.currentTarget.value;
-										updateCounterParam('trayWidthOverride', val === '' ? 0 : parseFloat(val));
+									selected={[selectedTray.params.cardSizeName]}
+									options={customCardSizes.map((s) => ({
+										value: s.name,
+										label: `${s.name} (${s.width}×${s.length}mm)`
+									}))}
+									onSelectedChange={(selected) => {
+										if (selected[0]) {
+											updateCardParam('cardSizeName', selected[0]);
+										}
 									}}
 								/>
 							{/snippet}
-							{#snippet end()}mm{/snippet}
 						</FormControl>
-						<FormControl label="Extra cols" name="extraTrayCols">
+						{#if selectedCardSize}
+							<Spacer size="0.25rem" />
+							<p class="cardSizeInfo">
+								{selectedCardSize.width}mm × {selectedCardSize.length}mm, {selectedCardSize.thickness}mm
+								thick (sleeved)
+							</p>
+						{/if}
+					</section>
+
+					<Spacer size="0.5rem" />
+
+					<section class="section">
+						<h3 class="sectionTitle">Card Stack</h3>
+						<Spacer size="0.5rem" />
+						<FormControl label="Card Count" name="cardCount">
 							{#snippet input({ inputProps })}
 								<Input
 									{...inputProps}
 									type="number"
 									step="1"
 									min="1"
-									value={selectedTray.params.extraTrayCols}
-									onchange={(e) => updateCounterParam('extraTrayCols', parseInt(e.currentTarget.value))}
+									value={selectedTray.params.cardCount}
+									onchange={(e) => updateCardParam('cardCount', parseInt(e.currentTarget.value))}
 								/>
 							{/snippet}
 						</FormControl>
-						<FormControl label="Extra rows" name="extraTrayRows">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="1"
-									min="1"
-									value={selectedTray.params.extraTrayRows}
-									onchange={(e) => updateCounterParam('extraTrayRows', parseInt(e.currentTarget.value))}
-								/>
-							{/snippet}
-						</FormControl>
-					</div>
-				</section>
-			</div>
-			{:else if isCardTray(selectedTray)}
-			<!-- Card Tray Settings -->
-			{@const customCardSizes = selectedBox ? getCustomCardSizesFromBox(selectedBox) : []}
-			{@const selectedCardSize = customCardSizes.find(s => s.name === selectedTray.params.cardSizeName)}
-			<div class="panelFormSection">
-				<section class="section">
-					<h3 class="sectionTitle">Card Size</h3>
+					</section>
+
 					<Spacer size="0.5rem" />
-					<FormControl label="Card Size" name="cardSizeName">
-						{#snippet input({ inputProps })}
-							<Select
-								{...inputProps}
-								selected={[selectedTray.params.cardSizeName]}
-								options={customCardSizes.map((s) => ({ value: s.name, label: `${s.name} (${s.width}×${s.length}mm)` }))}
-								onSelectedChange={(selected) => {
-									if (selected[0]) {
-										updateCardParam('cardSizeName', selected[0]);
-									}
-								}}
-							/>
-						{/snippet}
-					</FormControl>
-					{#if selectedCardSize}
-						<Spacer size="0.25rem" />
-						<p class="cardSizeInfo">
-							{selectedCardSize.width}mm × {selectedCardSize.length}mm, {selectedCardSize.thickness}mm thick (sleeved)
-						</p>
-					{/if}
-				</section>
 
-				<Spacer size="0.5rem" />
+					<section class="section">
+						<h3 class="sectionTitle">Tray Settings</h3>
+						<Spacer size="0.5rem" />
+						<div class="formGrid">
+							<FormControl label="Wall" name="wallThickness">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										value={selectedTray.params.wallThickness}
+										onchange={(e) =>
+											updateCardParam('wallThickness', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Floor" name="floorThickness">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										value={selectedTray.params.floorThickness}
+										onchange={(e) =>
+											updateCardParam('floorThickness', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Clearance" name="clearance">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										value={selectedTray.params.clearance}
+										onchange={(e) =>
+											updateCardParam('clearance', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Slope Angle" name="floorSlopeAngle">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="1"
+										min="0"
+										max="30"
+										value={selectedTray.params.floorSlopeAngle}
+										onchange={(e) =>
+											updateCardParam('floorSlopeAngle', parseInt(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}°{/snippet}
+							</FormControl>
+						</div>
+					</section>
 
-				<section class="section">
-					<h3 class="sectionTitle">Card Stack</h3>
 					<Spacer size="0.5rem" />
-					<FormControl label="Card Count" name="cardCount">
-						{#snippet input({ inputProps })}
-							<Input
-								{...inputProps}
-								type="number"
-								step="1"
-								min="1"
-								value={selectedTray.params.cardCount}
-								onchange={(e) => updateCardParam('cardCount', parseInt(e.currentTarget.value))}
-							/>
-						{/snippet}
-					</FormControl>
-				</section>
 
-				<Spacer size="0.5rem" />
-
-				<section class="section">
-					<h3 class="sectionTitle">Tray Settings</h3>
-					<Spacer size="0.5rem" />
-					<div class="formGrid">
-						<FormControl label="Wall" name="wallThickness">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="0.1"
-									value={selectedTray.params.wallThickness}
-									onchange={(e) => updateCardParam('wallThickness', parseFloat(e.currentTarget.value))}
-								/>
-							{/snippet}
-							{#snippet end()}mm{/snippet}
-						</FormControl>
-						<FormControl label="Floor" name="floorThickness">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="0.1"
-									value={selectedTray.params.floorThickness}
-									onchange={(e) => updateCardParam('floorThickness', parseFloat(e.currentTarget.value))}
-								/>
-							{/snippet}
-							{#snippet end()}mm{/snippet}
-						</FormControl>
-						<FormControl label="Clearance" name="clearance">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="0.1"
-									value={selectedTray.params.clearance}
-									onchange={(e) => updateCardParam('clearance', parseFloat(e.currentTarget.value))}
-								/>
-							{/snippet}
-							{#snippet end()}mm{/snippet}
-						</FormControl>
-						<FormControl label="Slope Angle" name="floorSlopeAngle">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="1"
-									min="0"
-									max="30"
-									value={selectedTray.params.floorSlopeAngle}
-									onchange={(e) => updateCardParam('floorSlopeAngle', parseInt(e.currentTarget.value))}
-								/>
-							{/snippet}
-							{#snippet end()}°{/snippet}
-						</FormControl>
-					</div>
-				</section>
-
-				<Spacer size="0.5rem" />
-
-				<section class="section">
-					<h3 class="sectionTitle">Magnet Holes</h3>
-					<Spacer size="0.5rem" />
-					<div class="formGrid">
-						<FormControl label="Diameter" name="magnetHoleDiameter">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="0.5"
-									value={selectedTray.params.magnetHoleDiameter}
-									onchange={(e) => updateCardParam('magnetHoleDiameter', parseFloat(e.currentTarget.value))}
-								/>
-							{/snippet}
-							{#snippet end()}mm{/snippet}
-						</FormControl>
-						<FormControl label="Depth" name="magnetHoleDepth">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="0.1"
-									value={selectedTray.params.magnetHoleDepth}
-									onchange={(e) => updateCardParam('magnetHoleDepth', parseFloat(e.currentTarget.value))}
-								/>
-							{/snippet}
-							{#snippet end()}mm{/snippet}
-						</FormControl>
-					</div>
-				</section>
-			</div>
+					<section class="section">
+						<h3 class="sectionTitle">Magnet Holes</h3>
+						<Spacer size="0.5rem" />
+						<div class="formGrid">
+							<FormControl label="Diameter" name="magnetHoleDiameter">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.5"
+										value={selectedTray.params.magnetHoleDiameter}
+										onchange={(e) =>
+											updateCardParam('magnetHoleDiameter', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Depth" name="magnetHoleDepth">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										value={selectedTray.params.magnetHoleDepth}
+										onchange={(e) =>
+											updateCardParam('magnetHoleDepth', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+						</div>
+					</section>
+				</div>
 			{/if}
 		</div>
 	{:else}

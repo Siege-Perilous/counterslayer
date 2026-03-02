@@ -21,7 +21,12 @@
 		IconRectangle,
 		IconCards
 	} from '@tabler/icons-svelte';
-	import type { CounterTrayParams, CustomShape, CustomBaseShape, CustomCardSize } from '$lib/models/counterTray';
+	import type {
+		CounterTrayParams,
+		CustomShape,
+		CustomBaseShape,
+		CustomCardSize
+	} from '$lib/models/counterTray';
 	import { getProject, isCounterTray } from '$lib/stores/project.svelte';
 
 	interface Props {
@@ -218,11 +223,7 @@
 		expandedCardIndex = newIndex;
 	}
 
-	function updateCardSize(
-		index: number,
-		field: keyof CustomCardSize,
-		value: string | number
-	) {
+	function updateCardSize(index: number, field: keyof CustomCardSize, value: string | number) {
 		const newSizes = [...(params.customCardSizes ?? [])];
 		if (field === 'name') {
 			const newName = value as string;

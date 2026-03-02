@@ -1,7 +1,12 @@
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { Box, LidParams } from '$lib/types/project';
-import { arrangeTrays, getBoxInteriorDimensions, calculateMinimumBoxDimensions, getCustomCardSizesFromBox } from './box';
+import {
+	arrangeTrays,
+	getBoxInteriorDimensions,
+	calculateMinimumBoxDimensions,
+	getCustomCardSizesFromBox
+} from './box';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;

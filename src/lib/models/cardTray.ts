@@ -2,8 +2,8 @@ import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
 const { cuboid, cylinder } = jscad.primitives;
-const { subtract, union, intersect } = jscad.booleans;
-const { translate, rotateX, rotateY, rotateZ, scale, mirrorY } = jscad.transforms;
+const { subtract, union } = jscad.booleans;
+const { translate, rotateY, scale, mirrorY } = jscad.transforms;
 const { hull } = jscad.hulls;
 const { vectorText } = jscad.text;
 const { path2 } = jscad.geometries;
@@ -36,8 +36,11 @@ export const defaultCardTrayParams: CardTrayParams = {
 };
 
 // Helper to get card dimensions from global card sizes
-export function getCardSize(cardSizeName: string, customCardSizes: CustomCardSize[]): CustomCardSize | null {
-	return customCardSizes.find(s => s.name === cardSizeName) || null;
+export function getCardSize(
+	cardSizeName: string,
+	customCardSizes: CustomCardSize[]
+): CustomCardSize | null {
+	return customCardSizes.find((s) => s.name === cardSizeName) || null;
 }
 
 export interface CardStack {
@@ -126,19 +129,21 @@ export function getCardPositions(
 	const innerWidth = cardWidth - sleeveOverhang;
 	const innerLength = cardLength - sleeveOverhang;
 
-	return [{
-		x: wallThickness + clearance + cardWidth / 2,
-		y: centerY,
-		z: heightAtCenter,
-		width: cardWidth,
-		length: cardLength,
-		innerWidth,
-		innerLength,
-		thickness: cardThickness,
-		count: cardCount,
-		color: '#4a90a4',
-		slopeAngle
-	}];
+	return [
+		{
+			x: wallThickness + clearance + cardWidth / 2,
+			y: centerY,
+			z: heightAtCenter,
+			width: cardWidth,
+			length: cardLength,
+			innerWidth,
+			innerLength,
+			thickness: cardThickness,
+			count: cardCount,
+			color: '#4a90a4',
+			slopeAngle
+		}
+	];
 }
 
 export function createCardTray(
@@ -229,12 +234,20 @@ export function createCardTray(
 
 	// Back corners - two cylinders for rounded corners
 	const backLeftCorner = translate(
-		[trayWidth / 2 - cutoutWidth / 2 + cornerRadius, cutoutDepth - cornerRadius, floorThickness + slopeRise],
+		[
+			trayWidth / 2 - cutoutWidth / 2 + cornerRadius,
+			cutoutDepth - cornerRadius,
+			floorThickness + slopeRise
+		],
 		cylinder({ radius: cornerRadius, height: cutoutHeight, segments: 32 })
 	);
 
 	const backRightCorner = translate(
-		[trayWidth / 2 + cutoutWidth / 2 - cornerRadius, cutoutDepth - cornerRadius, floorThickness + slopeRise],
+		[
+			trayWidth / 2 + cutoutWidth / 2 - cornerRadius,
+			cutoutDepth - cornerRadius,
+			floorThickness + slopeRise
+		],
 		cylinder({ radius: cornerRadius, height: cutoutHeight, segments: 32 })
 	);
 

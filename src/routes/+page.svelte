@@ -145,7 +145,9 @@
 
 	let selectedTray = $derived(getSelectedTray());
 	let selectedBox = $derived(getSelectedBox());
-	let printBedSize = $derived(selectedTray && isCounterTray(selectedTray) ? selectedTray.params.printBedSize : 256);
+	let printBedSize = $derived(
+		selectedTray && isCounterTray(selectedTray) ? selectedTray.params.printBedSize : 256
+	);
 	let selectedTrayLetter = $derived.by(() => {
 		// Use override during PDF capture
 		if (captureTrayLetter) return captureTrayLetter;
@@ -683,7 +685,11 @@
 				customWidth: box.customWidth,
 				customBoxHeight: box.customBoxHeight,
 				fillSolidEmpty: box.fillSolidEmpty,
-				trays: box.trays.map((t) => ({ id: t.id, params: t.params, rotationOverride: t.rotationOverride }))
+				trays: box.trays.map((t) => ({
+					id: t.id,
+					params: t.params,
+					rotationOverride: t.rotationOverride
+				}))
 			}))
 		});
 	});
