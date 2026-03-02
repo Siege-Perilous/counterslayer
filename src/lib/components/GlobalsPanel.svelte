@@ -120,13 +120,15 @@
 				onchange({
 					...params,
 					customShapes: newShapes,
-					topLoadedStacks: params.topLoadedStacks.map(([shape, count]) =>
-						shape === `custom:${oldName}` ? [`custom:${newName}`, count] : [shape, count]
-					),
-					edgeLoadedStacks: params.edgeLoadedStacks.map(([shape, count, orient]) =>
+					topLoadedStacks: params.topLoadedStacks.map(([shape, count, label]) =>
 						shape === `custom:${oldName}`
-							? [`custom:${newName}`, count, orient]
-							: [shape, count, orient]
+							? [`custom:${newName}`, count, label]
+							: [shape, count, label]
+					),
+					edgeLoadedStacks: params.edgeLoadedStacks.map(([shape, count, orient, label]) =>
+						shape === `custom:${oldName}`
+							? [`custom:${newName}`, count, orient, label]
+							: [shape, count, orient, label]
 					)
 				});
 				return;
