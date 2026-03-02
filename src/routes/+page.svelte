@@ -701,10 +701,23 @@
 		}
 	});
 
-	// Generate on mount (forced) and when tray/box selection changes (uses cache if not dirty)
+	// Track structural changes (selection, add/delete) but not param edits
+	let structuralHash = $derived.by(() => {
+		const project = getProject();
+		return JSON.stringify({
+			selectedBoxId: project.selectedBoxId,
+			selectedTrayId: project.selectedTrayId,
+			boxIds: project.boxes.map((b) => b.id),
+			trayIds: project.boxes.map((b) => b.trays.map((t) => t.id))
+		});
+	});
+
+	// Generate on mount (forced) and when structure changes (selection, add/delete)
 	let hasInitialized = false;
 	$effect(() => {
-		if (browser && selectedTray && selectedBox) {
+		// Track structuralHash so we regenerate on selection change or add/delete,
+		// but not on every param edit
+		if (browser && structuralHash && selectedTray && selectedBox) {
 			if (!hasInitialized) {
 				hasInitialized = true;
 				regenerate(true); // Force on initial load
