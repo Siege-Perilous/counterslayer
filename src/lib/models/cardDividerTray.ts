@@ -465,7 +465,7 @@ export function createCardDividerTray(
 
 		const fingerCutout = translate(
 			[trayWidth / 2, trayDepth / 2, cutoutCenterZ],
-			rotateX(Math.PI / 2, cylinder({ radius: cutoutRadius, height: cutoutLength, segments: 32 }))
+			rotateX(Math.PI / 2, cylinder({ radius: cutoutRadius, height: cutoutLength, segments: 128 }))
 		);
 		tray = subtract(tray, fingerCutout);
 	} else {
@@ -486,7 +486,7 @@ export function createCardDividerTray(
 
 			const fingerCutout = translate(
 				[stackCenterX, trayDepth / 2, cutoutCenterZ],
-				rotateX(Math.PI / 2, cylinder({ radius: cutoutRadius, height: cutoutLength, segments: 32 }))
+				rotateX(Math.PI / 2, cylinder({ radius: cutoutRadius, height: cutoutLength, segments: 128 }))
 			);
 			tray = subtract(tray, fingerCutout);
 
@@ -512,7 +512,7 @@ export function createCardDividerTray(
 				if (segment.length >= 2) {
 					const pathObj = path2.fromPoints({ closed: false }, segment);
 					const expanded = expand(
-						{ delta: strokeWidth / 2, corners: 'round', segments: 32 },
+						{ delta: strokeWidth / 2, corners: 'round', segments: 128 },
 						pathObj
 					);
 					const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
