@@ -18,9 +18,10 @@
 		IconCircle,
 		IconHexagon,
 		IconTriangle,
-		IconRectangle
+		IconRectangle,
+		IconCards
 	} from '@tabler/icons-svelte';
-	import type { CounterTrayParams, CustomShape, CustomBaseShape } from '$lib/models/counterTray';
+	import type { CounterTrayParams, CustomShape, CustomBaseShape, CustomCardSize } from '$lib/models/counterTray';
 	import { getProject, isCounterTray } from '$lib/stores/project.svelte';
 
 	interface Props {
@@ -32,6 +33,8 @@
 
 	// Track which counter is expanded (null = none)
 	let expandedIndex: number | null = $state(null);
+	// Track which card size is expanded (null = none)
+	let expandedCardIndex: number | null = $state(null);
 
 	// Get the shape icon component for a base shape
 	function getShapeIcon(baseShape: CustomBaseShape) {
@@ -199,6 +202,64 @@
 		});
 		// Collapse the expanded view after delete
 		expandedIndex = null;
+	}
+
+	// Card size handlers
+	function addCardSize() {
+		const newIndex = (params.customCardSizes ?? []).length;
+		const newName = `Custom Card ${newIndex + 1}`;
+		onchange({
+			...params,
+			customCardSizes: [
+				...(params.customCardSizes ?? []),
+				{ name: newName, width: 66, length: 91, thickness: 0.5 }
+			]
+		});
+		expandedCardIndex = newIndex;
+	}
+
+	function updateCardSize(
+		index: number,
+		field: keyof CustomCardSize,
+		value: string | number
+	) {
+		const newSizes = [...(params.customCardSizes ?? [])];
+		if (field === 'name') {
+			const newName = value as string;
+			// Don't allow duplicate names
+			if (newSizes.some((s, i) => i !== index && s.name === newName)) {
+				return;
+			}
+		}
+		newSizes[index] = { ...newSizes[index], [field]: value };
+		onchange({ ...params, customCardSizes: newSizes });
+	}
+
+	// Count card trays using a given card size
+	function countTraysUsingCardSize(sizeName: string): number {
+		const project = getProject();
+		let count = 0;
+
+		for (const box of project.boxes) {
+			for (const tray of box.trays) {
+				if (!isCounterTray(tray) && 'params' in tray) {
+					const cardTray = tray as { params: { cardSizeName?: string } };
+					if (cardTray.params.cardSizeName === sizeName) {
+						count++;
+					}
+				}
+			}
+		}
+
+		return count;
+	}
+
+	function removeCardSize(index: number) {
+		onchange({
+			...params,
+			customCardSizes: (params.customCardSizes ?? []).filter((_, i) => i !== index)
+		});
+		expandedCardIndex = null;
 	}
 </script>
 
@@ -447,6 +508,128 @@
 		</div>
 		<Spacer />
 		<Link as="button" onclick={addCustomShape}>+ New counter</Link>
+	</section>
+
+	<Hr />
+
+	<section class="section">
+		<h3 class="sectionTitle">Card Sizes (Sleeved)</h3>
+		<Spacer size="0.5rem" />
+		<div class="customShapesList">
+			{#each params.customCardSizes ?? [] as cardSize, index (cardSize.name)}
+				{@const isExpanded = expandedCardIndex === index}
+				{#if isExpanded}
+					<!-- Expanded view: full form in Panel -->
+					<Panel class="shapePanel">
+						<div class="shapePanelContent">
+							<div class="shapeFormGrid">
+								<FormControl label="Name" name="cardName-{index}">
+									{#snippet input({ inputProps })}
+										<Input
+											{...inputProps}
+											type="text"
+											value={cardSize.name}
+											onchange={(e) => updateCardSize(index, 'name', e.currentTarget.value)}
+											placeholder="Name"
+										/>
+									{/snippet}
+								</FormControl>
+								<FormControl label="Width" name="cardWidth-{index}">
+									{#snippet input({ inputProps })}
+										<Input
+											{...inputProps}
+											type="number"
+											step="0.5"
+											min="10"
+											value={cardSize.width}
+											onchange={(e) =>
+												updateCardSize(index, 'width', parseFloat(e.currentTarget.value))}
+										/>
+									{/snippet}
+									{#snippet end()}mm{/snippet}
+								</FormControl>
+								<FormControl label="Length" name="cardLength-{index}">
+									{#snippet input({ inputProps })}
+										<Input
+											{...inputProps}
+											type="number"
+											step="0.5"
+											min="10"
+											value={cardSize.length}
+											onchange={(e) =>
+												updateCardSize(index, 'length', parseFloat(e.currentTarget.value))}
+										/>
+									{/snippet}
+									{#snippet end()}mm{/snippet}
+								</FormControl>
+								<FormControl label="Thickness" name="cardThickness-{index}">
+									{#snippet input({ inputProps })}
+										<Input
+											{...inputProps}
+											type="number"
+											step="0.05"
+											min="0.1"
+											value={cardSize.thickness}
+											onchange={(e) =>
+												updateCardSize(index, 'thickness', parseFloat(e.currentTarget.value))}
+										/>
+									{/snippet}
+									{#snippet end()}mm{/snippet}
+								</FormControl>
+							</div>
+						</div>
+						<Hr />
+						{@const trayCount = countTraysUsingCardSize(cardSize.name)}
+						<div class="shapePanelActions">
+							<Button size="sm" onclick={() => (expandedCardIndex = null)}>Save</Button>
+							<ConfirmActionButton
+								action={() => removeCardSize(index)}
+								actionButtonText="Delete card size"
+							>
+								{#snippet trigger({ triggerProps })}
+									<Button {...triggerProps} size="sm" variant="ghost">Delete</Button>
+								{/snippet}
+								{#snippet actionMessage()}
+									<div style="max-width: 15rem;">
+										<Text weight={600} color="var(--fgDanger)">Warning</Text>
+										<Spacer size="0.5rem" />
+										{#if trayCount > 0}
+											<Text size="0.875rem">
+												Deleting "{cardSize.name}" will affect
+												<Text as="span" color="var(--fgDanger)">
+													{trayCount}
+													card tray{trayCount === 1 ? '' : 's'}</Text
+												> using it.
+											</Text>
+										{:else}
+											<Text size="0.875rem">Delete the "{cardSize.name}" card size?</Text>
+										{/if}
+										<Spacer size="0.5rem" />
+									</div>
+								{/snippet}
+							</ConfirmActionButton>
+						</div>
+					</Panel>
+				{:else}
+					<div class="shapeCard">
+						<!-- Collapsed view: compact summary -->
+						<button
+							class="shapeSummary"
+							onclick={() => (expandedCardIndex = index)}
+							title="Click to edit {cardSize.name}"
+						>
+							<span class="shapeIcon">
+								<Icon Icon={IconCards} size={16} />
+							</span>
+							<span class="shapeName">{cardSize.name}</span>
+							<span class="shapeSize">{cardSize.width}×{cardSize.length} mm</span>
+						</button>
+					</div>
+				{/if}
+			{/each}
+		</div>
+		<Spacer />
+		<Link as="button" onclick={addCardSize}>+ New card size</Link>
 	</section>
 
 	<Hr />

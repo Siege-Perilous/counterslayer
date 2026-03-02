@@ -26,7 +26,7 @@
 		type CounterStack
 	} from '$lib/models/counterTray';
 	import { createCardTray, getCardPositions, type CardStack } from '$lib/models/cardTray';
-	import { arrangeTrays, calculateTraySpacers } from '$lib/models/box';
+	import { arrangeTrays, calculateTraySpacers, getCustomCardSizesFromBox } from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 	import {
 		getGeometryWorker,
@@ -421,10 +421,12 @@
 			// Capture each tray
 			for (let boxIdx = 0; boxIdx < project.boxes.length; boxIdx++) {
 				const box = project.boxes[boxIdx];
+				const customCardSizes = getCustomCardSizesFromBox(box);
 				const placements = arrangeTrays(box.trays, {
 					customBoxWidth: box.customWidth,
 					wallThickness: box.wallThickness,
-					tolerance: box.tolerance
+					tolerance: box.tolerance,
+					customCardSizes
 				});
 				const spacerInfo = calculateTraySpacers(box);
 				const maxHeight = Math.max(...placements.map((p) => p.dimensions.height));
@@ -452,12 +454,14 @@
 					} else {
 						jscadGeom = createCardTray(
 							placement.tray.params,
+							customCardSizes,
 							placement.tray.name,
 							maxHeight,
 							spacerHeight
 						);
 						selectedTrayCounters = getCardPositions(
 							placement.tray.params,
+							customCardSizes,
 							maxHeight,
 							spacerHeight
 						);

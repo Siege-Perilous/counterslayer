@@ -60,6 +60,19 @@ function migrateTrayParams(params: CounterTrayParams & LegacyTrayParams): Counte
 		migrated.customShapes = [];
 	}
 
+	// Ensure customCardSizes exists with defaults
+	if (!migrated.customCardSizes || migrated.customCardSizes.length === 0) {
+		migrated.customCardSizes = [
+			{ name: 'Standard', width: 66, length: 91, thickness: 0.5 },
+			{ name: 'Mini American', width: 44, length: 66, thickness: 0.5 },
+			{ name: 'Mini European', width: 47, length: 71, thickness: 0.5 },
+			{ name: 'Euro', width: 62, length: 95, thickness: 0.5 },
+			{ name: 'Japanese', width: 62, length: 89, thickness: 0.5 },
+			{ name: 'Tarot', width: 73, length: 123, thickness: 0.5 },
+			{ name: 'Square', width: 73, length: 73, thickness: 0.5 }
+		];
+	}
+
 	// Detect old format: has squareWidth but customShapes don't include default shapes
 	const hasOldFormat = params.squareWidth !== undefined;
 	const hasDefaultShapes = migrated.customShapes.some((s) =>

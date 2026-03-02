@@ -4,7 +4,7 @@
  */
 
 import jscad from '@jscad/modeling';
-import { createCounterTray, getCounterPositions, type CounterStack } from '$lib/models/counterTray';
+import { createCounterTray, getCounterPositions, type CounterStack, type CustomCardSize } from '$lib/models/counterTray';
 import { createCardTray, getCardPositions, type CardStack } from '$lib/models/cardTray';
 import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
 import {
@@ -12,6 +12,7 @@ import {
 	calculateTraySpacers,
 	getBoxDimensions,
 	validateCustomDimensions,
+	getCustomCardSizesFromBox,
 	type TrayPlacement
 } from '$lib/models/box';
 import stlSerializer from '@jscad/stl-serializer';
@@ -122,11 +123,12 @@ let cachedBoxName = '';
  */
 function createTrayGeometry(
 	tray: Tray,
+	customCardSizes: CustomCardSize[],
 	maxHeight: number,
 	spacerHeight: number
 ): Geom3 {
 	if (isCardTray(tray)) {
-		return createCardTray(tray.params, tray.name, maxHeight, spacerHeight);
+		return createCardTray(tray.params, customCardSizes, tray.name, maxHeight, spacerHeight);
 	}
 	// Default to counter tray
 	return createCounterTray(tray.params, tray.name, maxHeight, spacerHeight);
@@ -137,12 +139,13 @@ function createTrayGeometry(
  */
 function getTrayPositions(
 	tray: Tray,
+	customCardSizes: CustomCardSize[],
 	maxHeight: number,
 	spacerHeight: number
 ): CounterStack[] {
 	if (isCardTray(tray)) {
 		// Convert CardStack to CounterStack format for visualization
-		const cardStacks = getCardPositions(tray.params, maxHeight, spacerHeight);
+		const cardStacks = getCardPositions(tray.params, customCardSizes, maxHeight, spacerHeight);
 		return cardStacks.map((stack) => ({
 			shape: 'custom' as const,
 			customShapeName: 'Card',
@@ -248,11 +251,15 @@ function handleGenerate(msg: GenerateMessage): void {
 			return;
 		}
 
+		// Get customCardSizes from the box (global param stored in counter trays)
+		const customCardSizes = getCustomCardSizesFromBox(box);
+
 		// Generate all trays with their placements for selected box
 		const placements = arrangeTrays(box.trays, {
 			customBoxWidth: box.customWidth,
 			wallThickness: box.wallThickness,
-			tolerance: box.tolerance
+			tolerance: box.tolerance,
+			customCardSizes
 		});
 
 		const spacerInfo = calculateTraySpacers(box);
@@ -263,16 +270,16 @@ function handleGenerate(msg: GenerateMessage): void {
 		const selectedSpacerHeight = selectedSpacer?.floorSpacerHeight ?? 0;
 
 		// Generate selected tray
-		cachedSelectedTray = createTrayGeometry(tray, maxHeight, selectedSpacerHeight);
+		cachedSelectedTray = createTrayGeometry(tray, customCardSizes, maxHeight, selectedSpacerHeight);
 		const selectedTrayGeometry = jscadToArrays(cachedSelectedTray);
-		const selectedTrayCounters = getTrayPositions(tray, maxHeight, selectedSpacerHeight);
+		const selectedTrayCounters = getTrayPositions(tray, customCardSizes, maxHeight, selectedSpacerHeight);
 
 		// Generate all trays for selected box
 		cachedAllTrays = [];
 		const allTrayGeometries: TrayGeometryResult[] = placements.map((placement, index) => {
 			const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
 			const spacerHeight = spacer?.floorSpacerHeight ?? 0;
-			const jscadGeom = createTrayGeometry(placement.tray, maxHeight, spacerHeight);
+			const jscadGeom = createTrayGeometry(placement.tray, customCardSizes, maxHeight, spacerHeight);
 
 			cachedAllTrays.push({ jscadGeom, name: placement.tray.name });
 
@@ -282,7 +289,7 @@ function handleGenerate(msg: GenerateMessage): void {
 				color: placement.tray.color,
 				geometry: jscadToArrays(jscadGeom),
 				placement,
-				counterStacks: getTrayPositions(placement.tray, maxHeight, spacerHeight),
+				counterStacks: getTrayPositions(placement.tray, customCardSizes, maxHeight, spacerHeight),
 				trayLetter: getTrayLetter(getCumulativeTrayIndex(project.boxes, selectedBoxIndex, index))
 			};
 		});
@@ -308,10 +315,14 @@ function handleGenerate(msg: GenerateMessage): void {
 			const lidBufferGeom = lidJscad ? jscadToArrays(lidJscad) : null;
 			const boxDims = getBoxDimensions(projectBox);
 
+			// Get customCardSizes for this box
+			const boxCustomCardSizes = getCustomCardSizesFromBox(projectBox);
+
 			const boxPlacements = arrangeTrays(projectBox.trays, {
 				customBoxWidth: projectBox.customWidth,
 				wallThickness: projectBox.wallThickness,
-				tolerance: projectBox.tolerance
+				tolerance: projectBox.tolerance,
+				customCardSizes: boxCustomCardSizes
 			});
 
 			const boxSpacerInfo = calculateTraySpacers(projectBox);
@@ -320,7 +331,7 @@ function handleGenerate(msg: GenerateMessage): void {
 			const trayGeoms: TrayGeometryResult[] = boxPlacements.map((placement, index) => {
 				const spacer = boxSpacerInfo.find((s) => s.trayId === placement.tray.id);
 				const spacerHeight = spacer?.floorSpacerHeight ?? 0;
-				const jscadGeom = createTrayGeometry(placement.tray, boxMaxHeight, spacerHeight);
+				const jscadGeom = createTrayGeometry(placement.tray, boxCustomCardSizes, boxMaxHeight, spacerHeight);
 
 				return {
 					trayId: placement.tray.id,
@@ -328,7 +339,7 @@ function handleGenerate(msg: GenerateMessage): void {
 					color: placement.tray.color,
 					geometry: jscadToArrays(jscadGeom),
 					placement,
-					counterStacks: getTrayPositions(placement.tray, boxMaxHeight, spacerHeight),
+					counterStacks: getTrayPositions(placement.tray, boxCustomCardSizes, boxMaxHeight, spacerHeight),
 					trayLetter: getTrayLetter(getCumulativeTrayIndex(project.boxes, boxIndex, index))
 				};
 			});

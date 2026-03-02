@@ -15,10 +15,9 @@
 	import { IconX, IconPlus, IconMenu } from '@tabler/icons-svelte';
 	import type { Box, Tray } from '$lib/types/project';
 	import { isCounterTray, isCardTray } from '$lib/types/project';
-	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
+	import type { CounterTrayParams, EdgeOrientation, CustomCardSize } from '$lib/models/counterTray';
 	import type { CardTrayParams } from '$lib/models/cardTray';
-	import { CARD_SIZE_PRESETS } from '$lib/models/cardTray';
-	import { getTrayDimensions } from '$lib/models/box';
+	import { getTrayDimensions, getCustomCardSizesFromBox } from '$lib/models/box';
 	import { getProject, getCumulativeTrayLetter, moveTray } from '$lib/stores/project.svelte';
 
 	interface Props {
@@ -660,62 +659,32 @@
 			</div>
 			{:else if isCardTray(selectedTray)}
 			<!-- Card Tray Settings -->
+			{@const customCardSizes = selectedBox ? getCustomCardSizesFromBox(selectedBox) : []}
+			{@const selectedCardSize = customCardSizes.find(s => s.name === selectedTray.params.cardSizeName)}
 			<div class="panelFormSection">
 				<section class="section">
 					<h3 class="sectionTitle">Card Size</h3>
 					<Spacer size="0.5rem" />
-					<FormControl label="Preset" name="cardSizePreset">
+					<FormControl label="Card Size" name="cardSizeName">
 						{#snippet input({ inputProps })}
 							<Select
 								{...inputProps}
-								selected={[selectedTray.params.cardSizePreset]}
-								options={CARD_SIZE_PRESETS.map((p) => ({ value: p.name, label: p.name }))}
+								selected={[selectedTray.params.cardSizeName]}
+								options={customCardSizes.map((s) => ({ value: s.name, label: `${s.name} (${s.width}×${s.length}mm)` }))}
 								onSelectedChange={(selected) => {
-									const preset = CARD_SIZE_PRESETS.find((p) => p.name === selected[0]);
-									if (preset && !preset.isCustom) {
-										updateCardParam('cardSizePreset', preset.name);
-										updateCardParam('cardWidth', preset.width);
-										updateCardParam('cardLength', preset.length);
-									} else {
-										updateCardParam('cardSizePreset', 'Custom');
+									if (selected[0]) {
+										updateCardParam('cardSizeName', selected[0]);
 									}
 								}}
 							/>
 						{/snippet}
 					</FormControl>
-					<Spacer size="0.5rem" />
-					<div class="formGrid">
-						<FormControl label="Card Width" name="cardWidth">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="0.5"
-									value={selectedTray.params.cardWidth}
-									onchange={(e) => {
-										updateCardParam('cardWidth', parseFloat(e.currentTarget.value));
-										updateCardParam('cardSizePreset', 'Custom');
-									}}
-								/>
-							{/snippet}
-							{#snippet end()}mm{/snippet}
-						</FormControl>
-						<FormControl label="Card Length" name="cardLength">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="0.5"
-									value={selectedTray.params.cardLength}
-									onchange={(e) => {
-										updateCardParam('cardLength', parseFloat(e.currentTarget.value));
-										updateCardParam('cardSizePreset', 'Custom');
-									}}
-								/>
-							{/snippet}
-							{#snippet end()}mm{/snippet}
-						</FormControl>
-					</div>
+					{#if selectedCardSize}
+						<Spacer size="0.25rem" />
+						<p class="cardSizeInfo">
+							{selectedCardSize.width}mm × {selectedCardSize.length}mm, {selectedCardSize.thickness}mm thick (sleeved)
+						</p>
+					{/if}
 				</section>
 
 				<Spacer size="0.5rem" />
@@ -723,32 +692,18 @@
 				<section class="section">
 					<h3 class="sectionTitle">Card Stack</h3>
 					<Spacer size="0.5rem" />
-					<div class="formGrid">
-						<FormControl label="Card Count" name="cardCount">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="1"
-									min="1"
-									value={selectedTray.params.cardCount}
-									onchange={(e) => updateCardParam('cardCount', parseInt(e.currentTarget.value))}
-								/>
-							{/snippet}
-						</FormControl>
-						<FormControl label="Card Thickness" name="cardThickness">
-							{#snippet input({ inputProps })}
-								<Input
-									{...inputProps}
-									type="number"
-									step="0.1"
-									value={selectedTray.params.cardThickness}
-									onchange={(e) => updateCardParam('cardThickness', parseFloat(e.currentTarget.value))}
-								/>
-							{/snippet}
-							{#snippet end()}mm{/snippet}
-						</FormControl>
-					</div>
+					<FormControl label="Card Count" name="cardCount">
+						{#snippet input({ inputProps })}
+							<Input
+								{...inputProps}
+								type="number"
+								step="1"
+								min="1"
+								value={selectedTray.params.cardCount}
+								onchange={(e) => updateCardParam('cardCount', parseInt(e.currentTarget.value))}
+							/>
+						{/snippet}
+					</FormControl>
 				</section>
 
 				<Spacer size="0.5rem" />
@@ -1043,5 +998,11 @@
 		font-family: var(--font-mono);
 		font-size: 0.75rem;
 		color: var(--fgMuted);
+	}
+
+	.cardSizeInfo {
+		font-size: 0.75rem;
+		color: var(--fgMuted);
+		margin: 0;
 	}
 </style>

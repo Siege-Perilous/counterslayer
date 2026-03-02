@@ -119,6 +119,10 @@
 		return `${shapeName} x${stack.count}`;
 	}
 
+	function getCardStackLabel(stack: CardStack): string {
+		return `cards x${stack.count}`;
+	}
+
 	// Update label rotation each frame to face the camera (true billboard)
 	useTask(() => {
 		if (camera.current) {
@@ -898,14 +902,14 @@
 <!-- All trays with positions (when showAllTrays is true, single box view) -->
 {#if showAllTrays && !showAllBoxes && allTrays.length > 0}
 	{@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
+	{@const maxTrayHeight = Math.max(...allTrays.map((t) => t.placement.dimensions.height))}
+	{@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
+	{@const traySpacing = liftPhase * maxTrayHeight * 1.2}
 	{#each allTrays as trayData, i (trayData.trayId)}
 		{@const placement = trayData.placement}
 		{@const xOffset = exploded
 			? meshOffset.x + interiorStartOffset + placement.x
 			: sidePositions.traysGroup.x - maxTrayWidth / 2 + placement.x}
-		{@const trayHeight = trayData.placement.dimensions.height}
-		{@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
-		{@const traySpacing = liftPhase * trayHeight * 1.2}
 		{@const yOffset = exploded ? boxFloorThickness + explodedOffset.trays + i * traySpacing : 0}
 		{@const zOffset = exploded
 			? meshOffset.z - interiorStartOffset - placement.y
@@ -1232,11 +1236,11 @@
 <!-- Counter preview for all trays view (single box view) -->
 {#if showCounters && showAllTrays && !showAllBoxes && allTrays.length > 0}
 	{@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
+	{@const maxTrayHeight = Math.max(...allTrays.map((t) => t.placement.dimensions.height))}
+	{@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
+	{@const traySpacing = liftPhase * maxTrayHeight * 1.2}
 	{#each allTrays as trayData, trayIdx (trayData.trayId)}
 		{@const placement = trayData.placement}
-		{@const trayHeight = placement.dimensions.height}
-		{@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
-		{@const traySpacing = liftPhase * trayHeight * 1.2}
 		{@const trayXOffset = exploded
 			? meshOffset.x + interiorStartOffset + placement.x
 			: sidePositions.traysGroup.x - maxTrayWidth / 2 + placement.x}
@@ -1481,7 +1485,8 @@
 <!-- Reference labels for PDF capture - single tray view -->
 {#if showReferenceLabels && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
 	{@const counterStacks = selectedTrayCounters.filter(isCounterStack)}
-	{@const maxStackHeight = counterStacks.length > 0 ? Math.max(
+	{@const cardStacks = selectedTrayCounters.filter((s): s is CardStack => !isCounterStack(s))}
+	{@const counterMaxHeight = counterStacks.length > 0 ? Math.max(
 		...counterStacks.map((stack) => {
 			const effectiveShape =
 				stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape;
@@ -1493,7 +1498,11 @@
 						: Math.max(stack.width, stack.length)
 				: stack.z + stack.count * stack.thickness;
 		})
-	) : 20}
+	) : 0}
+	{@const cardMaxHeight = cardStacks.length > 0 ? Math.max(
+		...cardStacks.map((stack) => stack.z + stack.count * stack.thickness)
+	) : 0}
+	{@const maxStackHeight = Math.max(counterMaxHeight, cardMaxHeight, 20)}
 	{@const labelHeight = maxStackHeight + 5}
 	{#each counterStacks as stack, stackIdx (stackIdx)}
 		{@const refCode = `${selectedTrayLetter}${stackIdx + 1}`}
@@ -1511,6 +1520,33 @@
 		{@const tooltipHeight = labelHeight + 6}
 		{@const isHovered = hoveredLabel?.refCode === refCode}
 		<!-- Floating label above stack -->
+		<Text
+			text={refCode}
+			font={monoFont}
+			fontSize={4}
+			position={[posX, labelHeight, posZ]}
+			quaternion={captureMode ? topDownQuaternion : labelQuaternion}
+			color={isHovered ? '#ffffff' : '#000000'}
+			anchorX="center"
+			anchorY="bottom"
+			outlineWidth="8%"
+			outlineColor={isHovered ? '#000000' : '#ffffff'}
+			onpointerenter={() => {
+				hoveredLabel = { refCode, text: stackLabel, position: [posX, tooltipHeight, posZ] };
+			}}
+			onpointerleave={() => {
+				hoveredLabel = null;
+			}}
+		/>
+	{/each}
+	{#each cardStacks as stack, stackIdx (stackIdx)}
+		{@const refCode = `${selectedTrayLetter}${counterStacks.length + stackIdx + 1}`}
+		{@const posX = meshOffset.x + stack.x}
+		{@const posZ = meshOffset.z - stack.y}
+		{@const stackLabel = getCardStackLabel(stack)}
+		{@const tooltipHeight = labelHeight + 6}
+		{@const isHovered = hoveredLabel?.refCode === refCode}
+		<!-- Floating label above card stack -->
 		<Text
 			text={refCode}
 			font={monoFont}
@@ -1574,11 +1610,12 @@
 <!-- Reference labels for PDF capture - all trays view (single box view) -->
 {#if showReferenceLabels && showAllTrays && !showAllBoxes && allTrays.length > 0}
 	{@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
+	{@const maxTrayHeight = Math.max(...allTrays.map((t) => t.placement.dimensions.height))}
+	{@const globalLabelHeight = maxTrayHeight + 5}
+	{@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
+	{@const traySpacing = liftPhase * maxTrayHeight * 1.2}
 	{#each allTrays as trayData, trayIdx (trayData.trayId)}
 		{@const placement = trayData.placement}
-		{@const trayHeight = placement.dimensions.height}
-		{@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
-		{@const traySpacing = liftPhase * trayHeight * 1.2}
 		{@const trayXOffset = exploded
 			? meshOffset.x + interiorStartOffset + placement.x
 			: sidePositions.traysGroup.x - maxTrayWidth / 2 + placement.x}
@@ -1589,20 +1626,7 @@
 			? meshOffset.z - interiorStartOffset - placement.y
 			: traysGroupDepth - placement.y}
 		{@const trayLetter = trayData.trayLetter ?? String.fromCharCode(65 + trayIdx)}
-		{@const maxStackHeight = Math.max(
-			...trayData.counterStacks.map((stack) => {
-				const effectiveShape =
-					stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape;
-				return stack.isEdgeLoaded
-					? effectiveShape === 'triangle'
-						? stack.length
-						: stack.shape === 'custom'
-							? Math.min(stack.width, stack.length)
-							: Math.max(stack.width, stack.length)
-					: stack.z + stack.count * stack.thickness;
-			})
-		)}
-		{@const labelHeight = trayYOffset + maxStackHeight + 5}
+		{@const labelHeight = trayYOffset + globalLabelHeight}
 		{#each trayData.counterStacks as stack, stackIdx (stackIdx)}
 			{@const refCode = `${trayLetter}${stackIdx + 1}`}
 			{@const posX = stack.isEdgeLoaded
@@ -1643,6 +1667,8 @@
 
 <!-- Reference labels for multi-box (print) view -->
 {#if showReferenceLabels && showAllBoxes && allBoxes.length > 0}
+	{@const globalMaxTrayHeight = Math.max(...allBoxes.flatMap((b) => b.trayGeometries.map((t) => t.placement.dimensions.height)))}
+	{@const globalLabelHeight = boxFloorThickness + globalMaxTrayHeight + 5}
 	{#each allBoxes as boxData, boxIndex (boxData.boxId)}
 		{@const boxPos = boxPositions[boxIndex]}
 		{@const boxWidth = boxData.boxDimensions.width}
@@ -1653,28 +1679,11 @@
 			{@const placement = trayData.placement}
 			{@const trayX = xOffset - boxWidth / 2 + boxWallThickness + boxTolerance + placement.x}
 			{@const trayZ = zOffset + boxDepth / 2 - boxWallThickness - boxTolerance - placement.y}
-			{@const trayY = boxFloorThickness}
 			{@const cumulativeIdx =
 				allBoxes.slice(0, boxIndex).reduce((sum, b) => sum + b.trayGeometries.length, 0) +
 				trayIndex}
 			{@const trayLetter = trayData.trayLetter ?? getTrayLetter(cumulativeIdx)}
-			{@const maxStackHeight =
-				trayData.counterStacks.length > 0
-					? Math.max(
-							...trayData.counterStacks.map((stack) => {
-								const effectiveShape =
-									stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape;
-								return stack.isEdgeLoaded
-									? effectiveShape === 'triangle'
-										? stack.length
-										: stack.shape === 'custom'
-											? Math.min(stack.width, stack.length)
-											: Math.max(stack.width, stack.length)
-									: stack.z + stack.count * stack.thickness;
-							})
-						)
-					: 10}
-			{@const labelHeight = trayY + maxStackHeight + 5}
+			{@const labelHeight = globalLabelHeight}
 			{#each trayData.counterStacks as stack, stackIdx (stackIdx)}
 				{@const refCode = `${trayLetter}${stackIdx + 1}`}
 				{@const posX = stack.isEdgeLoaded

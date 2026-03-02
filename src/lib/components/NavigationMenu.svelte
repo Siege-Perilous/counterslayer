@@ -140,6 +140,7 @@
 								action={() => handleDeleteBox(box.id)}
 								actionButtonText="Delete box"
 								positioning={{ placement: 'right' }}
+								portal=".appContainer"
 							>
 								{#snippet trigger({ triggerProps })}
 									<IconButton {...triggerProps} size="sm" variant="ghost" title="Delete box">
@@ -184,6 +185,7 @@
 										action={() => handleDeleteTray(box.id, tray.id)}
 										actionButtonText="Delete tray"
 										positioning={{ placement: 'right' }}
+										portal=".appContainer"
 									>
 										{#snippet trigger({ triggerProps })}
 											<IconButton {...triggerProps} size="sm" variant="ghost" title="Delete tray">

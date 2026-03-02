@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { arrangeTrays } from '$lib/models/box';
+import { arrangeTrays, getCustomCardSizesFromBox } from '$lib/models/box';
 import {
 	getCounterPositions,
 	type CounterStack,
@@ -141,12 +141,14 @@ export function extractPdfData(project: Project): PdfData {
 
 	for (let boxIndex = 0; boxIndex < project.boxes.length; boxIndex++) {
 		const box = project.boxes[boxIndex];
+		const customCardSizes = getCustomCardSizesFromBox(box);
 
 		// Get tray placements
 		const placements = arrangeTrays(box.trays, {
 			customBoxWidth: box.customWidth,
 			wallThickness: box.wallThickness,
-			tolerance: box.tolerance
+			tolerance: box.tolerance,
+			customCardSizes
 		});
 
 		// Calculate box dimensions
@@ -171,7 +173,7 @@ export function extractPdfData(project: Project): PdfData {
 
 			if (isCardTray(tray)) {
 				// Convert card positions to CounterStack format for PDF generation
-				const cardStacks = getCardPositions(tray.params);
+				const cardStacks = getCardPositions(tray.params, customCardSizes);
 				counterPositions = cardStacks.map((stack) => ({
 					shape: 'custom' as const,
 					customShapeName: 'Card',

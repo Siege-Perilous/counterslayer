@@ -2,7 +2,7 @@ import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { Box, Tray, CounterTray, CardTray } from '$lib/types/project';
 import { isCounterTray, isCardTray } from '$lib/types/project';
-import type { CounterTrayParams } from './counterTray';
+import type { CounterTrayParams, CustomCardSize } from './counterTray';
 import { getCardTrayDimensions } from './cardTray';
 
 const { cylinder } = jscad.primitives;
@@ -41,10 +41,31 @@ export interface TraySpacerInfo {
 	floorSpacerHeight: number; // Additional solid material under tray floor
 }
 
+// Extract customCardSizes from the first counter tray in a box
+// (customCardSizes is a global param stored in CounterTrayParams)
+export function getCustomCardSizesFromBox(box: Box): CustomCardSize[] {
+	for (const tray of box.trays) {
+		if (isCounterTray(tray) && tray.params.customCardSizes) {
+			return tray.params.customCardSizes;
+		}
+	}
+	// Return default card sizes if no counter tray found
+	return [
+		{ name: 'Standard', width: 66, length: 91, thickness: 0.5 },
+		{ name: 'Mini American', width: 44, length: 66, thickness: 0.5 },
+		{ name: 'Mini European', width: 47, length: 71, thickness: 0.5 },
+		{ name: 'Euro', width: 62, length: 95, thickness: 0.5 },
+		{ name: 'Japanese', width: 62, length: 89, thickness: 0.5 },
+		{ name: 'Tarot', width: 73, length: 123, thickness: 0.5 },
+		{ name: 'Square', width: 73, length: 73, thickness: 0.5 }
+	];
+}
+
 // Get dimensions for any tray type (dispatches based on tray type)
-export function getTrayDimensionsForTray(tray: Tray): TrayDimensions {
+export function getTrayDimensionsForTray(tray: Tray, customCardSizes?: CustomCardSize[]): TrayDimensions {
 	if (isCardTray(tray)) {
-		return getCardTrayDimensions(tray.params);
+		// Use provided customCardSizes or fall back to empty array (will throw if card size not found)
+		return getCardTrayDimensions(tray.params, customCardSizes ?? []);
 	}
 	// Default to counter tray
 	return getCounterTrayDimensions(tray.params);
@@ -416,14 +437,14 @@ export const getTrayDimensions = getCounterTrayDimensions;
 // If customBoxWidth is provided, use interior width (minus walls/tolerance) for packing
 export function arrangeTrays(
 	trays: Tray[],
-	options?: { customBoxWidth?: number; wallThickness?: number; tolerance?: number }
+	options?: { customBoxWidth?: number; wallThickness?: number; tolerance?: number; customCardSizes?: CustomCardSize[] }
 ): TrayPlacement[] {
 	if (trays.length === 0) return [];
 
 	// Calculate dimensions for all trays
 	const trayDims = trays.map((tray) => ({
 		tray,
-		dimensions: getTrayDimensionsForTray(tray)
+		dimensions: getTrayDimensionsForTray(tray, options?.customCardSizes)
 	}));
 
 	// Sort by width (X dimension) descending so widest trays are first
@@ -597,10 +618,12 @@ const POKE_HOLE_DIAMETER = 15;
 export function createBox(box: Box): Geom3 | null {
 	if (box.trays.length === 0) return null;
 
+	const customCardSizes = getCustomCardSizesFromBox(box);
 	const placements = arrangeTrays(box.trays, {
 		customBoxWidth: box.customWidth,
 		wallThickness: box.wallThickness,
-		tolerance: box.tolerance
+		tolerance: box.tolerance,
+		customCardSizes
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
@@ -658,10 +681,12 @@ export function calculateMinimumBoxDimensions(box: Box): BoxMinimumDimensions {
 		return { minWidth: 0, minDepth: 0, minHeight: 0 };
 	}
 
+	const customCardSizes = getCustomCardSizesFromBox(box);
 	const placements = arrangeTrays(box.trays, {
 		customBoxWidth: box.customWidth,
 		wallThickness: box.wallThickness,
-		tolerance: box.tolerance
+		tolerance: box.tolerance,
+		customCardSizes
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
@@ -704,10 +729,12 @@ export function validateCustomDimensions(box: Box): ValidationResult {
 export function calculateTraySpacers(box: Box): TraySpacerInfo[] {
 	if (box.trays.length === 0) return [];
 
+	const customCardSizes = getCustomCardSizesFromBox(box);
 	const placements = arrangeTrays(box.trays, {
 		customBoxWidth: box.customWidth,
 		wallThickness: box.wallThickness,
-		tolerance: box.tolerance
+		tolerance: box.tolerance,
+		customCardSizes
 	});
 	const minimums = calculateMinimumBoxDimensions(box);
 
