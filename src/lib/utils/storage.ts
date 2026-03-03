@@ -187,6 +187,10 @@ function migrateCounterTrayParams(
 	delete (migrated as LegacyTrayParams).hexPointyTop;
 	delete (migrated as LegacyTrayParams).stacks;
 
+	// Remove deprecated extra tray params (now handled by cup trays)
+	delete (migrated as { extraTrayCols?: number }).extraTrayCols;
+	delete (migrated as { extraTrayRows?: number }).extraTrayRows;
+
 	return migrated;
 }
 
@@ -263,6 +267,14 @@ function migrateTray(
 			type: 'cardDivider',
 			color,
 			params: { ...params, stacks: migratedStacks }
+		} as Tray;
+	}
+
+	if (trayType === 'cup') {
+		return {
+			...tray,
+			type: 'cup',
+			color
 		} as Tray;
 	}
 

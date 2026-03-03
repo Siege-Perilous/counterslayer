@@ -1,7 +1,7 @@
 import jscad from '@jscad/modeling';
 import type { CounterShape, CounterBaseShape } from '$lib/types/project';
 
-const { cuboid, cylinder, roundedCuboid, sphere, circle, rectangle } = jscad.primitives;
+const { cuboid, cylinder, sphere, circle, rectangle } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
 const { translate, rotateX, rotateY, rotateZ, scale, mirrorY } = jscad.transforms;
 const { hull } = jscad.hulls;
@@ -36,8 +36,6 @@ export interface CounterTrayParams {
 	cutoutRatio: number;
 	cutoutMax: number;
 	trayWidthOverride: number;
-	extraTrayCols: number;
-	extraTrayRows: number;
 	topLoadedStacks: TopLoadedStackDef[];
 	edgeLoadedStacks: EdgeLoadedStackDef[];
 	printBedSize: number;
@@ -70,8 +68,6 @@ export const defaultParams: CounterTrayParams = {
 	cutoutRatio: 0.35,
 	cutoutMax: 12,
 	trayWidthOverride: 0,
-	extraTrayCols: 1,
-	extraTrayRows: 1,
 	topLoadedStacks: [
 		[DEFAULT_SHAPE_IDS.square, 12],
 		[DEFAULT_SHAPE_IDS.hex, 10],
@@ -728,8 +724,6 @@ export function createCounterTray(
 		cutoutRatio,
 		cutoutMax,
 		trayWidthOverride,
-		extraTrayCols,
-		extraTrayRows,
 		topLoadedStacks,
 		edgeLoadedStacks
 	} = params;
@@ -1178,13 +1172,6 @@ export function createCounterTray(
 	const spacerHeight = floorSpacerHeight ?? 0;
 	const trayHeight = trayHeightWithoutSpacer + spacerHeight;
 	// Extra tray area
-	const extraTrayLength = trayWidth > trayWidthAuto ? trayWidth - trayWidthAuto : 0;
-	const extraTrayStartX = trayWidthAuto;
-	const extraTrayInnerWidth = trayDepth - 2 * wallThickness;
-	const extraTrayInnerLength = extraTrayLength - wallThickness;
-	// Extra tray depth should not include the spacer - it's the usable depth from the tray surface
-	const extraTrayDepth = trayHeightWithoutSpacer - floorThickness;
-
 	// Create pocket shape
 	const createPocketShape = (shapeId: string, height: number) => {
 		const counterShape = getShape(shapeId);
@@ -1458,53 +1445,6 @@ export function createCounterTray(
 		);
 	};
 
-	// Scoopable cell - uses rounded cuboid for easy finger access
-	const createScoopableCell = (width: number, length: number, depth: number) => {
-		// Guard against invalid dimensions
-		if (width <= 0 || length <= 0 || depth <= 0) {
-			return cuboid({ size: [0.1, 0.1, 0.1], center: [0, 0, 0] });
-		}
-
-		// Round the bottom corners - radius limited to half the smallest dimension
-		const roundRadius = Math.min(length / 2, depth / 2, width / 2, 8);
-
-		return roundedCuboid({
-			size: [width, length, depth + roundRadius], // Extra height so rounding is at bottom
-			center: [width / 2, length / 2, (depth + roundRadius) / 2],
-			roundRadius,
-			segments: 32
-		});
-	};
-
-	// Extra tray area cells
-	const createExtraTrayArea = () => {
-		if (extraTrayLength <= 0 || extraTrayInnerLength <= 0) return [];
-
-		const totalColWalls = (extraTrayCols - 1) * wallThickness;
-		const totalRowWalls = (extraTrayRows - 1) * wallThickness;
-		const cellWidth = (extraTrayInnerLength - totalColWalls) / extraTrayCols;
-		const cellLength = (extraTrayInnerWidth - totalRowWalls) / extraTrayRows;
-
-		// Guard against invalid cell dimensions
-		if (cellWidth <= 0 || cellLength <= 0) return [];
-
-		const cells = [];
-		for (let col = 0; col < extraTrayCols; col++) {
-			for (let row = 0; row < extraTrayRows; row++) {
-				const xPos = extraTrayStartX + col * (cellWidth + wallThickness);
-				const yPos = wallThickness + row * (cellLength + wallThickness);
-
-				cells.push(
-					translate(
-						[xPos, yPos, spacerHeight + floorThickness],
-						createScoopableCell(cellWidth, cellLength, extraTrayDepth)
-					)
-				);
-			}
-		}
-		return cells;
-	};
-
 	// Build the tray
 	const trayBody = cuboid({
 		size: [trayWidth, trayDepth, trayHeight],
@@ -1669,10 +1609,8 @@ export function createCounterTray(
 		}
 	}
 
-	const extraCells = createExtraTrayArea();
-
 	// The tray body now includes the spacer height, and pockets are cut at the correct Z positions
-	let result = subtract(trayBody, ...pocketCuts, ...fingerCuts, ...extraCells);
+	let result = subtract(trayBody, ...pocketCuts, ...fingerCuts);
 
 	// Emboss tray name on bottom (Z=0 face)
 	if (trayName && trayName.trim().length > 0) {

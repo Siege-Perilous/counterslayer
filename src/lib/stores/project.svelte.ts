@@ -9,6 +9,7 @@ import {
 	defaultCardDividerTrayParams,
 	type CardDividerTrayParams
 } from '$lib/models/cardDividerTray';
+import { defaultCupTrayParams, type CupTrayParams } from '$lib/models/cupTray';
 import { defaultLidParams } from '$lib/models/lid';
 import { saveProject, loadProject, migrateProjectData } from '$lib/utils/storage';
 import type {
@@ -19,11 +20,18 @@ import type {
 	CounterTray,
 	CardDrawTray,
 	CardDividerTray,
+	CupTray,
 	CardTray,
 	CounterShape,
 	CardSize
 } from '$lib/types/project';
-import { isCounterTray, isCardTray, isCardDrawTray, isCardDividerTray } from '$lib/types/project';
+import {
+	isCounterTray,
+	isCardTray,
+	isCardDrawTray,
+	isCardDividerTray,
+	isCupTray
+} from '$lib/types/project';
 
 export type {
 	Tray,
@@ -33,11 +41,12 @@ export type {
 	CounterTray,
 	CardDrawTray,
 	CardDividerTray,
+	CupTray,
 	CardTray,
 	CounterShape,
 	CardSize
 };
-export { isCounterTray, isCardTray, isCardDrawTray, isCardDividerTray };
+export { isCounterTray, isCardTray, isCardDrawTray, isCardDividerTray, isCupTray };
 
 // Default counter shapes (global)
 export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
@@ -221,6 +230,17 @@ function createDefaultCardDividerTray(
 	};
 }
 
+function createDefaultCupTray(name: string, color: string): CupTray {
+	return {
+		id: generateId(),
+		type: 'cup',
+		name,
+		color,
+		rotationOverride: 'auto',
+		params: { ...defaultCupTrayParams }
+	};
+}
+
 // Legacy alias for backwards compatibility
 function _createDefaultCardTray(name: string, color: string): CardDrawTray {
 	return createDefaultCardDrawTray(name, color);
@@ -252,10 +272,12 @@ function createDefaultProject(): Project {
 	const box = createDefaultBox('Box 1');
 	const counterTray = createDefaultTray('Tray 1', TRAY_COLORS[0]);
 	const cardDrawTray = createDefaultCardDrawTray('Card Draw', TRAY_COLORS[1]);
+	const cupTray = createDefaultCupTray('Cup Tray', TRAY_COLORS[2]);
 	// Set card draw tray to hold 25 cards
 	cardDrawTray.params = { ...cardDrawTray.params, cardCount: 25 };
 	box.trays.push(counterTray);
 	box.trays.push(cardDrawTray);
+	box.trays.push(cupTray);
 
 	return {
 		boxes: [box],
@@ -330,6 +352,8 @@ export function addBox(trayType: TrayType = 'counter'): Box {
 		tray = createDefaultCardDrawTray('Card Draw 1', color, project.cardSizes);
 	} else if (trayType === 'cardDivider') {
 		tray = createDefaultCardDividerTray('Card Divider 1', color, project.cardSizes);
+	} else if (trayType === 'cup') {
+		tray = createDefaultCupTray('Cup Tray 1', color);
 	} else {
 		tray = createDefaultCounterTray('Tray 1', color, project.counterShapes);
 		// Inherit global params (including customShapes) from existing counter trays
@@ -403,7 +427,7 @@ function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
 }
 
 // Tray type for addTray function
-export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'card';
+export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'cup' | 'card';
 
 // Tray operations
 export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | null {
@@ -418,6 +442,8 @@ export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | n
 		tray = createDefaultCardDrawTray(`Card Draw ${trayNumber}`, color, project.cardSizes);
 	} else if (trayType === 'cardDivider') {
 		tray = createDefaultCardDividerTray(`Card Divider ${trayNumber}`, color, project.cardSizes);
+	} else if (trayType === 'cup') {
+		tray = createDefaultCupTray(`Cup Tray ${trayNumber}`, color);
 	} else {
 		tray = createDefaultCounterTray(`Tray ${trayNumber}`, color, project.counterShapes);
 		// Inherit global params (including customShapes) from existing counter trays
@@ -586,6 +612,18 @@ export function updateCardDividerTrayParams(trayId: string, params: CardDividerT
 	for (const box of project.boxes) {
 		const tray = box.trays.find((t) => t.id === trayId);
 		if (tray && isCardDividerTray(tray)) {
+			tray.params = params;
+			autosave();
+			return;
+		}
+	}
+}
+
+// Update cup tray params
+export function updateCupTrayParams(trayId: string, params: CupTrayParams): void {
+	for (const box of project.boxes) {
+		const tray = box.trays.find((t) => t.id === trayId);
+		if (tray && isCupTray(tray)) {
 			tray.params = params;
 			autosave();
 			return;

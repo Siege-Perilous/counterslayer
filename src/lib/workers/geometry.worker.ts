@@ -12,6 +12,7 @@ import {
 } from '$lib/models/counterTray';
 import { createCardDrawTray, getCardDrawPositions } from '$lib/models/cardTray';
 import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
+import { createCupTray, getCupPositions } from '$lib/models/cupTray';
 import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
 import {
 	arrangeTrays,
@@ -23,7 +24,7 @@ import {
 import stlSerializer from '@jscad/stl-serializer';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { Box, Tray, CardSize, CounterShape } from '$lib/types/project';
-import { isCardTray, isCardDividerTray } from '$lib/types/project';
+import { isCardTray, isCardDividerTray, isCupTray } from '$lib/types/project';
 
 const { geom3 } = jscad.geometries;
 
@@ -173,6 +174,9 @@ function createTrayGeometry(
 	maxHeight: number,
 	spacerHeight: number
 ): Geom3 {
+	if (isCupTray(tray)) {
+		return createCupTray(tray.params, tray.name, maxHeight, spacerHeight);
+	}
 	if (isCardDividerTray(tray)) {
 		return createCardDividerTray(tray.params, cardSizes, tray.name, maxHeight, spacerHeight);
 	}
@@ -193,6 +197,25 @@ function getTrayPositions(
 	maxHeight: number,
 	spacerHeight: number
 ): CounterStack[] {
+	if (isCupTray(tray)) {
+		// Convert CupPosition to CounterStack format for visualization
+		const cupPositions = getCupPositions(tray.params, maxHeight, spacerHeight);
+		return cupPositions.map((cup, index) => ({
+			shape: 'custom' as const,
+			customShapeName: `Cup ${cup.row + 1}-${cup.column + 1}`,
+			customBaseShape: 'rectangle' as const,
+			// Convert from center to edge position
+			x: cup.x - cup.width / 2,
+			y: cup.y - cup.depth / 2,
+			z: cup.z,
+			width: cup.width,
+			length: cup.depth,
+			thickness: cup.height,
+			count: 1,
+			hexPointyTop: false,
+			color: `hsl(${(index * 60) % 360}, 50%, 55%)`
+		}));
+	}
 	if (isCardDividerTray(tray)) {
 		// Convert CardDividerStackPosition to CounterStack format for visualization
 		const dividerStacks = getCardDividerPositions(tray.params, cardSizes, maxHeight, spacerHeight);

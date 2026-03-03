@@ -1,10 +1,11 @@
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { Box, Tray, CardSize, CounterShape } from '$lib/types/project';
-import { isCardTray, isCardDividerTray } from '$lib/types/project';
+import { isCardTray, isCardDividerTray, isCupTray } from '$lib/types/project';
 import type { CounterTrayParams } from './counterTray';
 import { getCardDrawTrayDimensions } from './cardTray';
 import { getCardDividerTrayDimensions } from './cardDividerTray';
+import { getCupTrayDimensions } from './cupTray';
 
 const { cylinder } = jscad.primitives;
 const { subtract } = jscad.booleans;
@@ -49,6 +50,9 @@ export function getTrayDimensionsForTray(
 	cardSizes: CardSize[] = [],
 	counterShapes: CounterShape[] = []
 ): TrayDimensions {
+	if (isCupTray(tray)) {
+		return getCupTrayDimensions(tray.params);
+	}
 	if (isCardDividerTray(tray)) {
 		return getCardDividerTrayDimensions(tray.params, cardSizes);
 	}

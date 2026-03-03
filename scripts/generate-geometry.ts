@@ -16,8 +16,14 @@ import { createBoxWithLidGrooves, createLid } from '../src/lib/models/lid.js';
 import { createCounterTray } from '../src/lib/models/counterTray.js';
 import { createCardDrawTray } from '../src/lib/models/cardTray.js';
 import { createCardDividerTray } from '../src/lib/models/cardDividerTray.js';
+import { createCupTray } from '../src/lib/models/cupTray.js';
 import type { Box, Tray } from '../src/lib/types/project.js';
-import { isCounterTray, isCardTray, isCardDividerTray } from '../src/lib/types/project.js';
+import {
+	isCounterTray,
+	isCardTray,
+	isCardDividerTray,
+	isCupTray
+} from '../src/lib/types/project.js';
 import stlSerializer from '@jscad/stl-serializer';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
@@ -107,7 +113,9 @@ async function main() {
 		try {
 			// Dispatch to appropriate geometry generator based on tray type
 			let trayGeom: Geom3 | null = null;
-			if (isCardTray(tray)) {
+			if (isCupTray(tray)) {
+				trayGeom = createCupTray(tray.params, tray.name, maxHeight, 0);
+			} else if (isCardTray(tray)) {
 				trayGeom = createCardDrawTray(tray.params, project.cardSizes, tray.name, maxHeight, 0);
 			} else if (isCardDividerTray(tray)) {
 				trayGeom = createCardDividerTray(tray.params, project.cardSizes, tray.name, maxHeight, 0);

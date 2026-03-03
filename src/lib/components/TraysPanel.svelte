@@ -14,13 +14,18 @@
 	} from '@tableslayer/ui';
 	import { IconX, IconPlus, IconMenu } from '@tabler/icons-svelte';
 	import type { Box, Tray } from '$lib/types/project';
-	import { isCounterTray, isCardTray, isCardDividerTray } from '$lib/types/project';
+	import { isCounterTray, isCardTray, isCardDividerTray, isCupTray } from '$lib/types/project';
 	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
 	import { type CardDrawTrayParams, getCardDrawTrayDimensions } from '$lib/models/cardTray';
 	import {
 		type CardDividerTrayParams,
 		getCardDividerTrayDimensions
 	} from '$lib/models/cardDividerTray';
+	import {
+		type CupTrayParams,
+		getCupTrayDimensions,
+		validateCupTrayParams
+	} from '$lib/models/cupTray';
 	import { getTrayDimensions } from '$lib/models/box';
 	import {
 		getProject,
@@ -42,6 +47,7 @@
 		onUpdateCounterParams?: (params: CounterTrayParams) => void;
 		onUpdateCardParams?: (params: CardDrawTrayParams) => void;
 		onUpdateCardDividerParams?: (params: CardDividerTrayParams) => void;
+		onUpdateCupParams?: (params: CupTrayParams) => void;
 		hideList?: boolean;
 	}
 
@@ -55,6 +61,7 @@
 		onUpdateCounterParams,
 		onUpdateCardParams,
 		onUpdateCardDividerParams,
+		onUpdateCupParams,
 		hideList = false
 	}: Props = $props();
 
@@ -130,14 +137,26 @@
 		counters: number;
 		isCardTray: boolean;
 		isCardDivider: boolean;
+		isCupTray: boolean;
 	} {
+		if (isCupTray(tray)) {
+			const cupCount = tray.params.rows * tray.params.columns;
+			return {
+				stacks: cupCount,
+				counters: cupCount,
+				isCardTray: false,
+				isCardDivider: false,
+				isCupTray: true
+			};
+		}
 		if (isCardDividerTray(tray)) {
 			const totalCards = tray.params.stacks.reduce((sum, s) => sum + s.count, 0);
 			return {
 				stacks: tray.params.stacks.length,
 				counters: totalCards,
 				isCardTray: false,
-				isCardDivider: true
+				isCardDivider: true,
+				isCupTray: false
 			};
 		}
 		if (isCardTray(tray)) {
@@ -145,7 +164,8 @@
 				stacks: 1,
 				counters: tray.params.cardCount,
 				isCardTray: true,
-				isCardDivider: false
+				isCardDivider: false,
+				isCupTray: false
 			};
 		}
 		// Counter tray
@@ -155,7 +175,8 @@
 			stacks: tray.params.topLoadedStacks.length + tray.params.edgeLoadedStacks.length,
 			counters: topCount + edgeCount,
 			isCardTray: false,
-			isCardDivider: false
+			isCardDivider: false,
+			isCupTray: false
 		};
 	}
 
@@ -201,6 +222,12 @@
 	) {
 		if (selectedTray && isCardDividerTray(selectedTray) && onUpdateCardDividerParams) {
 			onUpdateCardDividerParams({ ...selectedTray.params, [key]: value });
+		}
+	}
+
+	function updateCupParam<K extends keyof CupTrayParams>(key: K, value: CupTrayParams[K]) {
+		if (selectedTray && isCupTray(selectedTray) && onUpdateCupParams) {
+			onUpdateCupParams({ ...selectedTray.params, [key]: value });
 		}
 	}
 
@@ -262,6 +289,18 @@
 	let cardDividerTrayDimensions = $derived.by(() => {
 		if (!selectedTray || !isCardDividerTray(selectedTray)) return null;
 		return getCardDividerTrayDimensions(selectedTray.params, getCardSizes());
+	});
+
+	// Compute dimensions for cup trays
+	let cupTrayDimensions = $derived.by(() => {
+		if (!selectedTray || !isCupTray(selectedTray)) return null;
+		return getCupTrayDimensions(selectedTray.params);
+	});
+
+	// Compute validation warnings for cup trays
+	let cupTrayWarnings = $derived.by(() => {
+		if (!selectedTray || !isCupTray(selectedTray)) return [];
+		return validateCupTrayParams(selectedTray.params);
 	});
 
 	// Top-loaded stack handlers (counter tray only)
@@ -382,7 +421,9 @@
 							? stats.counters + ' cards'
 							: stats.isCardDivider
 								? stats.counters + ' cards in ' + stats.stacks + ' stacks'
-								: stats.counters + ' counters in ' + stats.stacks + ' stacks'}"
+								: stats.isCupTray
+									? stats.stacks + ' cups'
+									: stats.counters + ' counters in ' + stats.stacks + ' stacks'}"
 					>
 						<span style="overflow: hidden; text-overflow: ellipsis;">{tray.name}</span>
 						<span style="display: flex; align-items: center; gap: 0.25rem;">
@@ -391,7 +432,9 @@
 									? stats.counters + ' cards'
 									: stats.isCardDivider
 										? stats.counters + ' cards/' + stats.stacks + 's'
-										: stats.counters + 'c in ' + stats.stacks + 's'}</span
+										: stats.isCupTray
+											? stats.stacks + ' cups'
+											: stats.counters + 'c in ' + stats.stacks + 's'}</span
 							>
 							{#if selectedBox.trays.length > 1}
 								<IconButton
@@ -786,32 +829,6 @@
 								{/snippet}
 								{#snippet end()}mm{/snippet}
 							</FormControl>
-							<FormControl label="Extra cols" name="extraTrayCols">
-								{#snippet input({ inputProps })}
-									<Input
-										{...inputProps}
-										type="number"
-										step="1"
-										min="1"
-										value={selectedTray.params.extraTrayCols}
-										onchange={(e) =>
-											updateCounterParam('extraTrayCols', parseInt(e.currentTarget.value))}
-									/>
-								{/snippet}
-							</FormControl>
-							<FormControl label="Extra rows" name="extraTrayRows">
-								{#snippet input({ inputProps })}
-									<Input
-										{...inputProps}
-										type="number"
-										step="1"
-										min="1"
-										value={selectedTray.params.extraTrayRows}
-										onchange={(e) =>
-											updateCounterParam('extraTrayRows', parseInt(e.currentTarget.value))}
-									/>
-								{/snippet}
-							</FormControl>
 						</div>
 					</section>
 				</div>
@@ -1168,6 +1185,154 @@
 						</div>
 					</section>
 				</div>
+			{:else if isCupTray(selectedTray)}
+				<!-- Cup Tray Settings -->
+				<div class="panelFormSection">
+					{#if cupTrayWarnings.length > 0}
+						{#each cupTrayWarnings as warning, i (i)}
+							<p class="warningText">{warning}</p>
+						{/each}
+						<Spacer size="0.5rem" />
+					{/if}
+
+					<section class="section">
+						<h3 class="sectionTitle">Grid Layout</h3>
+						<Spacer size="0.5rem" />
+						<div class="formGrid">
+							<FormControl label="Columns" name="columns">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="1"
+										min="1"
+										value={selectedTray.params.columns}
+										onchange={(e) => updateCupParam('columns', parseInt(e.currentTarget.value))}
+									/>
+								{/snippet}
+							</FormControl>
+							<FormControl label="Rows" name="rows">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="1"
+										min="1"
+										value={selectedTray.params.rows}
+										onchange={(e) => updateCupParam('rows', parseInt(e.currentTarget.value))}
+									/>
+								{/snippet}
+							</FormControl>
+						</div>
+					</section>
+
+					<Spacer size="0.5rem" />
+
+					<section class="section">
+						<h3 class="sectionTitle">Cup Size</h3>
+						<Spacer size="0.5rem" />
+						<div class="formGrid">
+							<FormControl label="Cup width" name="cupWidth">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="1"
+										min="10"
+										value={selectedTray.params.cupWidth}
+										onchange={(e) => updateCupParam('cupWidth', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Cup depth" name="cupDepth">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="1"
+										min="10"
+										value={selectedTray.params.cupDepth}
+										onchange={(e) => updateCupParam('cupDepth', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Cup height" name="cupHeight">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="1"
+										min="10"
+										value={selectedTray.params.cupHeight}
+										onchange={(e) => updateCupParam('cupHeight', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Corner radius" name="cornerRadius">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="1"
+										min="0"
+										max="20"
+										value={selectedTray.params.cornerRadius}
+										onchange={(e) =>
+											updateCupParam('cornerRadius', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+						</div>
+					</section>
+
+					<Spacer size="0.5rem" />
+
+					<section class="section">
+						<div class="sectionHeader">
+							<h3 class="sectionTitle">Tray Settings</h3>
+							{#if cupTrayDimensions}
+								<span class="dimensionsInfo">
+									{cupTrayDimensions.width.toFixed(1)} × {cupTrayDimensions.depth.toFixed(1)} × {cupTrayDimensions.height.toFixed(
+										1
+									)} mm
+								</span>
+							{/if}
+						</div>
+						<Spacer size="0.5rem" />
+						<div class="formGrid">
+							<FormControl label="Wall" name="wallThickness">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										value={selectedTray.params.wallThickness}
+										onchange={(e) =>
+											updateCupParam('wallThickness', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+							<FormControl label="Floor" name="floorThickness">
+								{#snippet input({ inputProps })}
+									<Input
+										{...inputProps}
+										type="number"
+										step="0.1"
+										value={selectedTray.params.floorThickness}
+										onchange={(e) =>
+											updateCupParam('floorThickness', parseFloat(e.currentTarget.value))}
+									/>
+								{/snippet}
+								{#snippet end()}mm{/snippet}
+							</FormControl>
+						</div>
+					</section>
+				</div>
 			{/if}
 		</div>
 	{:else}
@@ -1391,5 +1556,15 @@
 		font-size: 0.75rem;
 		color: var(--fgMuted);
 		margin: 0;
+	}
+
+	.warningText {
+		font-size: 0.75rem;
+		color: var(--fgDanger);
+		margin: 0;
+	}
+
+	.warningText + .warningText {
+		margin-top: 0.25rem;
 	}
 </style>

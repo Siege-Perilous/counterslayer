@@ -12,16 +12,19 @@
 		updateTrayParams,
 		updateCardTrayParams,
 		updateCardDividerTrayParams,
+		updateCupTrayParams,
 		getCumulativeTrayLetter,
 		isCounterTray,
 		isCardTray,
 		isCardDividerTray,
+		isCupTray,
 		type Box,
 		type Tray
 	} from '$lib/stores/project.svelte';
 	import type { CounterTrayParams } from '$lib/models/counterTray';
 	import type { CardDrawTrayParams } from '$lib/models/cardTray';
 	import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
+	import type { CupTrayParams } from '$lib/models/cupTray';
 
 	type SelectionType = 'dimensions' | 'box' | 'tray';
 
@@ -86,18 +89,30 @@
 		}
 	}
 
+	function handleCupParamsChange(newParams: CupTrayParams) {
+		if (selectedTray && isCupTray(selectedTray)) {
+			updateCupTrayParams(selectedTray.id, newParams);
+		}
+	}
+
 	// Get tray stats for display
 	function getTrayStats(tray: Tray): {
 		stacks: number;
 		counters: number;
 		letter: string;
 		isCards: boolean;
+		isCups: boolean;
 	} {
 		let stacks = 0;
 		let counters = 0;
 		let isCards = false;
+		let isCups = false;
 
-		if (isCardDividerTray(tray)) {
+		if (isCupTray(tray)) {
+			stacks = tray.params.rows * tray.params.columns;
+			counters = stacks;
+			isCups = true;
+		} else if (isCardDividerTray(tray)) {
 			stacks = tray.params.stacks.length;
 			counters = tray.params.stacks.reduce((sum, s) => sum + s.count, 0);
 			isCards = true;
@@ -121,7 +136,7 @@
 				letter = getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx);
 			}
 		}
-		return { stacks, counters, letter, isCards };
+		return { stacks, counters, letter, isCards, isCups };
 	}
 
 	let panelTitle = $derived.by(() => {
@@ -150,7 +165,9 @@
 			{:else if selectionType === 'tray' && selectedTray}
 				{@const stats = getTrayStats(selectedTray)}
 				<span class="headerStats"
-					>{stats.counters} {stats.isCards ? 'cards' : 'counters'} in {stats.stacks} stacks</span
+					>{stats.isCups
+						? `${stats.stacks} cups`
+						: `${stats.counters} ${stats.isCards ? 'cards' : 'counters'} in ${stats.stacks} stacks`}</span
 				>
 			{/if}
 		</div>
@@ -192,6 +209,7 @@
 						onUpdateCounterParams={handleCounterParamsChange}
 						onUpdateCardParams={handleCardParamsChange}
 						onUpdateCardDividerParams={handleCardDividerParamsChange}
+						onUpdateCupParams={handleCupParamsChange}
 						hideList={true}
 					/>
 				{:else}

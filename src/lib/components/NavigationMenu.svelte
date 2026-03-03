@@ -14,6 +14,7 @@
 		getCumulativeTrayLetter,
 		isCardTray,
 		isCardDividerTray,
+		isCupTray,
 		type Box,
 		type Tray,
 		type TrayType
@@ -85,14 +86,26 @@
 		counters: number;
 		isCardTray: boolean;
 		isCardDivider: boolean;
+		isCupTray: boolean;
 	} {
+		if (isCupTray(tray)) {
+			const cupCount = tray.params.rows * tray.params.columns;
+			return {
+				stacks: cupCount,
+				counters: cupCount,
+				isCardTray: false,
+				isCardDivider: false,
+				isCupTray: true
+			};
+		}
 		if (isCardDividerTray(tray)) {
 			const totalCards = tray.params.stacks.reduce((sum, s) => sum + s.count, 0);
 			return {
 				stacks: tray.params.stacks.length,
 				counters: totalCards,
 				isCardTray: false,
-				isCardDivider: true
+				isCardDivider: true,
+				isCupTray: false
 			};
 		}
 		if (isCardTray(tray)) {
@@ -100,7 +113,8 @@
 				stacks: 1,
 				counters: tray.params.cardCount,
 				isCardTray: true,
-				isCardDivider: false
+				isCardDivider: false,
+				isCupTray: false
 			};
 		}
 		const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
@@ -109,7 +123,8 @@
 			stacks: tray.params.topLoadedStacks.length + tray.params.edgeLoadedStacks.length,
 			counters: topCount + edgeCount,
 			isCardTray: false,
-			isCardDivider: false
+			isCardDivider: false,
+			isCupTray: false
 		};
 	}
 </script>
@@ -187,7 +202,9 @@
 								? stats.counters + ' cards'
 								: stats.isCardDivider
 									? stats.counters + ' cards/' + stats.stacks + 's'
-									: stats.counters + 'c in ' + stats.stacks + 's'})"
+									: stats.isCupTray
+										? stats.stacks + ' cups'
+										: stats.counters + 'c in ' + stats.stacks + 's'})"
 						>
 							<span class="navItemLabel">
 								<span class="trayLetter">{letter}</span>
@@ -267,6 +284,18 @@
 									>Divided stacks of cards, divided by walls</Text
 								>
 							</button>
+							<button
+								class="trayTypeOption"
+								onclick={() => {
+									handleAddTray(box.id, 'cup');
+									contentProps.close();
+								}}
+							>
+								<Text weight={500}>Cup tray</Text>
+								<Text size="0.75rem" color="var(--fgMuted)"
+									>Bowl-shaped cups for dice and tokens</Text
+								>
+							</button>
 						{/snippet}
 					</Popover>
 				</div>
@@ -318,6 +347,16 @@
 					<Text size="0.75rem" color="var(--fgMuted)"
 						>Divided stacks of cards, divided by walls</Text
 					>
+				</button>
+				<button
+					class="trayTypeOption"
+					onclick={() => {
+						handleAddBox('cup');
+						contentProps.close();
+					}}
+				>
+					<Text weight={500}>Cup tray</Text>
+					<Text size="0.75rem" color="var(--fgMuted)">Bowl-shaped cups for dice and tokens</Text>
 				</button>
 			{/snippet}
 		</Popover>

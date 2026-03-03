@@ -1,6 +1,7 @@
 import type { CounterTrayParams } from '$lib/models/counterTray';
 import type { CardDrawTrayParams } from '$lib/models/cardTray';
 import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
+import type { CupTrayParams } from '$lib/models/cupTray';
 
 // Base shape types for counter shapes
 export type CounterBaseShape = 'rectangle' | 'square' | 'circle' | 'hex' | 'triangle';
@@ -51,11 +52,17 @@ export interface CardDividerTray extends BaseTray {
 	params: CardDividerTrayParams;
 }
 
+// Cup tray for loose game components (dice, tokens, meeples) in bowl-shaped cups
+export interface CupTray extends BaseTray {
+	type: 'cup';
+	params: CupTrayParams;
+}
+
 // Legacy alias for backwards compatibility
 export type CardTray = CardDrawTray;
 
 // Discriminated union of all tray types
-export type Tray = CounterTray | CardDrawTray | CardDividerTray;
+export type Tray = CounterTray | CardDrawTray | CardDividerTray | CupTray;
 
 // Type guards for tray types
 export function isCounterTray(tray: Tray): tray is CounterTray {
@@ -68,6 +75,10 @@ export function isCardDrawTray(tray: Tray): tray is CardDrawTray {
 
 export function isCardDividerTray(tray: Tray): tray is CardDividerTray {
 	return tray.type === 'cardDivider';
+}
+
+export function isCupTray(tray: Tray): tray is CupTray {
+	return tray.type === 'cup';
 }
 
 // Legacy alias - also matches old 'card' type for migration
