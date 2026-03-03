@@ -532,8 +532,12 @@
 
 					// Capture screenshot at 2x resolution for print quality (16:9 widescreen for long trays)
 					// If tray is rotated in layout, swap dimensions back to get original orientation
-					const boundsWidth = placement.rotated ? placement.dimensions.depth : placement.dimensions.width;
-					const boundsDepth = placement.rotated ? placement.dimensions.width : placement.dimensions.depth;
+					const boundsWidth = placement.rotated
+						? placement.dimensions.depth
+						: placement.dimensions.width;
+					const boundsDepth = placement.rotated
+						? placement.dimensions.width
+						: placement.dimensions.depth;
 					const dataUrl = captureFunction({
 						width: 1920,
 						height: 1080,
