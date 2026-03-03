@@ -34,8 +34,7 @@
 	import {
 		getGeometryWorker,
 		type TrayGeometryData,
-		type BoxGeometryData,
-		type StlFile
+		type BoxGeometryData
 	} from '$lib/utils/geometryWorker';
 	import { BlobWriter, ZipWriter } from '@zip.js/zip.js';
 	import {

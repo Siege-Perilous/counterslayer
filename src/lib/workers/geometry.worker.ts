@@ -150,7 +150,6 @@ interface CachedBoxData {
 	trays: { jscadGeom: Geom3; name: string }[];
 }
 let cachedAllBoxes: CachedBoxData[] = [];
-let cachedProjectName = '';
 
 /**
  * Sanitize a string for use in filenames (replace slashes, spaces, etc.)

@@ -24,7 +24,11 @@
 	<link rel="icon" type="image/svg+xml" href={dev ? '/favicon-dev.svg' : '/favicon.svg'} />
 </svelte:head>
 
-<div class="appContainer" class:dark={mode.current === 'dark'} class:light={mode.current === 'light'}>
+<div
+	class="appContainer"
+	class:dark={mode.current === 'dark'}
+	class:light={mode.current === 'light'}
+>
 	<!-- Header -->
 	<div class="appHeader">
 		<div style="display: flex; align-items: center; gap: 0.25rem;">
