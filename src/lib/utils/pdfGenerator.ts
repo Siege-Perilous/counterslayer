@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { arrangeTrays, getCustomCardSizesFromBox } from '$lib/models/box';
+import { arrangeTrays } from '$lib/models/box';
 import {
 	getCounterPositions,
 	type CounterStack,
@@ -8,7 +8,7 @@ import {
 } from '$lib/models/counterTray';
 import { getCardDrawPositions } from '$lib/models/cardTray';
 import { getCardDividerPositions } from '$lib/models/cardDividerTray';
-import type { Box, Project } from '$lib/types/project';
+import type { Box, Project, CounterShape } from '$lib/types/project';
 import { isCardTray, isCardDividerTray, isCounterTray } from '$lib/types/project';
 
 /**
@@ -79,11 +79,17 @@ export interface PdfData {
 }
 
 // Generate stack label from definition
-function generateStackLabel(shapeRef: string, count: number, customLabel?: string): string {
+function generateStackLabel(
+	shapeId: string,
+	count: number,
+	counterShapes: CounterShape[],
+	customLabel?: string
+): string {
 	if (customLabel) return customLabel;
 
-	// Generate default label from shape and count
-	const shapeName = shapeRef.startsWith('custom:') ? shapeRef.substring(7) : shapeRef;
+	// Look up shape name from project-level shapes
+	const shape = counterShapes.find((s) => s.id === shapeId);
+	const shapeName = shape?.name ?? shapeId;
 	return `${shapeName} x${count}`;
 }
 
@@ -93,20 +99,21 @@ function findStackLabel(
 	topLoadedStacks: TopLoadedStackDef[],
 	edgeLoadedStacks: EdgeLoadedStackDef[],
 	usedTopIndices: Set<number>,
-	usedEdgeIndices: Set<number>
+	usedEdgeIndices: Set<number>,
+	counterShapes: CounterShape[]
 ): { label: string; usedIndex: number; isEdge: boolean } {
-	const shapeRef =
-		counterStack.shape === 'custom' ? `custom:${counterStack.customShapeName}` : counterStack.shape;
+	// Shape ID is stored directly on the counter stack
+	const shapeId = counterStack.shapeId ?? '';
 
 	if (counterStack.isEdgeLoaded) {
 		// Match against edge-loaded stacks
 		for (let i = 0; i < edgeLoadedStacks.length; i++) {
 			if (usedEdgeIndices.has(i)) continue;
 			const [defShape, defCount, , defLabel] = edgeLoadedStacks[i];
-			if (defCount === counterStack.count && defShape === shapeRef) {
+			if (defCount === counterStack.count && defShape === shapeId) {
 				usedEdgeIndices.add(i);
 				return {
-					label: generateStackLabel(shapeRef, counterStack.count, defLabel),
+					label: generateStackLabel(shapeId, counterStack.count, counterShapes, defLabel),
 					usedIndex: i,
 					isEdge: true
 				};
@@ -117,10 +124,10 @@ function findStackLabel(
 		for (let i = 0; i < topLoadedStacks.length; i++) {
 			if (usedTopIndices.has(i)) continue;
 			const [defShape, defCount, defLabel] = topLoadedStacks[i];
-			if (defCount === counterStack.count && defShape === shapeRef) {
+			if (defCount === counterStack.count && defShape === shapeId) {
 				usedTopIndices.add(i);
 				return {
-					label: generateStackLabel(shapeRef, counterStack.count, defLabel),
+					label: generateStackLabel(shapeId, counterStack.count, counterShapes, defLabel),
 					usedIndex: i,
 					isEdge: false
 				};
@@ -130,7 +137,7 @@ function findStackLabel(
 
 	// No match found, generate default label
 	return {
-		label: generateStackLabel(shapeRef, counterStack.count),
+		label: generateStackLabel(shapeId, counterStack.count, counterShapes),
 		usedIndex: -1,
 		isEdge: counterStack.isEdgeLoaded ?? false
 	};
@@ -140,16 +147,20 @@ function findStackLabel(
 export function extractPdfData(project: Project): PdfData {
 	const boxes: PdfBoxData[] = [];
 
+	// Get project-level card sizes and counter shapes
+	const cardSizes = project.cardSizes ?? [];
+	const counterShapes = project.counterShapes ?? [];
+
 	for (let boxIndex = 0; boxIndex < project.boxes.length; boxIndex++) {
 		const box = project.boxes[boxIndex];
-		const customCardSizes = getCustomCardSizesFromBox(box);
 
 		// Get tray placements
 		const placements = arrangeTrays(box.trays, {
 			customBoxWidth: box.customWidth,
 			wallThickness: box.wallThickness,
 			tolerance: box.tolerance,
-			customCardSizes
+			cardSizes,
+			counterShapes
 		});
 
 		// Calculate box dimensions
@@ -174,9 +185,10 @@ export function extractPdfData(project: Project): PdfData {
 
 			if (isCardDividerTray(tray)) {
 				// Convert card divider positions to CounterStack format for PDF generation
-				const dividerStacks = getCardDividerPositions(tray.params, customCardSizes);
+				const dividerStacks = getCardDividerPositions(tray.params, cardSizes);
 				counterPositions = dividerStacks.map((stack) => ({
 					shape: 'custom' as const,
+					shapeId: stack.cardSizeId,
 					customShapeName: stack.label ?? 'Cards',
 					customBaseShape: 'rectangle' as const,
 					x: stack.x,
@@ -194,9 +206,10 @@ export function extractPdfData(project: Project): PdfData {
 				}));
 			} else if (isCardTray(tray)) {
 				// Convert card draw positions to CounterStack format for PDF generation
-				const cardStacks = getCardDrawPositions(tray.params, customCardSizes);
+				const cardStacks = getCardDrawPositions(tray.params, cardSizes);
 				counterPositions = cardStacks.map((stack) => ({
 					shape: 'custom' as const,
+					shapeId: tray.params.cardSizeId,
 					customShapeName: 'Card',
 					customBaseShape: 'rectangle' as const,
 					x: stack.x,
@@ -210,7 +223,7 @@ export function extractPdfData(project: Project): PdfData {
 					color: stack.color
 				}));
 			} else if (isCounterTray(tray)) {
-				counterPositions = getCounterPositions(tray.params);
+				counterPositions = getCounterPositions(tray.params, counterShapes);
 				topLoadedStacks = tray.params.topLoadedStacks || [];
 				edgeLoadedStacks = tray.params.edgeLoadedStacks || [];
 			}
@@ -229,7 +242,8 @@ export function extractPdfData(project: Project): PdfData {
 					topLoadedStacks,
 					edgeLoadedStacks,
 					usedTopIndices,
-					usedEdgeIndices
+					usedEdgeIndices,
+					counterShapes
 				);
 
 				// Calculate center position

@@ -1,14 +1,25 @@
-import type { Project, Box, LidParams, Tray } from '$lib/types/project';
+import type { Project, Box, LidParams, Tray, CounterShape, CardSize } from '$lib/types/project';
 import { defaultLidParams } from '$lib/models/lid';
 import {
 	defaultParams,
+	DEFAULT_SHAPE_IDS,
+	DEFAULT_CARD_SIZE_IDS,
 	type CounterTrayParams,
 	type TopLoadedStackDef,
 	type EdgeLoadedStackDef
 } from '$lib/models/counterTray';
-import { TRAY_COLORS } from '$lib/stores/project.svelte';
+import {
+	TRAY_COLORS,
+	DEFAULT_COUNTER_SHAPES,
+	DEFAULT_CARD_SIZES
+} from '$lib/stores/project.svelte';
+import { isCounterTray, isCardTray, isCardDividerTray } from '$lib/types/project';
 
 const STORAGE_KEY = 'counter-tray-project';
+
+function generateId(): string {
+	return Math.random().toString(36).substring(2, 9);
+}
 
 export function saveProject(project: Project): void {
 	try {
@@ -36,18 +47,116 @@ interface LegacyTrayParams {
 	triangleCornerRadius?: number;
 	hexPointyTop?: boolean;
 	stacks?: [string, number][];
+	customShapes?: LegacyCustomShape[];
+	customCardSizes?: LegacyCardSize[];
 }
 
-// Migrate tray params to handle:
-// 1. stacks -> topLoadedStacks/edgeLoadedStacks rename
-// 2. simple counters -> custom shapes migration
-function migrateTrayParams(params: CounterTrayParams & LegacyTrayParams): CounterTrayParams {
+interface LegacyCustomShape {
+	name: string;
+	baseShape: 'rectangle' | 'square' | 'circle' | 'hex' | 'triangle';
+	width: number;
+	length: number;
+	cornerRadius?: number;
+	pointyTop?: boolean;
+}
+
+interface LegacyCardSize {
+	name: string;
+	width: number;
+	length: number;
+	thickness: number;
+}
+
+// Legacy card tray params
+interface LegacyCardTrayParams {
+	cardSizeName?: string;
+	cardSizeId?: string;
+}
+
+// Legacy card divider stack
+interface LegacyCardDividerStack {
+	cardSizeName?: string;
+	cardSizeId?: string;
+	count: number;
+	label?: string;
+}
+
+// Build a mapping from old shape names (custom:Name) to new IDs
+function buildShapeIdMapping(counterShapes: CounterShape[]): Map<string, string> {
+	const mapping = new Map<string, string>();
+	for (const shape of counterShapes) {
+		mapping.set(`custom:${shape.name}`, shape.id);
+		mapping.set(shape.name, shape.id);
+	}
+	// Add mappings for old basic shape names
+	mapping.set('square', DEFAULT_SHAPE_IDS.square);
+	mapping.set('hex', DEFAULT_SHAPE_IDS.hex);
+	mapping.set('circle', DEFAULT_SHAPE_IDS.circle);
+	mapping.set('triangle', DEFAULT_SHAPE_IDS.triangle);
+	return mapping;
+}
+
+// Build a mapping from old card size names to new IDs
+function buildCardSizeIdMapping(cardSizes: CardSize[]): Map<string, string> {
+	const mapping = new Map<string, string>();
+	for (const cardSize of cardSizes) {
+		mapping.set(cardSize.name, cardSize.id);
+	}
+	return mapping;
+}
+
+// Extract counter shapes from old format (stored in counter tray params)
+function extractCounterShapesFromLegacy(boxes: Box[]): CounterShape[] {
+	for (const box of boxes) {
+		for (const tray of box.trays) {
+			const legacyParams = (tray as { params?: LegacyTrayParams }).params;
+			if (legacyParams?.customShapes && legacyParams.customShapes.length > 0) {
+				return legacyParams.customShapes.map((shape) => ({
+					id: generateId(),
+					name: shape.name,
+					baseShape: shape.baseShape,
+					width: shape.width,
+					length: shape.length,
+					cornerRadius: shape.cornerRadius,
+					pointyTop: shape.pointyTop
+				}));
+			}
+		}
+	}
+	// Return defaults if no legacy shapes found
+	return DEFAULT_COUNTER_SHAPES.map((s) => ({ ...s }));
+}
+
+// Extract card sizes from old format (stored in counter tray params)
+function extractCardSizesFromLegacy(boxes: Box[]): CardSize[] {
+	for (const box of boxes) {
+		for (const tray of box.trays) {
+			const legacyParams = (tray as { params?: LegacyTrayParams }).params;
+			if (legacyParams?.customCardSizes && legacyParams.customCardSizes.length > 0) {
+				return legacyParams.customCardSizes.map((cardSize) => ({
+					id: generateId(),
+					name: cardSize.name,
+					width: cardSize.width,
+					length: cardSize.length,
+					thickness: cardSize.thickness
+				}));
+			}
+		}
+	}
+	// Return defaults if no legacy card sizes found
+	return DEFAULT_CARD_SIZES.map((s) => ({ ...s }));
+}
+
+// Migrate counter tray params to new format (remove customShapes/customCardSizes, update stack refs)
+function migrateCounterTrayParams(
+	params: CounterTrayParams & LegacyTrayParams,
+	shapeIdMapping: Map<string, string>
+): CounterTrayParams {
 	const migrated = { ...defaultParams, ...params };
 
 	// Handle migration from old 'stacks' field to 'topLoadedStacks'
 	if (params.stacks && !params.topLoadedStacks) {
-		migrated.topLoadedStacks = params.stacks;
-		delete (migrated as { stacks?: [string, number][] }).stacks;
+		migrated.topLoadedStacks = params.stacks as TopLoadedStackDef[];
 	}
 
 	// Ensure edgeLoadedStacks exists
@@ -55,116 +164,22 @@ function migrateTrayParams(params: CounterTrayParams & LegacyTrayParams): Counte
 		migrated.edgeLoadedStacks = [];
 	}
 
-	// Ensure customShapes exists
-	if (!migrated.customShapes) {
-		migrated.customShapes = [];
-	}
-
-	// Ensure customCardSizes exists with defaults
-	if (!migrated.customCardSizes || migrated.customCardSizes.length === 0) {
-		migrated.customCardSizes = [
-			{ name: 'Standard', width: 66, length: 91, thickness: 0.5 },
-			{ name: 'Mini American', width: 44, length: 66, thickness: 0.5 },
-			{ name: 'Mini European', width: 47, length: 71, thickness: 0.5 },
-			{ name: 'Euro', width: 62, length: 95, thickness: 0.5 },
-			{ name: 'Japanese', width: 62, length: 89, thickness: 0.5 },
-			{ name: 'Tarot', width: 73, length: 123, thickness: 0.5 },
-			{ name: 'Square', width: 73, length: 73, thickness: 0.5 }
-		];
-	}
-
-	// Detect old format: has squareWidth but customShapes don't include default shapes
-	const hasOldFormat = params.squareWidth !== undefined;
-	const hasDefaultShapes = migrated.customShapes.some((s) =>
-		['Square', 'Hex', 'Circle', 'Triangle'].includes(s.name)
-	);
-
-	if (hasOldFormat && !hasDefaultShapes) {
-		// Create custom shapes from old params
-		const defaultShapes = [
-			{
-				name: 'Square',
-				baseShape: 'square' as const,
-				width: params.squareWidth ?? 15.9,
-				length: params.squareWidth ?? 15.9
-			},
-			{
-				name: 'Hex',
-				baseShape: 'hex' as const,
-				width: params.hexFlatToFlat ?? 15.9,
-				length: params.hexFlatToFlat ?? 15.9,
-				pointyTop: params.hexPointyTop ?? false
-			},
-			{
-				name: 'Circle',
-				baseShape: 'circle' as const,
-				width: params.circleDiameter ?? 15.9,
-				length: params.circleDiameter ?? 15.9
-			},
-			{
-				name: 'Triangle',
-				baseShape: 'triangle' as const,
-				width: params.triangleSide ?? 15.9,
-				length: params.triangleSide ?? 15.9,
-				cornerRadius: params.triangleCornerRadius ?? 1.5
-			}
-		];
-
-		// Prepend default shapes (user's custom shapes come after)
-		migrated.customShapes = [...defaultShapes, ...migrated.customShapes];
-
-		// Update stack references from 'square' to 'custom:Square', etc.
-		const shapeMapping: Record<string, string> = {
-			square: 'custom:Square',
-			hex: 'custom:Hex',
-			circle: 'custom:Circle',
-			triangle: 'custom:Triangle'
-		};
-
-		migrated.topLoadedStacks = migrated.topLoadedStacks.map(([shape, count, label]) => {
-			const newShape = shapeMapping[shape] ?? shape;
-			return [newShape, count, label] as TopLoadedStackDef;
-		});
-
-		migrated.edgeLoadedStacks = migrated.edgeLoadedStacks.map(([shape, count, orient, label]) => {
-			const newShape = shapeMapping[shape] ?? shape;
-			return [newShape, count, orient, label] as EdgeLoadedStackDef;
-		});
-	}
-
-	// Validate stack references - if custom:X references missing shape, fallback to 'custom:Square'
-	// Also preserve optional label field
-	migrated.topLoadedStacks = migrated.topLoadedStacks.map(([shape, count, label]) => {
-		if (shape.startsWith('custom:')) {
-			const name = shape.substring(7);
-			if (!migrated.customShapes.some((s) => s.name === name)) {
-				return ['custom:Square', count, label] as TopLoadedStackDef;
-			}
-		}
-		return [shape, count, label] as TopLoadedStackDef;
+	// Update stack references from names to IDs
+	migrated.topLoadedStacks = migrated.topLoadedStacks.map(([shapeRef, count, label]) => {
+		const newId = shapeIdMapping.get(shapeRef) ?? shapeRef;
+		return [newId, count, label] as TopLoadedStackDef;
 	});
 
-	migrated.edgeLoadedStacks = migrated.edgeLoadedStacks.map(([shape, count, orient, label]) => {
-		if (shape.startsWith('custom:')) {
-			const name = shape.substring(7);
-			if (!migrated.customShapes.some((s) => s.name === name)) {
-				return ['custom:Square', count, orient, label] as EdgeLoadedStackDef;
-			}
-		}
-		return [shape, count, orient, label] as EdgeLoadedStackDef;
+	migrated.edgeLoadedStacks = migrated.edgeLoadedStacks.map(([shapeRef, count, orient, label]) => {
+		const newId = shapeIdMapping.get(shapeRef) ?? shapeRef;
+		return [newId, count, orient, label] as EdgeLoadedStackDef;
 	});
 
-	// Migrate global hexPointyTop to per-shape pointyTop for existing hex shapes
-	if (params.hexPointyTop !== undefined) {
-		migrated.customShapes = migrated.customShapes.map((shape) => {
-			if (shape.baseShape === 'hex' && shape.pointyTop === undefined) {
-				return { ...shape, pointyTop: params.hexPointyTop };
-			}
-			return shape;
-		});
-	}
+	// Remove old fields that are now at project level
+	delete (migrated as LegacyTrayParams).customShapes;
+	delete (migrated as LegacyTrayParams).customCardSizes;
 
-	// Remove old params that are no longer used
+	// Remove very old params
 	delete (migrated as LegacyTrayParams).squareWidth;
 	delete (migrated as LegacyTrayParams).squareLength;
 	delete (migrated as LegacyTrayParams).hexFlatToFlat;
@@ -172,39 +187,84 @@ function migrateTrayParams(params: CounterTrayParams & LegacyTrayParams): Counte
 	delete (migrated as LegacyTrayParams).triangleSide;
 	delete (migrated as LegacyTrayParams).triangleCornerRadius;
 	delete (migrated as LegacyTrayParams).hexPointyTop;
+	delete (migrated as LegacyTrayParams).stacks;
 
 	return migrated;
 }
 
-// Migrate a tray to ensure all fields have valid values
-function migrateTray(tray: Tray, cumulativeIndex: number): Tray {
-	// Check if tray already has a type (new format) or needs migration (old format)
-	const trayType = (tray as { type?: string }).type;
-
-	if (trayType === 'card') {
-		// Legacy 'card' type - migrate to 'cardDraw' with color migration
-		return {
-			...tray,
-			type: 'cardDraw',
-			color: tray.color || TRAY_COLORS[cumulativeIndex % TRAY_COLORS.length]
-		} as Tray;
+// Migrate card draw tray params to use cardSizeId
+function migrateCardDrawTrayParams(
+	params: LegacyCardTrayParams,
+	cardSizeIdMapping: Map<string, string>
+): { cardSizeId: string } {
+	// If already has cardSizeId, keep it
+	if (params.cardSizeId) {
+		return { cardSizeId: params.cardSizeId };
 	}
+	// Migrate from cardSizeName
+	if (params.cardSizeName) {
+		const id = cardSizeIdMapping.get(params.cardSizeName);
+		if (id) {
+			return { cardSizeId: id };
+		}
+	}
+	// Fallback to Standard
+	return { cardSizeId: DEFAULT_CARD_SIZE_IDS.standard };
+}
 
-	if (trayType === 'cardDraw') {
-		// Card draw tray - preserve with color migration
+// Migrate card divider stacks to use cardSizeId
+function migrateCardDividerStacks(
+	stacks: LegacyCardDividerStack[],
+	cardSizeIdMapping: Map<string, string>
+): Array<{ cardSizeId: string; count: number; label?: string }> {
+	return stacks.map((stack) => {
+		// If already has cardSizeId, keep it
+		if (stack.cardSizeId) {
+			return { cardSizeId: stack.cardSizeId, count: stack.count, label: stack.label };
+		}
+		// Migrate from cardSizeName
+		if (stack.cardSizeName) {
+			const id = cardSizeIdMapping.get(stack.cardSizeName);
+			if (id) {
+				return { cardSizeId: id, count: stack.count, label: stack.label };
+			}
+		}
+		// Fallback to Standard
+		return { cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: stack.count, label: stack.label };
+	});
+}
+
+// Migrate a tray to ensure all fields have valid values
+function migrateTray(
+	tray: Tray,
+	cumulativeIndex: number,
+	shapeIdMapping: Map<string, string>,
+	cardSizeIdMapping: Map<string, string>
+): Tray {
+	const trayType = (tray as { type?: string }).type;
+	const color = tray.color || TRAY_COLORS[cumulativeIndex % TRAY_COLORS.length];
+
+	if (trayType === 'card' || trayType === 'cardDraw') {
+		// Card draw tray - migrate params
+		const legacyParams = (tray as { params: LegacyCardTrayParams }).params;
+		const migratedCardParams = migrateCardDrawTrayParams(legacyParams, cardSizeIdMapping);
 		return {
 			...tray,
 			type: 'cardDraw',
-			color: tray.color || TRAY_COLORS[cumulativeIndex % TRAY_COLORS.length]
+			color,
+			params: { ...legacyParams, ...migratedCardParams }
 		} as Tray;
 	}
 
 	if (trayType === 'cardDivider') {
-		// Card divider tray - preserve with color migration
+		// Card divider tray - migrate stacks
+		const params = (tray as { params: { stacks: LegacyCardDividerStack[] } }).params;
+		const migratedStacks = migrateCardDividerStacks(params.stacks, cardSizeIdMapping);
 		return {
 			...tray,
 			type: 'cardDivider',
-			color: tray.color || TRAY_COLORS[cumulativeIndex % TRAY_COLORS.length]
+			color,
+			params: { ...params, stacks: migratedStacks }
 		} as Tray;
 	}
 
@@ -212,32 +272,71 @@ function migrateTray(tray: Tray, cumulativeIndex: number): Tray {
 	return {
 		...tray,
 		type: 'counter',
-		// Assign color if missing (for old data)
-		color: tray.color || TRAY_COLORS[cumulativeIndex % TRAY_COLORS.length],
-		params: migrateTrayParams((tray as { params: CounterTrayParams }).params)
+		color,
+		params: migrateCounterTrayParams(
+			(tray as { params: CounterTrayParams & LegacyTrayParams }).params,
+			shapeIdMapping
+		)
 	} as Tray;
 }
 
 // Migrate a box to ensure all fields have valid values
-function migrateBox(box: Box, cumulativeStartIndex: number): Box {
+function migrateBox(
+	box: Box,
+	cumulativeStartIndex: number,
+	shapeIdMapping: Map<string, string>,
+	cardSizeIdMapping: Map<string, string>
+): Box {
 	return {
 		...box,
-		trays: box.trays.map((tray, idx) => migrateTray(tray, cumulativeStartIndex + idx)),
+		trays: box.trays.map((tray, idx) =>
+			migrateTray(tray, cumulativeStartIndex + idx, shapeIdMapping, cardSizeIdMapping)
+		),
 		lidParams: migrateLidParams(box.lidParams)
 	};
 }
 
 // Migrate a full project to ensure all fields have valid values
 export function migrateProjectData(project: Project): Project {
+	// Check if project already has new format (counterShapes/cardSizes at project level)
+	const hasNewFormat =
+		Array.isArray((project as { counterShapes?: unknown }).counterShapes) &&
+		Array.isArray((project as { cardSizes?: unknown }).cardSizes);
+
+	let counterShapes: CounterShape[];
+	let cardSizes: CardSize[];
+
+	if (hasNewFormat) {
+		// Already migrated, just ensure arrays are valid
+		counterShapes = (project as { counterShapes: CounterShape[] }).counterShapes;
+		cardSizes = (project as { cardSizes: CardSize[] }).cardSizes;
+
+		// Ensure all shapes/sizes have IDs
+		counterShapes = counterShapes.map((s) => (s.id ? s : { ...s, id: generateId() }));
+		cardSizes = cardSizes.map((s) => (s.id ? s : { ...s, id: generateId() }));
+	} else {
+		// Legacy format - extract from counter tray params
+		counterShapes = extractCounterShapesFromLegacy(project.boxes);
+		cardSizes = extractCardSizesFromLegacy(project.boxes);
+	}
+
+	// Build ID mappings for migration
+	const shapeIdMapping = buildShapeIdMapping(counterShapes);
+	const cardSizeIdMapping = buildCardSizeIdMapping(cardSizes);
+
+	// Migrate boxes
 	let cumulativeIndex = 0;
 	const migratedBoxes = project.boxes.map((box) => {
-		const migratedBox = migrateBox(box, cumulativeIndex);
+		const migratedBox = migrateBox(box, cumulativeIndex, shapeIdMapping, cardSizeIdMapping);
 		cumulativeIndex += box.trays.length;
 		return migratedBox;
 	});
+
 	return {
 		...project,
-		boxes: migratedBoxes
+		boxes: migratedBoxes,
+		counterShapes,
+		cardSizes
 	};
 }
 
@@ -246,7 +345,7 @@ export function loadProject(): Project | null {
 		const data = localStorage.getItem(STORAGE_KEY);
 		if (data) {
 			const project = JSON.parse(data) as Project;
-			// Migrate boxes to ensure new fields have defaults
+			// Migrate to new format
 			return migrateProjectData(project);
 		}
 	} catch (e) {

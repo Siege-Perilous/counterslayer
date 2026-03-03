@@ -27,7 +27,7 @@
 	} from '$lib/models/counterTray';
 	import { createCardDrawTray, getCardDrawPositions, type CardStack } from '$lib/models/cardTray';
 	import { createCardDividerTray } from '$lib/models/cardDividerTray';
-	import { arrangeTrays, calculateTraySpacers, getCustomCardSizesFromBox } from '$lib/models/box';
+	import { arrangeTrays, calculateTraySpacers } from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 	import {
 		getGeometryWorker,
@@ -423,17 +423,21 @@
 			showReferenceLabels = true;
 			hidePrintBed = true;
 
+			// Get global card sizes and counter shapes from project
+			const cardSizes = project.cardSizes;
+			const counterShapes = project.counterShapes;
+
 			// Capture each tray
 			for (let boxIdx = 0; boxIdx < project.boxes.length; boxIdx++) {
 				const box = project.boxes[boxIdx];
-				const customCardSizes = getCustomCardSizesFromBox(box);
 				const placements = arrangeTrays(box.trays, {
 					customBoxWidth: box.customWidth,
 					wallThickness: box.wallThickness,
 					tolerance: box.tolerance,
-					customCardSizes
+					cardSizes,
+					counterShapes
 				});
-				const spacerInfo = calculateTraySpacers(box);
+				const spacerInfo = calculateTraySpacers(box, cardSizes, counterShapes);
 				const maxHeight = Math.max(...placements.map((p) => p.dimensions.height));
 
 				for (let trayIdx = 0; trayIdx < placements.length; trayIdx++) {
@@ -447,19 +451,21 @@
 					if (isCounterTray(placement.tray)) {
 						jscadGeom = createCounterTray(
 							placement.tray.params,
+							counterShapes,
 							placement.tray.name,
 							maxHeight,
 							spacerHeight
 						);
 						selectedTrayCounters = getCounterPositions(
 							placement.tray.params,
+							counterShapes,
 							maxHeight,
 							spacerHeight
 						);
 					} else if (isCardDividerTray(placement.tray)) {
 						jscadGeom = createCardDividerTray(
 							placement.tray.params,
-							customCardSizes,
+							cardSizes,
 							placement.tray.name,
 							maxHeight,
 							spacerHeight
@@ -469,14 +475,14 @@
 					} else if (isCardTray(placement.tray)) {
 						jscadGeom = createCardDrawTray(
 							placement.tray.params,
-							customCardSizes,
+							cardSizes,
 							placement.tray.name,
 							maxHeight,
 							spacerHeight
 						);
 						selectedTrayCounters = getCardDrawPositions(
 							placement.tray.params,
-							customCardSizes,
+							cardSizes,
 							maxHeight,
 							spacerHeight
 						);
@@ -1246,7 +1252,6 @@
 		justify-content: space-between;
 	}
 
-	.toolbarLeft,
 	.toolbarRight {
 		display: flex;
 		align-items: center;
@@ -1354,7 +1359,6 @@
 			gap: 0.5rem;
 		}
 
-		.toolbarLeft,
 		.toolbarRight {
 			flex-wrap: wrap;
 		}

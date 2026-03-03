@@ -1,12 +1,7 @@
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
-import type { Box, LidParams } from '$lib/types/project';
-import {
-	arrangeTrays,
-	getBoxInteriorDimensions,
-	calculateMinimumBoxDimensions,
-	getCustomCardSizesFromBox
-} from './box';
+import type { Box, LidParams, CardSize, CounterShape } from '$lib/types/project';
+import { arrangeTrays, getBoxInteriorDimensions, calculateMinimumBoxDimensions } from './box';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
@@ -112,15 +107,19 @@ export const defaultLidParams: LidParams = {
  *
  *   The recess is on the OUTSIDE of the wall.
  */
-export function createBoxWithLidGrooves(box: Box): Geom3 | null {
+export function createBoxWithLidGrooves(
+	box: Box,
+	cardSizes: CardSize[] = [],
+	counterShapes: CounterShape[] = []
+): Geom3 | null {
 	if (box.trays.length === 0) return null;
 
-	const customCardSizes = getCustomCardSizesFromBox(box);
 	const placements = arrangeTrays(box.trays, {
 		customBoxWidth: box.customWidth,
 		wallThickness: box.wallThickness,
 		tolerance: box.tolerance,
-		customCardSizes
+		cardSizes,
+		counterShapes
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
@@ -134,7 +133,7 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
 	const recessDepth = wall; // How deep the lid lip goes
 
 	// Calculate minimum (auto) dimensions
-	const minimums = calculateMinimumBoxDimensions(box);
+	const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
 
 	// Box exterior dimensions (use custom if set, otherwise auto)
 	const extWidth = box.customWidth ?? minimums.minWidth;
@@ -1003,15 +1002,19 @@ export function createBoxWithLidGrooves(box: Box): Geom3 | null {
  *   |___|           |___|
  *       (open here)
  */
-export function createLid(box: Box): Geom3 | null {
+export function createLid(
+	box: Box,
+	cardSizes: CardSize[] = [],
+	counterShapes: CounterShape[] = []
+): Geom3 | null {
 	if (box.trays.length === 0) return null;
 
-	const customCardSizes = getCustomCardSizesFromBox(box);
 	const placements = arrangeTrays(box.trays, {
 		customBoxWidth: box.customWidth,
 		wallThickness: box.wallThickness,
 		tolerance: box.tolerance,
-		customCardSizes
+		cardSizes,
+		counterShapes
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
@@ -1036,7 +1039,7 @@ export function createLid(box: Box): Geom3 | null {
 	const rampLengthOut = box.lidParams?.rampLengthOut ?? 1.5;
 
 	// Calculate minimum (auto) dimensions
-	const minimums = calculateMinimumBoxDimensions(box);
+	const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
 
 	// Lid exterior matches box exterior (uses custom dimensions if set)
 	const extWidth = box.customWidth ?? minimums.minWidth;

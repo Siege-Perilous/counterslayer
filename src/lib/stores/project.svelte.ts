@@ -1,4 +1,9 @@
-import { defaultParams, type CounterTrayParams } from '$lib/models/counterTray';
+import {
+	defaultParams,
+	DEFAULT_SHAPE_IDS,
+	DEFAULT_CARD_SIZE_IDS,
+	type CounterTrayParams
+} from '$lib/models/counterTray';
 import { defaultCardDrawTrayParams, type CardDrawTrayParams } from '$lib/models/cardTray';
 import {
 	defaultCardDividerTrayParams,
@@ -14,13 +19,76 @@ import type {
 	CounterTray,
 	CardDrawTray,
 	CardDividerTray,
-	CardTray
+	CardTray,
+	CounterShape,
+	CardSize
 } from '$lib/types/project';
 import { isCounterTray, isCardTray, isCardDrawTray, isCardDividerTray } from '$lib/types/project';
-import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
-export type { Tray, Box, Project, LidParams, CounterTray, CardDrawTray, CardDividerTray, CardTray };
+export type {
+	Tray,
+	Box,
+	Project,
+	LidParams,
+	CounterTray,
+	CardDrawTray,
+	CardDividerTray,
+	CardTray,
+	CounterShape,
+	CardSize
+};
 export { isCounterTray, isCardTray, isCardDrawTray, isCardDividerTray };
+
+// Default counter shapes (global)
+export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
+	{ id: DEFAULT_SHAPE_IDS.square, name: 'Square', baseShape: 'square', width: 15.9, length: 15.9 },
+	{
+		id: DEFAULT_SHAPE_IDS.hex,
+		name: 'Hex',
+		baseShape: 'hex',
+		width: 15.9,
+		length: 15.9,
+		pointyTop: false
+	},
+	{
+		id: DEFAULT_SHAPE_IDS.circle,
+		name: 'Circle',
+		baseShape: 'circle',
+		width: 15.9,
+		length: 15.9
+	},
+	{
+		id: DEFAULT_SHAPE_IDS.triangle,
+		name: 'Triangle',
+		baseShape: 'triangle',
+		width: 15.9,
+		length: 15.9,
+		cornerRadius: 1.5
+	}
+];
+
+// Default card sizes (global)
+export const DEFAULT_CARD_SIZES: CardSize[] = [
+	{ id: DEFAULT_CARD_SIZE_IDS.standard, name: 'Standard', width: 66, length: 91, thickness: 0.5 },
+	{
+		id: DEFAULT_CARD_SIZE_IDS.miniAmerican,
+		name: 'Mini American',
+		width: 44,
+		length: 66,
+		thickness: 0.5
+	},
+	{
+		id: DEFAULT_CARD_SIZE_IDS.miniEuropean,
+		name: 'Mini European',
+		width: 47,
+		length: 71,
+		thickness: 0.5
+	},
+	{ id: DEFAULT_CARD_SIZE_IDS.euro, name: 'Euro', width: 62, length: 95, thickness: 0.5 },
+	{ id: DEFAULT_CARD_SIZE_IDS.japanese, name: 'Japanese', width: 62, length: 89, thickness: 0.5 },
+	{ id: DEFAULT_CARD_SIZE_IDS.tarot, name: 'Tarot', width: 73, length: 123, thickness: 0.5 },
+	{ id: DEFAULT_CARD_SIZE_IDS.square, name: 'Square', width: 73, length: 73, thickness: 0.5 }
+];
 
 function generateId(): string {
 	return Math.random().toString(36).substring(2, 9);
@@ -137,6 +205,8 @@ function createDefaultProject(): Project {
 
 	return {
 		boxes: [box],
+		counterShapes: DEFAULT_COUNTER_SHAPES.map((s) => ({ ...s })),
+		cardSizes: DEFAULT_CARD_SIZES.map((s) => ({ ...s })),
 		selectedBoxId: box.id,
 		selectedTrayId: counterTray.id
 	};
@@ -196,13 +266,23 @@ export function selectTray(trayId: string): void {
 }
 
 // Box operations
-export function addBox(): Box {
+export function addBox(trayType: TrayType = 'counter'): Box {
 	const boxNumber = project.boxes.length + 1;
 	const box = createDefaultBox(`Box ${boxNumber}`);
-	const tray = createDefaultTray('Tray 1', getNextTrayColor(project.boxes));
-	// Inherit global params (including customShapes) from existing trays
-	const globalParams = getGlobalParamsFromExisting();
-	tray.params = { ...tray.params, ...globalParams };
+	const color = getNextTrayColor(project.boxes);
+
+	let tray: Tray;
+	if (trayType === 'cardDraw' || trayType === 'card') {
+		tray = createDefaultCardDrawTray('Card Draw 1', color);
+	} else if (trayType === 'cardDivider') {
+		tray = createDefaultCardDividerTray('Card Divider 1', color);
+	} else {
+		tray = createDefaultCounterTray('Tray 1', color);
+		// Inherit global params (including customShapes) from existing counter trays
+		const globalParams = getGlobalParamsFromExisting();
+		tray.params = { ...tray.params, ...globalParams };
+	}
+
 	box.trays.push(tray);
 	project.boxes.push(box);
 	project.selectedBoxId = box.id;
@@ -238,6 +318,18 @@ export function updateBox(boxId: string, updates: Partial<Omit<Box, 'id' | 'tray
 		autosave();
 	}
 }
+
+// Global params that should be shared across counter trays
+const GLOBAL_PARAM_KEYS: (keyof CounterTrayParams)[] = [
+	'counterThickness',
+	'clearance',
+	'wallThickness',
+	'floorThickness',
+	'rimHeight',
+	'cutoutRatio',
+	'cutoutMax',
+	'printBedSize'
+];
 
 // Get current global params from any existing counter tray
 function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
@@ -329,150 +421,94 @@ export function setTrayRotation(trayId: string, rotation: 'auto' | 0 | 90): void
 	}
 }
 
-// Global params that should be shared across all trays when changed
-const GLOBAL_PARAM_KEYS: (keyof CounterTrayParams)[] = [
-	'printBedSize',
-	'counterThickness',
-	'customShapes',
-	'customCardSizes'
-];
-
-// Update counter tray params (with global param propagation)
+// Update counter tray params
 export function updateTrayParams(trayId: string, params: CounterTrayParams): void {
-	// Find the tray being updated to get its old params
-	let oldParams: CounterTrayParams | null = null;
-	let targetTray: CounterTray | null = null;
 	for (const box of project.boxes) {
 		const tray = box.trays.find((t) => t.id === trayId);
 		if (tray && isCounterTray(tray)) {
-			oldParams = tray.params;
-			targetTray = tray;
-			break;
+			tray.params = params;
+			autosave();
+			return;
 		}
 	}
+}
 
-	if (!oldParams || !targetTray) return;
+// Counter shape operations (global)
+export function getCounterShapes(): CounterShape[] {
+	return project.counterShapes;
+}
 
-	// Detect which global params changed
-	const changedGlobals: Partial<CounterTrayParams> = {};
-	for (const key of GLOBAL_PARAM_KEYS) {
-		const oldVal = oldParams[key];
-		const newVal = params[key];
-		// Deep compare for arrays (customShapes)
-		const changed = Array.isArray(oldVal)
-			? JSON.stringify(oldVal) !== JSON.stringify(newVal)
-			: oldVal !== newVal;
-		if (changed) {
-			(changedGlobals as Record<string, unknown>)[key] = newVal;
-		}
+export function getCounterShape(id: string): CounterShape | null {
+	return project.counterShapes.find((s) => s.id === id) ?? null;
+}
+
+export function addCounterShape(shape: Omit<CounterShape, 'id'>): CounterShape {
+	const newShape: CounterShape = { ...shape, id: generateId() };
+	project.counterShapes.push(newShape);
+	autosave();
+	return newShape;
+}
+
+export function updateCounterShape(id: string, updates: Partial<Omit<CounterShape, 'id'>>): void {
+	const shape = project.counterShapes.find((s) => s.id === id);
+	if (shape) {
+		Object.assign(shape, updates);
+		autosave();
 	}
+}
 
-	// Update the target tray with full new params
-	targetTray.params = params;
-
-	// Propagate changed global params to all other trays
-	if (Object.keys(changedGlobals).length > 0) {
-		// Detect shape renames and deletions by comparing old and new customShapes by name
-		const shapeRenames = new SvelteMap<string, string>(); // oldName -> newName
-		const deletedShapes = new SvelteSet<string>(); // names of shapes that were deleted
-
-		if (changedGlobals.customShapes && oldParams.customShapes) {
-			const newShapes = changedGlobals.customShapes as typeof oldParams.customShapes;
-			const newShapeNames = new SvelteSet(newShapes.map((s) => s.name));
-			const oldShapeNames = new SvelteSet(oldParams.customShapes.map((s) => s.name));
-
-			// Find deleted shapes (in old but not in new)
-			for (const oldShape of oldParams.customShapes) {
-				if (!newShapeNames.has(oldShape.name)) {
-					deletedShapes.add(oldShape.name);
-				}
-			}
-
-			// Find renames: shapes at same index with different names, where the old name
-			// no longer exists and the new name didn't exist before
-			for (let i = 0; i < Math.min(oldParams.customShapes.length, newShapes.length); i++) {
-				const oldName = oldParams.customShapes[i].name;
-				const newName = newShapes[i].name;
-				if (oldName !== newName && !newShapeNames.has(oldName) && !oldShapeNames.has(newName)) {
-					// This is a genuine rename, not a deletion causing index shift
-					shapeRenames.set(oldName, newName);
-					deletedShapes.delete(oldName); // It was renamed, not deleted
-				}
-			}
-		}
-
+export function deleteCounterShape(id: string): void {
+	const index = project.counterShapes.findIndex((s) => s.id === id);
+	if (index >= 0) {
+		project.counterShapes.splice(index, 1);
+		// Remove stacks referencing this shape from all counter trays
 		for (const box of project.boxes) {
 			for (const tray of box.trays) {
-				// Only propagate to other counter trays
-				if (tray.id !== trayId && isCounterTray(tray)) {
-					let updatedParams = { ...tray.params, ...changedGlobals };
-
-					// Filter out stacks referencing deleted shapes and update renamed shapes
-					if (shapeRenames.size > 0 || deletedShapes.size > 0) {
-						updatedParams = {
-							...updatedParams,
-							topLoadedStacks: updatedParams.topLoadedStacks
-								.filter(([shape]) => {
-									// Remove stacks referencing deleted shapes
-									for (const deletedName of deletedShapes) {
-										if (shape === `custom:${deletedName}`) {
-											return false;
-										}
-									}
-									return true;
-								})
-								.map(([shape, count, label]) => {
-									// Update renamed shape references, preserving label
-									for (const [oldName, newName] of shapeRenames) {
-										if (shape === `custom:${oldName}`) {
-											return [
-												`custom:${newName}`,
-												count,
-												label
-											] as (typeof updatedParams.topLoadedStacks)[0];
-										}
-									}
-									return [shape, count, label] as (typeof updatedParams.topLoadedStacks)[0];
-								}),
-							edgeLoadedStacks: updatedParams.edgeLoadedStacks
-								.filter(([shape]) => {
-									// Remove stacks referencing deleted shapes
-									for (const deletedName of deletedShapes) {
-										if (shape === `custom:${deletedName}`) {
-											return false;
-										}
-									}
-									return true;
-								})
-								.map(([shape, count, orient, label]) => {
-									// Update renamed shape references, preserving label
-									for (const [oldName, newName] of shapeRenames) {
-										if (shape === `custom:${oldName}`) {
-											return [
-												`custom:${newName}`,
-												count,
-												orient,
-												label
-											] as (typeof updatedParams.edgeLoadedStacks)[0];
-										}
-									}
-									return [
-										shape,
-										count,
-										orient,
-										label
-									] as (typeof updatedParams.edgeLoadedStacks)[0];
-								})
-						};
-					}
-
-					tray.params = updatedParams;
+				if (isCounterTray(tray)) {
+					tray.params.topLoadedStacks = tray.params.topLoadedStacks.filter(
+						([shapeId]) => shapeId !== id
+					);
+					tray.params.edgeLoadedStacks = tray.params.edgeLoadedStacks.filter(
+						([shapeId]) => shapeId !== id
+					);
 				}
 			}
 		}
+		autosave();
 	}
+}
 
+// Card size operations (global)
+export function getCardSizes(): CardSize[] {
+	return project.cardSizes;
+}
+
+export function getCardSize(id: string): CardSize | null {
+	return project.cardSizes.find((s) => s.id === id) ?? null;
+}
+
+export function addCardSize(cardSize: Omit<CardSize, 'id'>): CardSize {
+	const newCardSize: CardSize = { ...cardSize, id: generateId() };
+	project.cardSizes.push(newCardSize);
 	autosave();
+	return newCardSize;
+}
+
+export function updateCardSize(id: string, updates: Partial<Omit<CardSize, 'id'>>): void {
+	const cardSize = project.cardSizes.find((s) => s.id === id);
+	if (cardSize) {
+		Object.assign(cardSize, updates);
+		autosave();
+	}
+}
+
+export function deleteCardSize(id: string): void {
+	const index = project.cardSizes.findIndex((s) => s.id === id);
+	if (index >= 0) {
+		project.cardSizes.splice(index, 1);
+		// Note: We don't auto-delete card trays using this size - let them show an error
+		autosave();
+	}
 }
 
 // Update card draw tray params

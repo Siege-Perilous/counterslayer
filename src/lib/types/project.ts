@@ -2,6 +2,29 @@ import type { CounterTrayParams } from '$lib/models/counterTray';
 import type { CardDrawTrayParams } from '$lib/models/cardTray';
 import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
 
+// Base shape types for counter shapes
+export type CounterBaseShape = 'rectangle' | 'square' | 'circle' | 'hex' | 'triangle';
+
+// Counter shape definition (global, referenced by ID)
+export interface CounterShape {
+	id: string;
+	name: string;
+	baseShape: CounterBaseShape;
+	width: number;
+	length: number;
+	cornerRadius?: number; // For triangle shapes
+	pointyTop?: boolean; // For hex shapes
+}
+
+// Card size definition (global, referenced by ID)
+export interface CardSize {
+	id: string;
+	name: string;
+	width: number; // Sleeved width in mm
+	length: number; // Sleeved length in mm
+	thickness: number; // Sleeved thickness in mm
+}
+
 // Base tray interface shared by all tray types
 interface BaseTray {
 	id: string;
@@ -92,6 +115,8 @@ export interface Box {
 
 export interface Project {
 	boxes: Box[];
+	counterShapes: CounterShape[];
+	cardSizes: CardSize[];
 	selectedBoxId: string | null;
 	selectedTrayId: string | null;
 }

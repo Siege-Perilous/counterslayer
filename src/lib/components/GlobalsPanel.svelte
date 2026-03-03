@@ -21,13 +21,22 @@
 		IconRectangle,
 		IconCards
 	} from '@tabler/icons-svelte';
-	import type {
-		CounterTrayParams,
-		CustomShape,
-		CustomBaseShape,
-		CustomCardSize
-	} from '$lib/models/counterTray';
-	import { getProject, isCounterTray } from '$lib/stores/project.svelte';
+	import type { CounterTrayParams } from '$lib/models/counterTray';
+	import type { CounterShape, CounterBaseShape, CardSize } from '$lib/types/project';
+	import {
+		getProject,
+		isCounterTray,
+		isCardDrawTray,
+		isCardDividerTray,
+		getCounterShapes,
+		getCardSizes,
+		addCounterShape,
+		updateCounterShape,
+		deleteCounterShape,
+		addCardSize,
+		updateCardSize,
+		deleteCardSize
+	} from '$lib/stores/project.svelte';
 
 	interface Props {
 		params: CounterTrayParams;
@@ -41,8 +50,12 @@
 	// Track which card size is expanded (null = none)
 	let expandedCardIndex: number | null = $state(null);
 
+	// Get shapes and card sizes from project level
+	let counterShapes = $derived(getCounterShapes());
+	let cardSizes = $derived(getCardSizes());
+
 	// Get the shape icon component for a base shape
-	function getShapeIcon(baseShape: CustomBaseShape) {
+	function getShapeIcon(baseShape: CounterBaseShape) {
 		switch (baseShape) {
 			case 'square':
 				return IconSquare;
@@ -59,8 +72,8 @@
 	}
 
 	// Calculate icon scale relative to max size (with clamping)
-	function getRelativeIconScale(shape: CustomShape): number {
-		const maxWidth = Math.max(...params.customShapes.map((s) => Math.max(s.width, s.length)));
+	function getRelativeIconScale(shape: CounterShape): number {
+		const maxWidth = Math.max(...counterShapes.map((s) => Math.max(s.width, s.length)));
 		const shapeSize = Math.max(shape.width, shape.length);
 		const minScale = 0.6;
 		const maxScale = 1.4;
@@ -69,7 +82,7 @@
 	}
 
 	// Get display size string for a shape
-	function getSizeDisplay(shape: CustomShape): string {
+	function getSizeDisplay(shape: CounterShape): string {
 		const baseShape = shape.baseShape ?? 'rectangle';
 		if (baseShape === 'rectangle') {
 			return `${shape.width} × ${shape.length}`;
@@ -77,7 +90,7 @@
 		return `${shape.width}`;
 	}
 
-	const baseShapeOptions: { value: CustomBaseShape; label: string }[] = [
+	const baseShapeOptions: { value: CounterBaseShape; label: string }[] = [
 		{ value: 'rectangle', label: 'Rectangle' },
 		{ value: 'square', label: 'Square' },
 		{ value: 'circle', label: 'Circle' },
@@ -89,108 +102,74 @@
 		onchange({ ...params, [key]: value });
 	}
 
-	// Custom shape handlers
-	function addCustomShape() {
-		const newIndex = params.customShapes.length;
-		const newName = `Custom ${newIndex + 1}`;
-		onchange({
-			...params,
-			customShapes: [
-				...params.customShapes,
-				{ name: newName, baseShape: 'rectangle', width: 20, length: 30 }
-			]
+	// Custom shape handlers - now using project-level store functions
+	function handleAddShape() {
+		const newName = `Custom ${counterShapes.length + 1}`;
+		const newShape = addCounterShape({
+			name: newName,
+			baseShape: 'rectangle',
+			width: 20,
+			length: 30
 		});
+		// Find the index of the newly added shape
+		const newIndex = getCounterShapes().findIndex((s) => s.id === newShape.id);
 		expandedIndex = newIndex;
 	}
 
-	function updateCustomShape(
-		index: number,
-		field: keyof CustomShape | 'cornerRadius' | 'pointyTop',
+	function handleUpdateShape(
+		shapeId: string,
+		field: keyof CounterShape | 'cornerRadius' | 'pointyTop',
 		value: string | number | boolean
 	) {
-		const newShapes = [...params.customShapes];
+		const shape = counterShapes.find((s) => s.id === shapeId);
+		if (!shape) return;
+
 		if (field === 'name') {
 			const newName = value as string;
-			if (newShapes.some((s, i) => i !== index && s.name === newName)) {
+			// Don't allow duplicate names
+			if (counterShapes.some((s) => s.id !== shapeId && s.name === newName)) {
 				return;
 			}
-			const oldName = newShapes[index].name;
-			if (oldName !== newName) {
-				newShapes[index] = { ...newShapes[index], name: newName };
-				onchange({
-					...params,
-					customShapes: newShapes,
-					topLoadedStacks: params.topLoadedStacks.map(([shape, count, label]) =>
-						shape === `custom:${oldName}`
-							? [`custom:${newName}`, count, label]
-							: [shape, count, label]
-					),
-					edgeLoadedStacks: params.edgeLoadedStacks.map(([shape, count, orient, label]) =>
-						shape === `custom:${oldName}`
-							? [`custom:${newName}`, count, orient, label]
-							: [shape, count, orient, label]
-					)
-				});
-				return;
-			}
+			updateCounterShape(shapeId, { name: newName });
+			return;
 		}
 
 		// Handle baseShape changes - sync length to width for non-rectangle shapes
 		if (field === 'baseShape') {
-			const baseShape = value as CustomBaseShape;
+			const baseShape = value as CounterBaseShape;
 			if (baseShape !== 'rectangle') {
-				// For square, circle, hex, triangle: set length = width
-				newShapes[index] = { ...newShapes[index], baseShape, length: newShapes[index].width };
+				updateCounterShape(shapeId, { baseShape, length: shape.width });
 			} else {
-				newShapes[index] = { ...newShapes[index], baseShape };
+				updateCounterShape(shapeId, { baseShape });
 			}
-			onchange({ ...params, customShapes: newShapes });
 			return;
 		}
 
 		// Handle width changes for non-rectangle shapes - sync length
 		if (field === 'width') {
-			const shape = newShapes[index];
 			const baseShape = shape.baseShape ?? 'rectangle';
 			if (baseShape !== 'rectangle') {
-				// For square, circle, hex, triangle: length = width
-				newShapes[index] = { ...newShapes[index], width: value as number, length: value as number };
+				updateCounterShape(shapeId, { width: value as number, length: value as number });
 			} else {
-				newShapes[index] = { ...newShapes[index], width: value as number };
+				updateCounterShape(shapeId, { width: value as number });
 			}
-			onchange({ ...params, customShapes: newShapes });
 			return;
 		}
 
-		// Handle cornerRadius for triangles
-		if (field === 'cornerRadius') {
-			newShapes[index] = { ...newShapes[index], cornerRadius: value as number };
-			onchange({ ...params, customShapes: newShapes });
-			return;
-		}
-
-		// Handle pointyTop for hexes
-		if (field === 'pointyTop') {
-			newShapes[index] = { ...newShapes[index], pointyTop: Boolean(value) };
-			onchange({ ...params, customShapes: newShapes });
-			return;
-		}
-
-		newShapes[index] = { ...newShapes[index], [field]: value };
-		onchange({ ...params, customShapes: newShapes });
+		// Handle other fields
+		updateCounterShape(shapeId, { [field]: value });
 	}
 
 	// Count stacks using a given shape across ALL counter trays in the project
-	function countStacksUsingShape(shapeName: string): number {
-		const shapeRef = `custom:${shapeName}`;
+	function countStacksUsingShape(shapeId: string): number {
 		const project = getProject();
 		let count = 0;
 
 		for (const box of project.boxes) {
 			for (const tray of box.trays) {
 				if (isCounterTray(tray)) {
-					count += tray.params.topLoadedStacks.filter((stack) => stack[0] === shapeRef).length;
-					count += tray.params.edgeLoadedStacks.filter((stack) => stack[0] === shapeRef).length;
+					count += tray.params.topLoadedStacks.filter((stack) => stack[0] === shapeId).length;
+					count += tray.params.edgeLoadedStacks.filter((stack) => stack[0] === shapeId).length;
 				}
 			}
 		}
@@ -198,58 +177,50 @@
 		return count;
 	}
 
-	function removeCustomShape(index: number) {
-		const shapeName = params.customShapes[index].name;
-		const shapeRef = `custom:${shapeName}`;
-		onchange({
-			...params,
-			customShapes: params.customShapes.filter((_, i) => i !== index),
-			topLoadedStacks: params.topLoadedStacks.filter(([shape]) => shape !== shapeRef),
-			edgeLoadedStacks: params.edgeLoadedStacks.filter(([shape]) => shape !== shapeRef)
-		});
-		// Collapse the expanded view after delete
+	function handleRemoveShape(shapeId: string) {
+		deleteCounterShape(shapeId);
 		expandedIndex = null;
 	}
 
-	// Card size handlers
-	function addCardSize() {
-		const newIndex = (params.customCardSizes ?? []).length;
-		const newName = `Custom Card ${newIndex + 1}`;
-		onchange({
-			...params,
-			customCardSizes: [
-				...(params.customCardSizes ?? []),
-				{ name: newName, width: 66, length: 91, thickness: 0.5 }
-			]
+	// Card size handlers - now using project-level store functions
+	function handleAddCardSize() {
+		const newName = `Custom Card ${cardSizes.length + 1}`;
+		const newCardSize = addCardSize({
+			name: newName,
+			width: 66,
+			length: 91,
+			thickness: 0.5
 		});
+		// Find the index of the newly added card size
+		const newIndex = getCardSizes().findIndex((s) => s.id === newCardSize.id);
 		expandedCardIndex = newIndex;
 	}
 
-	function updateCardSize(index: number, field: keyof CustomCardSize, value: string | number) {
-		const newSizes = [...(params.customCardSizes ?? [])];
+	function handleUpdateCardSize(cardSizeId: string, field: keyof CardSize, value: string | number) {
 		if (field === 'name') {
 			const newName = value as string;
 			// Don't allow duplicate names
-			if (newSizes.some((s, i) => i !== index && s.name === newName)) {
+			if (cardSizes.some((s) => s.id !== cardSizeId && s.name === newName)) {
 				return;
 			}
 		}
-		newSizes[index] = { ...newSizes[index], [field]: value };
-		onchange({ ...params, customCardSizes: newSizes });
+		updateCardSize(cardSizeId, { [field]: value });
 	}
 
 	// Count card trays using a given card size
-	function countTraysUsingCardSize(sizeName: string): number {
+	function countTraysUsingCardSize(cardSizeId: string): number {
 		const project = getProject();
 		let count = 0;
 
 		for (const box of project.boxes) {
 			for (const tray of box.trays) {
-				if (!isCounterTray(tray) && 'params' in tray) {
-					const cardTray = tray as { params: { cardSizeName?: string } };
-					if (cardTray.params.cardSizeName === sizeName) {
+				if (isCardDrawTray(tray)) {
+					if (tray.params.cardSizeId === cardSizeId) {
 						count++;
 					}
+				}
+				if (isCardDividerTray(tray)) {
+					count += tray.params.stacks.filter((s) => s.cardSizeId === cardSizeId).length;
 				}
 			}
 		}
@@ -257,11 +228,8 @@
 		return count;
 	}
 
-	function removeCardSize(index: number) {
-		onchange({
-			...params,
-			customCardSizes: (params.customCardSizes ?? []).filter((_, i) => i !== index)
-		});
+	function handleRemoveCardSize(cardSizeId: string) {
+		deleteCardSize(cardSizeId);
 		expandedCardIndex = null;
 	}
 </script>
@@ -309,7 +277,7 @@
 		<h3 class="sectionTitle">Counters</h3>
 		<Spacer size="0.5rem" />
 		<div class="customShapesList">
-			{#each params.customShapes as shape, index (shape.name)}
+			{#each counterShapes as shape, index (shape.id)}
 				{@const baseShape = shape.baseShape ?? 'rectangle'}
 				{@const isExpanded = expandedIndex === index}
 				{#if isExpanded}
@@ -323,7 +291,7 @@
 											{...inputProps}
 											type="text"
 											value={shape.name}
-											onchange={(e) => updateCustomShape(index, 'name', e.currentTarget.value)}
+											onchange={(e) => handleUpdateShape(shape.id, 'name', e.currentTarget.value)}
 											placeholder="Name"
 										/>
 									{/snippet}
@@ -333,7 +301,7 @@
 										<Select
 											selected={[baseShape]}
 											onSelectedChange={(selected) =>
-												updateCustomShape(index, 'baseShape', selected[0])}
+												handleUpdateShape(shape.id, 'baseShape', selected[0])}
 											options={baseShapeOptions}
 											{...inputProps}
 										/>
@@ -349,7 +317,7 @@
 												min="1"
 												value={shape.width}
 												onchange={(e) =>
-													updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+													handleUpdateShape(shape.id, 'width', parseFloat(e.currentTarget.value))}
 											/>
 										{/snippet}
 										{#snippet end()}mm{/snippet}
@@ -363,7 +331,7 @@
 												min="1"
 												value={shape.length}
 												onchange={(e) =>
-													updateCustomShape(index, 'length', parseFloat(e.currentTarget.value))}
+													handleUpdateShape(shape.id, 'length', parseFloat(e.currentTarget.value))}
 											/>
 										{/snippet}
 										{#snippet end()}mm{/snippet}
@@ -378,7 +346,7 @@
 												min="1"
 												value={shape.width}
 												onchange={(e) =>
-													updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+													handleUpdateShape(shape.id, 'width', parseFloat(e.currentTarget.value))}
 											/>
 										{/snippet}
 										{#snippet end()}mm{/snippet}
@@ -393,7 +361,7 @@
 												min="1"
 												value={shape.width}
 												onchange={(e) =>
-													updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+													handleUpdateShape(shape.id, 'width', parseFloat(e.currentTarget.value))}
 											/>
 										{/snippet}
 										{#snippet end()}mm{/snippet}
@@ -408,7 +376,7 @@
 												min="1"
 												value={shape.width}
 												onchange={(e) =>
-													updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+													handleUpdateShape(shape.id, 'width', parseFloat(e.currentTarget.value))}
 											/>
 										{/snippet}
 										{#snippet end()}mm{/snippet}
@@ -416,7 +384,7 @@
 									<InputCheckbox
 										checked={shape.pointyTop ?? false}
 										onchange={(e) =>
-											updateCustomShape(index, 'pointyTop', e.currentTarget.checked ? 1 : 0)}
+											handleUpdateShape(shape.id, 'pointyTop', e.currentTarget.checked ? 1 : 0)}
 										label="Pointy top"
 									/>
 								{:else if baseShape === 'triangle'}
@@ -429,7 +397,7 @@
 												min="1"
 												value={shape.width}
 												onchange={(e) =>
-													updateCustomShape(index, 'width', parseFloat(e.currentTarget.value))}
+													handleUpdateShape(shape.id, 'width', parseFloat(e.currentTarget.value))}
 											/>
 										{/snippet}
 										{#snippet end()}mm{/snippet}
@@ -443,8 +411,8 @@
 												min="0"
 												value={shape.cornerRadius ?? 1.5}
 												onchange={(e) =>
-													updateCustomShape(
-														index,
+													handleUpdateShape(
+														shape.id,
 														'cornerRadius',
 														parseFloat(e.currentTarget.value)
 													)}
@@ -456,11 +424,11 @@
 							</div>
 						</div>
 						<Hr />
-						{@const stackCount = countStacksUsingShape(shape.name)}
+						{@const stackCount = countStacksUsingShape(shape.id)}
 						<div class="shapePanelActions">
 							<Button size="sm" onclick={() => (expandedIndex = null)}>Save</Button>
 							<ConfirmActionButton
-								action={() => removeCustomShape(index)}
+								action={() => handleRemoveShape(shape.id)}
 								actionButtonText="Delete counter"
 							>
 								{#snippet trigger({ triggerProps })}
@@ -510,7 +478,7 @@
 			{/each}
 		</div>
 		<Spacer />
-		<Link as="button" onclick={addCustomShape}>+ New counter</Link>
+		<Link as="button" onclick={handleAddShape}>+ New counter</Link>
 	</section>
 
 	<Hr />
@@ -519,7 +487,7 @@
 		<h3 class="sectionTitle">Card Sizes (Sleeved)</h3>
 		<Spacer size="0.5rem" />
 		<div class="customShapesList">
-			{#each params.customCardSizes ?? [] as cardSize, index (cardSize.name)}
+			{#each cardSizes as cardSize, index (cardSize.id)}
 				{@const isExpanded = expandedCardIndex === index}
 				{#if isExpanded}
 					<!-- Expanded view: full form in Panel -->
@@ -532,7 +500,8 @@
 											{...inputProps}
 											type="text"
 											value={cardSize.name}
-											onchange={(e) => updateCardSize(index, 'name', e.currentTarget.value)}
+											onchange={(e) =>
+												handleUpdateCardSize(cardSize.id, 'name', e.currentTarget.value)}
 											placeholder="Name"
 										/>
 									{/snippet}
@@ -546,7 +515,11 @@
 											min="10"
 											value={cardSize.width}
 											onchange={(e) =>
-												updateCardSize(index, 'width', parseFloat(e.currentTarget.value))}
+												handleUpdateCardSize(
+													cardSize.id,
+													'width',
+													parseFloat(e.currentTarget.value)
+												)}
 										/>
 									{/snippet}
 									{#snippet end()}mm{/snippet}
@@ -560,7 +533,11 @@
 											min="10"
 											value={cardSize.length}
 											onchange={(e) =>
-												updateCardSize(index, 'length', parseFloat(e.currentTarget.value))}
+												handleUpdateCardSize(
+													cardSize.id,
+													'length',
+													parseFloat(e.currentTarget.value)
+												)}
 										/>
 									{/snippet}
 									{#snippet end()}mm{/snippet}
@@ -574,7 +551,11 @@
 											min="0.1"
 											value={cardSize.thickness}
 											onchange={(e) =>
-												updateCardSize(index, 'thickness', parseFloat(e.currentTarget.value))}
+												handleUpdateCardSize(
+													cardSize.id,
+													'thickness',
+													parseFloat(e.currentTarget.value)
+												)}
 										/>
 									{/snippet}
 									{#snippet end()}mm{/snippet}
@@ -582,11 +563,11 @@
 							</div>
 						</div>
 						<Hr />
-						{@const trayCount = countTraysUsingCardSize(cardSize.name)}
+						{@const trayCount = countTraysUsingCardSize(cardSize.id)}
 						<div class="shapePanelActions">
 							<Button size="sm" onclick={() => (expandedCardIndex = null)}>Save</Button>
 							<ConfirmActionButton
-								action={() => removeCardSize(index)}
+								action={() => handleRemoveCardSize(cardSize.id)}
 								actionButtonText="Delete card size"
 							>
 								{#snippet trigger({ triggerProps })}
@@ -632,7 +613,7 @@
 			{/each}
 		</div>
 		<Spacer />
-		<Link as="button" onclick={addCardSize}>+ New card size</Link>
+		<Link as="button" onclick={handleAddCardSize}>+ New card size</Link>
 	</section>
 
 	<Hr />

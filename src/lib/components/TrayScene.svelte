@@ -619,6 +619,14 @@
 		{@const boxDepth = boxData.boxDimensions.depth}
 		{@const xOffset = boxPos?.x ?? 0}
 		{@const zOffset = printBedSize / 2}
+		<!-- Compute geometry bounds for proper centering -->
+		{@const boxGeomBounds = boxData.boxGeometry ? getGeomBounds(boxData.boxGeometry) : null}
+		{@const boxCenterX = boxGeomBounds
+			? -(boxGeomBounds.max.x + boxGeomBounds.min.x) / 2
+			: -boxWidth / 2}
+		{@const boxCenterZ = boxGeomBounds
+			? (boxGeomBounds.max.y + boxGeomBounds.min.y) / 2
+			: boxDepth / 2}
 
 		<!-- Print bed for this box -->
 		<PrintBed size={printBedSize} title={boxData.boxName} position={[xOffset, 0, zOffset]} />
@@ -628,9 +636,9 @@
 			<T.Mesh
 				geometry={boxData.boxGeometry}
 				rotation.x={-Math.PI / 2}
-				position.x={xOffset - boxWidth / 2}
+				position.x={xOffset + boxCenterX}
 				position.y={0}
-				position.z={zOffset + boxDepth / 2}
+				position.z={zOffset + boxCenterZ}
 			>
 				<T.MeshStandardMaterial
 					color="#333333"
@@ -646,13 +654,20 @@
 			{@const placement = trayData.placement}
 			{@const isRotated = placement.rotated}
 			{@const groupX =
-				xOffset -
-				boxWidth / 2 +
+				xOffset +
+				boxCenterX +
+				(boxGeomBounds?.min.x ?? 0) +
 				boxWallThickness +
 				boxTolerance +
 				placement.x +
 				(isRotated ? placement.dimensions.width : 0)}
-			{@const groupZ = zOffset + boxDepth / 2 - boxWallThickness - boxTolerance - placement.y}
+			{@const groupZ =
+				zOffset +
+				boxCenterZ -
+				(boxGeomBounds?.min.y ?? 0) -
+				boxWallThickness -
+				boxTolerance -
+				placement.y}
 			{@const groupY = boxFloorThickness}
 			<T.Group
 				position.x={groupX}
@@ -1786,11 +1801,30 @@
 		{@const boxDepth = boxData.boxDimensions.depth}
 		{@const xOffset = boxPos?.x ?? 0}
 		{@const zOffset = printBedSize / 2}
+		{@const labelBoxGeomBounds = boxData.boxGeometry ? getGeomBounds(boxData.boxGeometry) : null}
+		{@const labelBoxCenterX = labelBoxGeomBounds
+			? -(labelBoxGeomBounds.max.x + labelBoxGeomBounds.min.x) / 2
+			: -boxWidth / 2}
+		{@const labelBoxCenterZ = labelBoxGeomBounds
+			? (labelBoxGeomBounds.max.y + labelBoxGeomBounds.min.y) / 2
+			: boxDepth / 2}
 		{#each boxData.trayGeometries as trayData, trayIndex (trayData.trayId)}
 			{@const placement = trayData.placement}
 			{@const isRotated = placement.rotated}
-			{@const trayX = xOffset - boxWidth / 2 + boxWallThickness + boxTolerance + placement.x}
-			{@const trayZ = zOffset + boxDepth / 2 - boxWallThickness - boxTolerance - placement.y}
+			{@const trayX =
+				xOffset +
+				labelBoxCenterX +
+				(labelBoxGeomBounds?.min.x ?? 0) +
+				boxWallThickness +
+				boxTolerance +
+				placement.x}
+			{@const trayZ =
+				zOffset +
+				labelBoxCenterZ -
+				(labelBoxGeomBounds?.min.y ?? 0) -
+				boxWallThickness -
+				boxTolerance -
+				placement.y}
 			{@const cumulativeIdx =
 				allBoxes.slice(0, boxIndex).reduce((sum, b) => sum + b.trayGeometries.length, 0) +
 				trayIndex}

@@ -9,12 +9,16 @@ const { path2 } = jscad.geometries;
 const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
 
-// Import CustomCardSize type from counterTray for type safety
-import type { CustomCardSize } from './counterTray';
+// Import types from project
+import type { CardSize } from '$lib/types/project';
+import { DEFAULT_CARD_SIZE_IDS } from './counterTray';
+
+// Re-export for backwards compatibility
+export type CustomCardSize = CardSize;
 
 // A single stack within a card divider tray
 export interface CardDividerStack {
-	cardSizeName: string; // Reference to a CustomCardSize by name
+	cardSizeId: string; // Reference to a CardSize by ID
 	count: number; // Number of cards in this stack
 	label?: string; // Optional label for the stack
 }
@@ -31,8 +35,8 @@ export interface CardDividerTrayParams {
 
 export const defaultCardDividerTrayParams: CardDividerTrayParams = {
 	stacks: [
-		{ cardSizeName: 'Standard', count: 30, label: undefined },
-		{ cardSizeName: 'Standard', count: 30, label: undefined }
+		{ cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: 30, label: undefined },
+		{ cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: 30, label: undefined }
 	],
 	orientation: 'horizontal',
 	stackDirection: 'frontToBack',
@@ -42,12 +46,9 @@ export const defaultCardDividerTrayParams: CardDividerTrayParams = {
 	rimHeight: 3.0
 };
 
-// Helper to get card dimensions from global card sizes
-export function getCardSize(
-	cardSizeName: string,
-	customCardSizes: CustomCardSize[]
-): CustomCardSize | null {
-	return customCardSizes.find((s) => s.name === cardSizeName) || null;
+// Helper to get card dimensions from global card sizes by ID
+export function getCardSize(cardSizeId: string, cardSizes: CardSize[]): CardSize | null {
+	return cardSizes.find((s) => s.id === cardSizeId) || null;
 }
 
 // For visualization - position data for each stack
@@ -58,7 +59,7 @@ export interface CardDividerStackPosition {
 	slotWidth: number; // Width of the slot (card dimension + clearance)
 	slotDepth: number; // Depth of the slot based on card count
 	slotHeight: number; // Height of the slot (card standing dimension)
-	cardSizeName: string;
+	cardSizeId: string;
 	count: number;
 	label?: string;
 	color: string;
@@ -97,7 +98,7 @@ export function getCardDividerTrayDimensions(
 	const slotDimensions: { slotWidth: number; slotDepth: number; slotHeight: number }[] = [];
 
 	for (const stack of stacks) {
-		const cardSize = getCardSize(stack.cardSizeName, customCardSizes);
+		const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
 		if (!cardSize) continue;
 
 		const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
@@ -176,7 +177,7 @@ export function getCardDividerPositions(
 	// Calculate max slot height across all stacks for floor adjustment
 	let maxSlotHeight = 0;
 	for (const stack of stacks) {
-		const cardSize = getCardSize(stack.cardSizeName, customCardSizes);
+		const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
 		if (!cardSize) continue;
 		const slotHeight = orientation === 'vertical' ? cardSize.length : cardSize.width;
 		maxSlotHeight = Math.max(maxSlotHeight, slotHeight);
@@ -188,7 +189,7 @@ export function getCardDividerPositions(
 
 		for (let i = 0; i < stacks.length; i++) {
 			const stack = stacks[i];
-			const cardSize = getCardSize(stack.cardSizeName, customCardSizes);
+			const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
 			if (!cardSize) continue;
 
 			const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
@@ -220,7 +221,7 @@ export function getCardDividerPositions(
 				slotWidth,
 				slotDepth,
 				slotHeight,
-				cardSizeName: stack.cardSizeName,
+				cardSizeId: stack.cardSizeId,
 				count: stack.count,
 				label: stack.label,
 				color: colors[i % colors.length],
@@ -239,7 +240,7 @@ export function getCardDividerPositions(
 		// Calculate max slot width for centering
 		let maxSlotWidth = 0;
 		for (const stack of stacks) {
-			const cardSize = getCardSize(stack.cardSizeName, customCardSizes);
+			const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
 			if (!cardSize) continue;
 			const slotWidth =
 				orientation === 'vertical'
@@ -250,7 +251,7 @@ export function getCardDividerPositions(
 
 		for (let i = 0; i < stacks.length; i++) {
 			const stack = stacks[i];
-			const cardSize = getCardSize(stack.cardSizeName, customCardSizes);
+			const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
 			if (!cardSize) continue;
 
 			const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
@@ -282,7 +283,7 @@ export function getCardDividerPositions(
 				slotWidth,
 				slotDepth,
 				slotHeight,
-				cardSizeName: stack.cardSizeName,
+				cardSizeId: stack.cardSizeId,
 				count: stack.count,
 				label: stack.label,
 				color: colors[i % colors.length],
@@ -345,7 +346,7 @@ export function createCardDividerTray(
 	// Calculate max slot height for per-stack floor adjustment
 	let maxSlotHeight = 0;
 	for (const stack of stacks) {
-		const cardSize = getCardSize(stack.cardSizeName, customCardSizes);
+		const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
 		if (!cardSize) continue;
 		const slotHeight = orientation === 'vertical' ? cardSize.length : cardSize.width;
 		maxSlotHeight = Math.max(maxSlotHeight, slotHeight);
@@ -356,7 +357,7 @@ export function createCardDividerTray(
 		let currentX = wallThickness;
 
 		for (const stack of stacks) {
-			const cardSize = getCardSize(stack.cardSizeName, customCardSizes);
+			const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
 			if (!cardSize) continue;
 
 			const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
@@ -397,7 +398,7 @@ export function createCardDividerTray(
 		// Calculate max slot width for cavity centering
 		let maxSlotWidth = 0;
 		for (const stack of stacks) {
-			const cardSize = getCardSize(stack.cardSizeName, customCardSizes);
+			const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
 			if (!cardSize) continue;
 			const slotWidth =
 				orientation === 'vertical'
@@ -407,7 +408,7 @@ export function createCardDividerTray(
 		}
 
 		for (const stack of stacks) {
-			const cardSize = getCardSize(stack.cardSizeName, customCardSizes);
+			const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
 			if (!cardSize) continue;
 
 			const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
@@ -449,7 +450,7 @@ export function createCardDividerTray(
 	// Horizontal: cards on side, cutout based on card length (longer side)
 	let maxCutoutDimension = 0;
 	for (const stack of stacks) {
-		const cardSize = getCardSize(stack.cardSizeName, customCardSizes);
+		const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
 		if (!cardSize) continue;
 		const cutoutDimension = orientation === 'vertical' ? cardSize.width : cardSize.length;
 		maxCutoutDimension = Math.max(maxCutoutDimension, cutoutDimension);
@@ -474,7 +475,7 @@ export function createCardDividerTray(
 		const cutoutLength = trayDepth + 2; // Extend beyond tray for clean cut
 
 		for (const stack of stacks) {
-			const cardSize = getCardSize(stack.cardSizeName, customCardSizes);
+			const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
 			if (!cardSize) continue;
 
 			const { width: cardWidth, length: cardLength } = cardSize;

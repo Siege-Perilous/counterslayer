@@ -52,14 +52,13 @@
 		onExpandPanel();
 	}
 
-	function handleAddBox() {
-		addBox();
-		onSelectionChange('box');
+	function handleAddBox(trayType: TrayType) {
+		addBox(trayType);
+		onSelectionChange('tray');
 		onExpandPanel();
 	}
 
-	function handleAddTray(boxId: string, trayType: TrayType, e: Event) {
-		e.stopPropagation();
+	function handleAddTray(boxId: string, trayType: TrayType) {
 		addTray(boxId, trayType);
 		onSelectionChange('tray');
 		onExpandPanel();
@@ -233,12 +232,24 @@
 								<span class="addLabel">Add tray</span>
 							</button>
 						{/snippet}
-						{#snippet content()}
-							<button class="trayTypeOption" onclick={(e) => handleAddTray(box.id, 'counter', e)}>
+						{#snippet content({ contentProps })}
+							<button
+								class="trayTypeOption"
+								onclick={() => {
+									handleAddTray(box.id, 'counter');
+									contentProps.close();
+								}}
+							>
 								<Text weight={500}>Counters</Text>
 								<Text size="0.75rem" color="var(--fgMuted)">Stacks of geometric tokens</Text>
 							</button>
-							<button class="trayTypeOption" onclick={(e) => handleAddTray(box.id, 'cardDraw', e)}>
+							<button
+								class="trayTypeOption"
+								onclick={() => {
+									handleAddTray(box.id, 'cardDraw');
+									contentProps.close();
+								}}
+							>
 								<Text weight={500}>Card draw</Text>
 								<Text size="0.75rem" color="var(--fgMuted)"
 									>Single stack of cards, draw from top</Text
@@ -246,7 +257,10 @@
 							</button>
 							<button
 								class="trayTypeOption"
-								onclick={(e) => handleAddTray(box.id, 'cardDivider', e)}
+								onclick={() => {
+									handleAddTray(box.id, 'cardDivider');
+									contentProps.close();
+								}}
 							>
 								<Text weight={500}>Card divider</Text>
 								<Text size="0.75rem" color="var(--fgMuted)"
@@ -260,11 +274,53 @@
 			</div>
 		{/each}
 
-		<!-- Add Box Button -->
-		<button class="navItem navItem--add" onclick={handleAddBox}>
-			<span class="addIcon">+</span>
-			<span class="addLabel">Add box</span>
-		</button>
+		<!-- Add Box Button with Popover -->
+		<Popover
+			positioning={{ placement: 'right-start' }}
+			portal=".appContainer"
+			contentClass="trayTypePopover"
+		>
+			{#snippet trigger()}
+				<button class="navItem navItem--add">
+					<span class="addIcon">+</span>
+					<span class="addLabel">Add box</span>
+				</button>
+			{/snippet}
+			{#snippet content({ contentProps })}
+				<button
+					class="trayTypeOption"
+					onclick={() => {
+						handleAddBox('counter');
+						contentProps.close();
+					}}
+				>
+					<Text weight={500}>Counters</Text>
+					<Text size="0.75rem" color="var(--fgMuted)">Stacks of geometric tokens</Text>
+				</button>
+				<button
+					class="trayTypeOption"
+					onclick={() => {
+						handleAddBox('cardDraw');
+						contentProps.close();
+					}}
+				>
+					<Text weight={500}>Card draw</Text>
+					<Text size="0.75rem" color="var(--fgMuted)">Single stack of cards, draw from top</Text>
+				</button>
+				<button
+					class="trayTypeOption"
+					onclick={() => {
+						handleAddBox('cardDivider');
+						contentProps.close();
+					}}
+				>
+					<Text weight={500}>Card divider</Text>
+					<Text size="0.75rem" color="var(--fgMuted)"
+						>Divided stacks of cards, divided by walls</Text
+					>
+				</button>
+			{/snippet}
+		</Popover>
 	</div>
 </Panel>
 

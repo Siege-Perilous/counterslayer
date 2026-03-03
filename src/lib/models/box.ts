@@ -1,8 +1,8 @@
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
-import type { Box, Tray } from '$lib/types/project';
+import type { Box, Tray, CardSize, CounterShape } from '$lib/types/project';
 import { isCounterTray, isCardTray, isCardDividerTray } from '$lib/types/project';
-import type { CounterTrayParams, CustomCardSize } from './counterTray';
+import type { CounterTrayParams } from './counterTray';
 import { getCardDrawTrayDimensions } from './cardTray';
 import { getCardDividerTrayDimensions } from './cardDividerTray';
 
@@ -43,44 +43,30 @@ export interface TraySpacerInfo {
 	floorSpacerHeight: number; // Additional solid material under tray floor
 }
 
-// Extract customCardSizes from the first counter tray in a box
-// (customCardSizes is a global param stored in CounterTrayParams)
-export function getCustomCardSizesFromBox(box: Box): CustomCardSize[] {
-	for (const tray of box.trays) {
-		if (isCounterTray(tray) && tray.params.customCardSizes) {
-			return tray.params.customCardSizes;
-		}
-	}
-	// Return default card sizes if no counter tray found
-	return [
-		{ name: 'Standard', width: 66, length: 91, thickness: 0.5 },
-		{ name: 'Mini American', width: 44, length: 66, thickness: 0.5 },
-		{ name: 'Mini European', width: 47, length: 71, thickness: 0.5 },
-		{ name: 'Euro', width: 62, length: 95, thickness: 0.5 },
-		{ name: 'Japanese', width: 62, length: 89, thickness: 0.5 },
-		{ name: 'Tarot', width: 73, length: 123, thickness: 0.5 },
-		{ name: 'Square', width: 73, length: 73, thickness: 0.5 }
-	];
-}
+// Type alias for backward compatibility
+type CustomCardSize = CardSize;
 
 // Get dimensions for any tray type (dispatches based on tray type)
 export function getTrayDimensionsForTray(
 	tray: Tray,
-	customCardSizes?: CustomCardSize[]
+	cardSizes: CardSize[] = [],
+	counterShapes: CounterShape[] = []
 ): TrayDimensions {
 	if (isCardDividerTray(tray)) {
-		return getCardDividerTrayDimensions(tray.params, customCardSizes ?? []);
+		return getCardDividerTrayDimensions(tray.params, cardSizes);
 	}
 	if (isCardTray(tray)) {
-		// Use provided customCardSizes or fall back to empty array (will throw if card size not found)
-		return getCardDrawTrayDimensions(tray.params, customCardSizes ?? []);
+		return getCardDrawTrayDimensions(tray.params, cardSizes);
 	}
 	// Default to counter tray
-	return getCounterTrayDimensions(tray.params);
+	return getCounterTrayDimensions(tray.params, counterShapes);
 }
 
 // Calculate counter tray dimensions from params (same logic as counterTray.ts)
-export function getCounterTrayDimensions(params: CounterTrayParams): TrayDimensions {
+export function getCounterTrayDimensions(
+	params: CounterTrayParams,
+	counterShapes: CounterShape[] = []
+): TrayDimensions {
 	const {
 		counterThickness,
 		clearance,
@@ -89,25 +75,32 @@ export function getCounterTrayDimensions(params: CounterTrayParams): TrayDimensi
 		rimHeight,
 		trayWidthOverride,
 		topLoadedStacks,
-		edgeLoadedStacks,
-		customShapes
+		edgeLoadedStacks
 	} = params;
 
 	// Use topLoadedStacks (renamed from stacks)
 	const stacks = topLoadedStacks || [];
 
-	// Helper to get custom shape by name from 'custom:ShapeName' reference
-	const getCustomShape = (shapeRef: string) => {
-		if (!shapeRef.startsWith('custom:')) return null;
-		const name = shapeRef.substring(7);
-		return customShapes?.find((s) => s.name === name) || null;
+	// Helper to get counter shape by ID
+	// Falls back to matching by name if ID not found (for legacy data)
+	const getShape = (shapeId: string): CounterShape | null => {
+		// First try by ID
+		let shape = counterShapes.find((s) => s.id === shapeId);
+		if (shape) return shape;
+
+		// Fall back to matching by name (for legacy data where ID might be stale)
+		shape = counterShapes.find((s) => s.name === shapeId);
+		if (shape) {
+			console.warn(`Shape ID "${shapeId}" not found, matched by name instead`);
+			return shape;
+		}
+
+		return null;
 	};
 
-	// Get effective dimensions for custom shapes based on their base shape
+	// Get effective dimensions for counter shapes based on their base shape
 	// Returns [width, length] accounting for hex point-to-point calculations
-	const getCustomEffectiveDims = (
-		custom: NonNullable<ReturnType<typeof getCustomShape>>
-	): [number, number] => {
+	const getCustomEffectiveDims = (custom: CounterShape): [number, number] => {
 		const baseShape = custom.baseShape ?? 'rectangle';
 		if (baseShape === 'hex') {
 			// width stores flat-to-flat, calculate point-to-point
@@ -133,75 +126,80 @@ export function getCounterTrayDimensions(params: CounterTrayParams): TrayDimensi
 		return [custom.width, custom.length];
 	};
 
+	// Wrapper that ensures we always have a shape (uses first available as ultimate fallback)
+	const getShapeRequired = (shapeId: string): CounterShape => {
+		const shape = getShape(shapeId);
+		if (shape) return shape;
+		// Ultimate fallback: use first available shape, or a default
+		if (counterShapes.length > 0) {
+			console.warn(`Shape "${shapeId}" not found by ID or name, using first available shape`);
+			return counterShapes[0];
+		}
+		// No shapes at all - return a minimal default
+		return { id: 'default', name: 'Default', baseShape: 'square', width: 20, length: 20 };
+	};
+
 	// For top-loaded/crosswise custom shapes: LONGER side = width (X), SHORTER side = length (Y)
-	const getPocketWidth = (shape: string): number => {
-		const custom = getCustomShape(shape);
-		if (!custom) throw new Error(`Unknown shape: ${shape}`);
-		const [w, l] = getCustomEffectiveDims(custom);
+	const getPocketWidth = (shapeId: string): number => {
+		const shape = getShapeRequired(shapeId);
+		const [w, l] = getCustomEffectiveDims(shape);
 		return Math.max(w, l) + clearance * 2; // Longer side along X (parallel to tray width)
 	};
 
-	const getPocketLength = (shape: string): number => {
-		const custom = getCustomShape(shape);
-		if (!custom) throw new Error(`Unknown shape: ${shape}`);
-		const [w, l] = getCustomEffectiveDims(custom);
+	const getPocketLength = (shapeId: string): number => {
+		const shape = getShapeRequired(shapeId);
+		const [w, l] = getCustomEffectiveDims(shape);
 		return Math.min(w, l) + clearance * 2; // Shorter side along Y
 	};
 
 	// For lengthwise edge-loaded: longest dimension runs perpendicular to tray (along Y)
 	// This prevents the slot from receding too far into the tray depth
-	const getPocketLengthLengthwise = (shape: string): number => {
-		const custom = getCustomShape(shape);
-		if (!custom) throw new Error(`Unknown shape: ${shape}`);
-		const [w, l] = getCustomEffectiveDims(custom);
+	const getPocketLengthLengthwise = (shapeId: string): number => {
+		const shape = getShapeRequired(shapeId);
+		const [w, l] = getCustomEffectiveDims(shape);
 		return Math.max(w, l) + clearance * 2; // Longer side along Y (perpendicular to tray width)
 	};
 
 	// For lengthwise custom shapes: shorter dimension is height (longer runs along Y)
-	const getStandingHeightLengthwise = (shape: string): number => {
-		const custom = getCustomShape(shape);
-		if (!custom) throw new Error(`Unknown shape: ${shape}`);
-		if (custom.baseShape === 'triangle') {
-			return custom.width * (Math.sqrt(3) / 2); // Triangle geometric height
+	const getStandingHeightLengthwise = (shapeId: string): number => {
+		const shape = getShapeRequired(shapeId);
+		if (shape.baseShape === 'triangle') {
+			return shape.width * (Math.sqrt(3) / 2); // Triangle geometric height
 		}
-		const [w, l] = getCustomEffectiveDims(custom);
+		const [w, l] = getCustomEffectiveDims(shape);
 		return Math.min(w, l); // Shorter side is height
 	};
 
 	// For crosswise custom shapes: shorter dimension is height (longer runs along X)
-	const getStandingHeightCrosswise = (shape: string): number => {
-		const custom = getCustomShape(shape);
-		if (!custom) throw new Error(`Unknown shape: ${shape}`);
-		if (custom.baseShape === 'triangle') {
-			return custom.width * (Math.sqrt(3) / 2); // Triangle geometric height
+	const getStandingHeightCrosswise = (shapeId: string): number => {
+		const shape = getShapeRequired(shapeId);
+		if (shape.baseShape === 'triangle') {
+			return shape.width * (Math.sqrt(3) / 2); // Triangle geometric height
 		}
-		const [w, l] = getCustomEffectiveDims(custom);
+		const [w, l] = getCustomEffectiveDims(shape);
 		return Math.min(w, l); // Shorter side is height
 	};
 
 	// Get actual counter dimensions (without clearance) for standing height
-	const _getCounterWidth = (shape: string): number => {
-		const custom = getCustomShape(shape);
-		if (!custom) throw new Error(`Unknown shape: ${shape}`);
-		const [w, l] = getCustomEffectiveDims(custom);
+	const _getCounterWidth = (shapeId: string): number => {
+		const shape = getShapeRequired(shapeId);
+		const [w, l] = getCustomEffectiveDims(shape);
 		return Math.max(w, l); // Longer side along X
 	};
 
-	const _getCounterLength = (shape: string): number => {
-		const custom = getCustomShape(shape);
-		if (!custom) throw new Error(`Unknown shape: ${shape}`);
-		const [w, l] = getCustomEffectiveDims(custom);
+	const _getCounterLength = (shapeId: string): number => {
+		const shape = getShapeRequired(shapeId);
+		const [w, l] = getCustomEffectiveDims(shape);
 		return Math.min(w, l); // Shorter side along Y
 	};
 
 	// Get counter standing height (for edge-loaded stacks) - uses actual counter size, not pocket size
-	const _getCounterStandingHeight = (shape: string): number => {
-		const custom = getCustomShape(shape);
-		if (!custom) throw new Error(`Unknown shape: ${shape}`);
-		if (custom.baseShape === 'triangle') {
-			return custom.width * (Math.sqrt(3) / 2); // Triangle geometric height
+	const _getCounterStandingHeight = (shapeId: string): number => {
+		const shape = getShapeRequired(shapeId);
+		if (shape.baseShape === 'triangle') {
+			return shape.width * (Math.sqrt(3) / 2); // Triangle geometric height
 		}
-		const [w, l] = getCustomEffectiveDims(custom);
+		const [w, l] = getCustomEffectiveDims(shape);
 		return Math.max(w, l);
 	};
 	// Suppress unused warnings for future use
@@ -450,7 +448,8 @@ export function arrangeTrays(
 		customBoxWidth?: number;
 		wallThickness?: number;
 		tolerance?: number;
-		customCardSizes?: CustomCardSize[];
+		cardSizes?: CardSize[];
+		counterShapes?: CounterShape[];
 	}
 ): TrayPlacement[] {
 	if (trays.length === 0) return [];
@@ -463,7 +462,11 @@ export function arrangeTrays(
 	}
 
 	const trayOptions: TrayOption[][] = trays.map((tray) => {
-		const dims = getTrayDimensionsForTray(tray, options?.customCardSizes);
+		const dims = getTrayDimensionsForTray(
+			tray,
+			options?.cardSizes ?? [],
+			options?.counterShapes ?? []
+		);
 		const rotatedDims: TrayDimensions = {
 			width: dims.depth,
 			depth: dims.width,
@@ -701,15 +704,19 @@ function createRoundedBox(
 const POKE_HOLE_DIAMETER = 15;
 
 // Create box geometry with rounded corners
-export function createBox(box: Box): Geom3 | null {
+export function createBox(
+	box: Box,
+	cardSizes: CardSize[] = [],
+	counterShapes: CounterShape[] = []
+): Geom3 | null {
 	if (box.trays.length === 0) return null;
 
-	const customCardSizes = getCustomCardSizesFromBox(box);
 	const placements = arrangeTrays(box.trays, {
 		customBoxWidth: box.customWidth,
 		wallThickness: box.wallThickness,
 		tolerance: box.tolerance,
-		customCardSizes
+		cardSizes,
+		counterShapes
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
@@ -762,17 +769,21 @@ export function createBox(box: Box): Geom3 | null {
 }
 
 // Calculate minimum required exterior dimensions for a box
-export function calculateMinimumBoxDimensions(box: Box): BoxMinimumDimensions {
+export function calculateMinimumBoxDimensions(
+	box: Box,
+	cardSizes: CardSize[] = [],
+	counterShapes: CounterShape[] = []
+): BoxMinimumDimensions {
 	if (box.trays.length === 0) {
 		return { minWidth: 0, minDepth: 0, minHeight: 0 };
 	}
 
-	const customCardSizes = getCustomCardSizesFromBox(box);
 	const placements = arrangeTrays(box.trays, {
 		customBoxWidth: box.customWidth,
 		wallThickness: box.wallThickness,
 		tolerance: box.tolerance,
-		customCardSizes
+		cardSizes,
+		counterShapes
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
@@ -812,17 +823,21 @@ export function validateCustomDimensions(box: Box): ValidationResult {
 }
 
 // Calculate floor spacer heights for each tray to fill height gaps
-export function calculateTraySpacers(box: Box): TraySpacerInfo[] {
+export function calculateTraySpacers(
+	box: Box,
+	cardSizes: CardSize[] = [],
+	counterShapes: CounterShape[] = []
+): TraySpacerInfo[] {
 	if (box.trays.length === 0) return [];
 
-	const customCardSizes = getCustomCardSizesFromBox(box);
 	const placements = arrangeTrays(box.trays, {
 		customBoxWidth: box.customWidth,
 		wallThickness: box.wallThickness,
 		tolerance: box.tolerance,
-		customCardSizes
+		cardSizes,
+		counterShapes
 	});
-	const minimums = calculateMinimumBoxDimensions(box);
+	const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
 
 	// Target exterior height (custom or auto)
 	const targetExteriorHeight = box.customBoxHeight ?? minimums.minHeight;
@@ -888,4 +903,24 @@ export function arrangeBoxes(
 	const offset = totalWidth / 2;
 
 	return positions.map((p) => ({ ...p, x: p.x - offset }));
+}
+
+// DEPRECATED: Card sizes are now at project level (project.cardSizes)
+// This function is kept for backwards compatibility but returns an empty array
+// Use getCardSizes() from project.svelte.ts instead
+export function getCustomCardSizesFromBoxes(_boxes: Box[]): CardSize[] {
+	console.warn(
+		'getCustomCardSizesFromBoxes is deprecated - use getCardSizes() from project.svelte.ts'
+	);
+	return [];
+}
+
+// DEPRECATED: Card sizes are now at project level (project.cardSizes)
+// This function is kept for backwards compatibility but returns an empty array
+// Use getCardSizes() from project.svelte.ts instead
+export function getCustomCardSizesFromBox(_box: Box): CardSize[] {
+	console.warn(
+		'getCustomCardSizesFromBox is deprecated - use getCardSizes() from project.svelte.ts'
+	);
+	return [];
 }

@@ -10,11 +10,15 @@ const { path2 } = jscad.geometries;
 const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
 
-// Import CustomCardSize type from counterTray for type safety
-import type { CustomCardSize } from './counterTray';
+// Import types from project
+import type { CardSize } from '$lib/types/project';
+import { DEFAULT_CARD_SIZE_IDS } from './counterTray';
+
+// Re-export for backwards compatibility
+export type CustomCardSize = CardSize;
 
 export interface CardDrawTrayParams {
-	cardSizeName: string; // Reference to a CustomCardSize by name
+	cardSizeId: string; // Reference to a CardSize by ID
 	cardCount: number;
 	wallThickness: number;
 	floorThickness: number;
@@ -28,7 +32,7 @@ export interface CardDrawTrayParams {
 export type CardTrayParams = CardDrawTrayParams;
 
 export const defaultCardDrawTrayParams: CardDrawTrayParams = {
-	cardSizeName: 'Standard',
+	cardSizeId: DEFAULT_CARD_SIZE_IDS.standard,
 	cardCount: 50,
 	wallThickness: 4.0,
 	floorThickness: 4.0,
@@ -41,12 +45,28 @@ export const defaultCardDrawTrayParams: CardDrawTrayParams = {
 // Legacy alias for backwards compatibility
 export const defaultCardTrayParams = defaultCardDrawTrayParams;
 
-// Helper to get card dimensions from global card sizes
-export function getCardSize(
-	cardSizeName: string,
-	customCardSizes: CustomCardSize[]
-): CustomCardSize | null {
-	return customCardSizes.find((s) => s.name === cardSizeName) || null;
+// Helper to get card dimensions from global card sizes by ID
+// Falls back to matching by name if ID not found (for legacy data)
+export function getCardSize(cardSizeId: string, cardSizes: CardSize[]): CardSize {
+	// First try by ID
+	let cardSize = cardSizes.find((s) => s.id === cardSizeId);
+	if (cardSize) return cardSize;
+
+	// Fall back to matching by name (for legacy data where ID might be stale)
+	cardSize = cardSizes.find((s) => s.name === cardSizeId);
+	if (cardSize) {
+		console.warn(`Card size ID "${cardSizeId}" not found, matched by name instead`);
+		return cardSize;
+	}
+
+	// Ultimate fallback: use first available card size, or a default
+	if (cardSizes.length > 0) {
+		console.warn(`Card size "${cardSizeId}" not found by ID or name, using first available size`);
+		return cardSizes[0];
+	}
+
+	// No card sizes at all - return a minimal default (standard playing card)
+	return { id: 'default', name: 'Default', width: 63, length: 88, thickness: 0.5 };
 }
 
 export interface CardDrawStack {
@@ -74,14 +94,10 @@ export function getCardDrawTrayDimensions(
 	depth: number;
 	height: number;
 } {
-	const { cardSizeName, cardCount, wallThickness, floorThickness, clearance } = params;
+	const { cardSizeId, cardCount, wallThickness, floorThickness, clearance } = params;
 
 	// Look up card size from global card sizes
-	const cardSize = getCardSize(cardSizeName, customCardSizes);
-	if (!cardSize) {
-		throw new Error(`Card size "${cardSizeName}" not found`);
-	}
-
+	const cardSize = getCardSize(cardSizeId, customCardSizes);
 	const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
 
 	const interiorWidth = cardWidth + clearance * 2;
@@ -110,14 +126,10 @@ export function getCardDrawPositions(
 	_targetHeight?: number,
 	_spacerHeight?: number
 ): CardDrawStack[] {
-	const { cardSizeName, cardCount, wallThickness, clearance, floorThickness } = params;
+	const { cardSizeId, cardCount, wallThickness, clearance, floorThickness } = params;
 
 	// Look up card size from global card sizes
-	const cardSize = getCardSize(cardSizeName, customCardSizes);
-	if (!cardSize) {
-		throw new Error(`Card size "${cardSizeName}" not found`);
-	}
-
+	const cardSize = getCardSize(cardSizeId, customCardSizes);
 	const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
 
 	// Calculate tray depth and slope rise (same as in getCardTrayDimensions)
@@ -168,14 +180,10 @@ export function createCardDrawTray(
 	targetHeight?: number,
 	floorSpacerHeight?: number
 ): Geom3 {
-	const { cardSizeName, cardCount, wallThickness, floorThickness, clearance } = params;
+	const { cardSizeId, cardCount, wallThickness, floorThickness, clearance } = params;
 
 	// Look up card size from global card sizes
-	const cardSize = getCardSize(cardSizeName, customCardSizes);
-	if (!cardSize) {
-		throw new Error(`Card size "${cardSizeName}" not found`);
-	}
-
+	const cardSize = getCardSize(cardSizeId, customCardSizes);
 	const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
 
 	// Calculate interior dimensions (space for cards)
