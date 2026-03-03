@@ -71,7 +71,12 @@ interface ExportStlMessage {
 	trayIndex?: number; // For all-tray exports
 }
 
-type WorkerMessage = GenerateMessage | ExportStlMessage;
+interface ExportAllStlsMessage {
+	type: 'export-all-stls';
+	id: number;
+}
+
+type WorkerMessage = GenerateMessage | ExportStlMessage | ExportAllStlsMessage;
 
 // Geometry data to transfer back (raw arrays for BufferGeometry reconstruction)
 interface GeometryData {
@@ -118,12 +123,46 @@ interface ExportStlResult {
 	error?: string;
 }
 
+interface StlFile {
+	filename: string;
+	data: ArrayBuffer;
+}
+
+interface ExportAllStlsResult {
+	type: 'export-all-stls-result';
+	id: number;
+	files: StlFile[];
+	error?: string;
+}
+
 // Cache the last generated JSCAD geometries for STL export
 let cachedSelectedTray: Geom3 | null = null;
 let cachedBox: Geom3 | null = null;
 let cachedLid: Geom3 | null = null;
 let cachedAllTrays: { jscadGeom: Geom3; name: string }[] = [];
 let cachedBoxName = '';
+
+// Cache for all boxes (for export all)
+interface CachedBoxData {
+	boxName: string;
+	boxGeom: Geom3 | null;
+	lidGeom: Geom3 | null;
+	trays: { jscadGeom: Geom3; name: string }[];
+}
+let cachedAllBoxes: CachedBoxData[] = [];
+let cachedProjectName = '';
+
+/**
+ * Sanitize a string for use in filenames (replace slashes, spaces, etc.)
+ */
+function sanitizeFilename(name: string): string {
+	return name
+		.toLowerCase()
+		.replace(/[/\\]+/g, '-') // Replace slashes with dashes
+		.replace(/\s+/g, '-') // Replace spaces with dashes
+		.replace(/-+/g, '-') // Collapse multiple dashes
+		.replace(/^-|-$/g, ''); // Trim leading/trailing dashes
+}
 
 /**
  * Create tray geometry based on tray type
@@ -389,7 +428,8 @@ function handleGenerate(msg: GenerateMessage): void {
 		const boxGeometry = cachedBox ? jscadToArrays(cachedBox) : null;
 		const lidGeometry = cachedLid ? jscadToArrays(cachedLid) : null;
 
-		// Generate geometries for ALL boxes (for all-no-lid view)
+		// Generate geometries for ALL boxes (for all-no-lid view) and cache JSCAD for STL export
+		cachedAllBoxes = [];
 		const allBoxGeometries: BoxGeometryResult[] = project.boxes.map((projectBox, boxIndex) => {
 			const boxValidation = validateCustomDimensions(projectBox);
 			if (!boxValidation.valid) {
@@ -414,6 +454,9 @@ function handleGenerate(msg: GenerateMessage): void {
 			const boxSpacerInfo = calculateTraySpacers(projectBox, cardSizes, counterShapes);
 			const boxMaxHeight = Math.max(...boxPlacements.map((p) => p.dimensions.height), 0);
 
+			// Cache JSCAD geometries for this box's trays
+			const cachedTraysForBox: { jscadGeom: Geom3; name: string }[] = [];
+
 			const trayGeoms: TrayGeometryResult[] = boxPlacements.map((placement, index) => {
 				const spacer = boxSpacerInfo.find((s) => s.trayId === placement.tray.id);
 				const spacerHeight = spacer?.floorSpacerHeight ?? 0;
@@ -424,6 +467,9 @@ function handleGenerate(msg: GenerateMessage): void {
 					boxMaxHeight,
 					spacerHeight
 				);
+
+				// Cache for STL export
+				cachedTraysForBox.push({ jscadGeom, name: placement.tray.name });
 
 				return {
 					trayId: placement.tray.id,
@@ -440,6 +486,14 @@ function handleGenerate(msg: GenerateMessage): void {
 					),
 					trayLetter: getTrayLetter(getCumulativeTrayIndex(project.boxes, boxIndex, index))
 				};
+			});
+
+			// Cache this box's JSCAD geometries for export
+			cachedAllBoxes.push({
+				boxName: projectBox.name,
+				boxGeom: boxJscad,
+				lidGeom: lidJscad,
+				trays: cachedTraysForBox
 			});
 
 			return {
@@ -526,16 +580,16 @@ function handleExportStl(msg: ExportStlMessage): void {
 				break;
 			case 'box':
 				geom = cachedBox;
-				filename = `${cachedBoxName.toLowerCase().replace(/\s+/g, '-')}-box.stl`;
+				filename = `${sanitizeFilename(cachedBoxName)}-box.stl`;
 				break;
 			case 'lid':
 				geom = cachedLid;
-				filename = `${cachedBoxName.toLowerCase().replace(/\s+/g, '-')}-lid.stl`;
+				filename = `${sanitizeFilename(cachedBoxName)}-lid.stl`;
 				break;
 			case 'all-tray':
 				if (trayIndex !== undefined && cachedAllTrays[trayIndex]) {
 					geom = cachedAllTrays[trayIndex].jscadGeom;
-					filename = `${cachedBoxName.toLowerCase().replace(/\s+/g, '-')}-${cachedAllTrays[trayIndex].name.toLowerCase().replace(/\s+/g, '-')}.stl`;
+					filename = `${sanitizeFilename(cachedBoxName)}-${sanitizeFilename(cachedAllTrays[trayIndex].name)}.stl`;
 				}
 				break;
 		}
@@ -553,23 +607,102 @@ function handleExportStl(msg: ExportStlMessage): void {
 		const blob = new Blob(stlData, { type: 'application/octet-stream' });
 
 		// Convert blob to ArrayBuffer
-		blob.arrayBuffer().then((buffer) => {
-			self.postMessage(
-				{
+		blob
+			.arrayBuffer()
+			.then((buffer) => {
+				self.postMessage(
+					{
+						type: 'export-stl-result',
+						id,
+						data: buffer,
+						filename
+					} as ExportStlResult,
+					{ transfer: [buffer] }
+				);
+			})
+			.catch((e) => {
+				self.postMessage({
 					type: 'export-stl-result',
 					id,
-					data: buffer,
-					filename
-				} as ExportStlResult,
-				{ transfer: [buffer] }
-			);
-		});
+					error: e instanceof Error ? e.message : 'Failed to convert STL data'
+				} as ExportStlResult);
+			});
 	} catch (e) {
 		self.postMessage({
 			type: 'export-stl-result',
 			id,
 			error: e instanceof Error ? e.message : 'Unknown error'
 		} as ExportStlResult);
+	}
+}
+
+/**
+ * Export all STLs for all boxes
+ */
+async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
+	const { id } = msg;
+
+	try {
+		if (cachedAllBoxes.length === 0) {
+			self.postMessage({
+				type: 'export-all-stls-result',
+				id,
+				files: [],
+				error: 'No geometry available for export. Please generate geometry first.'
+			} as ExportAllStlsResult);
+			return;
+		}
+
+		const files: StlFile[] = [];
+		const transferables: ArrayBuffer[] = [];
+
+		for (const boxData of cachedAllBoxes) {
+			const boxPrefix = sanitizeFilename(boxData.boxName);
+
+			// Export box
+			if (boxData.boxGeom) {
+				const stlData = stlSerializer.serialize({ binary: true }, boxData.boxGeom);
+				const blob = new Blob(stlData, { type: 'application/octet-stream' });
+				const buffer = await blob.arrayBuffer();
+				files.push({ filename: `${boxPrefix}-box.stl`, data: buffer });
+				transferables.push(buffer);
+			}
+
+			// Export lid
+			if (boxData.lidGeom) {
+				const stlData = stlSerializer.serialize({ binary: true }, boxData.lidGeom);
+				const blob = new Blob(stlData, { type: 'application/octet-stream' });
+				const buffer = await blob.arrayBuffer();
+				files.push({ filename: `${boxPrefix}-lid.stl`, data: buffer });
+				transferables.push(buffer);
+			}
+
+			// Export trays
+			for (const tray of boxData.trays) {
+				const stlData = stlSerializer.serialize({ binary: true }, tray.jscadGeom);
+				const blob = new Blob(stlData, { type: 'application/octet-stream' });
+				const buffer = await blob.arrayBuffer();
+				const trayName = sanitizeFilename(tray.name);
+				files.push({ filename: `${boxPrefix}-${trayName}.stl`, data: buffer });
+				transferables.push(buffer);
+			}
+		}
+
+		self.postMessage(
+			{
+				type: 'export-all-stls-result',
+				id,
+				files
+			} as ExportAllStlsResult,
+			{ transfer: transferables }
+		);
+	} catch (e) {
+		self.postMessage({
+			type: 'export-all-stls-result',
+			id,
+			files: [],
+			error: e instanceof Error ? e.message : 'Unknown error during export'
+		} as ExportAllStlsResult);
 	}
 }
 
@@ -583,6 +716,9 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
 			break;
 		case 'export-stl':
 			handleExportStl(msg);
+			break;
+		case 'export-all-stls':
+			handleExportAllStls(msg);
 			break;
 	}
 };

@@ -10,7 +10,9 @@
 		Popover,
 		Hr,
 		FormControl,
-		Loader
+		Loader,
+		addToast,
+		removeToast
 	} from '@tableslayer/ui';
 	import {
 		IconChevronDown,
@@ -32,8 +34,10 @@
 	import {
 		getGeometryWorker,
 		type TrayGeometryData,
-		type BoxGeometryData
+		type BoxGeometryData,
+		type StlFile
 	} from '$lib/utils/geometryWorker';
+	import { BlobWriter, ZipWriter } from '@zip.js/zip.js';
 	import {
 		exportPdfReference,
 		exportPdfWithScreenshots,
@@ -114,9 +118,10 @@
 		(((options: CaptureOptions) => string) & { setCaptureMode?: (mode: boolean) => void }) | null
 	>(null);
 	let exportingPdf = $state(false);
+	let exportingStl = $state(false);
+	let exportStlProgress = $state('');
 	let captureTrayLetter = $state<string | null>(null); // Override during PDF export
 	let debugExporting = $state(false);
-	let debugExportError = $state<string | null>(null);
 
 	// Initialize project from localStorage and fetch community projects
 	$effect(() => {
@@ -340,57 +345,75 @@
 		}
 	}
 
-	async function handleExport() {
-		if (!selectedTrayGeometry) return;
-
-		try {
-			const { data, filename } = await geometryWorker.exportTrayStl();
-			downloadStl(data, filename);
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Export failed';
-			console.error('Export error:', e);
-		}
-	}
-
 	async function handleExportAll() {
-		const box = getSelectedBox();
-		if (!box) return;
+		const project = getProject();
+		if (project.boxes.length === 0) return;
+
+		exportingStl = true;
+		exportStlProgress = 'Generating STL files...';
+
+		const loadingToast = addToast({
+			data: {
+				title: 'Exporting STLs',
+				body: 'This may take a few moments',
+				type: 'info'
+			}
+		});
 
 		try {
-			// Export box
-			if (boxGeometry) {
-				const { data, filename } = await geometryWorker.exportBoxStl();
-				downloadStl(data, filename);
-				await new Promise((resolve) => setTimeout(resolve, 100));
+			// Get all STL files from worker
+			const files = await geometryWorker.exportAllStls();
+
+			if (files.length === 0) {
+				throw new Error('No geometry available for export');
 			}
 
-			// Export lid
-			if (lidGeometry) {
-				const { data, filename } = await geometryWorker.exportLidStl();
-				downloadStl(data, filename);
-				await new Promise((resolve) => setTimeout(resolve, 100));
+			exportStlProgress = `Creating zip (${files.length} files)...`;
+
+			// Create zip file
+			const zipBlobWriter = new BlobWriter('application/zip');
+			const zipWriter = new ZipWriter(zipBlobWriter);
+
+			for (const file of files) {
+				const blob = new Blob([file.data], { type: 'application/octet-stream' });
+				await zipWriter.add(file.filename, blob.stream());
 			}
 
-			// Export all trays
-			for (let i = 0; i < allTrayGeometries.length; i++) {
-				const { data, filename } = await geometryWorker.exportTrayByIndexStl(i);
-				downloadStl(data, filename);
-				await new Promise((resolve) => setTimeout(resolve, 100));
-			}
+			const zipBlob = await zipWriter.close();
+
+			// Download zip - use first box name or default
+			const projectName =
+				project.boxes[0]?.name?.toLowerCase().replace(/\s+/g, '-') || 'counterslayer';
+			const url = URL.createObjectURL(zipBlob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `${projectName}-stls.zip`;
+			a.click();
+			URL.revokeObjectURL(url);
+
+			removeToast(loadingToast.id);
+			addToast({
+				data: {
+					title: 'STL export complete',
+					body: `Downloaded ${files.length} files as zip`,
+					type: 'success'
+				}
+			});
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Export failed';
+			removeToast(loadingToast.id);
+			const message = e instanceof Error ? e.message : 'Export failed';
+			addToast({
+				data: {
+					title: 'STL export failed',
+					body: message,
+					type: 'danger'
+				}
+			});
 			console.error('Export error:', e);
+		} finally {
+			exportingStl = false;
+			exportStlProgress = '';
 		}
-	}
-
-	function downloadStl(data: ArrayBuffer, filename: string) {
-		const blob = new Blob([data], { type: 'application/octet-stream' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = filename;
-		a.click();
-		URL.revokeObjectURL(url);
 	}
 
 	async function handleExportPdf() {
@@ -405,6 +428,14 @@
 
 		exportingPdf = true;
 		error = '';
+
+		const loadingToast = addToast({
+			data: {
+				title: 'Exporting PDF',
+				body: 'Capturing tray screenshots...',
+				type: 'info'
+			}
+		});
 
 		try {
 			const screenshots: TrayScreenshot[] = [];
@@ -573,8 +604,25 @@
 
 			// Generate PDF with screenshots
 			await exportPdfWithScreenshots(project, screenshots);
+
+			removeToast(loadingToast.id);
+			addToast({
+				data: {
+					title: 'PDF export complete',
+					body: `Reference PDF with ${screenshots.length} tray screenshots`,
+					type: 'success'
+				}
+			});
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to export PDF';
+			removeToast(loadingToast.id);
+			const message = e instanceof Error ? e.message : 'Failed to export PDF';
+			addToast({
+				data: {
+					title: 'PDF export failed',
+					body: message,
+					type: 'danger'
+				}
+			});
 			console.error('PDF export error:', e);
 		} finally {
 			exportingPdf = false;
@@ -599,12 +647,25 @@
 		const tray = getSelectedTray();
 
 		if (!box || !tray || !selectedTrayGeometry) {
-			debugExportError = 'No tray selected or geometry not generated';
+			addToast({
+				data: {
+					title: 'Debug export failed',
+					body: 'No tray selected or geometry not generated',
+					type: 'danger'
+				}
+			});
 			return;
 		}
 
 		debugExporting = true;
-		debugExportError = null;
+
+		const loadingToast = addToast({
+			data: {
+				title: 'Debug export',
+				body: 'Analyzing geometry...',
+				type: 'info'
+			}
+		});
 
 		// Helper to convert ArrayBuffer to base64
 		const toBase64 = (data: ArrayBuffer) =>
@@ -689,19 +750,38 @@
 
 			const result = await response.json();
 
+			removeToast(loadingToast.id);
 			if (!result.success) {
-				debugExportError = result.error || 'Analysis failed';
-				if (result.hint) {
-					debugExportError += '\n\nHint: ' + result.hint;
-				}
+				const errorMsg = result.error || 'Analysis failed';
+				addToast({
+					data: {
+						title: 'Debug export failed',
+						body: result.hint ? `${errorMsg} - ${result.hint}` : errorMsg,
+						type: 'danger'
+					}
+				});
 				console.error('Debug export failed:', result);
 			} else {
-				// Success - briefly show in console
+				addToast({
+					data: {
+						title: 'Debug export complete',
+						body: 'Files written to mesh-analysis/',
+						type: 'success'
+					}
+				});
 				console.log('Debug analysis complete:', result.message);
 				console.log(result.output);
 			}
 		} catch (e) {
-			debugExportError = e instanceof Error ? e.message : 'Failed to export debug info';
+			removeToast(loadingToast.id);
+			const message = e instanceof Error ? e.message : 'Failed to export debug info';
+			addToast({
+				data: {
+					title: 'Debug export failed',
+					body: message,
+					type: 'danger'
+				}
+			});
 			console.error('Debug export error:', e);
 		} finally {
 			debugExporting = false;
@@ -935,20 +1015,12 @@
 								<Hr />
 								<Button
 									variant="ghost"
-									onclick={handleExport}
-									disabled={generating || !selectedTrayGeometry}
-									style="width: 100%; justify-content: flex-start;"
-								>
-									Export tray STL
-								</Button>
-								<Button
-									variant="ghost"
 									onclick={handleExportAll}
-									disabled={generating ||
-										(!boxGeometry && !lidGeometry && allTrayGeometries.length === 0)}
+									disabled={generating || exportingStl || getProject().boxes.length === 0}
+									isLoading={exportingStl}
 									style="width: 100%; justify-content: flex-start;"
 								>
-									Export all STLs
+									{exportingStl ? exportStlProgress : 'Export STLs'}
 								</Button>
 								<Button
 									variant="ghost"
@@ -998,9 +1070,9 @@
 					</div>
 				</div>
 
-				{#if error || debugExportError}
+				{#if error}
 					<div class="errorBanner">
-						{error || debugExportError}
+						{error}
 					</div>
 				{/if}
 			</main>
@@ -1133,20 +1205,12 @@
 								<Hr />
 								<Button
 									variant="ghost"
-									onclick={handleExport}
-									disabled={generating || !selectedTrayGeometry}
-									style="width: 100%; justify-content: flex-start;"
-								>
-									Export tray STL
-								</Button>
-								<Button
-									variant="ghost"
 									onclick={handleExportAll}
-									disabled={generating ||
-										(!boxGeometry && !lidGeometry && allTrayGeometries.length === 0)}
+									disabled={generating || exportingStl || getProject().boxes.length === 0}
+									isLoading={exportingStl}
 									style="width: 100%; justify-content: flex-start;"
 								>
-									Export all STLs
+									{exportingStl ? exportStlProgress : 'Export STLs'}
 								</Button>
 								<Button
 									variant="ghost"
@@ -1206,9 +1270,9 @@
 					</div>
 				</div>
 
-				{#if error || debugExportError}
+				{#if error}
 					<div class="errorBanner">
-						{error || debugExportError}
+						{error}
 					</div>
 				{/if}
 			</main>

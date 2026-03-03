@@ -21,20 +21,26 @@ importers:
         specifier: ^3.31.0
         version: 3.37.1(svelte@5.53.3)
       '@tableslayer/ui':
-        specifier: 0.1.8
-        version: 0.1.8(@melt-ui/svelte@0.86.6(svelte@5.53.3))(@sveltejs/kit@2.53.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)
+        specifier: 0.1.9
+        version: 0.1.9(@melt-ui/svelte@0.86.6(svelte@5.53.3))(@sveltejs/kit@2.53.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)
       '@threlte/core':
         specifier: ^8.0.0
         version: 8.3.1(svelte@5.53.3)(three@0.170.0)
       '@threlte/extras':
         specifier: ^9.0.0
         version: 9.7.1(@types/three@0.170.0)(svelte@5.53.3)(three@0.170.0)
+      '@zip.js/zip.js':
+        specifier: ^2.8.22
+        version: 2.8.22
       jspdf:
         specifier: ^4.1.0
         version: 4.1.0
       marked:
         specifier: ^17.0.2
         version: 17.0.3
+      mode-watcher:
+        specifier: ^1.1.0
+        version: 1.1.0(svelte@5.53.3)
       paneforge:
         specifier: ^1.0.2
         version: 1.0.2(svelte@5.53.3)
@@ -591,8 +597,8 @@ packages:
   '@tabler/icons@3.37.1':
     resolution: {integrity: sha512-neLCWkuyNHEPXCyYu6nbN4S3g/59BTa4qyITAugYVpq1YzYNDOZooW7/vRWH98ZItXAudxdKU8muFT7y1PqzuA==}
 
-  '@tableslayer/ui@0.1.8':
-    resolution: {integrity: sha512-NuZCbkproG3j4bF9LsYzPhu5/FHR03D/Oins70D/0Lx6VFLhdW4xHHqbuFtwSo2y3BnUAInSbABMl3LSMN5nmw==}
+  '@tableslayer/ui@0.1.9':
+    resolution: {integrity: sha512-jM4vvEP1nSrtU9iIl6+GQYfT177538Uq/Jpr1Q3jpM841RLIxaJNWlNoBMPV44YSu+vQFEIU4ugGTlDLGD8wQw==}
     peerDependencies:
       '@melt-ui/svelte': ^0.86.2
       '@sveltejs/kit': ^2.16.0
@@ -861,6 +867,10 @@ packages:
 
   '@webgpu/types@0.1.68':
     resolution: {integrity: sha512-3ab1B59Ojb6RwjOspYLsTpCzbNB3ZaamIAxBMmvnNkiDoLTZUOBXZ9p5nAYVEkQlDdf6qAZWi1pqj9+ypiqznA==}
+
+  '@zip.js/zip.js@2.8.22':
+    resolution: {integrity: sha512-0KlzbVR6r8irIX2o3zvUlosBDef62VDl47oUfa1U/qgEs67h4/eGBrX/6HWa1RQbt+J6sAeVmtyFKbTHNdF8qQ==}
+    engines: {bun: '>=0.7.0', deno: '>=1.0.0', node: '>=18.0.0'}
 
   acorn-jsx@5.3.2:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
@@ -1397,6 +1407,11 @@ packages:
   mitt@3.0.1:
     resolution: {integrity: sha512-vKivATfr97l2/QBCYAkXYDbrIWPM2IIKEl7YPhjCvKlG3kE2gm+uBo6nEXK3M5/Ffh/FLpKExzOQ3JJoJGFKBw==}
 
+  mode-watcher@1.1.0:
+    resolution: {integrity: sha512-mUT9RRGPDYenk59qJauN1rhsIMKBmWA3xMF+uRwE8MW/tjhaDSCCARqkSuDTq8vr4/2KcAxIGVjACxTjdk5C3g==}
+    peerDependencies:
+      svelte: ^5.27.0
+
   mri@1.2.0:
     resolution: {integrity: sha512-tzzskb3bG8LvYGFF/mDTpq3jpI6Q9wc3LEmBaghu+DdCssd1FakN7Bc0hVNmEyGq1bq3RgfkCb3cmQLpNPOroA==}
     engines: {node: '>=4'}
@@ -1645,6 +1660,11 @@ packages:
     peerDependencies:
       svelte: ^5.7.0
 
+  runed@0.25.0:
+    resolution: {integrity: sha512-7+ma4AG9FT2sWQEA0Egf6mb7PBT2vHyuHail1ie8ropfSjvZGtEAx8YTmUjv/APCsdRRxEVvArNjALk9zFSOrg==}
+    peerDependencies:
+      svelte: ^5.7.0
+
   runed@0.29.2:
     resolution: {integrity: sha512-0cq6cA6sYGZwl/FvVqjx9YN+1xEBu9sDDyuWdDW1yWX7JF2wmvmVKfH+hVCZs+csW+P3ARH92MjI3H9QTagOQA==}
     peerDependencies:
@@ -1722,6 +1742,12 @@ packages:
     peerDependenciesMeta:
       svelte:
         optional: true
+
+  svelte-toolbelt@0.7.1:
+    resolution: {integrity: sha512-HcBOcR17Vx9bjaOceUvxkY3nGmbBmCBBbuWLLEWO6jtmWH8f/QoWmbyUfQZrpDINH39en1b8mptfPQT9VKQ1xQ==}
+    engines: {node: '>=18', pnpm: '>=8.7.0'}
+    peerDependencies:
+      svelte: ^5.0.0
 
   svelte-toolbelt@0.9.3:
     resolution: {integrity: sha512-HCSWxCtVmv+c6g1ACb8LTwHVbDqLKJvHpo6J8TaqwUme2hj9ATJCpjCPNISR1OCq2Q4U1KT41if9ON0isINQZw==}
@@ -2329,7 +2355,7 @@ snapshots:
 
   '@tabler/icons@3.37.1': {}
 
-  '@tableslayer/ui@0.1.8(@melt-ui/svelte@0.86.6(svelte@5.53.3))(@sveltejs/kit@2.53.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)':
+  '@tableslayer/ui@0.1.9(@melt-ui/svelte@0.86.6(svelte@5.53.3))(@sveltejs/kit@2.53.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.53.3)':
     dependencies:
       '@floating-ui/dom': 1.7.5
       '@melt-ui/svelte': 0.86.6(svelte@5.53.3)
@@ -2672,6 +2698,8 @@ snapshots:
   '@ungap/structured-clone@1.3.0': {}
 
   '@webgpu/types@0.1.68': {}
+
+  '@zip.js/zip.js@2.8.22': {}
 
   acorn-jsx@5.3.2(acorn@8.15.0):
     dependencies:
@@ -3221,6 +3249,12 @@ snapshots:
 
   mitt@3.0.1: {}
 
+  mode-watcher@1.1.0(svelte@5.53.3):
+    dependencies:
+      runed: 0.25.0(svelte@5.53.3)
+      svelte: 5.53.3
+      svelte-toolbelt: 0.7.1(svelte@5.53.3)
+
   mri@1.2.0: {}
 
   mrmime@2.0.1: {}
@@ -3502,6 +3536,11 @@ snapshots:
       esm-env: 1.2.2
       svelte: 5.53.3
 
+  runed@0.25.0(svelte@5.53.3):
+    dependencies:
+      esm-env: 1.2.2
+      svelte: 5.53.3
+
   runed@0.29.2(svelte@5.53.3):
     dependencies:
       esm-env: 1.2.2
@@ -3583,6 +3622,13 @@ snapshots:
       postcss-scss: 4.0.9(postcss@8.5.6)
       postcss-selector-parser: 7.1.1
     optionalDependencies:
+      svelte: 5.53.3
+
+  svelte-toolbelt@0.7.1(svelte@5.53.3):
+    dependencies:
+      clsx: 2.1.1
+      runed: 0.23.4(svelte@5.53.3)
+      style-to-object: 1.0.14
       svelte: 5.53.3
 
   svelte-toolbelt@0.9.3(svelte@5.53.3):

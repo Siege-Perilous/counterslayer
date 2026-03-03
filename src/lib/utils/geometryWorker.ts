@@ -53,6 +53,18 @@ interface ExportStlResult {
 	error?: string;
 }
 
+export interface StlFile {
+	filename: string;
+	data: ArrayBuffer;
+}
+
+interface ExportAllStlsResult {
+	type: 'export-all-stls-result';
+	id: number;
+	files: StlFile[];
+	error?: string;
+}
+
 // Result interfaces with BufferGeometry
 export interface TrayGeometryData {
 	trayId: string;
@@ -82,7 +94,7 @@ export interface GenerationResult {
 	allBoxGeometries: BoxGeometryData[];
 }
 
-type WorkerResult = GenerateResult | ExportStlResult;
+type WorkerResult = GenerateResult | ExportStlResult | ExportAllStlsResult;
 
 /**
  * Convert raw geometry data to Three.js BufferGeometry
@@ -269,6 +281,32 @@ export class GeometryWorkerManager {
 				id,
 				target,
 				trayIndex
+			});
+		});
+	}
+
+	/**
+	 * Export all STLs for all boxes
+	 */
+	async exportAllStls(): Promise<StlFile[]> {
+		if (!this.worker) {
+			await this.init();
+		}
+
+		const id = ++this.messageId;
+
+		return new Promise((resolve, reject) => {
+			this.pendingRequests.set(id, {
+				resolve: (result) => {
+					const r = result as ExportAllStlsResult;
+					resolve(r.files);
+				},
+				reject
+			});
+
+			this.worker!.postMessage({
+				type: 'export-all-stls',
+				id
 			});
 		});
 	}

@@ -1,47 +1,30 @@
 <script lang="ts">
 	import './layout.css';
-	import { dev, browser } from '$app/environment';
+	import { dev } from '$app/environment';
 	import { resolve } from '$app/paths';
-	import { Link, IconButton, Icon, Popover } from '@tableslayer/ui';
+	import { Link, IconButton, Icon, Popover, Toast } from '@tableslayer/ui';
 	import { IconSun, IconMoon, IconMenu2 } from '@tabler/icons-svelte';
+	import { ModeWatcher, toggleMode, mode } from 'mode-watcher';
 	import { setContext } from 'svelte';
 
 	let { children } = $props();
 
-	// Theme state
-	let mode = $state<'light' | 'dark'>('dark');
-
-	// Initialize mode from localStorage
-	$effect(() => {
-		if (browser) {
-			const saved = localStorage.getItem('counterslayer-theme');
-			if (saved === 'light' || saved === 'dark') {
-				mode = saved;
-			}
-		}
-	});
-
-	function toggleTheme() {
-		mode = mode === 'dark' ? 'light' : 'dark';
-		if (browser) {
-			localStorage.setItem('counterslayer-theme', mode);
-		}
-	}
-
 	// Set context for child components
 	setContext('theme', {
 		get mode() {
-			return mode;
+			return mode.current;
 		},
-		toggle: toggleTheme
+		toggle: toggleMode
 	});
 </script>
+
+<ModeWatcher defaultMode="dark" darkClassNames={['dark']} lightClassNames={['light']} />
 
 <svelte:head>
 	<link rel="icon" type="image/svg+xml" href={dev ? '/favicon-dev.svg' : '/favicon.svg'} />
 </svelte:head>
 
-<div class="appContainer {mode}">
+<div class="appContainer" class:dark={mode.current === 'dark'} class:light={mode.current === 'light'}>
 	<!-- Header -->
 	<div class="appHeader">
 		<div style="display: flex; align-items: center; gap: 0.25rem;">
@@ -93,8 +76,8 @@
 					{/snippet}
 				</Popover>
 			</div>
-			<IconButton variant="ghost" onclick={toggleTheme} size="sm">
-				<Icon Icon={mode === 'dark' ? IconSun : IconMoon} />
+			<IconButton variant="ghost" onclick={toggleMode} size="sm">
+				<Icon Icon={mode.current === 'dark' ? IconSun : IconMoon} />
 			</IconButton>
 		</div>
 	</div>
@@ -102,6 +85,7 @@
 	<div class="appContent">
 		{@render children()}
 	</div>
+	<Toast />
 </div>
 
 <style>
