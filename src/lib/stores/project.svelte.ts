@@ -269,10 +269,10 @@ function createDefaultBox(name: string): Box {
 }
 
 function createDefaultProject(): Project {
-	const box = createDefaultBox('Box 1');
-	const counterTray = createDefaultTray('Tray 1', TRAY_COLORS[0]);
-	const cardDrawTray = createDefaultCardDrawTray('Card Draw', TRAY_COLORS[1]);
-	const cupTray = createDefaultCupTray('Cup Tray', TRAY_COLORS[2]);
+	const box = createDefaultBox('Game box');
+	const counterTray = createDefaultTray('Counter tray', TRAY_COLORS[0]);
+	const cardDrawTray = createDefaultCardDrawTray('Card draw', TRAY_COLORS[1]);
+	const cupTray = createDefaultCupTray('Segmented cups', TRAY_COLORS[2]);
 	// Set card draw tray to hold 25 cards
 	cardDrawTray.params = { ...cardDrawTray.params, cardCount: 25 };
 	box.trays.push(counterTray);

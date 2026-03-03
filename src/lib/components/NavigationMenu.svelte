@@ -291,10 +291,8 @@
 									contentProps.close();
 								}}
 							>
-								<Text weight={500}>Cup tray</Text>
-								<Text size="0.75rem" color="var(--fgMuted)"
-									>Bowl-shaped cups for dice and tokens</Text
-								>
+								<Text weight={500}>Cups</Text>
+								<Text size="0.75rem" color="var(--fgMuted)">Segmented cups for loose ojbects</Text>
 							</button>
 						{/snippet}
 					</Popover>
