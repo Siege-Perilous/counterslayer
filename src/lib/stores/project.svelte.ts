@@ -138,7 +138,11 @@ function getNextTrayColor(boxes: Box[]): string {
 	return TRAY_COLORS[totalTrays % TRAY_COLORS.length];
 }
 
-function createDefaultCounterTray(name: string, color: string, counterShapes?: CounterShape[]): CounterTray {
+function createDefaultCounterTray(
+	name: string,
+	color: string,
+	counterShapes?: CounterShape[]
+): CounterTray {
 	// Build a mapping from default shape IDs to project shape IDs
 	const shapeIdMap: Record<string, string> = {};
 	if (counterShapes && counterShapes.length > 0) {
@@ -170,17 +174,18 @@ function createDefaultCounterTray(name: string, color: string, counterShapes?: C
 				count,
 				label
 			]),
-			edgeLoadedStacks: defaultParams.edgeLoadedStacks.map(([shapeId, count, orientation, label]) => [
-				mapShapeId(shapeId),
-				count,
-				orientation,
-				label
-			])
+			edgeLoadedStacks: defaultParams.edgeLoadedStacks.map(
+				([shapeId, count, orientation, label]) => [mapShapeId(shapeId), count, orientation, label]
+			)
 		}
 	};
 }
 
-function createDefaultCardDrawTray(name: string, color: string, cardSizes?: CardSize[]): CardDrawTray {
+function createDefaultCardDrawTray(
+	name: string,
+	color: string,
+	cardSizes?: CardSize[]
+): CardDrawTray {
 	// Use the first available card size, falling back to default ID
 	const cardSizeId = cardSizes?.[0]?.id ?? DEFAULT_CARD_SIZE_IDS.standard;
 	return {
@@ -193,7 +198,11 @@ function createDefaultCardDrawTray(name: string, color: string, cardSizes?: Card
 	};
 }
 
-function createDefaultCardDividerTray(name: string, color: string, cardSizes?: CardSize[]): CardDividerTray {
+function createDefaultCardDividerTray(
+	name: string,
+	color: string,
+	cardSizes?: CardSize[]
+): CardDividerTray {
 	// Use the first available card size, falling back to default ID
 	const cardSizeId = cardSizes?.[0]?.id ?? DEFAULT_CARD_SIZE_IDS.standard;
 	return {
@@ -218,7 +227,11 @@ function _createDefaultCardTray(name: string, color: string): CardDrawTray {
 }
 
 // Backwards compatibility alias
-function createDefaultTray(name: string, color: string, counterShapes?: CounterShape[]): CounterTray {
+function createDefaultTray(
+	name: string,
+	color: string,
+	counterShapes?: CounterShape[]
+): CounterTray {
 	return createDefaultCounterTray(name, color, counterShapes);
 }
 

@@ -228,10 +228,7 @@
 		const cardSizeId = getCardSizes()[0]?.id ?? DEFAULT_CARD_SIZE_IDS.standard;
 		onUpdateCardDividerParams({
 			...selectedTray.params,
-			stacks: [
-				...selectedTray.params.stacks,
-				{ cardSizeId, count: 30, label: undefined }
-			]
+			stacks: [...selectedTray.params.stacks, { cardSizeId, count: 30, label: undefined }]
 		});
 	}
 
@@ -291,10 +288,7 @@
 		const shapeId = getCounterShapes()[0]?.id ?? DEFAULT_SHAPE_IDS.square;
 		onUpdateCounterParams({
 			...selectedTray.params,
-			topLoadedStacks: [
-				...selectedTray.params.topLoadedStacks,
-				[shapeId, 10, undefined]
-			]
+			topLoadedStacks: [...selectedTray.params.topLoadedStacks, [shapeId, 10, undefined]]
 		});
 	}
 
@@ -675,7 +669,9 @@
 							<h3 class="sectionTitle">Tray Settings</h3>
 							{#if counterTrayDimensions}
 								<span class="dimensionsInfo">
-									{counterTrayDimensions.width.toFixed(1)} × {counterTrayDimensions.depth.toFixed(1)} × {counterTrayDimensions.height.toFixed(1)} mm
+									{counterTrayDimensions.width.toFixed(1)} × {counterTrayDimensions.depth.toFixed(
+										1
+									)} × {counterTrayDimensions.height.toFixed(1)} mm
 								</span>
 							{/if}
 						</div>
@@ -949,7 +945,9 @@
 							<h3 class="sectionTitle">Tray Settings</h3>
 							{#if cardDividerTrayDimensions}
 								<span class="dimensionsInfo">
-									{cardDividerTrayDimensions.width.toFixed(1)} × {cardDividerTrayDimensions.depth.toFixed(1)} × {cardDividerTrayDimensions.height.toFixed(1)} mm
+									{cardDividerTrayDimensions.width.toFixed(1)} × {cardDividerTrayDimensions.depth.toFixed(
+										1
+									)} × {cardDividerTrayDimensions.height.toFixed(1)} mm
 								</span>
 							{/if}
 						</div>
@@ -1070,7 +1068,9 @@
 							<h3 class="sectionTitle">Tray Settings</h3>
 							{#if cardDrawTrayDimensions}
 								<span class="dimensionsInfo">
-									{cardDrawTrayDimensions.width.toFixed(1)} × {cardDrawTrayDimensions.depth.toFixed(1)} × {cardDrawTrayDimensions.height.toFixed(1)} mm
+									{cardDrawTrayDimensions.width.toFixed(1)} × {cardDrawTrayDimensions.depth.toFixed(
+										1
+									)} × {cardDrawTrayDimensions.height.toFixed(1)} mm
 								</span>
 							{/if}
 						</div>
