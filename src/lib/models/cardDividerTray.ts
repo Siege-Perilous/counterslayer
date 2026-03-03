@@ -163,7 +163,14 @@ export function getCardDividerPositions(
 	targetHeight?: number,
 	spacerHeight?: number
 ): CardDividerStackPosition[] {
-	const { stacks: originalStacks, orientation, stackDirection, wallThickness, floorThickness, clearance } = params;
+	const {
+		stacks: originalStacks,
+		orientation,
+		stackDirection,
+		wallThickness,
+		floorThickness,
+		clearance
+	} = params;
 
 	// Reverse stacks so first item in UI list appears at front of tray
 	const stacks = [...originalStacks].reverse();
@@ -439,7 +446,14 @@ export function createCardDividerTray(
 	targetHeight?: number,
 	floorSpacerHeight?: number
 ): Geom3 {
-	const { stacks: originalStacks, orientation, stackDirection, wallThickness, floorThickness, clearance } = params;
+	const {
+		stacks: originalStacks,
+		orientation,
+		stackDirection,
+		wallThickness,
+		floorThickness,
+		clearance
+	} = params;
 
 	// Reverse stacks so first item in UI list appears at front of tray
 	const stacks = [...originalStacks].reverse();
