@@ -64,10 +64,10 @@
 
 	// Drag and drop state
 	let draggedIndex: number | null = $state(null);
-	let draggedType: 'top' | 'edge' | null = $state(null);
+	let draggedType: 'top' | 'edge' | 'cardDivider' | null = $state(null);
 	let dragOverIndex: number | null = $state(null);
 
-	function handleDragStart(e: DragEvent, index: number, type: 'top' | 'edge') {
+	function handleDragStart(e: DragEvent, index: number, type: 'top' | 'edge' | 'cardDivider') {
 		draggedIndex = index;
 		draggedType = type;
 		if (e.dataTransfer) {
@@ -76,7 +76,7 @@
 		}
 	}
 
-	function handleDragOver(e: DragEvent, index: number, type: 'top' | 'edge') {
+	function handleDragOver(e: DragEvent, index: number, type: 'top' | 'edge' | 'cardDivider') {
 		e.preventDefault();
 		if (draggedType === type) {
 			dragOverIndex = index;
@@ -89,21 +89,29 @@
 		dragOverIndex = null;
 	}
 
-	function handleDrop(e: DragEvent, targetIndex: number, type: 'top' | 'edge') {
+	function handleDrop(e: DragEvent, targetIndex: number, type: 'top' | 'edge' | 'cardDivider') {
 		e.preventDefault();
 		if (draggedIndex === null || draggedType !== type || !selectedTray) return;
-		if (!isCounterTray(selectedTray) || !onUpdateCounterParams) return;
 
-		if (type === 'top') {
-			const newStacks = [...selectedTray.params.topLoadedStacks];
+		if (type === 'cardDivider') {
+			if (!isCardDividerTray(selectedTray) || !onUpdateCardDividerParams) return;
+			const newStacks = [...selectedTray.params.stacks];
 			const [removed] = newStacks.splice(draggedIndex, 1);
 			newStacks.splice(targetIndex, 0, removed);
-			onUpdateCounterParams({ ...selectedTray.params, topLoadedStacks: newStacks });
+			onUpdateCardDividerParams({ ...selectedTray.params, stacks: newStacks });
 		} else {
-			const newStacks = [...selectedTray.params.edgeLoadedStacks];
-			const [removed] = newStacks.splice(draggedIndex, 1);
-			newStacks.splice(targetIndex, 0, removed);
-			onUpdateCounterParams({ ...selectedTray.params, edgeLoadedStacks: newStacks });
+			if (!isCounterTray(selectedTray) || !onUpdateCounterParams) return;
+			if (type === 'top') {
+				const newStacks = [...selectedTray.params.topLoadedStacks];
+				const [removed] = newStacks.splice(draggedIndex, 1);
+				newStacks.splice(targetIndex, 0, removed);
+				onUpdateCounterParams({ ...selectedTray.params, topLoadedStacks: newStacks });
+			} else {
+				const newStacks = [...selectedTray.params.edgeLoadedStacks];
+				const [removed] = newStacks.splice(draggedIndex, 1);
+				newStacks.splice(targetIndex, 0, removed);
+				onUpdateCounterParams({ ...selectedTray.params, edgeLoadedStacks: newStacks });
+			}
 		}
 
 		handleDragEnd();
@@ -836,9 +844,31 @@
 						<Spacer size="0.5rem" />
 						<div class="stackList">
 							{#each selectedTray.params.stacks as stack, index (index)}
-								<div class="stackRow" role="listitem">
-									<span class="stackRef">{trayLetter}{index + 1}</span>
+								<div
+									class="stackRow {draggedIndex === index && draggedType === 'cardDivider'
+										? 'stackRow--dragging'
+										: ''} {dragOverIndex === index &&
+									draggedType === 'cardDivider' &&
+									draggedIndex !== index
+										? 'stackRow--dragover'
+										: ''}"
+									role="listitem"
+									ondragover={(e) => handleDragOver(e, index, 'cardDivider')}
+									ondrop={(e) => handleDrop(e, index, 'cardDivider')}
+								>
+									<span
+										class="dragHandle"
+										title="Drag to reorder"
+										draggable="true"
+										ondragstart={(e) => handleDragStart(e, index, 'cardDivider')}
+										ondragend={handleDragEnd}
+										role="button"
+										tabindex="0"
+									>
+										<Icon Icon={IconMenu} size="1rem" color="var(--fgMuted)" />
+									</span>
 									<div class="stackLabelInput">
+										<span class="stackRef">{trayLetter}{index + 1}</span>
 										<Input
 											type="text"
 											placeholder="Label"
