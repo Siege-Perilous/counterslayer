@@ -301,8 +301,12 @@ function handleGenerate(msg: GenerateMessage): void {
 			return;
 		}
 
+		// Get card sizes and counter shapes from project level (global)
+		const cardSizes = project.cardSizes ?? [];
+		const counterShapes = project.counterShapes ?? [];
+
 		// Validate custom dimensions
-		const validation = validateCustomDimensions(box);
+		const validation = validateCustomDimensions(box, cardSizes, counterShapes);
 		if (!validation.valid) {
 			self.postMessage({
 				type: 'generate-result',
@@ -311,10 +315,6 @@ function handleGenerate(msg: GenerateMessage): void {
 			} as GenerateResult);
 			return;
 		}
-
-		// Get card sizes and counter shapes from project level (global)
-		const cardSizes = project.cardSizes ?? [];
-		const counterShapes = project.counterShapes ?? [];
 
 		// Generate all trays with their placements for selected box
 		const placements = arrangeTrays(box.trays, {
@@ -391,7 +391,7 @@ function handleGenerate(msg: GenerateMessage): void {
 
 		// Generate geometries for ALL boxes (for all-no-lid view)
 		const allBoxGeometries: BoxGeometryResult[] = project.boxes.map((projectBox, boxIndex) => {
-			const boxValidation = validateCustomDimensions(projectBox);
+			const boxValidation = validateCustomDimensions(projectBox, cardSizes, counterShapes);
 			if (!boxValidation.valid) {
 				console.warn(`Box "${projectBox.name}" validation failed:`, boxValidation.errors);
 			}
