@@ -3,7 +3,7 @@ import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
-const { translate, scale, mirrorX, mirrorY, rotateX, rotateZ } = jscad.transforms;
+const { translate, scale, mirrorY, rotateX, rotateZ } = jscad.transforms;
 const { vectorText } = jscad.text;
 const { path2 } = jscad.geometries;
 const { expand } = jscad.expansions;
@@ -365,17 +365,6 @@ function createStackLabelGeometry(
 	const wallHeight = trayHeight - floorThickness;
 	const wallCenterZ = floorThickness + wallHeight / 2;
 
-	// Determine available space and calculate scale
-	// Text is horizontal (reads left-to-right along the wall)
-	let availableHorizontal: number;
-	if (stackDirection === 'sideBySide') {
-		// Text on front wall, horizontal space is slot width
-		availableHorizontal = slotWidth - strokeWidth * 2;
-	} else {
-		// Text on left wall, horizontal space is slot depth
-		availableHorizontal = slotDepth - strokeWidth * 2;
-	}
-
 	// Minimum margins
 	const verticalMargin = 2;
 	const availableVertical = wallHeight - verticalMargin * 2;
@@ -383,10 +372,21 @@ function createStackLabelGeometry(
 	// Skip if wall is too short for readable text
 	if (availableVertical < 3) return null;
 
-	// After 90-degree rotation: textWidth becomes vertical, textHeight becomes horizontal
-	const scaleH = Math.min(1, availableHorizontal / textHeight);
-	const scaleV = Math.min(1, availableVertical / textWidth);
-	const textScale = Math.min(scaleH, scaleV);
+	// Calculate scale based on text orientation
+	let textScale: number;
+	if (stackDirection === 'sideBySide') {
+		// Horizontal text: textWidth is horizontal, textHeight is vertical
+		const availableHorizontal = slotWidth - strokeWidth * 2;
+		const scaleH = Math.min(1, availableHorizontal / textWidth);
+		const scaleV = Math.min(1, availableVertical / textHeight);
+		textScale = Math.min(scaleH, scaleV);
+	} else {
+		// Vertical text: textWidth becomes vertical, textHeight becomes horizontal
+		const availableHorizontal = slotDepth - strokeWidth * 2;
+		const scaleH = Math.min(1, availableHorizontal / textHeight);
+		const scaleV = Math.min(1, availableVertical / textWidth);
+		textScale = Math.min(scaleH, scaleV);
+	}
 
 	// Combine text shapes
 	let combinedText = union(...textShapes);
@@ -399,24 +399,25 @@ function createStackLabelGeometry(
 	combinedText = translate([-textCenterX, -textCenterY, 0], combinedText);
 	combinedText = scale([textScale, textScale, 1], combinedText);
 
-	// Mirror text so it reads correctly when embossed into the wall
-	combinedText = mirrorY(combinedText);
-
-	// Rotate text to be vertical (reading bottom-to-top)
-	combinedText = rotateZ(-Math.PI / 2, combinedText);
-
-	// Rotate text to stand up (perpendicular to floor)
-	combinedText = rotateX(-Math.PI / 2, combinedText);
-
 	if (stackDirection === 'sideBySide') {
-		// Front wall: text on Y=0 plane, facing +Y direction
-		// Position so outer face is at wall surface (Y=-0.1) for clean cut
+		// Front wall: text horizontal (parallel to floor), visible from -Y
+		// Mirror so text reads correctly when embossed
+		combinedText = mirrorY(combinedText);
+		// Stand text up perpendicular to floor
+		combinedText = rotateX(-Math.PI / 2, combinedText);
+		// Position at front wall surface
 		combinedText = translate([slotCenterX, -0.1, wallCenterZ], combinedText);
 	} else {
-		// Left wall: text on X=0 plane, facing +X direction
-		// Rotate around Z by -90 degrees so text faces +X
+		// Left wall: text vertical (reading bottom-to-top), visible from -X
+		// Mirror so text reads correctly when embossed
+		combinedText = mirrorY(combinedText);
+		// Rotate to be vertical (reading bottom-to-top)
 		combinedText = rotateZ(-Math.PI / 2, combinedText);
-		// Position so outer face is at wall surface (X=-0.1) for clean cut
+		// Stand text up perpendicular to floor
+		combinedText = rotateX(-Math.PI / 2, combinedText);
+		// Rotate to face the left wall
+		combinedText = rotateZ(-Math.PI / 2, combinedText);
+		// Position at left wall surface
 		combinedText = translate([-0.1, slotCenterY, wallCenterZ], combinedText);
 	}
 
