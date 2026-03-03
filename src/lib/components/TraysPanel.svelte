@@ -16,8 +16,11 @@
 	import type { Box, Tray } from '$lib/types/project';
 	import { isCounterTray, isCardTray, isCardDividerTray } from '$lib/types/project';
 	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
-	import type { CardDrawTrayParams } from '$lib/models/cardTray';
-	import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
+	import { type CardDrawTrayParams, getCardDrawTrayDimensions } from '$lib/models/cardTray';
+	import {
+		type CardDividerTrayParams,
+		getCardDividerTrayDimensions
+	} from '$lib/models/cardDividerTray';
 	import { getTrayDimensions } from '$lib/models/box';
 	import {
 		getProject,
@@ -222,11 +225,12 @@
 
 	function addCardDividerStack() {
 		if (!selectedTray || !isCardDividerTray(selectedTray) || !onUpdateCardDividerParams) return;
+		const cardSizeId = getCardSizes()[0]?.id ?? DEFAULT_CARD_SIZE_IDS.standard;
 		onUpdateCardDividerParams({
 			...selectedTray.params,
 			stacks: [
 				...selectedTray.params.stacks,
-				{ cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: 30, label: undefined }
+				{ cardSizeId, count: 30, label: undefined }
 			]
 		});
 	}
@@ -243,6 +247,24 @@
 		// Use trayWidthOverride=0 to get the auto-calculated width
 		const paramsWithoutOverride = { ...selectedTray.params, trayWidthOverride: 0 };
 		return getTrayDimensions(paramsWithoutOverride).width;
+	});
+
+	// Compute dimensions for counter trays
+	let counterTrayDimensions = $derived.by(() => {
+		if (!selectedTray || !isCounterTray(selectedTray)) return null;
+		return getTrayDimensions(selectedTray.params);
+	});
+
+	// Compute dimensions for card draw trays
+	let cardDrawTrayDimensions = $derived.by(() => {
+		if (!selectedTray || !isCardTray(selectedTray)) return null;
+		return getCardDrawTrayDimensions(selectedTray.params, getCardSizes());
+	});
+
+	// Compute dimensions for card divider trays
+	let cardDividerTrayDimensions = $derived.by(() => {
+		if (!selectedTray || !isCardDividerTray(selectedTray)) return null;
+		return getCardDividerTrayDimensions(selectedTray.params, getCardSizes());
 	});
 
 	// Top-loaded stack handlers (counter tray only)
@@ -266,11 +288,12 @@
 
 	function addTopLoadedStack() {
 		if (!selectedTray || !isCounterTray(selectedTray) || !onUpdateCounterParams) return;
+		const shapeId = getCounterShapes()[0]?.id ?? DEFAULT_SHAPE_IDS.square;
 		onUpdateCounterParams({
 			...selectedTray.params,
 			topLoadedStacks: [
 				...selectedTray.params.topLoadedStacks,
-				[DEFAULT_SHAPE_IDS.square, 10, undefined]
+				[shapeId, 10, undefined]
 			]
 		});
 	}
@@ -304,11 +327,12 @@
 
 	function addEdgeLoadedStack() {
 		if (!selectedTray || !isCounterTray(selectedTray) || !onUpdateCounterParams) return;
+		const shapeId = getCounterShapes()[0]?.id ?? DEFAULT_SHAPE_IDS.square;
 		onUpdateCounterParams({
 			...selectedTray.params,
 			edgeLoadedStacks: [
 				...selectedTray.params.edgeLoadedStacks,
-				[DEFAULT_SHAPE_IDS.square, 10, 'lengthwise', undefined]
+				[shapeId, 10, 'lengthwise', undefined]
 			]
 		});
 	}
@@ -647,7 +671,14 @@
 				<div class="panelFormSection">
 					<!-- Tray Settings -->
 					<section class="section">
-						<h3 class="sectionTitle">Tray Settings</h3>
+						<div class="sectionHeader">
+							<h3 class="sectionTitle">Tray Settings</h3>
+							{#if counterTrayDimensions}
+								<span class="dimensionsInfo">
+									{counterTrayDimensions.width.toFixed(1)} × {counterTrayDimensions.depth.toFixed(1)} × {counterTrayDimensions.height.toFixed(1)} mm
+								</span>
+							{/if}
+						</div>
 						<Spacer size="0.5rem" />
 						<div class="formGrid">
 							<FormControl label="Clearance" name="clearance">
@@ -914,7 +945,14 @@
 					<Spacer size="0.5rem" />
 
 					<section class="section">
-						<h3 class="sectionTitle">Tray Settings</h3>
+						<div class="sectionHeader">
+							<h3 class="sectionTitle">Tray Settings</h3>
+							{#if cardDividerTrayDimensions}
+								<span class="dimensionsInfo">
+									{cardDividerTrayDimensions.width.toFixed(1)} × {cardDividerTrayDimensions.depth.toFixed(1)} × {cardDividerTrayDimensions.height.toFixed(1)} mm
+								</span>
+							{/if}
+						</div>
 						<Spacer size="0.5rem" />
 						<div class="formGrid">
 							<FormControl label="Wall" name="wallThickness">
@@ -1028,7 +1066,14 @@
 					<Spacer size="0.5rem" />
 
 					<section class="section">
-						<h3 class="sectionTitle">Tray Settings</h3>
+						<div class="sectionHeader">
+							<h3 class="sectionTitle">Tray Settings</h3>
+							{#if cardDrawTrayDimensions}
+								<span class="dimensionsInfo">
+									{cardDrawTrayDimensions.width.toFixed(1)} × {cardDrawTrayDimensions.depth.toFixed(1)} × {cardDrawTrayDimensions.height.toFixed(1)} mm
+								</span>
+							{/if}
+						</div>
 						<Spacer size="0.5rem" />
 						<div class="formGrid">
 							<FormControl label="Wall" name="wallThickness">
@@ -1206,6 +1251,13 @@
 		margin-bottom: 1rem;
 	}
 
+	.sectionHeader {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+
 	.sectionTitle {
 		margin-bottom: 0.5rem;
 		font-size: 0.75rem;
@@ -1213,6 +1265,10 @@
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
 		color: var(--fgMuted);
+	}
+
+	.sectionHeader .sectionTitle {
+		margin-bottom: 0;
 	}
 
 	.formGrid {
@@ -1326,6 +1382,12 @@
 	}
 
 	.cardSizeInfo {
+		font-size: 0.75rem;
+		color: var(--fgMuted);
+		margin: 0;
+	}
+
+	.dimensionsInfo {
 		font-size: 0.75rem;
 		color: var(--fgMuted);
 		margin: 0;

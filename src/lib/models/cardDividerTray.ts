@@ -124,6 +124,11 @@ export function getCardDividerTrayDimensions(
 		maxSlotHeight = Math.max(maxSlotHeight, slotHeight);
 	}
 
+	// If no valid card sizes were found, return minimal dimensions
+	if (slotDimensions.length === 0) {
+		return { width: wallThickness * 2, depth: wallThickness * 2, height: floorThickness };
+	}
+
 	let trayWidth: number;
 	let trayDepth: number;
 

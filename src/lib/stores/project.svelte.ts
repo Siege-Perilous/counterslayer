@@ -138,36 +138,77 @@ function getNextTrayColor(boxes: Box[]): string {
 	return TRAY_COLORS[totalTrays % TRAY_COLORS.length];
 }
 
-function createDefaultCounterTray(name: string, color: string): CounterTray {
+function createDefaultCounterTray(name: string, color: string, counterShapes?: CounterShape[]): CounterTray {
+	// Build a mapping from default shape IDs to project shape IDs
+	const shapeIdMap: Record<string, string> = {};
+	if (counterShapes && counterShapes.length > 0) {
+		// Map default IDs to actual project IDs by matching names or falling back to first available
+		const defaultToName: Record<string, string> = {
+			[DEFAULT_SHAPE_IDS.square]: 'Square',
+			[DEFAULT_SHAPE_IDS.hex]: 'Hex',
+			[DEFAULT_SHAPE_IDS.circle]: 'Circle',
+			[DEFAULT_SHAPE_IDS.triangle]: 'Triangle'
+		};
+		for (const [defaultId, name] of Object.entries(defaultToName)) {
+			const match = counterShapes.find((s) => s.name === name);
+			shapeIdMap[defaultId] = match?.id ?? counterShapes[0].id;
+		}
+	}
+
+	const mapShapeId = (id: string) => shapeIdMap[id] ?? id;
+
 	return {
 		id: generateId(),
 		type: 'counter',
 		name,
 		color,
 		rotationOverride: 'auto',
-		params: { ...defaultParams }
+		params: {
+			...defaultParams,
+			topLoadedStacks: defaultParams.topLoadedStacks.map(([shapeId, count, label]) => [
+				mapShapeId(shapeId),
+				count,
+				label
+			]),
+			edgeLoadedStacks: defaultParams.edgeLoadedStacks.map(([shapeId, count, orientation, label]) => [
+				mapShapeId(shapeId),
+				count,
+				orientation,
+				label
+			])
+		}
 	};
 }
 
-function createDefaultCardDrawTray(name: string, color: string): CardDrawTray {
+function createDefaultCardDrawTray(name: string, color: string, cardSizes?: CardSize[]): CardDrawTray {
+	// Use the first available card size, falling back to default ID
+	const cardSizeId = cardSizes?.[0]?.id ?? DEFAULT_CARD_SIZE_IDS.standard;
 	return {
 		id: generateId(),
 		type: 'cardDraw',
 		name,
 		color,
 		rotationOverride: 'auto',
-		params: { ...defaultCardDrawTrayParams }
+		params: { ...defaultCardDrawTrayParams, cardSizeId }
 	};
 }
 
-function createDefaultCardDividerTray(name: string, color: string): CardDividerTray {
+function createDefaultCardDividerTray(name: string, color: string, cardSizes?: CardSize[]): CardDividerTray {
+	// Use the first available card size, falling back to default ID
+	const cardSizeId = cardSizes?.[0]?.id ?? DEFAULT_CARD_SIZE_IDS.standard;
 	return {
 		id: generateId(),
 		type: 'cardDivider',
 		name,
 		color,
 		rotationOverride: 'auto',
-		params: { ...defaultCardDividerTrayParams }
+		params: {
+			...defaultCardDividerTrayParams,
+			stacks: defaultCardDividerTrayParams.stacks.map((stack) => ({
+				...stack,
+				cardSizeId
+			}))
+		}
 	};
 }
 
@@ -177,8 +218,8 @@ function _createDefaultCardTray(name: string, color: string): CardDrawTray {
 }
 
 // Backwards compatibility alias
-function createDefaultTray(name: string, color: string): CounterTray {
-	return createDefaultCounterTray(name, color);
+function createDefaultTray(name: string, color: string, counterShapes?: CounterShape[]): CounterTray {
+	return createDefaultCounterTray(name, color, counterShapes);
 }
 
 function createDefaultBox(name: string): Box {
@@ -273,11 +314,11 @@ export function addBox(trayType: TrayType = 'counter'): Box {
 
 	let tray: Tray;
 	if (trayType === 'cardDraw' || trayType === 'card') {
-		tray = createDefaultCardDrawTray('Card Draw 1', color);
+		tray = createDefaultCardDrawTray('Card Draw 1', color, project.cardSizes);
 	} else if (trayType === 'cardDivider') {
-		tray = createDefaultCardDividerTray('Card Divider 1', color);
+		tray = createDefaultCardDividerTray('Card Divider 1', color, project.cardSizes);
 	} else {
-		tray = createDefaultCounterTray('Tray 1', color);
+		tray = createDefaultCounterTray('Tray 1', color, project.counterShapes);
 		// Inherit global params (including customShapes) from existing counter trays
 		const globalParams = getGlobalParamsFromExisting();
 		tray.params = { ...tray.params, ...globalParams };
@@ -361,17 +402,18 @@ export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | n
 
 	let tray: Tray;
 	if (trayType === 'cardDraw' || trayType === 'card') {
-		tray = createDefaultCardDrawTray(`Card Draw ${trayNumber}`, color);
+		tray = createDefaultCardDrawTray(`Card Draw ${trayNumber}`, color, project.cardSizes);
 	} else if (trayType === 'cardDivider') {
-		tray = createDefaultCardDividerTray(`Card Divider ${trayNumber}`, color);
+		tray = createDefaultCardDividerTray(`Card Divider ${trayNumber}`, color, project.cardSizes);
 	} else {
-		tray = createDefaultCounterTray(`Tray ${trayNumber}`, color);
+		tray = createDefaultCounterTray(`Tray ${trayNumber}`, color, project.counterShapes);
 		// Inherit global params (including customShapes) from existing counter trays
 		const globalParams = getGlobalParamsFromExisting();
 		tray.params = { ...tray.params, ...globalParams };
 	}
 
 	box.trays.push(tray);
+	project.selectedBoxId = boxId;
 	project.selectedTrayId = tray.id;
 	autosave();
 	return tray;
