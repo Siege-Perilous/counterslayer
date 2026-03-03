@@ -136,8 +136,12 @@ function findStackLabel(
 	}
 
 	// No match found, generate default label
+	// Use customShapeName if available (e.g., for card divider trays with user labels)
+	const fallbackLabel = counterStack.customShapeName
+		? `${counterStack.customShapeName} x${counterStack.count}`
+		: generateStackLabel(shapeId, counterStack.count, counterShapes);
 	return {
-		label: generateStackLabel(shapeId, counterStack.count, counterShapes),
+		label: fallbackLabel,
 		usedIndex: -1,
 		isEdge: counterStack.isEdgeLoaded ?? false
 	};
@@ -186,24 +190,31 @@ export function extractPdfData(project: Project): PdfData {
 			if (isCardDividerTray(tray)) {
 				// Convert card divider positions to CounterStack format for PDF generation
 				const dividerStacks = getCardDividerPositions(tray.params, cardSizes);
-				counterPositions = dividerStacks.map((stack) => ({
-					shape: 'custom' as const,
-					shapeId: stack.cardSizeId,
-					customShapeName: stack.label ?? 'Cards',
-					customBaseShape: 'rectangle' as const,
-					x: stack.x,
-					y: stack.y,
-					z: stack.z,
-					width: stack.slotWidth,
-					length: stack.slotDepth,
-					thickness: stack.cardThickness,
-					count: stack.count,
-					hexPointyTop: false,
-					color: stack.color,
-					isEdgeLoaded: true,
-					slotWidth: stack.slotWidth,
-					slotDepth: stack.slotDepth
-				}));
+				counterPositions = dividerStacks.map((stack) => {
+					// Look up card size name for the label
+					const cardSize = cardSizes.find((s) => s.id === stack.cardSizeId);
+					const cardSizeName = cardSize?.name ?? 'Cards';
+					// Use user-defined label if available, otherwise use card size name
+					const labelName = stack.label ?? cardSizeName;
+					return {
+						shape: 'custom' as const,
+						shapeId: stack.cardSizeId,
+						customShapeName: labelName,
+						customBaseShape: 'rectangle' as const,
+						x: stack.x,
+						y: stack.y,
+						z: stack.z,
+						width: stack.slotWidth,
+						length: stack.slotDepth,
+						thickness: stack.cardThickness,
+						count: stack.count,
+						hexPointyTop: false,
+						color: stack.color,
+						isEdgeLoaded: true,
+						slotWidth: stack.slotWidth,
+						slotDepth: stack.slotDepth
+					};
+				});
 			} else if (isCardTray(tray)) {
 				// Convert card draw positions to CounterStack format for PDF generation
 				const cardStacks = getCardDrawPositions(tray.params, cardSizes);

@@ -151,22 +151,33 @@
 					const trayDepth = options.bounds.depth;
 					const captureAspect = options.width / options.height;
 
+					// For 16:9 capture, rotate view 90° if tray is deeper than wide
+					// This maximizes tray size by aligning longer dimension with wider frame edge
+					const shouldRotate = trayDepth > trayWidth;
+					console.log('PDF capture dimensions:', { trayWidth, trayDepth, shouldRotate });
+					const effectiveWidth = shouldRotate ? trayDepth : trayWidth;
+					const effectiveDepth = shouldRotate ? trayWidth : trayDepth;
+
 					// Camera FOV is vertical (50 degrees)
 					const vFovRad = (50 * Math.PI) / 180;
 					// Calculate horizontal FOV based on aspect ratio
 					const hFovRad = 2 * Math.atan(Math.tan(vFovRad / 2) * captureAspect);
 
-					// Calculate distance needed to fit width (using horizontal FOV) and depth (using vertical FOV)
-					const distanceForWidth = trayWidth / 2 / Math.tan(hFovRad / 2);
-					const distanceForDepth = trayDepth / 2 / Math.tan(vFovRad / 2);
+					// Calculate distance needed to fit dimensions in frame
+					const distanceForWidth = effectiveWidth / 2 / Math.tan(hFovRad / 2);
+					const distanceForDepth = effectiveDepth / 2 / Math.tan(vFovRad / 2);
 
 					// Use the larger distance with padding for labels
 					const distance = Math.max(distanceForWidth, distanceForDepth) * 1.4;
 
 					// Position camera directly above origin (meshOffset centers the tray at origin)
 					cam.position.set(0, distance, 0);
-					cam.up.set(0, 0, -1); // Set "up" to -Z so the tray is oriented correctly
+					cam.up.set(0, 0, -1);
 					cam.lookAt(0, 0, 0);
+					// Rotate view 90° around the camera's view axis if tray is deeper than wide
+					if (shouldRotate) {
+						cam.rotateZ(Math.PI / 2);
+					}
 					cam.updateProjectionMatrix();
 
 					// Capture
