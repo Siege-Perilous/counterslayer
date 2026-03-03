@@ -26,7 +26,7 @@
 		type CounterStack
 	} from '$lib/models/counterTray';
 	import { createCardDrawTray, getCardDrawPositions, type CardStack } from '$lib/models/cardTray';
-	import { createCardDividerTray } from '$lib/models/cardDividerTray';
+	import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
 	import { arrangeTrays, calculateTraySpacers } from '$lib/models/box';
 	import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 	import {
@@ -470,8 +470,34 @@
 							maxHeight,
 							spacerHeight
 						);
-						// Card divider positions are converted to CounterStack format in worker
-						selectedTrayCounters = [];
+						// Get card divider positions for reference labels
+						const dividerPositions = getCardDividerPositions(
+							placement.tray.params,
+							cardSizes,
+							maxHeight,
+							spacerHeight
+						);
+						// Convert to CounterStack format for label rendering
+						selectedTrayCounters = dividerPositions.map((pos) => ({
+							shape: 'custom' as const,
+							shapeId: pos.cardSizeId,
+							customShapeName: pos.label,
+							customBaseShape: 'rectangle' as const,
+							x: pos.x,
+							y: pos.y,
+							z: pos.z,
+							width: pos.slotWidth,
+							length: pos.slotDepth,
+							thickness: pos.cardThickness,
+							count: pos.count,
+							hexPointyTop: false,
+							color: pos.color,
+							isEdgeLoaded: true,
+							isCardDivider: true,
+							cardDividerHeight: pos.slotHeight,
+							slotWidth: pos.slotWidth,
+							slotDepth: pos.slotDepth
+						}));
 					} else if (isCardTray(placement.tray)) {
 						jscadGeom = createCardDrawTray(
 							placement.tray.params,
@@ -505,13 +531,20 @@
 					await new Promise((r) => setTimeout(r, 200));
 
 					// Capture screenshot at 2x resolution for print quality (16:9 widescreen for long trays)
+					// If tray is rotated in layout, swap dimensions back to get original orientation
+					const boundsWidth = placement.rotated
+						? placement.dimensions.depth
+						: placement.dimensions.width;
+					const boundsDepth = placement.rotated
+						? placement.dimensions.width
+						: placement.dimensions.depth;
 					const dataUrl = captureFunction({
 						width: 1920,
 						height: 1080,
 						backgroundColor: '#f0f0f0',
 						bounds: {
-							width: placement.dimensions.width,
-							depth: placement.dimensions.depth,
+							width: boundsWidth,
+							depth: boundsDepth,
 							height: placement.dimensions.height
 						}
 					});
