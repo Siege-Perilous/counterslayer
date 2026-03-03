@@ -47,6 +47,17 @@
 	const displayTotalHeight = $derived(
 		selectedBox?.customBoxHeight !== undefined ? selectedBox.customBoxHeight + lidHeight : undefined
 	);
+
+	// Actual box dimensions (custom or auto-calculated)
+	const boxDimensions = $derived(
+		selectedBox
+			? {
+					width: selectedBox.customWidth ?? minimums.minWidth,
+					depth: selectedBox.customDepth ?? minimums.minDepth,
+					height: (selectedBox.customBoxHeight ?? minimums.minHeight) + lidHeight
+				}
+			: null
+	);
 </script>
 
 <div class="boxesPanel">
@@ -160,9 +171,17 @@
 			<Hr />
 
 			<div class="panelFormSection">
-				<!-- Custom Size -->
-				<h4 class="sectionTitle">Custom Size</h4>
-				<p class="sectionHint">Leave empty for auto-sizing.</p>
+				<!-- Box Size -->
+				<div class="sectionHeader">
+					<h4 class="sectionTitle">Box Size</h4>
+					{#if boxDimensions}
+						<span class="dimensionsInfo">
+							{boxDimensions.width.toFixed(1)} × {boxDimensions.depth.toFixed(1)} × {boxDimensions.height.toFixed(
+								1
+							)} mm
+						</span>
+					{/if}
+				</div>
 				<Spacer size="0.5rem" />
 
 				<div class="formGrid">
@@ -320,6 +339,13 @@
 		grid-column: span 2;
 	}
 
+	.sectionHeader {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+
 	.sectionTitle {
 		margin-bottom: 0.5rem;
 		font-size: 0.75rem;
@@ -329,9 +355,14 @@
 		color: var(--fgMuted);
 	}
 
-	.sectionHint {
+	.sectionHeader .sectionTitle {
+		margin-bottom: 0;
+	}
+
+	.dimensionsInfo {
 		font-size: 0.75rem;
 		color: var(--fgMuted);
+		margin: 0;
 	}
 
 	.emptyState {
