@@ -526,7 +526,10 @@ export function arrangeTrays(
 	}
 
 	// Calculate max row width
-	let maxRowWidth = Math.max(
+	// If customBoxWidth is set, use it as a hard constraint (trays pack into more rows)
+	// Otherwise, use the widest tray as the constraint
+	let maxRowWidth: number;
+	const widestTray = Math.max(
 		...trayOptions.map((opts) => Math.max(...opts.map((o) => o.dims.width)))
 	);
 
@@ -534,7 +537,11 @@ export function arrangeTrays(
 		const wallThickness = options.wallThickness ?? 3;
 		const tolerance = options.tolerance ?? 0.5;
 		const interiorWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
-		maxRowWidth = Math.max(interiorWidth, maxRowWidth);
+		// Use interior width as the constraint, but ensure single trays can still fit
+		// If a tray is wider than interior, we'll still need to use that width
+		maxRowWidth = Math.max(interiorWidth, 0);
+	} else {
+		maxRowWidth = widestTray;
 	}
 
 	// Greedy algorithm: place each tray, choosing the best orientation
@@ -792,20 +799,60 @@ export function calculateMinimumBoxDimensions(
 }
 
 // Validate custom dimensions against minimum requirements
-export function validateCustomDimensions(box: Box): ValidationResult {
-	const minimums = calculateMinimumBoxDimensions(box);
+export function validateCustomDimensions(
+	box: Box,
+	cardSizes: CardSize[] = [],
+	counterShapes: CounterShape[] = []
+): ValidationResult {
 	const errors: string[] = [];
 
-	if (box.customWidth !== undefined && box.customWidth < minimums.minWidth) {
-		errors.push(
-			`Custom width (${box.customWidth.toFixed(1)}mm) is smaller than minimum required (${minimums.minWidth.toFixed(1)}mm)`
-		);
+	// If customWidth is set, first check if any single tray is too wide
+	// (this is a hard constraint - a tray physically wider than the box can't fit)
+	if (box.customWidth !== undefined) {
+		const interiorWidth = box.customWidth - box.wallThickness * 2 - box.tolerance * 2;
+
+		for (const tray of box.trays) {
+			const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
+			// Check both orientations - tray can be rotated to fit
+			const minWidth = Math.min(dims.width, dims.depth);
+
+			if (minWidth > interiorWidth) {
+				errors.push(
+					`Tray "${tray.name}" is too wide to fit in box. Tray minimum dimension: ${minWidth.toFixed(1)}mm, Box interior: ${interiorWidth.toFixed(1)}mm`
+				);
+			}
+		}
 	}
+
+	// If customDepth is set, check if any single tray is too deep (in its narrowest orientation)
+	if (box.customDepth !== undefined) {
+		const interiorDepth = box.customDepth - box.wallThickness * 2 - box.tolerance * 2;
+
+		for (const tray of box.trays) {
+			const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
+			// Check both orientations
+			const minDepth = Math.min(dims.width, dims.depth);
+
+			if (minDepth > interiorDepth) {
+				errors.push(
+					`Tray "${tray.name}" is too deep to fit in box. Tray minimum dimension: ${minDepth.toFixed(1)}mm, Box interior: ${interiorDepth.toFixed(1)}mm`
+				);
+			}
+		}
+	}
+
+	// Calculate minimums based on actual arrangement (which now respects customWidth)
+	const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
+
+	// Only validate customDepth if it's explicitly set (width can grow to accommodate)
+	// The arrangement algorithm handles width constraints by using more rows
 	if (box.customDepth !== undefined && box.customDepth < minimums.minDepth) {
 		errors.push(
 			`Custom depth (${box.customDepth.toFixed(1)}mm) is smaller than minimum required (${minimums.minDepth.toFixed(1)}mm)`
 		);
 	}
+
+	// Validate height (this is always a hard constraint)
 	if (box.customBoxHeight !== undefined && box.customBoxHeight < minimums.minHeight) {
 		errors.push(
 			`Custom height (${box.customBoxHeight.toFixed(1)}mm) is smaller than minimum required (${minimums.minHeight.toFixed(1)}mm)`
