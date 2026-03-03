@@ -124,6 +124,11 @@ export function getCardDividerTrayDimensions(
 		maxSlotHeight = Math.max(maxSlotHeight, slotHeight);
 	}
 
+	// If no valid card sizes were found, return minimal dimensions
+	if (slotDimensions.length === 0) {
+		return { width: wallThickness * 2, depth: wallThickness * 2, height: floorThickness };
+	}
+
 	let trayWidth: number;
 	let trayDepth: number;
 
@@ -158,7 +163,17 @@ export function getCardDividerPositions(
 	targetHeight?: number,
 	spacerHeight?: number
 ): CardDividerStackPosition[] {
-	const { stacks, orientation, stackDirection, wallThickness, floorThickness, clearance } = params;
+	const {
+		stacks: originalStacks,
+		orientation,
+		stackDirection,
+		wallThickness,
+		floorThickness,
+		clearance
+	} = params;
+
+	// Reverse stacks so first item in UI list appears at front of tray
+	const stacks = [...originalStacks].reverse();
 
 	const positions: CardDividerStackPosition[] = [];
 	const colors = ['#4a90a4', '#a4784a', '#4aa474', '#a44a74', '#744aa4', '#a4a44a'];
@@ -431,7 +446,17 @@ export function createCardDividerTray(
 	targetHeight?: number,
 	floorSpacerHeight?: number
 ): Geom3 {
-	const { stacks, orientation, stackDirection, wallThickness, floorThickness, clearance } = params;
+	const {
+		stacks: originalStacks,
+		orientation,
+		stackDirection,
+		wallThickness,
+		floorThickness,
+		clearance
+	} = params;
+
+	// Reverse stacks so first item in UI list appears at front of tray
+	const stacks = [...originalStacks].reverse();
 
 	if (stacks.length === 0) {
 		// Empty tray - just a small box
