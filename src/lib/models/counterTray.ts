@@ -1,5 +1,5 @@
 import jscad from '@jscad/modeling';
-import type { CounterShape, CardSize, CounterBaseShape } from '$lib/types/project';
+import type { CounterShape, CounterBaseShape } from '$lib/types/project';
 
 const { cuboid, cylinder, roundedCuboid, sphere, circle, rectangle } = jscad.primitives;
 const { subtract, union } = jscad.booleans;

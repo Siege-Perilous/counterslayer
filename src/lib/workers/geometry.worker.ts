@@ -22,7 +22,7 @@ import {
 } from '$lib/models/box';
 import stlSerializer from '@jscad/stl-serializer';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
-import type { Box, Tray, CardSize, CounterShape, Project } from '$lib/types/project';
+import type { Box, Tray, CardSize, CounterShape } from '$lib/types/project';
 import { isCardTray, isCardDividerTray } from '$lib/types/project';
 
 const { geom3 } = jscad.geometries;

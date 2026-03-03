@@ -13,8 +13,6 @@ import {
 	DEFAULT_COUNTER_SHAPES,
 	DEFAULT_CARD_SIZES
 } from '$lib/stores/project.svelte';
-import { isCounterTray, isCardTray, isCardDividerTray } from '$lib/types/project';
-
 const STORAGE_KEY = 'counter-tray-project';
 
 function generateId(): string {

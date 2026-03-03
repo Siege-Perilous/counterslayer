@@ -21,7 +21,6 @@
 	import { getTrayDimensions } from '$lib/models/box';
 	import {
 		getProject,
-		getBoxes,
 		getCumulativeTrayLetter,
 		moveTray,
 		setTrayRotation,
@@ -147,11 +146,6 @@
 			isCardTray: false,
 			isCardDivider: false
 		};
-	}
-
-	function getShapeDisplayName(shapeId: string): string {
-		const shape = getCounterShapes().find((s) => s.id === shapeId);
-		return shape?.name ?? shapeId;
 	}
 
 	// Get the tray letter based on cumulative position across all boxes

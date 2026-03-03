@@ -1791,10 +1791,6 @@
 
 <!-- Reference labels for multi-box (print) view -->
 {#if showReferenceLabels && showAllBoxes && allBoxes.length > 0}
-	{@const globalMaxTrayHeight = Math.max(
-		...allBoxes.flatMap((b) => b.trayGeometries.map((t) => t.placement.dimensions.height))
-	)}
-	{@const globalLabelHeight = boxFloorThickness + globalMaxTrayHeight + 5}
 	{#each allBoxes as boxData, boxIndex (boxData.boxId)}
 		{@const boxPos = boxPositions[boxIndex]}
 		{@const boxWidth = boxData.boxDimensions.width}
@@ -1808,6 +1804,11 @@
 		{@const labelBoxCenterZ = labelBoxGeomBounds
 			? (labelBoxGeomBounds.max.y + labelBoxGeomBounds.min.y) / 2
 			: boxDepth / 2}
+		{@const boxMaxTrayHeight =
+			boxData.trayGeometries.length > 0
+				? Math.max(...boxData.trayGeometries.map((t) => t.placement.dimensions.height))
+				: 0}
+		{@const boxLabelHeight = boxFloorThickness + boxMaxTrayHeight + 5}
 		{#each boxData.trayGeometries as trayData, trayIndex (trayData.trayId)}
 			{@const placement = trayData.placement}
 			{@const isRotated = placement.rotated}
@@ -1829,7 +1830,7 @@
 				allBoxes.slice(0, boxIndex).reduce((sum, b) => sum + b.trayGeometries.length, 0) +
 				trayIndex}
 			{@const trayLetter = trayData.trayLetter ?? getTrayLetter(cumulativeIdx)}
-			{@const labelHeight = globalLabelHeight}
+			{@const labelHeight = boxLabelHeight}
 			{#each trayData.counterStacks as stack, stackIdx (stackIdx)}
 				{@const refCode = `${trayLetter}${stackIdx + 1}`}
 				{@const localX = stack.isEdgeLoaded

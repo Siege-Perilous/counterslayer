@@ -1,7 +1,7 @@
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { Box, Tray, CardSize, CounterShape } from '$lib/types/project';
-import { isCounterTray, isCardTray, isCardDividerTray } from '$lib/types/project';
+import { isCardTray, isCardDividerTray } from '$lib/types/project';
 import type { CounterTrayParams } from './counterTray';
 import { getCardDrawTrayDimensions } from './cardTray';
 import { getCardDividerTrayDimensions } from './cardDividerTray';
@@ -42,9 +42,6 @@ export interface TraySpacerInfo {
 	placement: TrayPlacement;
 	floorSpacerHeight: number; // Additional solid material under tray floor
 }
-
-// Type alias for backward compatibility
-type CustomCardSize = CardSize;
 
 // Get dimensions for any tray type (dispatches based on tray type)
 export function getTrayDimensionsForTray(
