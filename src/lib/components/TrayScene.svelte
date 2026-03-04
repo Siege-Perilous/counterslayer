@@ -47,6 +47,16 @@
 		boxDimensions: { width: number; depth: number; height: number };
 	}
 
+	interface TrayClickInfo {
+		trayId: string;
+		name: string;
+		letter: string;
+		width: number;
+		depth: number;
+		height: number;
+		color: string;
+	}
+
 	interface Props {
 		geometry: BufferGeometry | null;
 		allTrays?: TrayGeometryData[];
@@ -71,6 +81,8 @@
 		viewTitle?: string;
 		onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
 		isLayoutEditMode?: boolean;
+		onTrayClick?: (info: TrayClickInfo | null) => void;
+		onTrayDoubleClick?: (trayId: string) => void;
 	}
 
 	let {
@@ -96,7 +108,9 @@
 		hidePrintBed = false,
 		viewTitle = '',
 		onCaptureReady,
-		isLayoutEditMode = false
+		isLayoutEditMode = false,
+		onTrayClick,
+		onTrayDoubleClick
 	}: Props = $props();
 
 	// Get Threlte context for capture
@@ -941,6 +955,7 @@
 				position.x={xOffset + boxCenterX}
 				position.y={0}
 				position.z={zOffset + boxCenterZ}
+				onclick={() => onTrayClick?.(null)}
 			>
 				<T.MeshStandardMaterial
 					color="#333333"
@@ -971,13 +986,37 @@
 				boxTolerance -
 				placement.y}
 			{@const groupY = boxFloorThickness}
+			{@const cumulativeTrayIdx =
+				allBoxes.slice(0, boxIndex).reduce((sum, b) => sum + b.trayGeometries.length, 0) +
+				trayIndex}
 			<T.Group
 				position.x={groupX}
 				position.y={groupY}
 				position.z={groupZ}
 				rotation.y={isRotated ? Math.PI / 2 : 0}
 			>
-			<T.Mesh geometry={trayData.geometry} rotation.x={-Math.PI / 2}>
+			<T.Mesh
+				geometry={trayData.geometry}
+				rotation.x={-Math.PI / 2}
+				onclick={(e: IntersectionEvent<MouseEvent>) => {
+					e.stopPropagation();
+					const dims = trayData.placement.dimensions;
+					onTrayClick?.({
+						trayId: trayData.trayId,
+						name: trayData.name,
+						letter: trayData.trayLetter ?? getTrayLetter(cumulativeTrayIdx),
+						width: dims.width,
+						depth: dims.depth,
+						height: dims.height,
+						color: getTrayColor(trayData.trayId, trayIndex)
+					});
+				}}
+				ondblclick={() => {
+					if (!isLayoutEditMode) {
+						onTrayDoubleClick?.(trayData.trayId);
+					}
+				}}
+			>
 				<T.MeshStandardMaterial
 					color={getTrayColor(trayData.trayId, trayIndex)}
 					roughness={0.6}
@@ -1264,6 +1303,7 @@
 		position.x={showAllTrays && !exploded ? sidePositions.box.x - boxWidth / 2 : meshOffset.x}
 		position.y={explodedOffset.box}
 		position.z={showAllTrays && !exploded ? sidePositions.box.z : meshOffset.z}
+		onclick={() => onTrayClick?.(null)}
 	>
 		<T.MeshStandardMaterial
 			color="#333333"
@@ -1422,7 +1462,28 @@
 			position.z={groupZ}
 			rotation.y={isRotated ? Math.PI / 2 : 0}
 		>
-			<T.Mesh geometry={trayData.geometry} rotation.x={-Math.PI / 2}>
+			<T.Mesh
+				geometry={trayData.geometry}
+				rotation.x={-Math.PI / 2}
+				onclick={(e: IntersectionEvent<MouseEvent>) => {
+					e.stopPropagation();
+					const dims = trayData.placement.dimensions;
+					onTrayClick?.({
+						trayId: trayData.trayId,
+						name: trayData.name,
+						letter: trayData.trayLetter ?? getTrayLetter(i),
+						width: dims.width,
+						depth: dims.depth,
+						height: dims.height,
+						color: getTrayColor(trayData.trayId, i)
+					});
+				}}
+				ondblclick={() => {
+					if (!isLayoutEditMode) {
+						onTrayDoubleClick?.(trayData.trayId);
+					}
+				}}
+			>
 				<T.MeshStandardMaterial
 					color={getTrayColor(trayData.trayId, i)}
 					roughness={0.6}
@@ -1482,6 +1543,7 @@
 		position.x={lidPosX}
 		position.y={exploded ? explodedOffset.lidY + lidHeight : explodedOffset.lidY}
 		position.z={lidPosZ}
+		onclick={() => onTrayClick?.(null)}
 	>
 		<T.MeshStandardMaterial
 			color="#444444"

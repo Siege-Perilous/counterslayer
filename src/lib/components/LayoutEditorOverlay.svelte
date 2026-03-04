@@ -86,6 +86,9 @@
 		display: flex;
 		align-items: center;
 		gap: 1rem;
+		padding: 0.375rem 0.75rem;
+		border-radius: var(--radius-2);
+		background: var(--contrastLowest);
 	}
 
 	.toolbarSection {

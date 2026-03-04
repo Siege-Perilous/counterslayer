@@ -55,7 +55,8 @@
 		isCardTray,
 		isCardDividerTray,
 		saveManualLayout,
-		clearManualLayout
+		clearManualLayout,
+		selectTray
 	} from '$lib/stores/project.svelte';
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
@@ -255,6 +256,22 @@
 				viewMode = 'tray';
 				break;
 		}
+	}
+
+	// Handle double-click on tray to navigate to it
+	function handleTrayDoubleClick(trayId: string) {
+		// Find which box contains this tray and select it first
+		const project = getProject();
+		for (const box of project.boxes) {
+			const tray = box.trays.find((t) => t.id === trayId);
+			if (tray) {
+				project.selectedBoxId = box.id;
+				break;
+			}
+		}
+		selectTray(trayId);
+		selectionType = 'tray';
+		viewMode = 'tray';
 	}
 
 	function handleExpandPanel() {
@@ -943,7 +960,9 @@
 				width: p.rotation === 90 || p.rotation === 270 ? p.originalDepth : p.originalWidth,
 				depth: p.rotation === 90 || p.rotation === 270 ? p.originalWidth : p.originalDepth
 			};
-			console.log(`${p.name}: pos=(${p.x.toFixed(2)}, ${p.y.toFixed(2)}) dims=${dims.width.toFixed(2)}x${dims.depth.toFixed(2)} rot=${p.rotation}° bounds=(${p.x.toFixed(2)}-${(p.x + dims.width).toFixed(2)}, ${p.y.toFixed(2)}-${(p.y + dims.depth).toFixed(2)})`);
+			console.log(
+				`${p.name}: pos=(${p.x.toFixed(2)}, ${p.y.toFixed(2)}) dims=${dims.width.toFixed(2)}x${dims.depth.toFixed(2)} rot=${p.rotation}° bounds=(${p.x.toFixed(2)}-${(p.x + dims.width).toFixed(2)}, ${p.y.toFixed(2)}-${(p.y + dims.depth).toFixed(2)})`
+			);
 		}
 		console.log('=========================');
 		const overlaps = findAllOverlaps(workingPlacements);
@@ -951,8 +970,8 @@
 		if (overlaps.length > 0) {
 			// Find the names of overlapping trays for the error message
 			const overlapNames = overlaps.map(([id1, id2]) => {
-				const tray1 = workingPlacements.find(p => p.trayId === id1);
-				const tray2 = workingPlacements.find(p => p.trayId === id2);
+				const tray1 = workingPlacements.find((p) => p.trayId === id1);
+				const tray2 = workingPlacements.find((p) => p.trayId === id2);
 				return `${tray1?.name ?? 'Unknown'} and ${tray2?.name ?? 'Unknown'}`;
 			});
 			addToast({
@@ -1097,6 +1116,7 @@
 							{viewTitle}
 							onCaptureReady={(fn) => (captureFunction = fn)}
 							{isLayoutEditMode}
+							onTrayDoubleClick={handleTrayDoubleClick}
 						/>
 					{/await}
 				{/if}
@@ -1300,6 +1320,7 @@
 							{viewTitle}
 							onCaptureReady={(fn) => (captureFunction = fn)}
 							{isLayoutEditMode}
+							onTrayDoubleClick={handleTrayDoubleClick}
 						/>
 					{/await}
 				{/if}
@@ -1508,7 +1529,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.375rem 0.75rem;
+		padding: 0.25rem 0.75rem;
 		border-radius: var(--radius-2);
 		background: var(--contrastLowest);
 	}
