@@ -44,6 +44,11 @@
 	<!-- Edit mode toolbar (inline) -->
 	<div class="editToolbar">
 		<div class="toolbarSection">
+			<!-- TODO: isDisabled prop breaks onclick - possibly a Svelte 5 reactivity issue
+				 with the Button component. When isDisabled={someReactiveValue} is set,
+				 the onclick handler stops firing entirely, even when the value is false.
+				 Tried $derived, $derived.by(), reading directly from store - none worked.
+				 Need to investigate the Button component's implementation. -->
 			<Button
 				variant="ghost"
 				onclick={onRotate}
