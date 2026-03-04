@@ -27,6 +27,7 @@
 		"@zip.js/zip.js": "^2.8.22",
 		"jspdf": "^4.1.0",
 		"marked": "^17.0.2",
+		"maxrects-packer": "^2.7.3",
 		"mode-watcher": "^1.1.0",
 		"paneforge": "^1.0.2",
 		"svg2pdf.js": "^2.7.0",

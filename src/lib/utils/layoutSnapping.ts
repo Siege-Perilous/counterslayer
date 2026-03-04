@@ -178,7 +178,10 @@ export function snapPosition(
  * Uses a small epsilon to handle floating point precision issues from snapping
  * and minor placement discrepancies that don't matter for physical prints
  */
-const OVERLAP_EPSILON = 0.01; // 0.01mm tolerance for floating point precision
+// Tolerance for overlap detection - accounts for small tray dimension differences
+// due to different counter configurations (e.g., 134.75mm vs 134.80mm trays)
+// 0.1mm is negligible for 3D printing but catches real overlaps
+const OVERLAP_EPSILON = 0.1;
 
 export function checkOverlap(
 	placement1: EditorTrayPlacement,
@@ -199,8 +202,17 @@ export function checkOverlap(
 
 	// Check for non-overlap (if any is true, no overlap)
 	// Use epsilon to allow touching/snapped edges
-	if (right1 <= left2 + OVERLAP_EPSILON || right2 <= left1 + OVERLAP_EPSILON) return false;
-	if (back1 <= front2 + OVERLAP_EPSILON || back2 <= front1 + OVERLAP_EPSILON) return false;
+	const noOverlapX = right1 <= left2 + OVERLAP_EPSILON || right2 <= left1 + OVERLAP_EPSILON;
+	const noOverlapY = back1 <= front2 + OVERLAP_EPSILON || back2 <= front1 + OVERLAP_EPSILON;
+
+	if (noOverlapX || noOverlapY) return false;
+
+	// Log overlap details
+	console.log(`OVERLAP DETECTED: "${placement1.name}" vs "${placement2.name}"`);
+	console.log(`  ${placement1.name}: x=${left1.toFixed(2)}-${right1.toFixed(2)}, y=${front1.toFixed(2)}-${back1.toFixed(2)}`);
+	console.log(`  ${placement2.name}: x=${left2.toFixed(2)}-${right2.toFixed(2)}, y=${front2.toFixed(2)}-${back2.toFixed(2)}`);
+	console.log(`  X overlap by: ${Math.min(right1 - left2, right2 - left1).toFixed(3)}mm`);
+	console.log(`  Y overlap by: ${Math.min(back1 - front2, back2 - front1).toFixed(3)}mm`);
 
 	return true;
 }

@@ -38,6 +38,9 @@ importers:
       marked:
         specifier: ^17.0.2
         version: 17.0.3
+      maxrects-packer:
+        specifier: ^2.7.3
+        version: 2.7.3
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.53.3)
@@ -1372,6 +1375,9 @@ packages:
     resolution: {integrity: sha512-jt1v2ObpyOKR8p4XaUJVk3YWRJ5n+i4+rjQopxvV32rSndTJXvIzuUdWWIy/1pFQMkQmvTXawzDNqOH/CUmx6A==}
     engines: {node: '>= 20'}
     hasBin: true
+
+  maxrects-packer@2.7.3:
+    resolution: {integrity: sha512-bG6qXujJ1QgttZVIH4WDanhoJtvbud/xP/XPyf6A69C9RdA61BM4TomFALCq2nrTa+tARRIBB4LuIFsnUQU2wA==}
 
   mdast-util-to-hast@13.2.1:
     resolution: {integrity: sha512-cctsq2wp5vTsLIcaymblUriiTcZd0CwWtCbLvrOzYCDZoWyMNV8sZ7krj09FSnsiJi3WVsHLM4k6Dq/yaPyCXA==}
@@ -3205,6 +3211,8 @@ snapshots:
       uc.micro: 2.1.0
 
   marked@17.0.3: {}
+
+  maxrects-packer@2.7.3: {}
 
   mdast-util-to-hast@13.2.1:
     dependencies:
