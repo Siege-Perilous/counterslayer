@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { T, useThrelte, useTask } from '@threlte/core';
-	import { OrbitControls, Grid, Text, interactivity, type IntersectionEvent } from '@threlte/extras';
+	import {
+		OrbitControls,
+		Grid,
+		Text,
+		interactivity,
+		type IntersectionEvent
+	} from '@threlte/extras';
 	import PrintBed from './PrintBed.svelte';
 
 	// Enable interactivity for pointer events on 3D objects
@@ -26,7 +32,7 @@
 		clearSnapGuides,
 		getEffectiveDimensions
 	} from '$lib/stores/layoutEditor.svelte';
-	import { snapPosition, isValidPosition } from '$lib/utils/layoutSnapping';
+	import { snapPosition } from '$lib/utils/layoutSnapping';
 
 	interface TrayGeometryData {
 		trayId: string;
@@ -163,19 +169,10 @@
 	let savedCameraPosition = $state<THREE.Vector3 | null>(null);
 	let savedCameraTarget = $state<THREE.Vector3 | null>(null);
 
-	// Which scene is currently visible (for conditional rendering during transitions)
-	let showNormalScene = $derived(transitionPhase === 'normal' || transitionPhase === 'fading-to-edit');
-	let showEditScene = $derived(transitionPhase === 'edit' || transitionPhase === 'fading-to-normal' || transitionPhase === 'fading-to-edit');
-
 	// Visual edit mode - only true after fade-out completes (used for Grid/PrintBed positioning)
 	// This prevents visual jumps during the fade transition
-	let visualEditMode = $derived(transitionPhase === 'edit' || transitionPhase === 'fading-to-normal');
-
-	// Hide all 3D content during fade-out/fade-in phases
-	// Only show content when fully transitioned (no overlay visible)
-	let showSceneContent = $derived(
-		(transitionPhase === 'normal' && normalSceneOpacity >= 1) ||
-		(transitionPhase === 'edit' && editSceneOpacity >= 1)
+	let visualEditMode = $derived(
+		transitionPhase === 'edit' || transitionPhase === 'fading-to-normal'
 	);
 
 	// Fade overlay opacity for transition effect
@@ -191,7 +188,6 @@
 		if (transitionPhase === 'normal' && normalSceneOpacity < 1) return 1 - normalSceneOpacity;
 		return 0;
 	});
-
 
 	// Get layout editor state - use $derived.by() to properly track reactive reads from store
 	let workingPlacements = $derived.by(() => layoutEditorState.workingPlacements);
@@ -237,14 +233,14 @@
 		}
 	}
 
-	function handlePlanePointerUp(e: IntersectionEvent<PointerEvent>) {
+	function handlePlanePointerUp(_e: IntersectionEvent<PointerEvent>) {
 		if (!isLayoutEditMode) return;
 		pendingDrag = null;
 		actualDrag = false;
 		clearSnapGuides();
 	}
 
-	function handlePlanePointerDown(e: IntersectionEvent<PointerEvent>) {
+	function handlePlanePointerDown(_e: IntersectionEvent<PointerEvent>) {
 		// Click on background (plane) deselects - but only if a tray wasn't just clicked
 		// (pendingDrag being set means a tray's onpointerdown already fired for this click)
 		if (!isLayoutEditMode) return;
@@ -729,7 +725,6 @@
 		}
 		return TRAY_COLORS[fallbackIndex % TRAY_COLORS.length];
 	}
-
 </script>
 
 <T.PerspectiveCamera
@@ -737,7 +732,9 @@
 	position={[printBedSize * 0.7, printBedSize * 0.5, printBedSize * 0.7]}
 	fov={50}
 >
-	{@const isTransitioning = transitionPhase === 'fading-to-edit' || transitionPhase === 'fading-to-normal' ||
+	{@const isTransitioning =
+		transitionPhase === 'fading-to-edit' ||
+		transitionPhase === 'fading-to-normal' ||
 		(transitionPhase === 'edit' && editSceneOpacity < 1) ||
 		(transitionPhase === 'normal' && normalSceneOpacity < 1)}
 	<OrbitControls
@@ -770,7 +767,6 @@
 	intensity={0.3}
 /><!-- Subtle backlight for rim definition -->
 <T.AmbientLight intensity={0.4} />
-
 
 <!-- Background grid for multi-box view (subtle, at world origin for alignment) -->
 {#if showAllBoxes && !hidePrintBed}
@@ -871,38 +867,38 @@
 				position.z={groupZ}
 				rotation.y={isRotated ? Math.PI / 2 : 0}
 			>
-			<T.Mesh
-				geometry={trayData.geometry}
-				rotation.x={-Math.PI / 2}
-				onclick={(e: IntersectionEvent<MouseEvent>) => {
-					e.stopPropagation();
-					const dims = trayData.placement.dimensions;
-					onTrayClick?.({
-						trayId: trayData.trayId,
-						name: trayData.name,
-						letter: trayData.trayLetter ?? getTrayLetter(cumulativeTrayIdx),
-						width: dims.width,
-						depth: dims.depth,
-						height: dims.height,
-						color: getTrayColor(trayData.trayId, trayIndex)
-					});
-				}}
-				ondblclick={() => {
-					if (!isLayoutEditMode) {
-						onTrayDoubleClick?.(trayData.trayId);
-					}
-				}}
-			>
-				<T.MeshStandardMaterial
-					color={getTrayColor(trayData.trayId, trayIndex)}
-					roughness={0.6}
-					metalness={0.1}
-					side={THREE.DoubleSide}
-				/>
-			</T.Mesh>
+				<T.Mesh
+					geometry={trayData.geometry}
+					rotation.x={-Math.PI / 2}
+					onclick={(e: IntersectionEvent<MouseEvent>) => {
+						e.stopPropagation();
+						const dims = trayData.placement.dimensions;
+						onTrayClick?.({
+							trayId: trayData.trayId,
+							name: trayData.name,
+							letter: trayData.trayLetter ?? getTrayLetter(cumulativeTrayIdx),
+							width: dims.width,
+							depth: dims.depth,
+							height: dims.height,
+							color: getTrayColor(trayData.trayId, trayIndex)
+						});
+					}}
+					ondblclick={() => {
+						if (!isLayoutEditMode) {
+							onTrayDoubleClick?.(trayData.trayId);
+						}
+					}}
+				>
+					<T.MeshStandardMaterial
+						color={getTrayColor(trayData.trayId, trayIndex)}
+						roughness={0.6}
+						metalness={0.1}
+						side={THREE.DoubleSide}
+					/>
+				</T.Mesh>
 
-				<!-- Counter previews for this tray - positions are in tray-local coords -->
-				{#if showCounters && trayData.counterStacks}
+				<!-- Counter previews for this tray - positions are in tray-local coords (hidden in edit mode) -->
+				{#if showCounters && !isLayoutEditMode && trayData.counterStacks}
 					{#each trayData.counterStacks as stack, stackIdx (stackIdx)}
 						{#if stack.isEdgeLoaded}
 							{#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
@@ -1192,200 +1188,206 @@
 
 <!-- Layout Edit Mode: Render trays from working placements with selection -->
 {#if !generating}
-{#if visualEditMode && workingPlacements.length > 0}
-	{#each workingPlacements as placement, i (placement.trayId)}
-		{@const dims = getEffectiveDimensions(placement)}
-		{@const trayData = allTrays.find((t) => t.trayId === placement.trayId)}
-		{@const isSelected = placement.trayId === layoutSelectedTrayId}
-		{@const isHovered = placement.trayId === editModeHoveredTrayId}
-		{@const isRotated = placement.rotation === 90 || placement.rotation === 270}
-		<!-- Position: use current meshOffset - camera animates to match this position -->
-		{@const groupX = meshOffset.x + interiorStartOffset + placement.x + (isRotated ? dims.width : 0)}
-		{@const groupY = 0}
-		{@const groupZ = meshOffset.z - interiorStartOffset - placement.y}
-		{#if trayData}
-			<!-- Get actual geometry dimensions (un-rotate if bin-packing rotated it) -->
-			{@const binPackRotated = trayData.placement.rotated}
-			{@const layoutDims = trayData.placement.dimensions}
-			{@const geomWidth = binPackRotated ? layoutDims.depth : layoutDims.width}
-			{@const geomDepth = binPackRotated ? layoutDims.width : layoutDims.depth}
-			{@const geomHeight = layoutDims.height}
+	{#if visualEditMode && workingPlacements.length > 0}
+		{#each workingPlacements as placement, i (placement.trayId)}
+			{@const dims = getEffectiveDimensions(placement)}
+			{@const trayData = allTrays.find((t) => t.trayId === placement.trayId)}
+			{@const isSelected = placement.trayId === layoutSelectedTrayId}
+			{@const isHovered = placement.trayId === editModeHoveredTrayId}
+			{@const isRotated = placement.rotation === 90 || placement.rotation === 270}
+			<!-- Position: use current meshOffset - camera animates to match this position -->
+			{@const groupX =
+				meshOffset.x + interiorStartOffset + placement.x + (isRotated ? dims.width : 0)}
+			{@const groupY = 0}
+			{@const groupZ = meshOffset.z - interiorStartOffset - placement.y}
+			{#if trayData}
+				<!-- Get actual geometry dimensions (un-rotate if bin-packing rotated it) -->
+				{@const binPackRotated = trayData.placement.rotated}
+				{@const layoutDims = trayData.placement.dimensions}
+				{@const geomWidth = binPackRotated ? layoutDims.depth : layoutDims.width}
+				{@const geomDepth = binPackRotated ? layoutDims.width : layoutDims.depth}
+				{@const geomHeight = layoutDims.height}
+				<T.Group
+					position.x={groupX}
+					position.y={groupY}
+					position.z={groupZ}
+					rotation.y={isRotated ? Math.PI / 2 : 0}
+				>
+					<!-- Tray geometry (same as normal rendering) -->
+					<T.Mesh geometry={trayData.geometry} rotation.x={-Math.PI / 2}>
+						<T.MeshStandardMaterial
+							color={isSelected ? '#ffffff' : getTrayColor(placement.trayId, i)}
+							roughness={0.6}
+							metalness={0.1}
+							side={THREE.DoubleSide}
+							emissive={isSelected ? '#2060c0' : isHovered ? '#404040' : '#000000'}
+							emissiveIntensity={isSelected ? 0.3 : isHovered ? 0.15 : 0}
+						/>
+					</T.Mesh>
+					<!-- Invisible hit box for interaction - uses actual geometry dimensions -->
+					<T.Mesh
+						visible={false}
+						rotation.x={-Math.PI / 2}
+						position.x={geomWidth / 2}
+						position.y={geomHeight / 2}
+						position.z={-geomDepth / 2}
+						onpointerdown={(e: IntersectionEvent<PointerEvent>) => {
+							e.stopPropagation();
+							selectTray(placement.trayId);
+
+							// Start drag - store the intersection point for delta calculation
+							const point = e.point;
+							pendingDrag = {
+								trayId: placement.trayId,
+								startX: point ? point.x : placement.x,
+								startY: point ? point.z : -placement.y,
+								originalTrayX: placement.x,
+								originalTrayY: placement.y
+							};
+							actualDrag = false;
+						}}
+						onpointerenter={() => {
+							editModeHoveredTrayId = placement.trayId;
+						}}
+						onpointerleave={() => {
+							editModeHoveredTrayId = null;
+						}}
+					>
+						<T.BoxGeometry args={[geomWidth, geomDepth, geomHeight]} />
+						<T.MeshBasicMaterial transparent opacity={0} />
+					</T.Mesh>
+					<!-- Selection wireframe - uses actual geometry dimensions -->
+					{#if isSelected}
+						{@const edgesGeom = new THREE.EdgesGeometry(
+							new THREE.BoxGeometry(geomWidth, geomDepth, geomHeight)
+						)}
+						<T.LineSegments
+							rotation.x={-Math.PI / 2}
+							position.x={geomWidth / 2}
+							position.y={geomHeight / 2}
+							position.z={-geomDepth / 2}
+							geometry={edgesGeom}
+							oncreate={(ref) => {
+								ref.computeLineDistances();
+							}}
+						>
+							<T.LineDashedMaterial color="#ffffff" dashSize={3} gapSize={2} />
+						</T.LineSegments>
+					{/if}
+				</T.Group>
+			{/if}
+		{/each}
+
+		<!-- Interaction plane for drag tracking - covers the print bed area -->
+		<!-- This catches pointermove and pointerup when the pointer leaves the tray meshes -->
+		<T.Mesh
+			rotation.x={-Math.PI / 2}
+			position.x={editModeCenter.x}
+			position.y={-0.1}
+			position.z={editModeCenter.z}
+			onpointerdown={handlePlanePointerDown}
+			onpointermove={handlePlanePointerMove}
+			onpointerup={handlePlanePointerUp}
+		>
+			<T.PlaneGeometry args={[printBedSize * 2, printBedSize * 2]} />
+			<T.MeshBasicMaterial visible={false} />
+		</T.Mesh>
+
+		<!-- Snap guides - use meshOffset to match tray positions -->
+		{#each snapGuides as guide, guideIdx (guideIdx)}
+			{@const offsetX = meshOffset.x + interiorStartOffset}
+			{@const offsetZ = meshOffset.z - interiorStartOffset}
+			{@const geometry = new THREE.BufferGeometry().setFromPoints(
+				guide.type === 'vertical'
+					? [
+							new THREE.Vector3(offsetX + guide.position, 0.5, offsetZ - guide.start),
+							new THREE.Vector3(offsetX + guide.position, 0.5, offsetZ - guide.end)
+						]
+					: [
+							new THREE.Vector3(offsetX + guide.start, 0.5, offsetZ - guide.position),
+							new THREE.Vector3(offsetX + guide.end, 0.5, offsetZ - guide.position)
+						]
+			)}
+			<T.Line args={[geometry]}>
+				<T.LineBasicMaterial color="#c9503c" />
+			</T.Line>
+		{/each}
+		<!-- All trays with positions (when showAllTrays is true, single box view) -->
+	{:else if showAllTrays && !showAllBoxes && allTrays.length > 0}
+		{@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
+		{@const maxTrayHeight = Math.max(...allTrays.map((t) => t.placement.dimensions.height))}
+		{@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
+		{@const traySpacing = liftPhase * maxTrayHeight * 1.2}
+		{#each allTrays as trayData, i (trayData.trayId)}
+			{@const placement = trayData.placement}
+			{@const isRotated = placement.rotated}
+			{@const groupX = exploded
+				? meshOffset.x +
+					interiorStartOffset +
+					placement.x +
+					(isRotated ? placement.dimensions.width : 0)
+				: sidePositions.traysGroup.x -
+					maxTrayWidth / 2 +
+					placement.x +
+					(isRotated ? placement.dimensions.width : 0)}
+			{@const groupY = exploded ? boxFloorThickness + explodedOffset.trays + i * traySpacing : 0}
+			{@const groupZ = exploded
+				? meshOffset.z - interiorStartOffset - placement.y
+				: traysGroupDepth - placement.y}
 			<T.Group
 				position.x={groupX}
 				position.y={groupY}
 				position.z={groupZ}
 				rotation.y={isRotated ? Math.PI / 2 : 0}
 			>
-				<!-- Tray geometry (same as normal rendering) -->
 				<T.Mesh
 					geometry={trayData.geometry}
 					rotation.x={-Math.PI / 2}
+					onclick={(e: IntersectionEvent<MouseEvent>) => {
+						e.stopPropagation();
+						const dims = trayData.placement.dimensions;
+						onTrayClick?.({
+							trayId: trayData.trayId,
+							name: trayData.name,
+							letter: trayData.trayLetter ?? getTrayLetter(i),
+							width: dims.width,
+							depth: dims.depth,
+							height: dims.height,
+							color: getTrayColor(trayData.trayId, i)
+						});
+					}}
+					ondblclick={() => {
+						if (!isLayoutEditMode) {
+							onTrayDoubleClick?.(trayData.trayId);
+						}
+					}}
 				>
 					<T.MeshStandardMaterial
-						color={isSelected ? '#ffffff' : getTrayColor(placement.trayId, i)}
+						color={getTrayColor(trayData.trayId, i)}
 						roughness={0.6}
 						metalness={0.1}
 						side={THREE.DoubleSide}
-						emissive={isSelected ? '#2060c0' : isHovered ? '#404040' : '#000000'}
-						emissiveIntensity={isSelected ? 0.3 : isHovered ? 0.15 : 0}
 					/>
 				</T.Mesh>
-				<!-- Invisible hit box for interaction - uses actual geometry dimensions -->
-				<T.Mesh
-					visible={false}
-					rotation.x={-Math.PI / 2}
-					position.x={geomWidth / 2}
-					position.y={geomHeight / 2}
-					position.z={-geomDepth / 2}
-					onpointerdown={(e: IntersectionEvent<PointerEvent>) => {
-						e.stopPropagation();
-						selectTray(placement.trayId);
-
-						// Start drag - store the intersection point for delta calculation
-						const point = e.point;
-						pendingDrag = {
-							trayId: placement.trayId,
-							startX: point ? point.x : placement.x,
-							startY: point ? point.z : -placement.y,
-							originalTrayX: placement.x,
-							originalTrayY: placement.y
-						};
-						actualDrag = false;
-					}}
-					onpointerenter={() => { editModeHoveredTrayId = placement.trayId; }}
-					onpointerleave={() => { editModeHoveredTrayId = null; }}
-				>
-					<T.BoxGeometry args={[geomWidth, geomDepth, geomHeight]} />
-					<T.MeshBasicMaterial transparent opacity={0} />
-				</T.Mesh>
-				<!-- Selection wireframe - uses actual geometry dimensions -->
-				{#if isSelected}
-					{@const edgesGeom = new THREE.EdgesGeometry(new THREE.BoxGeometry(geomWidth, geomDepth, geomHeight))}
-					<T.LineSegments
-						rotation.x={-Math.PI / 2}
-						position.x={geomWidth / 2}
-						position.y={geomHeight / 2}
-						position.z={-geomDepth / 2}
-						geometry={edgesGeom}
-						oncreate={(ref) => { ref.computeLineDistances(); }}
-					>
-						<T.LineDashedMaterial color="#ffffff" dashSize={3} gapSize={2} />
-					</T.LineSegments>
-				{/if}
 			</T.Group>
-		{/if}
-	{/each}
-
-	<!-- Interaction plane for drag tracking - covers the print bed area -->
-	<!-- This catches pointermove and pointerup when the pointer leaves the tray meshes -->
-	<T.Mesh
-		rotation.x={-Math.PI / 2}
-		position.x={editModeCenter.x}
-		position.y={-0.1}
-		position.z={editModeCenter.z}
-		onpointerdown={handlePlanePointerDown}
-		onpointermove={handlePlanePointerMove}
-		onpointerup={handlePlanePointerUp}
-	>
-		<T.PlaneGeometry args={[printBedSize * 2, printBedSize * 2]} />
-		<T.MeshBasicMaterial visible={false} />
-	</T.Mesh>
-
-	<!-- Snap guides - use meshOffset to match tray positions -->
-	{#each snapGuides as guide}
-		{@const offsetX = meshOffset.x + interiorStartOffset}
-		{@const offsetZ = meshOffset.z - interiorStartOffset}
-		{@const geometry = new THREE.BufferGeometry().setFromPoints(
-			guide.type === 'vertical'
-				? [
-					new THREE.Vector3(offsetX + guide.position, 0.5, offsetZ - guide.start),
-					new THREE.Vector3(offsetX + guide.position, 0.5, offsetZ - guide.end)
-				]
-				: [
-					new THREE.Vector3(offsetX + guide.start, 0.5, offsetZ - guide.position),
-					new THREE.Vector3(offsetX + guide.end, 0.5, offsetZ - guide.position)
-				]
-		)}
-		<T.Line args={[geometry]}>
-			<T.LineBasicMaterial color="#c9503c" />
-		</T.Line>
-	{/each}
-<!-- All trays with positions (when showAllTrays is true, single box view) -->
-{:else if showAllTrays && !showAllBoxes && allTrays.length > 0}
-	{@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
-	{@const maxTrayHeight = Math.max(...allTrays.map((t) => t.placement.dimensions.height))}
-	{@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
-	{@const traySpacing = liftPhase * maxTrayHeight * 1.2}
-	{#each allTrays as trayData, i (trayData.trayId)}
-		{@const placement = trayData.placement}
-		{@const isRotated = placement.rotated}
-		{@const groupX = exploded
-			? meshOffset.x +
-				interiorStartOffset +
-				placement.x +
-				(isRotated ? placement.dimensions.width : 0)
-			: sidePositions.traysGroup.x -
-				maxTrayWidth / 2 +
-				placement.x +
-				(isRotated ? placement.dimensions.width : 0)}
-		{@const groupY = exploded ? boxFloorThickness + explodedOffset.trays + i * traySpacing : 0}
-		{@const groupZ = exploded
-			? meshOffset.z - interiorStartOffset - placement.y
-			: traysGroupDepth - placement.y}
-		<T.Group
-			position.x={groupX}
-			position.y={groupY}
-			position.z={groupZ}
-			rotation.y={isRotated ? Math.PI / 2 : 0}
+		{/each}
+	{:else if geometry}
+		<!-- Single selected tray -->
+		<T.Mesh
+			{geometry}
+			rotation.x={-Math.PI / 2}
+			position.x={meshOffset.x}
+			position.y={0}
+			position.z={meshOffset.z}
 		>
-			<T.Mesh
-				geometry={trayData.geometry}
-				rotation.x={-Math.PI / 2}
-				onclick={(e: IntersectionEvent<MouseEvent>) => {
-					e.stopPropagation();
-					const dims = trayData.placement.dimensions;
-					onTrayClick?.({
-						trayId: trayData.trayId,
-						name: trayData.name,
-						letter: trayData.trayLetter ?? getTrayLetter(i),
-						width: dims.width,
-						depth: dims.depth,
-						height: dims.height,
-						color: getTrayColor(trayData.trayId, i)
-					});
-				}}
-				ondblclick={() => {
-					if (!isLayoutEditMode) {
-						onTrayDoubleClick?.(trayData.trayId);
-					}
-				}}
-			>
-				<T.MeshStandardMaterial
-					color={getTrayColor(trayData.trayId, i)}
-					roughness={0.6}
-					metalness={0.1}
-					side={THREE.DoubleSide}
-				/>
-			</T.Mesh>
-		</T.Group>
-	{/each}
-{:else if geometry}
-	<!-- Single selected tray -->
-	<T.Mesh
-		{geometry}
-		rotation.x={-Math.PI / 2}
-		position.x={meshOffset.x}
-		position.y={0}
-		position.z={meshOffset.z}
-	>
-		<T.MeshStandardMaterial
-			color={getTrayColor(selectedTrayId, 0)}
-			roughness={0.6}
-			metalness={0.1}
-			side={THREE.DoubleSide}
-		/>
-	</T.Mesh>
-{/if}
+			<T.MeshStandardMaterial
+				color={getTrayColor(selectedTrayId, 0)}
+				roughness={0.6}
+				metalness={0.1}
+				side={THREE.DoubleSide}
+			/>
+		</T.Mesh>
+	{/if}
 {/if}
 
 <!-- Lid geometry (single box view) - hidden during edit mode -->
@@ -1431,8 +1433,8 @@
 	</T.Mesh>
 {/if}
 
-<!-- Counter preview for single tray view (only when tray geometry is visible) -->
-{#if !generating && showCounters && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
+<!-- Counter preview for single tray view (only when tray geometry is visible, hidden in edit mode) -->
+{#if !generating && showCounters && !isLayoutEditMode && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
 	{#each selectedTrayCounters as stack, stackIdx (stackIdx)}
 		{#if !isCounterStack(stack)}
 			<!-- CardStack: render sleeved cards with transparent sleeve and inner card -->
@@ -1689,8 +1691,8 @@
 	{/each}
 {/if}
 
-<!-- Counter preview for all trays view (single box view) - using T.Group so counters rotate with tray -->
-{#if !generating && showCounters && showAllTrays && !showAllBoxes && allTrays.length > 0}
+<!-- Counter preview for all trays view (single box view) - using T.Group so counters rotate with tray (hidden in edit mode) -->
+{#if !generating && showCounters && !isLayoutEditMode && showAllTrays && !showAllBoxes && allTrays.length > 0}
 	{@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
 	{@const maxTrayHeight = Math.max(...allTrays.map((t) => t.placement.dimensions.height))}
 	{@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
@@ -1965,11 +1967,14 @@
 		size={visualEditMode ? Math.max(editBoundsWidth, editBoundsDepth) : printBedSize}
 		title={visualEditMode ? '' : viewTitle}
 		position={visualEditMode ? [editModeCenter.x, 0, editModeCenter.z] : [0, 0, 0]}
+		sizeLabel={visualEditMode
+			? `${Math.max(editBoundsWidth, editBoundsDepth)}mm max box cavity`
+			: undefined}
 	/>
 {/if}
 
-<!-- Reference labels for PDF capture - single tray view -->
-{#if showReferenceLabels && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
+<!-- Reference labels for PDF capture - single tray view (hidden in edit mode) -->
+{#if showReferenceLabels && !isLayoutEditMode && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
 	{@const counterStacks = selectedTrayCounters.filter(isCounterStack)}
 	{@const cardStacks = selectedTrayCounters.filter((s): s is CardStack => !isCounterStack(s))}
 	{@const counterMaxHeight =
@@ -2097,8 +2102,8 @@
 	/>
 {/if}
 
-<!-- Reference labels for PDF capture - all trays view (single box view) -->
-{#if showReferenceLabels && showAllTrays && !showAllBoxes && allTrays.length > 0}
+<!-- Reference labels for PDF capture - all trays view (single box view, hidden in edit mode) -->
+{#if showReferenceLabels && !isLayoutEditMode && showAllTrays && !showAllBoxes && allTrays.length > 0}
 	{@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
 	{@const maxTrayHeight = Math.max(...allTrays.map((t) => t.placement.dimensions.height))}
 	{@const globalLabelHeight = maxTrayHeight + 5}
@@ -2159,8 +2164,8 @@
 	{/each}
 {/if}
 
-<!-- Reference labels for multi-box (print) view -->
-{#if showReferenceLabels && showAllBoxes && allBoxes.length > 0}
+<!-- Reference labels for multi-box (print) view (hidden in edit mode) -->
+{#if showReferenceLabels && !isLayoutEditMode && showAllBoxes && allBoxes.length > 0}
 	{#each allBoxes as boxData, boxIndex (boxData.boxId)}
 		{@const boxPos = boxPositions[boxIndex]}
 		{@const boxWidth = boxData.boxDimensions.width}

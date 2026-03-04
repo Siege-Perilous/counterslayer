@@ -7,9 +7,13 @@
 		size: number;
 		title?: string;
 		position?: [number, number, number];
+		sizeLabel?: string;
 	}
 
-	let { size, title = '', position = [0, 0, 0] }: Props = $props();
+	let { size, title = '', position = [0, 0, 0], sizeLabel }: Props = $props();
+
+	// Default size label if not provided
+	let displaySizeLabel = $derived(sizeLabel ?? `${size}mm bed`);
 
 	// Make position values reactive
 	let posX = $derived(position[0]);
@@ -196,7 +200,7 @@
 
 <!-- Bed size label - bottom right corner (outside bed) -->
 <Text
-	text={`${size}mm bed`}
+	text={displaySizeLabel}
 	fontSize={8}
 	position={bedSizeLabelPos}
 	rotation={[-Math.PI / 2, 0, 0]}

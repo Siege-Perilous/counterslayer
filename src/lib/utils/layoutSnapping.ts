@@ -228,9 +228,7 @@ export function hasAnyOverlap(
  * Check if any placements in the array overlap with each other
  * Returns array of overlapping tray ID pairs
  */
-export function findAllOverlaps(
-	placements: EditorTrayPlacement[]
-): Array<[string, string]> {
+export function findAllOverlaps(placements: EditorTrayPlacement[]): Array<[string, string]> {
 	const overlaps: Array<[string, string]> = [];
 	for (let i = 0; i < placements.length; i++) {
 		for (let j = i + 1; j < placements.length; j++) {

@@ -669,7 +669,13 @@ function arrangeTraysAuto(
 	for (const allowFlip of [true, false]) {
 		for (const rectChoice of rectChoices) {
 			for (const splitMethod of splitMethods) {
-				const placements = tryGuillotine(targetWidth, targetDepth, allowFlip, rectChoice, splitMethod);
+				const placements = tryGuillotine(
+					targetWidth,
+					targetDepth,
+					allowFlip,
+					rectChoice,
+					splitMethod
+				);
 				if (placements) {
 					let maxX = 0;
 					let maxY = 0;

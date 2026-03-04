@@ -3,6 +3,7 @@
 	import { OrbitControls } from '@threlte/extras';
 	import * as THREE from 'three';
 	import { onMount } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 	import {
 		getWorkingPlacements,
 		getSelectedTrayId,
@@ -23,9 +24,10 @@
 		boxTolerance?: number;
 	}
 
-	let { boxWallThickness = 3, boxTolerance = 0.5 }: Props = $props();
+	let { boxWallThickness: _boxWallThickness = 3, boxTolerance: _boxTolerance = 0.5 }: Props =
+		$props();
 
-	const { renderer, camera, scene } = useThrelte();
+	const { renderer, camera } = useThrelte();
 
 	// State
 	let isDragging = $state(false);
@@ -46,11 +48,7 @@
 	const intersectPoint = new THREE.Vector3();
 
 	// Map tray IDs to mesh references
-	let trayMeshes: Map<string, THREE.Mesh> = new Map();
-
-	function getTrayMesh(trayId: string): THREE.Mesh | undefined {
-		return trayMeshes.get(trayId);
-	}
+	let trayMeshes = new SvelteMap<string, THREE.Mesh>();
 
 	function registerTrayMesh(trayId: string, mesh: THREE.Mesh) {
 		trayMeshes.set(trayId, mesh);
@@ -236,7 +234,7 @@
 	{@const isHovered = placement.trayId === hoveredTrayId}
 	<T.Mesh
 		position={pos}
-		rotation.y={placement.rotation * Math.PI / 180}
+		rotation.y={(placement.rotation * Math.PI) / 180}
 		oncreate={(ref) => registerTrayMesh(placement.trayId, ref)}
 	>
 		<T.BoxGeometry args={[dims.width, placement.height, dims.depth]} />
@@ -251,7 +249,7 @@
 
 	<!-- Selection wireframe -->
 	{#if isSelected}
-		<T.LineSegments position={pos} rotation.y={placement.rotation * Math.PI / 180}>
+		<T.LineSegments position={pos} rotation.y={(placement.rotation * Math.PI) / 180}>
 			<T.EdgesGeometry args={[new THREE.BoxGeometry(dims.width, placement.height, dims.depth)]} />
 			<T.LineBasicMaterial color="#ffffff" linewidth={2} />
 		</T.LineSegments>
@@ -262,17 +260,17 @@
 {/each}
 
 <!-- Snap guides -->
-{#each snapGuides as guide}
+{#each snapGuides as guide, guideIdx (guideIdx)}
 	{@const geometry = new THREE.BufferGeometry().setFromPoints(
 		guide.type === 'vertical'
 			? [
-				new THREE.Vector3(guide.position, 0.5, -guide.start),
-				new THREE.Vector3(guide.position, 0.5, -guide.end)
-			]
+					new THREE.Vector3(guide.position, 0.5, -guide.start),
+					new THREE.Vector3(guide.position, 0.5, -guide.end)
+				]
 			: [
-				new THREE.Vector3(guide.start, 0.5, -guide.position),
-				new THREE.Vector3(guide.end, 0.5, -guide.position)
-			]
+					new THREE.Vector3(guide.start, 0.5, -guide.position),
+					new THREE.Vector3(guide.end, 0.5, -guide.position)
+				]
 	)}
 	<T.Line args={[geometry]}>
 		<T.LineBasicMaterial color="#00ffff" />

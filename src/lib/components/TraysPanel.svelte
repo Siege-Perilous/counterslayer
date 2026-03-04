@@ -518,8 +518,7 @@
 						/>
 					{/snippet}
 				</FormControl>
-
-				</div>
+			</div>
 
 			<Hr />
 

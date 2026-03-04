@@ -166,11 +166,15 @@
 		<div class="trayInfoOverlay" class:belowToolbar={showAllTrays}>
 			<span
 				class="trayLetter"
-				style="background-color: {clickedTrayInfo.color}; color: {getContrastColor(clickedTrayInfo.color)}"
-			>{clickedTrayInfo.letter}</span>
+				style="background-color: {clickedTrayInfo.color}; color: {getContrastColor(
+					clickedTrayInfo.color
+				)}">{clickedTrayInfo.letter}</span
+			>
 			<span class="trayName">{clickedTrayInfo.name}</span>
 			<span class="trayDims">
-				{clickedTrayInfo.width.toFixed(0)} × {clickedTrayInfo.depth.toFixed(0)} × {clickedTrayInfo.height.toFixed(0)}mm
+				{clickedTrayInfo.width.toFixed(0)} × {clickedTrayInfo.depth.toFixed(0)} × {clickedTrayInfo.height.toFixed(
+					0
+				)}mm
 			</span>
 		</div>
 	{/if}
@@ -219,5 +223,4 @@
 	.trayDims {
 		color: var(--fgMuted);
 	}
-
 </style>

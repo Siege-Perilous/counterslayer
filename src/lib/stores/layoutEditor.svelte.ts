@@ -4,7 +4,7 @@
  */
 
 import type { ManualTrayPlacement } from '$lib/types/project';
-import type { TrayPlacement, TrayDimensions } from '$lib/models/box';
+import type { TrayPlacement } from '$lib/models/box';
 
 // Working placement during editing (includes more info than saved placement)
 export interface EditorTrayPlacement {
@@ -74,14 +74,30 @@ let dragState = $state<DragState>({
 // Reactive state object - use this for $derived in components
 // Getters on this object will be called reactively
 export const layoutEditorState = {
-	get isEditMode() { return isEditMode; },
-	get selectedTrayId() { return selectedTrayId; },
-	get workingPlacements() { return workingPlacements; },
-	get activeSnapGuides() { return activeSnapGuides; },
-	get printBedSize() { return printBedSize; },
-	get boundsWidth() { return boundsWidth; },
-	get boundsDepth() { return boundsDepth; },
-	get dragState() { return dragState; }
+	get isEditMode() {
+		return isEditMode;
+	},
+	get selectedTrayId() {
+		return selectedTrayId;
+	},
+	get workingPlacements() {
+		return workingPlacements;
+	},
+	get activeSnapGuides() {
+		return activeSnapGuides;
+	},
+	get printBedSize() {
+		return printBedSize;
+	},
+	get boundsWidth() {
+		return boundsWidth;
+	},
+	get boundsDepth() {
+		return boundsDepth;
+	},
+	get dragState() {
+		return dragState;
+	}
 };
 
 // Legacy getters (for backwards compatibility, but prefer layoutEditorState)
@@ -155,7 +171,13 @@ export function selectTray(trayId: string | null): void {
 }
 
 // Drag operations
-export function startDrag(trayId: string, startX: number, startY: number, originalTrayX: number, originalTrayY: number): void {
+export function startDrag(
+	trayId: string,
+	startX: number,
+	startY: number,
+	originalTrayX: number,
+	originalTrayY: number
+): void {
 	dragState = {
 		isDragging: true,
 		hasMoved: false,
@@ -193,9 +215,7 @@ export function updateTrayPosition(trayId: string, x: number, y: number): void {
 	const index = workingPlacements.findIndex((p) => p.trayId === trayId);
 	if (index !== -1) {
 		// Create a new array to ensure reactivity triggers
-		workingPlacements = workingPlacements.map((p, i) =>
-			i === index ? { ...p, x, y } : p
-		);
+		workingPlacements = workingPlacements.map((p, i) => (i === index ? { ...p, x, y } : p));
 	}
 }
 
