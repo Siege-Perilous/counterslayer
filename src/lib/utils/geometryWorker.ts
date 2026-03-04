@@ -113,11 +113,13 @@ function arrayToBufferGeometry(data: GeometryData): THREE.BufferGeometry {
 export class GeometryWorkerManager {
 	private worker: Worker | null = null;
 	private messageId = 0;
+	private latestGenerateId = 0; // Track the most recent generate request
 	private pendingRequests = new Map<
 		number,
 		{
 			resolve: (value: unknown) => void;
 			reject: (reason: unknown) => void;
+			isGenerateRequest?: boolean;
 		}
 	>();
 
@@ -138,6 +140,12 @@ export class GeometryWorkerManager {
 
 			if (pending) {
 				this.pendingRequests.delete(result.id);
+
+				// Check if this is a stale generate request (a newer one was made)
+				if (pending.isGenerateRequest && result.id < this.latestGenerateId) {
+					// Silently ignore stale results
+					return;
+				}
 
 				if ('error' in result && result.error) {
 					pending.reject(new Error(result.error));
@@ -170,9 +178,11 @@ export class GeometryWorkerManager {
 		}
 
 		const id = ++this.messageId;
+		this.latestGenerateId = id; // Mark this as the latest generate request
 
 		return new Promise((resolve, reject) => {
 			this.pendingRequests.set(id, {
+				isGenerateRequest: true,
 				resolve: (result) => {
 					const r = result as GenerateResult;
 

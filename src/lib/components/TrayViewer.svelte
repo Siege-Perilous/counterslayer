@@ -78,6 +78,7 @@
 		onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
 		isLayoutEditMode?: boolean;
 		onTrayDoubleClick?: (trayId: string) => void;
+		generating?: boolean;
 	}
 
 	let {
@@ -104,7 +105,8 @@
 		viewTitle = '',
 		onCaptureReady,
 		isLayoutEditMode = false,
-		onTrayDoubleClick
+		onTrayDoubleClick,
+		generating = false
 	}: Props = $props();
 
 	// Clicked tray info for display overlay
@@ -155,6 +157,7 @@
 			{isLayoutEditMode}
 			onTrayClick={handleTrayClick}
 			{onTrayDoubleClick}
+			{generating}
 		/>
 	</Canvas>
 

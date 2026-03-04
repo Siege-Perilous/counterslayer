@@ -83,6 +83,7 @@
 		isLayoutEditMode?: boolean;
 		onTrayClick?: (info: TrayClickInfo | null) => void;
 		onTrayDoubleClick?: (trayId: string) => void;
+		generating?: boolean;
 	}
 
 	let {
@@ -110,7 +111,8 @@
 		onCaptureReady,
 		isLayoutEditMode = false,
 		onTrayClick,
-		onTrayDoubleClick
+		onTrayDoubleClick,
+		generating = false
 	}: Props = $props();
 
 	// Get Threlte context for capture
@@ -198,7 +200,7 @@
 	// Force reactivity tracking by reading all layout editor values in $effect
 	$effect(() => {
 		// Reading these values ensures Svelte tracks them for reactivity
-		console.log('[TrayScene] layout state:', isLayoutEditMode, 'placements:', workingPlacements.length, 'selected:', layoutSelectedTrayId);
+		void [isLayoutEditMode, workingPlacements.length, layoutSelectedTrayId];
 	});
 
 	let snapGuides = $derived(layoutEditorState.activeSnapGuides);
@@ -265,14 +267,12 @@
 
 			if (currentEditMode && !wasInEditMode) {
 				// Entering edit mode - start fading out normal scene
-				console.log('[Transition] Starting fade to edit mode');
 				savedCameraPosition = cam.position.clone();
-				savedCameraTarget = new THREE.Vector3(cameraTarget.x, cameraTarget.y, cameraTarget.z);
+				savedCameraTarget = new THREE.Vector3(0, 0, 0);
 				transitionPhase = 'fading-to-edit';
 				fadeProgress = 0;
 			} else if (!currentEditMode && wasInEditMode) {
 				// Exiting edit mode - start fading out edit scene
-				console.log('[Transition] Starting fade to normal mode');
 				transitionPhase = 'fading-to-normal';
 				fadeProgress = 0;
 			}
@@ -304,7 +304,6 @@
 				const editModeHeight = Math.max(printBedSize * 1.5, 400);
 				cam.position.set(editModeCenter.x, editModeHeight, editModeCenter.z + 0.01);
 				cam.lookAt(editModeCenter.x, 0, editModeCenter.z);
-				console.log('[Transition] Camera jumped to edit position:', editModeCenter);
 
 				// Start fade in
 				fadeProgress = 0;
@@ -324,7 +323,6 @@
 				if (savedCameraPosition && savedCameraTarget) {
 					cam.position.copy(savedCameraPosition);
 					cam.lookAt(savedCameraTarget);
-					console.log('[Transition] Camera jumped back to saved position');
 				}
 
 				// Clear saved state
@@ -401,7 +399,6 @@
 					// For 16:9 capture, rotate view 90° if tray is deeper than wide
 					// This maximizes tray size by aligning longer dimension with wider frame edge
 					const shouldRotate = trayDepth > trayWidth;
-					console.log('PDF capture dimensions:', { trayWidth, trayDepth, shouldRotate });
 					const effectiveWidth = shouldRotate ? trayDepth : trayWidth;
 					const effectiveDepth = shouldRotate ? trayWidth : trayDepth;
 
@@ -675,67 +672,6 @@
 	});
 
 	// Log edit mode center changes
-	$effect(() => {
-		console.log('[EditModeCenter] meshOffset:', meshOffset);
-		console.log('[EditModeCenter] computed center:', editModeCenter);
-	});
-
-	// Camera target
-	let cameraTarget = $derived.by(() => {
-		// For multi-box view, center on the print beds
-		if (showAllBoxes && allBoxes.length > 0) {
-			const maxHeight = Math.max(...allBoxes.map((b) => b.boxDimensions.height));
-			return {
-				x: 0,
-				y: maxHeight / 2,
-				z: printBedSize / 2
-			};
-		}
-
-		if (!combinedBounds) return { x: 0, y: 0, z: 0 };
-		const height = combinedBounds.max.z - combinedBounds.min.z;
-		return {
-			x: 0,
-			y: height / 2,
-			z: 0
-		};
-	});
-
-	let cameraDistance = $derived.by(() => {
-		// For multi-box view, calculate based on total arrangement width (using print bed sizes)
-		if (showAllBoxes && allBoxes.length > 0) {
-			const totalWidth = allBoxes.length * printBedSize + (allBoxes.length - 1) * sideGap;
-			const maxHeight = Math.max(...allBoxes.map((b) => b.boxDimensions.height));
-			const size = Math.max(totalWidth, printBedSize, maxHeight);
-			return size * 1.5;
-		}
-
-		if (!combinedBounds) return printBedSize;
-
-		let effectiveWidth = combinedBounds.max.x - combinedBounds.min.x;
-
-		// Account for side-by-side spread in "All" mode
-		if (showAllTrays && !exploded) {
-			const widths: number[] = [];
-			if (boxBounds) widths.push(boxBounds.max.x - boxBounds.min.x);
-			if (allTrays.length > 0) {
-				widths.push(Math.max(...allTrays.map((t) => t.placement.dimensions.width)));
-			}
-			if (lidBounds) widths.push(lidBounds.max.x - lidBounds.min.x);
-			if (widths.length > 0) {
-				effectiveWidth = widths.reduce((a, b) => a + b, 0) + (widths.length - 1) * sideGap;
-			}
-		}
-
-		const size = Math.max(
-			effectiveWidth,
-			combinedBounds.max.y - combinedBounds.min.y,
-			combinedBounds.max.z - combinedBounds.min.z,
-			printBedSize
-		);
-		return size * 1.5;
-	});
-
 	// Exploded view offsets - lid slides out first, then trays lift
 	// Lid slides along longest dimension of box
 	let explodedOffset = $derived.by(() => {
@@ -794,78 +730,18 @@
 		return TRAY_COLORS[fallbackIndex % TRAY_COLORS.length];
 	}
 
-	// Debug logging
-	$effect(() => {
-		if (showAllTrays && allTrays.length > 0) {
-			const maxTrayW = Math.max(...allTrays.map((t) => t.placement.dimensions.width));
-			console.log('=== TrayScene Debug ===');
-			console.log('exploded:', exploded);
-			console.log('showAllTrays:', showAllTrays);
-			console.log('maxTrayWidth:', maxTrayW);
-			console.log('traysGroupDepth:', traysGroupDepth);
-			console.log('sidePositions.traysGroup:', JSON.stringify(sidePositions.traysGroup));
-			console.log('meshOffset:', JSON.stringify(meshOffset));
-			console.log('interiorStartOffset:', interiorStartOffset);
-			allTrays.forEach((t, i) => {
-				const p = t.placement;
-				// Calculate actual positions based on current mode
-				const xPos = exploded
-					? meshOffset.x + interiorStartOffset + p.x
-					: sidePositions.traysGroup.x - maxTrayW / 2 + p.x;
-				const zPos = exploded ? meshOffset.z - interiorStartOffset - p.y : traysGroupDepth - p.y;
-				console.log(
-					`Tray ${i} "${t.name}": placement(x=${p.x}, y=${p.y}), dims(w=${p.dimensions.width.toFixed(1)}, d=${p.dimensions.depth}) -> actual position(x=${xPos.toFixed(1)}, z=${zPos.toFixed(1)})`
-				);
-			});
-		}
-		// Lid debug
-		if (exploded && lidBounds && boxBounds) {
-			const bw = boxBounds.max.x - boxBounds.min.x;
-			const bd = boxBounds.max.y - boxBounds.min.y;
-			const lw = lidBounds.max.x - lidBounds.min.x;
-			const ld = lidBounds.max.y - lidBounds.min.y;
-			const slidesX = bw > bd;
-			const boundsOffsetX = boxBounds.min.x - lidBounds.min.x;
-			const boundsOffsetY = boxBounds.min.y - lidBounds.min.y;
-			console.log('=== Lid Debug ===');
-			console.log('boxBounds:', {
-				min: { x: boxBounds.min.x.toFixed(2), y: boxBounds.min.y.toFixed(2) },
-				max: { x: boxBounds.max.x.toFixed(2), y: boxBounds.max.y.toFixed(2) }
-			});
-			console.log('lidBounds:', {
-				min: { x: lidBounds.min.x.toFixed(2), y: lidBounds.min.y.toFixed(2) },
-				max: { x: lidBounds.max.x.toFixed(2), y: lidBounds.max.y.toFixed(2) }
-			});
-			console.log('boxWidth:', bw.toFixed(2), 'boxDepth:', bd.toFixed(2));
-			console.log('lidWidth:', lw.toFixed(2), 'lidDepth:', ld.toFixed(2));
-			console.log(
-				'boundsOffsetX:',
-				boundsOffsetX.toFixed(2),
-				'boundsOffsetY:',
-				boundsOffsetY.toFixed(2)
-			);
-			console.log('slidesAlongX:', slidesX);
-			console.log('meshOffset:', { x: meshOffset.x.toFixed(2), z: meshOffset.z.toFixed(2) });
-			console.log('explodedOffset:', {
-				lidSlideX: explodedOffset.lidSlideX.toFixed(2),
-				maxSlideX: explodedOffset.maxSlideX.toFixed(2),
-				lidSlideZ: explodedOffset.lidSlideZ.toFixed(2),
-				maxSlideZ: explodedOffset.maxSlideZ.toFixed(2)
-			});
-		}
-	});
 </script>
 
 <T.PerspectiveCamera
 	makeDefault
-	position={[cameraDistance * 0.7, cameraDistance * 0.5, cameraDistance * 0.7]}
+	position={[printBedSize * 0.7, printBedSize * 0.5, printBedSize * 0.7]}
 	fov={50}
 >
 	{@const isTransitioning = transitionPhase === 'fading-to-edit' || transitionPhase === 'fading-to-normal' ||
 		(transitionPhase === 'edit' && editSceneOpacity < 1) ||
 		(transitionPhase === 'normal' && normalSceneOpacity < 1)}
 	<OrbitControls
-		target={visualEditMode ? [editModeCenter.x, 0, editModeCenter.z] : [cameraTarget.x, cameraTarget.y, cameraTarget.z]}
+		target={visualEditMode ? [editModeCenter.x, 0, editModeCenter.z] : [0, 0, 0]}
 		enableDamping={!isTransitioning}
 		enabled={!isTransitioning}
 		enableRotate={!visualEditMode && !isTransitioning}
@@ -928,7 +804,7 @@
 {/if}
 
 <!-- Multi-box view: All boxes arranged side by side with their own bed planes -->
-{#if showAllBoxes && allBoxes.length > 0}
+{#if !generating && showAllBoxes && allBoxes.length > 0}
 	{#each allBoxes as boxData, boxIndex (boxData.boxId)}
 		{@const boxPos = boxPositions[boxIndex]}
 		{@const boxWidth = boxData.boxDimensions.width}
@@ -1295,7 +1171,7 @@
 {/if}
 
 <!-- Box geometry (single box view) - hidden during edit mode -->
-{#if boxGeometry && !showAllBoxes && !visualEditMode}
+{#if !generating && boxGeometry && !showAllBoxes && !visualEditMode}
 	{@const boxWidth = boxBounds ? boxBounds.max.x - boxBounds.min.x : 0}
 	<T.Mesh
 		geometry={boxGeometry}
@@ -1315,6 +1191,7 @@
 {/if}
 
 <!-- Layout Edit Mode: Render trays from working placements with selection -->
+{#if !generating}
 {#if visualEditMode && workingPlacements.length > 0}
 	{#each workingPlacements as placement, i (placement.trayId)}
 		{@const dims = getEffectiveDimensions(placement)}
@@ -1326,7 +1203,6 @@
 		{@const groupX = meshOffset.x + interiorStartOffset + placement.x + (isRotated ? dims.width : 0)}
 		{@const groupY = 0}
 		{@const groupZ = meshOffset.z - interiorStartOffset - placement.y}
-		{@const _log = console.log(`[EditMode Tray ${i}] placement(${placement.x.toFixed(1)}, ${placement.y.toFixed(1)}) -> world(${groupX.toFixed(1)}, ${groupZ.toFixed(1)})`)}
 		{#if trayData}
 			<!-- Get actual geometry dimensions (un-rotate if bin-packing rotated it) -->
 			{@const binPackRotated = trayData.placement.rotated}
@@ -1510,9 +1386,10 @@
 		/>
 	</T.Mesh>
 {/if}
+{/if}
 
 <!-- Lid geometry (single box view) - hidden during edit mode -->
-{#if lidGeometry && !showAllBoxes && !visualEditMode}
+{#if !generating && lidGeometry && !showAllBoxes && !visualEditMode}
 	{@const lidWidth = lidBounds ? lidBounds.max.x - lidBounds.min.x : 0}
 	{@const lidHeight = lidBounds ? lidBounds.max.z - lidBounds.min.z : 0}
 	{@const lidDepth = lidBounds ? lidBounds.max.y - lidBounds.min.y : 0}
@@ -1555,7 +1432,7 @@
 {/if}
 
 <!-- Counter preview for single tray view (only when tray geometry is visible) -->
-{#if showCounters && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
+{#if !generating && showCounters && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
 	{#each selectedTrayCounters as stack, stackIdx (stackIdx)}
 		{#if !isCounterStack(stack)}
 			<!-- CardStack: render sleeved cards with transparent sleeve and inner card -->
@@ -1813,7 +1690,7 @@
 {/if}
 
 <!-- Counter preview for all trays view (single box view) - using T.Group so counters rotate with tray -->
-{#if showCounters && showAllTrays && !showAllBoxes && allTrays.length > 0}
+{#if !generating && showCounters && showAllTrays && !showAllBoxes && allTrays.length > 0}
 	{@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
 	{@const maxTrayHeight = Math.max(...allTrays.map((t) => t.placement.dimensions.height))}
 	{@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}

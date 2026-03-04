@@ -207,13 +207,6 @@ export function checkOverlap(
 
 	if (noOverlapX || noOverlapY) return false;
 
-	// Log overlap details
-	console.log(`OVERLAP DETECTED: "${placement1.name}" vs "${placement2.name}"`);
-	console.log(`  ${placement1.name}: x=${left1.toFixed(2)}-${right1.toFixed(2)}, y=${front1.toFixed(2)}-${back1.toFixed(2)}`);
-	console.log(`  ${placement2.name}: x=${left2.toFixed(2)}-${right2.toFixed(2)}, y=${front2.toFixed(2)}-${back2.toFixed(2)}`);
-	console.log(`  X overlap by: ${Math.min(right1 - left2, right2 - left1).toFixed(3)}mm`);
-	console.log(`  Y overlap by: ${Math.min(back1 - front2, back2 - front1).toFixed(3)}mm`);
-
 	return true;
 }
 

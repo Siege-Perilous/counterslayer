@@ -151,7 +151,6 @@ export function exitEditMode(): void {
 }
 
 export function selectTray(trayId: string | null): void {
-	console.log('[selectTray] setting selectedTrayId to:', trayId);
 	selectedTrayId = trayId;
 }
 
@@ -202,11 +201,9 @@ export function updateTrayPosition(trayId: string, x: number, y: number): void {
 
 export function rotateTray(trayId: string): void {
 	const index = workingPlacements.findIndex((p) => p.trayId === trayId);
-	console.log('[rotateTray] trayId:', trayId, 'index:', index);
 	if (index !== -1) {
 		const placement = workingPlacements[index];
 		const newRotation = ((placement.rotation + 90) % 360) as 0 | 90 | 180 | 270;
-		console.log('[rotateTray] rotating from', placement.rotation, 'to', newRotation);
 		// Create a new array to ensure reactivity triggers in derived consumers
 		workingPlacements = workingPlacements.map((p, i) =>
 			i === index ? { ...p, rotation: newRotation } : p

@@ -733,25 +733,12 @@ export function importProject(data: Project): void {
 // Manual layout operations
 import type { ManualTrayPlacement } from '$lib/types/project';
 
-// Save manual tray layout for a box (also updates box dimensions to fit)
-export function saveManualLayout(
-	boxId: string,
-	placements: ManualTrayPlacement[],
-	newWidth?: number,
-	newDepth?: number
-): void {
+// Save manual tray layout for a box (box dimensions auto-calculate from tray positions)
+export function saveManualLayout(boxId: string, placements: ManualTrayPlacement[]): void {
 	const box = project.boxes.find((b) => b.id === boxId);
 	if (!box) return;
 
 	box.manualLayout = placements;
-
-	// Update box dimensions if provided
-	if (newWidth !== undefined) {
-		box.customWidth = newWidth;
-	}
-	if (newDepth !== undefined) {
-		box.customDepth = newDepth;
-	}
 
 	autosave();
 }

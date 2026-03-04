@@ -69,7 +69,6 @@
 		layoutEditorState,
 		getIsEditMode,
 		getManualPlacements,
-		calculateBoundingBox,
 		rotateTray,
 		getSelectedTrayId
 	} from '$lib/stores/layoutEditor.svelte';
@@ -804,8 +803,6 @@
 						type: 'success'
 					}
 				});
-				console.log('Debug analysis complete:', result.message);
-				console.log(result.output);
 			}
 		} catch (e) {
 			removeToast(loadingToast.id);
@@ -952,19 +949,6 @@
 
 		// Check for overlaps before saving
 		const workingPlacements = layoutEditorState.workingPlacements;
-
-		// Debug: log all tray positions
-		console.log('=== SAVE LAYOUT DEBUG ===');
-		for (const p of workingPlacements) {
-			const dims = {
-				width: p.rotation === 90 || p.rotation === 270 ? p.originalDepth : p.originalWidth,
-				depth: p.rotation === 90 || p.rotation === 270 ? p.originalWidth : p.originalDepth
-			};
-			console.log(
-				`${p.name}: pos=(${p.x.toFixed(2)}, ${p.y.toFixed(2)}) dims=${dims.width.toFixed(2)}x${dims.depth.toFixed(2)} rot=${p.rotation}° bounds=(${p.x.toFixed(2)}-${(p.x + dims.width).toFixed(2)}, ${p.y.toFixed(2)}-${(p.y + dims.depth).toFixed(2)})`
-			);
-		}
-		console.log('=========================');
 		const overlaps = findAllOverlaps(workingPlacements);
 
 		if (overlaps.length > 0) {
@@ -985,14 +969,9 @@
 		}
 
 		const manualPlacements = getManualPlacements();
-		const bounds = calculateBoundingBox();
 
-		// Calculate new box dimensions (add walls and tolerance)
-		const newWidth = bounds.width + (box.wallThickness + box.tolerance) * 2;
-		const newDepth = bounds.depth + (box.wallThickness + box.tolerance) * 2;
-
-		// Save to project
-		saveManualLayout(box.id, manualPlacements, newWidth, newDepth);
+		// Save to project - box dimensions auto-calculate from tray positions
+		saveManualLayout(box.id, manualPlacements);
 
 		// Exit edit mode
 		exitEditMode();
@@ -1021,9 +1000,7 @@
 	}
 
 	function handleRotateLayout() {
-		console.log('handleRotateLayout called');
 		const selectedId = getSelectedTrayId();
-		console.log('selectedId:', selectedId);
 		if (selectedId) {
 			rotateTray(selectedId);
 		}
@@ -1117,6 +1094,7 @@
 							onCaptureReady={(fn) => (captureFunction = fn)}
 							{isLayoutEditMode}
 							onTrayDoubleClick={handleTrayDoubleClick}
+							{generating}
 						/>
 					{/await}
 				{/if}
@@ -1321,6 +1299,7 @@
 							onCaptureReady={(fn) => (captureFunction = fn)}
 							{isLayoutEditMode}
 							onTrayDoubleClick={handleTrayDoubleClick}
+							{generating}
 						/>
 					{/await}
 				{/if}
