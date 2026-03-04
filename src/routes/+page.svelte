@@ -53,11 +53,23 @@
 		getCumulativeTrayLetter,
 		isCounterTray,
 		isCardTray,
-		isCardDividerTray
+		isCardDividerTray,
+		saveManualLayout,
+		clearManualLayout
 	} from '$lib/stores/project.svelte';
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
 	import { onDestroy, untrack } from 'svelte';
+	import LayoutEditorOverlay from '$lib/components/LayoutEditorOverlay.svelte';
+	import {
+		enterEditMode,
+		exitEditMode,
+		cancelChanges,
+		layoutEditorState,
+		getIsEditMode,
+		getManualPlacements,
+		calculateBoundingBox
+	} from '$lib/stores/layoutEditor.svelte';
 
 	type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid';
 	type SelectionType = 'dimensions' | 'box' | 'tray';
@@ -197,14 +209,17 @@
 			showAllBoxes: false
 		};
 
+		// In layout edit mode, only show trays (no box/lid since layout isn't finalized)
+		const inEditMode = isLayoutEditMode;
+
 		switch (viewMode) {
 			case 'tray':
 				result.tray = selectedTrayGeometry;
 				break;
 			case 'all':
 				result.allTrays = allTrayGeometries;
-				result.box = boxGeometry;
-				result.lid = lidGeometry;
+				result.box = inEditMode ? null : boxGeometry;
+				result.lid = inEditMode ? null : lidGeometry;
 				result.showAllTrays = true;
 				break;
 			case 'all-no-lid':
@@ -214,9 +229,9 @@
 				break;
 			case 'exploded':
 				result.allTrays = allTrayGeometries;
-				result.box = boxGeometry;
-				result.lid = lidGeometry;
-				result.exploded = true;
+				result.box = inEditMode ? null : boxGeometry;
+				result.lid = inEditMode ? null : lidGeometry;
+				result.exploded = !inEditMode; // Don't explode in edit mode
 				result.showAllTrays = true;
 				break;
 		}
@@ -465,7 +480,8 @@
 					wallThickness: box.wallThickness,
 					tolerance: box.tolerance,
 					cardSizes,
-					counterShapes
+					counterShapes,
+					manualLayout: box.manualLayout
 				});
 				const spacerInfo = calculateTraySpacers(box, cardSizes, counterShapes);
 				const maxHeight = Math.max(...placements.map((p) => p.dimensions.height));
@@ -878,6 +894,85 @@
 		}
 	}
 
+	// Layout Editor handlers - use $derived.by() to properly track reactive reads from store
+	let isLayoutEditMode = $derived.by(() => layoutEditorState.isEditMode);
+
+	function handleEnterLayoutEdit() {
+		const box = getSelectedBox();
+		if (!box) return;
+
+		const project = getProject();
+		const cardSizes = project.cardSizes ?? [];
+		const counterShapes = project.counterShapes ?? [];
+
+		// Get current placements (either from manual layout or auto)
+		const placements = arrangeTrays(box.trays, {
+			customBoxWidth: box.customWidth,
+			wallThickness: box.wallThickness,
+			tolerance: box.tolerance,
+			cardSizes,
+			counterShapes,
+			manualLayout: box.manualLayout
+		});
+
+		// Enter edit mode with current placements
+		enterEditMode(placements, printBedSize);
+	}
+
+	function handleSaveLayout() {
+		const box = getSelectedBox();
+		if (!box) return;
+
+		const manualPlacements = getManualPlacements();
+		const bounds = calculateBoundingBox();
+
+		// Calculate new box dimensions (add walls and tolerance)
+		const newWidth = bounds.width + (box.wallThickness + box.tolerance) * 2;
+		const newDepth = bounds.depth + (box.wallThickness + box.tolerance) * 2;
+
+		// Save to project
+		saveManualLayout(box.id, manualPlacements, newWidth, newDepth);
+
+		// Exit edit mode
+		exitEditMode();
+
+		// Regenerate geometry with new layout
+		regenerate(true);
+	}
+
+	function handleCancelLayout() {
+		cancelChanges();
+		exitEditMode();
+	}
+
+	function handleResetAutoLayout() {
+		const box = getSelectedBox();
+		if (!box) return;
+
+		// Clear manual layout
+		clearManualLayout(box.id);
+
+		// Exit edit mode
+		exitEditMode();
+
+		// Regenerate with auto layout
+		regenerate(true);
+	}
+
+	// Cancel edit mode when selection changes (user navigates away)
+	let lastSelectedBoxId = $state<string | null>(null);
+	$effect(() => {
+		const currentBoxId = selectedBox?.id ?? null;
+		if (lastSelectedBoxId !== null && currentBoxId !== lastSelectedBoxId) {
+			// Box selection changed while in edit mode - cancel
+			if (getIsEditMode()) {
+				cancelChanges();
+				exitEditMode();
+			}
+		}
+		lastSelectedBoxId = currentBoxId;
+	});
+
 	// Cleanup worker on component destroy
 	onDestroy(() => {
 		geometryWorker.terminate();
@@ -942,6 +1037,7 @@
 							{hidePrintBed}
 							{viewTitle}
 							onCaptureReady={(fn) => (captureFunction = fn)}
+							{isLayoutEditMode}
 						/>
 					{/await}
 				{/if}
@@ -953,121 +1049,131 @@
 					</div>
 				{/if}
 
-				{#if viewMode === 'exploded'}
+				{#if (viewMode === 'exploded' || viewMode === 'all') && !generating}
 					<div class="viewToolbar">
-						<div class="sliderContainer">
-							<span class="sliderLabel">Explode</span>
-							<InputSlider min={0} max={100} bind:value={explosionAmount} />
-						</div>
+						{#if viewMode === 'exploded' && !isLayoutEditMode}
+							<div class="sliderContainer">
+								<span class="sliderLabel">Explode</span>
+								<InputSlider min={0} max={100} bind:value={explosionAmount} />
+							</div>
+						{/if}
+						<LayoutEditorOverlay
+							onEnterEdit={handleEnterLayoutEdit}
+							onSave={handleSaveLayout}
+							onCancel={handleCancelLayout}
+							onResetAuto={handleResetAutoLayout}
+						/>
 					</div>
 				{/if}
 
-				<div class="bottomToolbar">
-					<input
-						bind:this={jsonFileInput}
-						type="file"
-						accept=".json"
-						onchange={handleImportJson}
-						style="display: none;"
-					/>
-					<Popover positioning={{ placement: 'top-start' }}>
-						{#snippet trigger()}
-							<Button variant="special">
-								Import / Export
-								<Icon Icon={IconChevronDown} />
-							</Button>
-						{/snippet}
-						{#snippet content()}
-							<div class="popoverMenu">
-								{#if communityProjects.length > 0}
-									<FormControl label="Load community project" name="communityProject">
-										{#snippet input({ inputProps })}
-											<Select
-												selected={[]}
-												options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
-												onSelectedChange={(selected) => {
-													const project = communityProjects.find((p) => p.id === selected[0]);
-													if (project) {
-														loadCommunityProject(project);
-													}
-												}}
-												{...inputProps}
-											/>
-										{/snippet}
-									</FormControl>
-									<Hr />
-								{/if}
-								<Button
-									variant="ghost"
-									onclick={() => jsonFileInput?.click()}
-									style="width: 100%; justify-content: flex-start;"
-								>
-									Import project JSON
+				{#if !isLayoutEditMode}
+					<div class="bottomToolbar">
+						<input
+							bind:this={jsonFileInput}
+							type="file"
+							accept=".json"
+							onchange={handleImportJson}
+							style="display: none;"
+						/>
+						<Popover positioning={{ placement: 'top-start' }}>
+							{#snippet trigger()}
+								<Button variant="special">
+									Import / Export
+									<Icon Icon={IconChevronDown} />
 								</Button>
-								<Button
-									variant="ghost"
-									onclick={handleExportJson}
-									style="width: 100%; justify-content: flex-start;"
-								>
-									Export project JSON
-								</Button>
-								<Hr />
-								<Button
-									variant="ghost"
-									onclick={handleExportAll}
-									disabled={generating || exportingStl || getProject().boxes.length === 0}
-									isLoading={exportingStl}
-									style="width: 100%; justify-content: flex-start;"
-								>
-									{exportingStl ? exportStlProgress : 'Export STLs'}
-								</Button>
-								<Button
-									variant="ghost"
-									onclick={handleExportPdf}
-									disabled={getProject().boxes.length === 0 || exportingPdf}
-									isLoading={exportingPdf}
-									style="width: 100%; justify-content: flex-start;"
-								>
-									{exportingPdf ? 'Generating PDF...' : 'PDF reference'}
-								</Button>
-								{#if import.meta.env.DEV}
+							{/snippet}
+							{#snippet content()}
+								<div class="popoverMenu">
+									{#if communityProjects.length > 0}
+										<FormControl label="Load community project" name="communityProject">
+											{#snippet input({ inputProps })}
+												<Select
+													selected={[]}
+													options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
+													onSelectedChange={(selected) => {
+														const project = communityProjects.find((p) => p.id === selected[0]);
+														if (project) {
+															loadCommunityProject(project);
+														}
+													}}
+													{...inputProps}
+												/>
+											{/snippet}
+										</FormControl>
+										<Hr />
+									{/if}
+									<Button
+										variant="ghost"
+										onclick={() => jsonFileInput?.click()}
+										style="width: 100%; justify-content: flex-start;"
+									>
+										Import project JSON
+									</Button>
+									<Button
+										variant="ghost"
+										onclick={handleExportJson}
+										style="width: 100%; justify-content: flex-start;"
+									>
+										Export project JSON
+									</Button>
 									<Hr />
 									<Button
 										variant="ghost"
-										onclick={handleDebugForClaude}
-										disabled={!selectedTrayGeometry || debugExporting}
-										isLoading={debugExporting}
+										onclick={handleExportAll}
+										disabled={generating || exportingStl || getProject().boxes.length === 0}
+										isLoading={exportingStl}
 										style="width: 100%; justify-content: flex-start;"
 									>
-										{debugExporting ? 'Analyzing...' : 'Debug for Claude'}
+										{exportingStl ? exportStlProgress : 'Export STLs'}
 									</Button>
-								{/if}
-								<Hr />
-								<Button
-									variant="danger"
-									onclick={handleReset}
-									style="width: 100%; justify-content: flex-start;"
-								>
-									Clear current project
-								</Button>
-							</div>
-						{/snippet}
-					</Popover>
-					<div class="toolbarRight">
-						<span
-							class="regenerateButton {isDirty && !generating ? 'regenerateButton--dirty' : ''}"
-						>
-							<Button
-								variant="primary"
-								onclick={() => regenerate(true)}
-								isDisabled={generating}
-								isLoading={generating}
+									<Button
+										variant="ghost"
+										onclick={handleExportPdf}
+										disabled={getProject().boxes.length === 0 || exportingPdf}
+										isLoading={exportingPdf}
+										style="width: 100%; justify-content: flex-start;"
+									>
+										{exportingPdf ? 'Generating PDF...' : 'PDF reference'}
+									</Button>
+									{#if import.meta.env.DEV}
+										<Hr />
+										<Button
+											variant="ghost"
+											onclick={handleDebugForClaude}
+											disabled={!selectedTrayGeometry || debugExporting}
+											isLoading={debugExporting}
+											style="width: 100%; justify-content: flex-start;"
+										>
+											{debugExporting ? 'Analyzing...' : 'Debug for Claude'}
+										</Button>
+									{/if}
+									<Hr />
+									<Button
+										variant="danger"
+										onclick={handleReset}
+										style="width: 100%; justify-content: flex-start;"
+									>
+										Clear current project
+									</Button>
+								</div>
+							{/snippet}
+						</Popover>
+						<div class="toolbarRight">
+							<span
+								class="regenerateButton {isDirty && !generating ? 'regenerateButton--dirty' : ''}"
 							>
-								Regenerate
-							</Button>
-						</span>
+								<Button
+									variant="primary"
+									onclick={() => regenerate(true)}
+									isDisabled={generating}
+									isLoading={generating}
+								>
+									Regenerate
+								</Button>
+							</span>
+						</div>
 					</div>
-				</div>
+				{/if}
 
 				{#if error}
 					<div class="errorBanner">
@@ -1132,6 +1238,7 @@
 							{hidePrintBed}
 							{viewTitle}
 							onCaptureReady={(fn) => (captureFunction = fn)}
+							{isLayoutEditMode}
 						/>
 					{/await}
 				{/if}
@@ -1143,12 +1250,20 @@
 					</div>
 				{/if}
 
-				{#if viewMode === 'exploded'}
+				{#if (viewMode === 'exploded' || viewMode === 'all') && !generating}
 					<div class="viewToolbar">
-						<div class="sliderContainer">
-							<span class="sliderLabel">Explode</span>
-							<InputSlider min={0} max={100} bind:value={explosionAmount} />
-						</div>
+						{#if viewMode === 'exploded' && !isLayoutEditMode}
+							<div class="sliderContainer">
+								<span class="sliderLabel">Explode</span>
+								<InputSlider min={0} max={100} bind:value={explosionAmount} />
+							</div>
+						{/if}
+						<LayoutEditorOverlay
+							onEnterEdit={handleEnterLayoutEdit}
+							onSave={handleSaveLayout}
+							onCancel={handleCancelLayout}
+							onResetAuto={handleResetAutoLayout}
+						/>
 					</div>
 				{/if}
 

@@ -49,6 +49,7 @@
 		hidePrintBed?: boolean;
 		viewTitle?: string;
 		onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
+		isLayoutEditMode?: boolean;
 	}
 
 	let {
@@ -73,7 +74,8 @@
 		showReferenceLabels = false,
 		hidePrintBed = false,
 		viewTitle = '',
-		onCaptureReady
+		onCaptureReady,
+		isLayoutEditMode = false
 	}: Props = $props();
 </script>
 
@@ -102,6 +104,7 @@
 			{hidePrintBed}
 			{viewTitle}
 			{onCaptureReady}
+			{isLayoutEditMode}
 		/>
 	</Canvas>
 </div>

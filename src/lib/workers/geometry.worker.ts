@@ -383,7 +383,8 @@ function handleGenerate(msg: GenerateMessage): void {
 			wallThickness: box.wallThickness,
 			tolerance: box.tolerance,
 			cardSizes,
-			counterShapes
+			counterShapes,
+			manualLayout: box.manualLayout
 		});
 
 		const spacerInfo = calculateTraySpacers(box, cardSizes, counterShapes);
@@ -470,7 +471,8 @@ function handleGenerate(msg: GenerateMessage): void {
 				wallThickness: projectBox.wallThickness,
 				tolerance: projectBox.tolerance,
 				cardSizes,
-				counterShapes
+				counterShapes,
+				manualLayout: projectBox.manualLayout
 			});
 
 			const boxSpacerInfo = calculateTraySpacers(projectBox, cardSizes, counterShapes);

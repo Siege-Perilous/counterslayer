@@ -164,7 +164,8 @@ export function extractPdfData(project: Project): PdfData {
 			wallThickness: box.wallThickness,
 			tolerance: box.tolerance,
 			cardSizes,
-			counterShapes
+			counterShapes,
+			manualLayout: box.manualLayout
 		});
 
 		// Calculate box dimensions

@@ -439,11 +439,75 @@ export function getCounterTrayDimensions(
 // Backwards compatibility alias for counter tray dimensions
 export const getTrayDimensions = getCounterTrayDimensions;
 
+import type { ManualTrayPlacement } from '$lib/types/project';
+
 // Arrange trays in a box layout with bin-packing
 // Smaller trays can share a row if their combined width fits within the max tray width
 // If customBoxWidth is provided, use interior width (minus walls/tolerance) for packing
 // Supports tray rotation: trays can be rotated 90° for more efficient packing
+// If manualLayout is provided, uses those positions instead of auto-arrangement
 export function arrangeTrays(
+	trays: Tray[],
+	options?: {
+		customBoxWidth?: number;
+		wallThickness?: number;
+		tolerance?: number;
+		cardSizes?: CardSize[];
+		counterShapes?: CounterShape[];
+		manualLayout?: ManualTrayPlacement[];
+	}
+): TrayPlacement[] {
+	if (trays.length === 0) return [];
+
+	// If manual layout is provided, use it instead of auto-arrangement
+	if (options?.manualLayout && options.manualLayout.length > 0) {
+		const placements: TrayPlacement[] = [];
+		for (const manual of options.manualLayout) {
+			const tray = trays.find((t) => t.id === manual.trayId);
+			if (!tray) continue;
+
+			const dims = getTrayDimensionsForTray(
+				tray,
+				options?.cardSizes ?? [],
+				options?.counterShapes ?? []
+			);
+			// Apply rotation: 90° and 270° swap width/depth
+			const swapDims = manual.rotation === 90 || manual.rotation === 270;
+			const effectiveDims: TrayDimensions = swapDims
+				? { width: dims.depth, depth: dims.width, height: dims.height }
+				: dims;
+
+			placements.push({
+				tray,
+				dimensions: effectiveDims,
+				x: manual.x,
+				y: manual.y,
+				rotated: swapDims // TrayPlacement still uses boolean for compatibility
+			});
+		}
+		// Add any trays not in manual layout at auto positions (new trays)
+		const manualIds = new Set(options.manualLayout.map((m) => m.trayId));
+		const unplacedTrays = trays.filter((t) => !manualIds.has(t.id));
+		if (unplacedTrays.length > 0) {
+			// Auto-arrange remaining trays starting after the manual ones
+			const autoPlacements = arrangeTraysAuto(unplacedTrays, options);
+			// Offset them past the manual layout
+			let maxY = 0;
+			for (const p of placements) {
+				maxY = Math.max(maxY, p.y + p.dimensions.depth);
+			}
+			for (const p of autoPlacements) {
+				placements.push({ ...p, y: p.y + maxY });
+			}
+		}
+		return placements;
+	}
+
+	return arrangeTraysAuto(trays, options);
+}
+
+// Original auto-arrangement algorithm
+function arrangeTraysAuto(
 	trays: Tray[],
 	options?: {
 		customBoxWidth?: number;
@@ -724,7 +788,8 @@ export function createBox(
 		wallThickness: box.wallThickness,
 		tolerance: box.tolerance,
 		cardSizes,
-		counterShapes
+		counterShapes,
+		manualLayout: box.manualLayout
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
@@ -791,7 +856,8 @@ export function calculateMinimumBoxDimensions(
 		wallThickness: box.wallThickness,
 		tolerance: box.tolerance,
 		cardSizes,
-		counterShapes
+		counterShapes,
+		manualLayout: box.manualLayout
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
@@ -883,7 +949,8 @@ export function calculateTraySpacers(
 		wallThickness: box.wallThickness,
 		tolerance: box.tolerance,
 		cardSizes,
-		counterShapes
+		counterShapes,
+		manualLayout: box.manualLayout
 	});
 	const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
 

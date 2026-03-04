@@ -31,7 +31,6 @@
 		getProject,
 		getCumulativeTrayLetter,
 		moveTray,
-		setTrayRotation,
 		getCounterShapes,
 		getCardSizes
 	} from '$lib/stores/project.svelte';
@@ -520,30 +519,7 @@
 					{/snippet}
 				</FormControl>
 
-				<Spacer size="1rem" />
-
-				<!-- Rotation -->
-				<FormControl label="Rotation within box" name="trayRotation">
-					{#snippet input({ inputProps })}
-						<Select
-							{...inputProps}
-							selected={[String(selectedTray.rotationOverride ?? 'auto')]}
-							options={[
-								{ value: 'auto', label: 'Auto (recommended)' },
-								{ value: '0', label: 'No rotation (0°)' },
-								{ value: '90', label: 'Rotated (90°)' }
-							]}
-							onSelectedChange={(selected) => {
-								if (selected[0] && selectedTray) {
-									const val = selected[0];
-									const rotation = val === 'auto' ? 'auto' : (parseInt(val) as 0 | 90);
-									setTrayRotation(selectedTray.id, rotation);
-								}
-							}}
-						/>
-					{/snippet}
-				</FormControl>
-			</div>
+				</div>
 
 			<Hr />
 

@@ -119,7 +119,8 @@ export function createBoxWithLidGrooves(
 		wallThickness: box.wallThickness,
 		tolerance: box.tolerance,
 		cardSizes,
-		counterShapes
+		counterShapes,
+		manualLayout: box.manualLayout
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
@@ -1014,7 +1015,8 @@ export function createLid(
 		wallThickness: box.wallThickness,
 		tolerance: box.tolerance,
 		cardSizes,
-		counterShapes
+		counterShapes,
+		manualLayout: box.manualLayout
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 

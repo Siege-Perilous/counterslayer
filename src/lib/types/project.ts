@@ -108,6 +108,14 @@ export interface LidParams {
 	showName: boolean; // Emboss box name on lid top (default true)
 }
 
+// Manual tray placement for layout editor
+export interface ManualTrayPlacement {
+	trayId: string;
+	x: number; // Position in box interior (mm)
+	y: number;
+	rotation: 0 | 90 | 180 | 270; // Rotation in degrees
+}
+
 export interface Box {
 	id: string;
 	name: string;
@@ -122,6 +130,8 @@ export interface Box {
 	customBoxHeight?: number; // Exterior Z dimension (box only, excludes lid; UI shows total height)
 	// Gap-filling behavior
 	fillSolidEmpty?: boolean; // true = solid fill (default), false = walls only
+	// Manual layout (when set, overrides auto-arrangement)
+	manualLayout?: ManualTrayPlacement[];
 }
 
 export interface Project {
