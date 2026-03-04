@@ -25,14 +25,21 @@
 	import type { CardDrawTrayParams } from '$lib/models/cardTray';
 	import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
 	import type { CupTrayParams } from '$lib/models/cupTray';
+	import { layoutEditorState } from '$lib/stores/layoutEditor.svelte';
 
 	type SelectionType = 'dimensions' | 'box' | 'tray';
 
 	interface Props {
 		selectionType: SelectionType;
+		isLayoutEditMode?: boolean;
+		printBedSize?: number;
 	}
 
-	let { selectionType }: Props = $props();
+	let { selectionType, isLayoutEditMode = false, printBedSize = 256 }: Props = $props();
+
+	// Layout editor dimensions
+	let interiorWidth = $derived(layoutEditorState.boundsWidth);
+	let interiorDepth = $derived(layoutEditorState.boundsDepth);
 
 	let project = $derived(getProject());
 	let selectedBox = $derived(getSelectedBox());
@@ -173,7 +180,31 @@
 		</div>
 		<!-- Content -->
 		<div class="panelContent">
-			{#if selectionType === 'dimensions'}
+			{#if isLayoutEditMode}
+				<div class="layoutEditMessage">
+					<p class="hint">Drag trays to reposition. Save or cancel to continue editing.</p>
+					<div class="dimensionsInfo">
+						<div class="dimensionRow">
+							<span class="dimensionLabel">Print bed</span>
+							<span class="dimensionValue">{printBedSize} × {printBedSize}mm</span>
+						</div>
+						{#if selectedBox}
+							<div class="dimensionRow">
+								<span class="dimensionLabel">Wall + tolerance</span>
+								<span class="dimensionValue"
+									>{selectedBox.wallThickness + selectedBox.tolerance}mm</span
+								>
+							</div>
+						{/if}
+						<div class="dimensionRow highlight">
+							<span class="dimensionLabel">Interior cavity max</span>
+							<span class="dimensionValue"
+								>{interiorWidth.toFixed(0)} × {interiorDepth.toFixed(0)}mm</span
+							>
+						</div>
+					</div>
+				</div>
+			{:else if selectionType === 'dimensions'}
 				{#if globalCounterParams}
 					<GlobalsPanel params={globalCounterParams.params} onchange={handleCounterParamsChange} />
 				{:else}
@@ -262,6 +293,53 @@
 		padding: 2rem 1rem;
 		color: var(--fgMuted);
 		font-size: 0.875rem;
+	}
+
+	.layoutEditMessage {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		padding: 1rem;
+	}
+
+	.layoutEditMessage .hint {
+		font-size: 0.75rem;
+		color: var(--fgMuted);
+	}
+
+	.dimensionsInfo {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding-top: 0.75rem;
+		background: var(--contrastLowest);
+		border-radius: var(--radius-2);
+	}
+
+	.dimensionRow {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		font-size: 0.75rem;
+	}
+
+	.dimensionRow.highlight {
+		padding-top: 0.5rem;
+		margin-top: 0.25rem;
+		border-top: var(--borderThin);
+	}
+
+	.dimensionLabel {
+		color: var(--fgMuted);
+	}
+
+	.dimensionValue {
+		font-family: var(--font-mono);
+		color: var(--fg);
+	}
+
+	.dimensionRow.highlight .dimensionValue {
+		font-weight: 600;
 	}
 
 	.headerStats {

@@ -7,11 +7,7 @@
 		IconDeviceFloppy,
 		IconGridDots
 	} from '@tabler/icons-svelte';
-	import {
-		layoutEditorState,
-		rotateTray,
-		getSelectedPlacement
-	} from '$lib/stores/layoutEditor.svelte';
+	import { layoutEditorState, getSelectedPlacement } from '$lib/stores/layoutEditor.svelte';
 
 	interface Props {
 		onEnterEdit: () => void;
@@ -19,56 +15,48 @@
 		onCancel: () => void;
 		onResetAuto: () => void;
 		onRotate: () => void;
+		canEdit?: boolean; // If false, hide the Edit Layout button (e.g., only one tray)
 	}
 
-	let { onEnterEdit, onSave, onCancel, onResetAuto, onRotate }: Props = $props();
+	let { onEnterEdit, onSave, onCancel, onResetAuto, onRotate, canEdit = true }: Props = $props();
 
 	// Use $derived.by() to properly track reactive reads from store
 	let isEditMode = $derived.by(() => layoutEditorState.isEditMode);
-	let selectedTrayId = $derived.by(() => layoutEditorState.selectedTrayId);
 	let selectedPlacement = $derived.by(() => getSelectedPlacement());
-
-	// Debug: log when selectedTrayId changes
-	$effect(() => {
-		console.log('[LayoutEditorOverlay] selectedTrayId:', selectedTrayId, 'isEditMode:', isEditMode);
-	});
 </script>
 
 {#if !isEditMode}
-	<!-- Enter edit mode button (inline) -->
-	<Button variant="special" onclick={onEnterEdit}>
-		<Icon Icon={IconGridDots} />
-		Edit Layout
-	</Button>
+	<!-- Enter edit mode button (inline) - only show if more than one tray -->
+	{#if canEdit}
+		<Button onclick={onEnterEdit}>
+			{#snippet start()}
+				<Icon Icon={IconGridDots} />
+			{/snippet}
+			Edit layout
+		</Button>
+	{/if}
 {:else}
 	<!-- Edit mode toolbar (inline) -->
 	<div class="editToolbar">
 		<div class="toolbarSection">
-			<!-- TODO: isDisabled prop breaks onclick - possibly a Svelte 5 reactivity issue
-				 with the Button component. When isDisabled={someReactiveValue} is set,
-				 the onclick handler stops firing entirely, even when the value is false.
-				 Tried $derived, $derived.by(), reading directly from store - none worked.
-				 Need to investigate the Button component's implementation. -->
-			<Button
-				variant="ghost"
-				onclick={onRotate}
-				title="Rotate 90°"
-			>
-				<Icon Icon={IconRotate} />
-				Rotate 90°
-			</Button>
 			<Button variant="ghost" onclick={onResetAuto} title="Reset to automatic layout">
-				<Icon Icon={IconRefresh} />
-				Reset Auto
+				{#snippet start()}
+					<Icon Icon={IconRefresh} />
+				{/snippet}
+				Automatic Layout
 			</Button>
 		</div>
 		<div class="toolbarSection">
 			<Button variant="ghost" onclick={onCancel} title="Cancel changes">
-				<Icon Icon={IconX} />
+				{#snippet start()}
+					<Icon Icon={IconX} />
+				{/snippet}
 				Cancel
 			</Button>
-			<Button variant="primary" onclick={onSave} title="Save layout">
-				<Icon Icon={IconDeviceFloppy} />
+			<Button variant="special" onclick={onSave} title="Save layout">
+				{#snippet start()}
+					<Icon Icon={IconDeviceFloppy} />
+				{/snippet}
 				Save
 			</Button>
 		</div>
@@ -83,6 +71,12 @@
 					: `${selectedPlacement.originalWidth.toFixed(0)} × ${selectedPlacement.originalDepth.toFixed(0)}`}mm
 			</span>
 			<span class="selectionRotation">{selectedPlacement.rotation}°</span>
+			<Button size="sm" class="rotateButton" variant="link" onclick={onRotate} title="Rotate 90°">
+				{#snippet start()}
+					<Icon Icon={IconRotate} />
+				{/snippet}
+				Rotate
+			</Button>
 		</div>
 	{/if}
 {/if}
@@ -113,12 +107,12 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.375rem 0.75rem;
+		padding: 0.375rem 0.5rem 0.375rem 0.375rem;
 		background: var(--contrastLowest);
 		border-radius: var(--radius-2);
-		font-size: 0.75rem;
+		font-size: 0.875rem;
 		color: var(--fgMuted);
-		pointer-events: none;
+		text-wrap: nowrap;
 	}
 
 	.selectionName {

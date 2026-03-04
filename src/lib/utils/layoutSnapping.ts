@@ -25,7 +25,8 @@ export function snapPosition(
 	newX: number,
 	newY: number,
 	allPlacements: EditorTrayPlacement[],
-	printBedSize: number
+	boundsWidth: number,
+	boundsDepth: number = boundsWidth // Default to square if only one value provided
 ): SnapResult {
 	const guides: SnapGuide[] = [];
 	const movingDims = getEffectiveDimensions(movingTray);
@@ -151,7 +152,7 @@ export function snapPosition(
 					type: 'horizontal',
 					position: otherBack,
 					start: Math.min(movingLeft, otherLeft),
-					end: Math.max(movingRight, otherRight)
+					end: Math.max(movingBack, otherBack)
 				});
 			}
 		}
@@ -165,16 +166,20 @@ export function snapPosition(
 		snappedY = Math.round(snappedY / GRID_SIZE) * GRID_SIZE;
 	}
 
-	// Constrain to print bed bounds
-	snappedX = Math.max(0, Math.min(snappedX, printBedSize - movingDims.width));
-	snappedY = Math.max(0, Math.min(snappedY, printBedSize - movingDims.depth));
+	// Constrain to interior bounds (box interior, accounting for walls)
+	snappedX = Math.max(0, Math.min(snappedX, boundsWidth - movingDims.width));
+	snappedY = Math.max(0, Math.min(snappedY, boundsDepth - movingDims.depth));
 
 	return { x: snappedX, y: snappedY, guides };
 }
 
 /**
  * Check if two placements overlap (AABB collision)
+ * Uses a small epsilon to handle floating point precision issues from snapping
+ * and minor placement discrepancies that don't matter for physical prints
  */
+const OVERLAP_EPSILON = 0.01; // 0.01mm tolerance for floating point precision
+
 export function checkOverlap(
 	placement1: EditorTrayPlacement,
 	placement2: EditorTrayPlacement
@@ -193,8 +198,9 @@ export function checkOverlap(
 	const back2 = placement2.y + dims2.depth;
 
 	// Check for non-overlap (if any is true, no overlap)
-	if (right1 <= left2 || right2 <= left1) return false;
-	if (back1 <= front2 || back2 <= front1) return false;
+	// Use epsilon to allow touching/snapped edges
+	if (right1 <= left2 + OVERLAP_EPSILON || right2 <= left1 + OVERLAP_EPSILON) return false;
+	if (back1 <= front2 + OVERLAP_EPSILON || back2 <= front1 + OVERLAP_EPSILON) return false;
 
 	return true;
 }
@@ -214,18 +220,37 @@ export function hasAnyOverlap(
 }
 
 /**
- * Check if a placement is within print bed bounds
+ * Check if any placements in the array overlap with each other
+ * Returns array of overlapping tray ID pairs
+ */
+export function findAllOverlaps(
+	placements: EditorTrayPlacement[]
+): Array<[string, string]> {
+	const overlaps: Array<[string, string]> = [];
+	for (let i = 0; i < placements.length; i++) {
+		for (let j = i + 1; j < placements.length; j++) {
+			if (checkOverlap(placements[i], placements[j])) {
+				overlaps.push([placements[i].trayId, placements[j].trayId]);
+			}
+		}
+	}
+	return overlaps;
+}
+
+/**
+ * Check if a placement is within interior bounds
  */
 export function isWithinBounds(
 	placement: EditorTrayPlacement,
-	printBedSize: number
+	boundsWidth: number,
+	boundsDepth: number = boundsWidth
 ): boolean {
 	const dims = getEffectiveDimensions(placement);
 	return (
 		placement.x >= 0 &&
 		placement.y >= 0 &&
-		placement.x + dims.width <= printBedSize &&
-		placement.y + dims.depth <= printBedSize
+		placement.x + dims.width <= boundsWidth &&
+		placement.y + dims.depth <= boundsDepth
 	);
 }
 
@@ -237,7 +262,8 @@ export function isValidPosition(
 	newX: number,
 	newY: number,
 	allPlacements: EditorTrayPlacement[],
-	printBedSize: number
+	boundsWidth: number,
+	boundsDepth: number = boundsWidth
 ): boolean {
 	// Create a temporary placement with the new position
 	const testPlacement: EditorTrayPlacement = {
@@ -247,7 +273,7 @@ export function isValidPosition(
 	};
 
 	// Check bounds
-	if (!isWithinBounds(testPlacement, printBedSize)) {
+	if (!isWithinBounds(testPlacement, boundsWidth, boundsDepth)) {
 		return false;
 	}
 

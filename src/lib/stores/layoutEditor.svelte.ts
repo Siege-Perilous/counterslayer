@@ -37,7 +37,9 @@ let isEditMode = $state(false);
 let selectedTrayId = $state<string | null>(null);
 let workingPlacements = $state<EditorTrayPlacement[]>([]);
 let originalPlacements = $state<EditorTrayPlacement[]>([]); // For cancel/restore
-let printBedSize = $state(256);
+let printBedSize = $state(256); // Legacy - use boundsWidth/boundsDepth instead
+let boundsWidth = $state(256); // Interior width (box width minus walls)
+let boundsDepth = $state(256); // Interior depth (box depth minus walls)
 
 // Snap guides for visual feedback
 export interface SnapGuide {
@@ -77,6 +79,8 @@ export const layoutEditorState = {
 	get workingPlacements() { return workingPlacements; },
 	get activeSnapGuides() { return activeSnapGuides; },
 	get printBedSize() { return printBedSize; },
+	get boundsWidth() { return boundsWidth; },
+	get boundsDepth() { return boundsDepth; },
 	get dragState() { return dragState; }
 };
 
@@ -101,10 +105,19 @@ export function getPrintBedSize(): number {
 	return printBedSize;
 }
 
+export function getBoundsWidth(): number {
+	return boundsWidth;
+}
+
+export function getBoundsDepth(): number {
+	return boundsDepth;
+}
+
 // Actions
 export function enterEditMode(
 	placements: TrayPlacement[],
-	bedSize: number = 256
+	interiorWidth: number = 256,
+	interiorDepth: number = 256
 ): void {
 	// Convert TrayPlacement to EditorTrayPlacement
 	workingPlacements = placements.map((p) => ({
@@ -120,7 +133,10 @@ export function enterEditMode(
 	}));
 	// Deep copy for restore on cancel
 	originalPlacements = JSON.parse(JSON.stringify(workingPlacements));
-	printBedSize = bedSize;
+	// Set bounds for layout constraints (interior of box, not print bed)
+	boundsWidth = interiorWidth;
+	boundsDepth = interiorDepth;
+	printBedSize = Math.max(interiorWidth, interiorDepth); // Legacy compatibility
 	selectedTrayId = null;
 	activeSnapGuides = [];
 	isEditMode = true;

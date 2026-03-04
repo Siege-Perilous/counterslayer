@@ -72,6 +72,7 @@
 		rotateTray,
 		getSelectedTrayId
 	} from '$lib/stores/layoutEditor.svelte';
+	import { findAllOverlaps } from '$lib/utils/layoutSnapping';
 
 	type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid';
 	type SelectionType = 'dimensions' | 'box' | 'tray';
@@ -917,13 +918,41 @@
 			manualLayout: box.manualLayout
 		});
 
-		// Enter edit mode with current placements
-		enterEditMode(placements, printBedSize);
+		// Calculate interior size (usable area = box dimensions minus walls)
+		// The layout editor bounds should be the maximum usable interior (print bed minus walls)
+		// Always use print bed size, not current box size, so user can expand layout
+		const wallOffset = (box.wallThickness + box.tolerance) * 2;
+		const interiorWidth = printBedSize - wallOffset;
+		const interiorDepth = printBedSize - wallOffset;
+
+		// Enter edit mode with current placements and interior bounds
+		enterEditMode(placements, interiorWidth, interiorDepth);
 	}
 
 	function handleSaveLayout() {
 		const box = getSelectedBox();
 		if (!box) return;
+
+		// Check for overlaps before saving
+		const workingPlacements = layoutEditorState.workingPlacements;
+		const overlaps = findAllOverlaps(workingPlacements);
+
+		if (overlaps.length > 0) {
+			// Find the names of overlapping trays for the error message
+			const overlapNames = overlaps.map(([id1, id2]) => {
+				const tray1 = workingPlacements.find(p => p.trayId === id1);
+				const tray2 = workingPlacements.find(p => p.trayId === id2);
+				return `${tray1?.name ?? 'Unknown'} and ${tray2?.name ?? 'Unknown'}`;
+			});
+			addToast({
+				data: {
+					title: 'Cannot save layout',
+					body: `Trays are overlapping: ${overlapNames.join(', ')}`,
+					type: 'danger'
+				}
+			});
+			return;
+		}
 
 		const manualPlacements = getManualPlacements();
 		const bounds = calculateBoundingBox();
@@ -1082,6 +1111,7 @@
 							onCancel={handleCancelLayout}
 							onResetAuto={handleResetAutoLayout}
 							onRotate={handleRotateLayout}
+							canEdit={(selectedBox?.trays.length ?? 0) > 1}
 						/>
 					</div>
 				{/if}
@@ -1217,7 +1247,7 @@
 		<!-- Mobile Editor Pane (bottom) -->
 		<Pane defaultSize={0} minSize={0} maxSize={60} bind:this={mobileEditorPane}>
 			<div class="mobilePanelContent">
-				<EditorPanel {selectionType} />
+				<EditorPanel {selectionType} {isLayoutEditMode} {printBedSize} />
 			</div>
 		</Pane>
 	</PaneGroup>
@@ -1284,6 +1314,7 @@
 							onCancel={handleCancelLayout}
 							onResetAuto={handleResetAutoLayout}
 							onRotate={handleRotateLayout}
+							canEdit={(selectedBox?.trays.length ?? 0) > 1}
 						/>
 					</div>
 				{/if}
@@ -1379,30 +1410,32 @@
 							</div>
 						{/snippet}
 					</Popover>
-					<div class="toolbarRight">
-						<InputCheckbox
-							checked={showCounters}
-							onchange={(e) => (showCounters = e.currentTarget.checked)}
-							label="Preview counters"
-						/>
-						<InputCheckbox
-							checked={showReferenceLabels}
-							onchange={(e) => (showReferenceLabels = e.currentTarget.checked)}
-							label="Preview labels"
-						/>
-						<span
-							class="regenerateButton {isDirty && !generating ? 'regenerateButton--dirty' : ''}"
-						>
-							<Button
-								variant="primary"
-								onclick={() => regenerate(true)}
-								isDisabled={generating}
-								isLoading={generating}
+					{#if !isLayoutEditMode}
+						<div class="toolbarRight">
+							<InputCheckbox
+								checked={showCounters}
+								onchange={(e) => (showCounters = e.currentTarget.checked)}
+								label="Preview counters"
+							/>
+							<InputCheckbox
+								checked={showReferenceLabels}
+								onchange={(e) => (showReferenceLabels = e.currentTarget.checked)}
+								label="Preview labels"
+							/>
+							<span
+								class="regenerateButton {isDirty && !generating ? 'regenerateButton--dirty' : ''}"
 							>
-								Regenerate
-							</Button>
-						</span>
-					</div>
+								<Button
+									variant="primary"
+									onclick={() => regenerate(true)}
+									isDisabled={generating}
+									isLoading={generating}
+								>
+									Regenerate
+								</Button>
+							</span>
+						</div>
+					{/if}
 				</div>
 
 				{#if error}
@@ -1434,7 +1467,7 @@
 			onCollapse={() => (isEditorCollapsed = true)}
 			onExpand={() => (isEditorCollapsed = false)}
 		>
-			<EditorPanel {selectionType} />
+			<EditorPanel {selectionType} {isLayoutEditMode} {printBedSize} />
 		</Pane>
 	</PaneGroup>
 {/if}

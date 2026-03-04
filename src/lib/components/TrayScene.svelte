@@ -212,7 +212,9 @@
 
 			const placement = workingPlacements.find((p) => p.trayId === trayId);
 			if (placement) {
-				const snapResult = snapPosition(placement, newX, newY, workingPlacements, printBedSize);
+				const boundsW = layoutEditorState.boundsWidth;
+				const boundsD = layoutEditorState.boundsDepth;
+				const snapResult = snapPosition(placement, newX, newY, workingPlacements, boundsW, boundsD);
 				updateTrayPosition(trayId, snapResult.x, snapResult.y);
 				setSnapGuides(snapResult.guides);
 			}
@@ -646,11 +648,15 @@
 		};
 	});
 
-	// Edit mode center - uses current meshOffset (trays render here, camera looks here)
+	// Edit mode bounds from layout editor (interior size, accounting for walls)
+	let editBoundsWidth = $derived(layoutEditorState.boundsWidth);
+	let editBoundsDepth = $derived(layoutEditorState.boundsDepth);
+
+	// Edit mode center - uses interior bounds, not print bed size
 	let editModeCenter = $derived.by(() => {
 		return {
-			x: meshOffset.x + interiorStartOffset + printBedSize / 2,
-			z: meshOffset.z - interiorStartOffset - printBedSize / 2
+			x: meshOffset.x + interiorStartOffset + editBoundsWidth / 2,
+			z: meshOffset.z - interiorStartOffset - editBoundsDepth / 2
 		};
 	});
 
@@ -902,7 +908,7 @@
 			selectTray(null);
 		}}
 	>
-		<T.PlaneGeometry args={[printBedSize, printBedSize]} />
+		<T.PlaneGeometry args={[editBoundsWidth, editBoundsDepth]} />
 		<T.MeshBasicMaterial visible={false} />
 	</T.Mesh>
 {/if}
@@ -2015,8 +2021,9 @@
 	{/if}
 
 	<!-- PrintBed position differs in edit mode (corner at origin) vs normal mode (centered) -->
+	<!-- In edit mode, show interior bounds (accounting for walls) -->
 	<PrintBed
-		size={printBedSize}
+		size={visualEditMode ? Math.max(editBoundsWidth, editBoundsDepth) : printBedSize}
 		title={visualEditMode ? '' : viewTitle}
 		position={visualEditMode ? [editModeCenter.x, 0, editModeCenter.z] : [0, 0, 0]}
 	/>
