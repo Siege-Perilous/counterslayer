@@ -972,16 +972,24 @@
 
 	// Cancel edit mode when selection changes (user navigates away)
 	let lastSelectedBoxId = $state<string | null>(null);
+	let lastSelectionType = $state<SelectionType>('dimensions');
 	$effect(() => {
 		const currentBoxId = selectedBox?.id ?? null;
-		if (lastSelectedBoxId !== null && currentBoxId !== lastSelectedBoxId) {
-			// Box selection changed while in edit mode - cancel
-			if (getIsEditMode()) {
+		const currentSelectionType = selectionType;
+
+		// Cancel edit mode if box changes or selection type changes away from 'box'
+		if (getIsEditMode()) {
+			const boxChanged = lastSelectedBoxId !== null && currentBoxId !== lastSelectedBoxId;
+			const leftBoxView = lastSelectionType === 'box' && currentSelectionType !== 'box';
+
+			if (boxChanged || leftBoxView) {
 				cancelChanges();
 				exitEditMode();
 			}
 		}
+
 		lastSelectedBoxId = currentBoxId;
+		lastSelectionType = currentSelectionType;
 	});
 
 	// Cleanup worker on component destroy

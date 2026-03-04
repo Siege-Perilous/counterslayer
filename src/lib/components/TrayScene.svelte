@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { T, useThrelte, useTask } from '@threlte/core';
 	import { OrbitControls, Grid, Text, interactivity, type IntersectionEvent } from '@threlte/extras';
 	import PrintBed from './PrintBed.svelte';
@@ -133,11 +134,48 @@
 	} | null>(null);
 	let actualDrag = $state(false);
 
-	// Camera animation for edit mode
+	// Fade transition for edit mode (instead of camera animation)
+	// Phases: 'normal' -> 'fading-to-edit' -> 'edit' -> 'fading-to-normal' -> 'normal'
+	type TransitionPhase = 'normal' | 'fading-to-edit' | 'edit' | 'fading-to-normal';
+	let transitionPhase = $state<TransitionPhase>('normal');
+	let normalSceneOpacity = $state(1);
+	let editSceneOpacity = $state(0);
+	let fadeProgress = $state(0);
+	const FADE_DURATION = 0.3; // seconds
+
+	// Saved camera state for returning from edit mode
 	let savedCameraPosition = $state<THREE.Vector3 | null>(null);
 	let savedCameraTarget = $state<THREE.Vector3 | null>(null);
-	let cameraAnimating = $state(false);
-	let cameraAnimationProgress = $state(0);
+
+	// Which scene is currently visible (for conditional rendering during transitions)
+	let showNormalScene = $derived(transitionPhase === 'normal' || transitionPhase === 'fading-to-edit');
+	let showEditScene = $derived(transitionPhase === 'edit' || transitionPhase === 'fading-to-normal' || transitionPhase === 'fading-to-edit');
+
+	// Visual edit mode - only true after fade-out completes (used for Grid/PrintBed positioning)
+	// This prevents visual jumps during the fade transition
+	let visualEditMode = $derived(transitionPhase === 'edit' || transitionPhase === 'fading-to-normal');
+
+	// Hide all 3D content during fade-out/fade-in phases
+	// Only show content when fully transitioned (no overlay visible)
+	let showSceneContent = $derived(
+		(transitionPhase === 'normal' && normalSceneOpacity >= 1) ||
+		(transitionPhase === 'edit' && editSceneOpacity >= 1)
+	);
+
+	// Fade overlay opacity for transition effect
+	// Key insight: overlay must appear IMMEDIATELY when isLayoutEditMode changes,
+	// before the effect runs, to hide any scene jumps
+	let fadeOverlayOpacity = $derived.by(() => {
+		// If mode is changing but visual hasn't caught up, show overlay immediately
+		// This runs synchronously with the prop change, before effects
+		if (isLayoutEditMode !== visualEditMode) return 1;
+
+		// During fade-in phases (after camera jump), fade out the overlay
+		if (transitionPhase === 'edit' && editSceneOpacity < 1) return 1 - editSceneOpacity;
+		if (transitionPhase === 'normal' && normalSceneOpacity < 1) return 1 - normalSceneOpacity;
+		return 0;
+	});
+
 
 	// Get layout editor state - use $derived.by() to properly track reactive reads from store
 	let workingPlacements = $derived.by(() => layoutEditorState.workingPlacements);
@@ -198,66 +236,106 @@
 		selectTray(null);
 	}
 
-	// Animate camera when entering/exiting edit mode
-	$effect(() => {
-		if (!camera.current) return;
-		const cam = camera.current as THREE.PerspectiveCamera;
+	// Track previous edit mode state to detect transitions
+	let wasInEditMode = $state(false);
 
-		if (isLayoutEditMode && !savedCameraPosition) {
-			// Entering edit mode - save current camera and animate to top-down
-			savedCameraPosition = cam.position.clone();
-			savedCameraTarget = new THREE.Vector3(cameraTarget.x, cameraTarget.y, cameraTarget.z);
-			cameraAnimating = true;
-			cameraAnimationProgress = 0;
-		} else if (!isLayoutEditMode && savedCameraPosition) {
-			// Exiting edit mode - animate back to saved position
-			cameraAnimating = true;
-			cameraAnimationProgress = 0;
+	// Start fade transition when edit mode changes
+	$effect(() => {
+		const currentEditMode = isLayoutEditMode;
+
+		untrack(() => {
+			if (!camera.current) return;
+			const cam = camera.current as THREE.PerspectiveCamera;
+
+			if (currentEditMode && !wasInEditMode) {
+				// Entering edit mode - start fading out normal scene
+				console.log('[Transition] Starting fade to edit mode');
+				savedCameraPosition = cam.position.clone();
+				savedCameraTarget = new THREE.Vector3(cameraTarget.x, cameraTarget.y, cameraTarget.z);
+				transitionPhase = 'fading-to-edit';
+				fadeProgress = 0;
+			} else if (!currentEditMode && wasInEditMode) {
+				// Exiting edit mode - start fading out edit scene
+				console.log('[Transition] Starting fade to normal mode');
+				transitionPhase = 'fading-to-normal';
+				fadeProgress = 0;
+			}
+
+			wasInEditMode = currentEditMode;
+		});
+	});
+
+	// Fade transition animation task
+	useTask((delta) => {
+		if (transitionPhase === 'normal' || transitionPhase === 'edit') return;
+		if (!camera.current) return;
+
+		const cam = camera.current as THREE.PerspectiveCamera;
+		fadeProgress += delta / FADE_DURATION;
+		const t = Math.min(fadeProgress, 1);
+		// Ease out for smoother fade
+		const easeT = 1 - Math.pow(1 - t, 2);
+
+		if (transitionPhase === 'fading-to-edit') {
+			// First half: fade out normal scene
+			if (fadeProgress < 1) {
+				normalSceneOpacity = 1 - easeT;
+				editSceneOpacity = 0;
+			} else {
+				// Halfway point: jump camera to edit mode position, start fading in edit scene
+				normalSceneOpacity = 0;
+
+				const editModeHeight = Math.max(printBedSize * 1.5, 400);
+				cam.position.set(editModeCenter.x, editModeHeight, editModeCenter.z + 0.01);
+				cam.lookAt(editModeCenter.x, 0, editModeCenter.z);
+				console.log('[Transition] Camera jumped to edit position:', editModeCenter);
+
+				// Start fade in
+				fadeProgress = 0;
+				editSceneOpacity = 0;
+				transitionPhase = 'edit';
+				// We'll fade in the edit scene in the next block
+			}
+		} else if (transitionPhase === 'fading-to-normal') {
+			// First half: fade out edit scene
+			if (fadeProgress < 1) {
+				editSceneOpacity = 1 - easeT;
+				normalSceneOpacity = 0;
+			} else {
+				// Halfway point: jump camera back to saved position, start fading in normal scene
+				editSceneOpacity = 0;
+
+				if (savedCameraPosition && savedCameraTarget) {
+					cam.position.copy(savedCameraPosition);
+					cam.lookAt(savedCameraTarget);
+					console.log('[Transition] Camera jumped back to saved position');
+				}
+
+				// Clear saved state
+				savedCameraPosition = null;
+				savedCameraTarget = null;
+
+				// Start fade in
+				fadeProgress = 0;
+				normalSceneOpacity = 0;
+				transitionPhase = 'normal';
+			}
 		}
 	});
 
-	// Camera animation task
+	// Fade in after camera jump (separate task to handle the fade-in phase)
 	useTask((delta) => {
-		if (!cameraAnimating || !camera.current) return;
-		const cam = camera.current as THREE.PerspectiveCamera;
-
-		cameraAnimationProgress += delta * 2; // Animation speed
-		const t = Math.min(cameraAnimationProgress, 1);
-		const easeT = 1 - Math.pow(1 - t, 3); // Ease out cubic
-
-		// Edit mode: camera directly above center of print bed, looking straight down
-		const editModeTargetX = printBedSize / 2;
-		const editModeTargetZ = -printBedSize / 2;
-		const editModeHeight = Math.max(printBedSize * 1.5, 400);
-
-		if (isLayoutEditMode) {
-			// Animating to top-down view - camera directly above target
-			const topDownPos = new THREE.Vector3(
-				editModeTargetX,
-				editModeHeight,
-				editModeTargetZ + 0.01 // Tiny offset to avoid gimbal lock
-			);
-			if (savedCameraPosition) {
-				cam.position.lerpVectors(savedCameraPosition, topDownPos, easeT);
-				cam.lookAt(editModeTargetX, 0, editModeTargetZ);
-			}
-		} else if (savedCameraPosition && savedCameraTarget) {
-			// Animating back to saved position
-			const topDownPos = new THREE.Vector3(
-				editModeTargetX,
-				editModeHeight,
-				editModeTargetZ + 0.01
-			);
-			cam.position.lerpVectors(topDownPos, savedCameraPosition, easeT);
-			cam.lookAt(savedCameraTarget.x, savedCameraTarget.y, savedCameraTarget.z);
-		}
-
-		if (t >= 1) {
-			cameraAnimating = false;
-			if (!isLayoutEditMode) {
-				savedCameraPosition = null;
-				savedCameraTarget = null;
-			}
+		// Handle fade-in after transition completes
+		if (transitionPhase === 'edit' && editSceneOpacity < 1) {
+			fadeProgress += delta / FADE_DURATION;
+			const t = Math.min(fadeProgress, 1);
+			const easeT = 1 - Math.pow(1 - t, 2);
+			editSceneOpacity = easeT;
+		} else if (transitionPhase === 'normal' && normalSceneOpacity < 1) {
+			fadeProgress += delta / FADE_DURATION;
+			const t = Math.min(fadeProgress, 1);
+			const easeT = 1 - Math.pow(1 - t, 2);
+			normalSceneOpacity = easeT;
 		}
 	});
 
@@ -568,6 +646,20 @@
 		};
 	});
 
+	// Edit mode center - uses current meshOffset (trays render here, camera looks here)
+	let editModeCenter = $derived.by(() => {
+		return {
+			x: meshOffset.x + interiorStartOffset + printBedSize / 2,
+			z: meshOffset.z - interiorStartOffset - printBedSize / 2
+		};
+	});
+
+	// Log edit mode center changes
+	$effect(() => {
+		console.log('[EditModeCenter] meshOffset:', meshOffset);
+		console.log('[EditModeCenter] computed center:', editModeCenter);
+	});
+
 	// Camera target
 	let cameraTarget = $derived.by(() => {
 		// For multi-box view, center on the print beds
@@ -749,13 +841,30 @@
 	position={[cameraDistance * 0.7, cameraDistance * 0.5, cameraDistance * 0.7]}
 	fov={50}
 >
+	{@const isTransitioning = transitionPhase === 'fading-to-edit' || transitionPhase === 'fading-to-normal' ||
+		(transitionPhase === 'edit' && editSceneOpacity < 1) ||
+		(transitionPhase === 'normal' && normalSceneOpacity < 1)}
 	<OrbitControls
-		target={isLayoutEditMode ? [printBedSize / 2, 0, -printBedSize / 2] : [cameraTarget.x, cameraTarget.y, cameraTarget.z]}
-		enableDamping
-		enableRotate={!isLayoutEditMode}
-		enablePan={!isLayoutEditMode}
-		enableZoom={true}
+		target={visualEditMode ? [editModeCenter.x, 0, editModeCenter.z] : [cameraTarget.x, cameraTarget.y, cameraTarget.z]}
+		enableDamping={!isTransitioning}
+		enabled={!isTransitioning}
+		enableRotate={!visualEditMode && !isTransitioning}
+		enablePan={!visualEditMode && !isTransitioning}
+		enableZoom={!isTransitioning}
 	/>
+	<!-- Fade overlay - positioned in front of camera, fades to black during transitions -->
+	{#if fadeOverlayOpacity > 0}
+		<T.Mesh position.z={-1} renderOrder={999}>
+			<T.PlaneGeometry args={[10, 10]} />
+			<T.MeshBasicMaterial
+				color="#1a1a1a"
+				transparent
+				opacity={fadeOverlayOpacity}
+				depthTest={false}
+				depthWrite={false}
+			/>
+		</T.Mesh>
+	{/if}
 </T.PerspectiveCamera>
 
 <T.DirectionalLight position={[50, 100, 50]} intensity={1.5} />
@@ -765,6 +874,7 @@
 	intensity={0.3}
 /><!-- Subtle backlight for rim definition -->
 <T.AmbientLight intensity={0.4} />
+
 
 <!-- Background grid for multi-box view (subtle, at world origin for alignment) -->
 {#if showAllBoxes && !hidePrintBed}
@@ -781,33 +891,19 @@
 	/>
 {/if}
 
-<!-- Grid for layout edit mode -->
-{#if isLayoutEditMode}
-	<Grid
-		position.x={printBedSize / 2}
-		position.y={0.01}
-		position.z={-printBedSize / 2}
-		cellColor="#333333"
-		sectionColor="#4a6a8a"
-		sectionThickness={1}
-		cellSize={10}
-		sectionSize={50}
-		gridSize={[printBedSize, printBedSize]}
-		fadeDistance={500}
-		fadeStrength={1}
-	/>
-	<!-- Print bed boundary (also handles background clicks to deselect) -->
+<!-- Invisible interaction plane for deselecting in edit mode -->
+{#if visualEditMode}
 	<T.Mesh
 		rotation.x={-Math.PI / 2}
-		position.x={printBedSize / 2}
-		position.y={-0.5}
-		position.z={-printBedSize / 2}
+		position.x={editModeCenter.x}
+		position.y={-0.6}
+		position.z={editModeCenter.z}
 		onpointerdown={() => {
 			selectTray(null);
 		}}
 	>
 		<T.PlaneGeometry args={[printBedSize, printBedSize]} />
-		<T.MeshStandardMaterial color="#1a1a1a" />
+		<T.MeshBasicMaterial visible={false} />
 	</T.Mesh>
 {/if}
 
@@ -1153,8 +1249,8 @@
 	{/each}
 {/if}
 
-<!-- Box geometry (single box view) -->
-{#if boxGeometry && !showAllBoxes}
+<!-- Box geometry (single box view) - hidden during edit mode -->
+{#if boxGeometry && !showAllBoxes && !visualEditMode}
 	{@const boxWidth = boxBounds ? boxBounds.max.x - boxBounds.min.x : 0}
 	<T.Mesh
 		geometry={boxGeometry}
@@ -1173,17 +1269,18 @@
 {/if}
 
 <!-- Layout Edit Mode: Render trays from working placements with selection -->
-{#if isLayoutEditMode && workingPlacements.length > 0}
+{#if visualEditMode && workingPlacements.length > 0}
 	{#each workingPlacements as placement, i (placement.trayId)}
 		{@const dims = getEffectiveDimensions(placement)}
 		{@const trayData = allTrays.find((t) => t.trayId === placement.trayId)}
 		{@const isSelected = placement.trayId === layoutSelectedTrayId}
 		{@const isHovered = placement.trayId === editModeHoveredTrayId}
 		{@const isRotated = placement.rotation === 90 || placement.rotation === 270}
-		<!-- Position: x and y are corner positions, convert to Three.js coords -->
-		{@const groupX = placement.x + (isRotated ? dims.width : 0)}
+		<!-- Position: use current meshOffset - camera animates to match this position -->
+		{@const groupX = meshOffset.x + interiorStartOffset + placement.x + (isRotated ? dims.width : 0)}
 		{@const groupY = 0}
-		{@const groupZ = -placement.y}
+		{@const groupZ = meshOffset.z - interiorStartOffset - placement.y}
+		{@const _log = console.log(`[EditMode Tray ${i}] placement(${placement.x.toFixed(1)}, ${placement.y.toFixed(1)}) -> world(${groupX.toFixed(1)}, ${groupZ.toFixed(1)})`)}
 		{#if trayData}
 			<!-- Get actual geometry dimensions (un-rotate if bin-packing rotated it) -->
 			{@const binPackRotated = trayData.placement.rotated}
@@ -1203,7 +1300,7 @@
 					rotation.x={-Math.PI / 2}
 				>
 					<T.MeshStandardMaterial
-						color={isSelected ? '#4a9eff' : getTrayColor(placement.trayId, i)}
+						color={isSelected ? '#ffffff' : getTrayColor(placement.trayId, i)}
 						roughness={0.6}
 						metalness={0.1}
 						side={THREE.DoubleSide}
@@ -1241,14 +1338,16 @@
 				</T.Mesh>
 				<!-- Selection wireframe - uses actual geometry dimensions -->
 				{#if isSelected}
+					{@const edgesGeom = new THREE.EdgesGeometry(new THREE.BoxGeometry(geomWidth, geomDepth, geomHeight))}
 					<T.LineSegments
 						rotation.x={-Math.PI / 2}
 						position.x={geomWidth / 2}
 						position.y={geomHeight / 2}
 						position.z={-geomDepth / 2}
+						geometry={edgesGeom}
+						oncreate={(ref) => { ref.computeLineDistances(); }}
 					>
-						<T.EdgesGeometry args={[new THREE.BoxGeometry(geomWidth, geomDepth, geomHeight)]} />
-						<T.LineBasicMaterial color="#ffffff" />
+						<T.LineDashedMaterial color="#ffffff" dashSize={3} gapSize={2} />
 					</T.LineSegments>
 				{/if}
 			</T.Group>
@@ -1259,9 +1358,9 @@
 	<!-- This catches pointermove and pointerup when the pointer leaves the tray meshes -->
 	<T.Mesh
 		rotation.x={-Math.PI / 2}
-		position.x={printBedSize / 2}
+		position.x={editModeCenter.x}
 		position.y={-0.1}
-		position.z={-printBedSize / 2}
+		position.z={editModeCenter.z}
 		onpointerdown={handlePlanePointerDown}
 		onpointermove={handlePlanePointerMove}
 		onpointerup={handlePlanePointerUp}
@@ -1270,21 +1369,23 @@
 		<T.MeshBasicMaterial visible={false} />
 	</T.Mesh>
 
-	<!-- Snap guides -->
+	<!-- Snap guides - use meshOffset to match tray positions -->
 	{#each snapGuides as guide}
+		{@const offsetX = meshOffset.x + interiorStartOffset}
+		{@const offsetZ = meshOffset.z - interiorStartOffset}
 		{@const geometry = new THREE.BufferGeometry().setFromPoints(
 			guide.type === 'vertical'
 				? [
-					new THREE.Vector3(guide.position, 0.5, -guide.start),
-					new THREE.Vector3(guide.position, 0.5, -guide.end)
+					new THREE.Vector3(offsetX + guide.position, 0.5, offsetZ - guide.start),
+					new THREE.Vector3(offsetX + guide.position, 0.5, offsetZ - guide.end)
 				]
 				: [
-					new THREE.Vector3(guide.start, 0.5, -guide.position),
-					new THREE.Vector3(guide.end, 0.5, -guide.position)
+					new THREE.Vector3(offsetX + guide.start, 0.5, offsetZ - guide.position),
+					new THREE.Vector3(offsetX + guide.end, 0.5, offsetZ - guide.position)
 				]
 		)}
 		<T.Line args={[geometry]}>
-			<T.LineBasicMaterial color="#00ffff" />
+			<T.LineBasicMaterial color="#c9503c" />
 		</T.Line>
 	{/each}
 <!-- All trays with positions (when showAllTrays is true, single box view) -->
@@ -1343,8 +1444,8 @@
 	</T.Mesh>
 {/if}
 
-<!-- Lid geometry (single box view) -->
-{#if lidGeometry && !showAllBoxes}
+<!-- Lid geometry (single box view) - hidden during edit mode -->
+{#if lidGeometry && !showAllBoxes && !visualEditMode}
 	{@const lidWidth = lidBounds ? lidBounds.max.x - lidBounds.min.x : 0}
 	{@const lidHeight = lidBounds ? lidBounds.max.z - lidBounds.min.z : 0}
 	{@const lidDepth = lidBounds ? lidBounds.max.y - lidBounds.min.y : 0}
@@ -1897,20 +1998,28 @@
 	{/each}
 {/if}
 
-{#if !hidePrintBed && !showAllBoxes && !isLayoutEditMode}
-	<!-- Background grid for single box view (subtle) -->
-	<Grid
-		position.y={-0.51}
-		cellColor="#2a2a2a"
-		sectionColor="#5a3530"
-		sectionThickness={1}
-		cellSize={10}
-		sectionSize={50}
-		gridSize={[2000, 2000]}
-		fadeDistance={800}
-	/>
+{#if !hidePrintBed && !showAllBoxes}
+	<!-- Background grid for single box view (subtle) - hidden in edit mode -->
+	{#if !visualEditMode}
+		<Grid
+			position.y={-0.51}
+			cellColor="#2a2a2a"
+			sectionColor="#5a3530"
+			sectionThickness={1}
+			cellSize={10}
+			sectionSize={50}
+			gridSize={[2000, 2000]}
+			fadeDistance={800}
+			fadeStrength={1}
+		/>
+	{/if}
 
-	<PrintBed size={printBedSize} title={viewTitle} position={[0, 0, 0]} />
+	<!-- PrintBed position differs in edit mode (corner at origin) vs normal mode (centered) -->
+	<PrintBed
+		size={printBedSize}
+		title={visualEditMode ? '' : viewTitle}
+		position={visualEditMode ? [editModeCenter.x, 0, editModeCenter.z] : [0, 0, 0]}
+	/>
 {/if}
 
 <!-- Reference labels for PDF capture - single tray view -->
