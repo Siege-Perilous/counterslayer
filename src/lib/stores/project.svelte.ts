@@ -454,6 +454,12 @@ export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | n
 	box.trays.push(tray);
 	project.selectedBoxId = boxId;
 	project.selectedTrayId = tray.id;
+
+	// Clear manual layout and custom dimensions so auto layout takes over
+	box.manualLayout = undefined;
+	box.customWidth = undefined;
+	box.customDepth = undefined;
+
 	autosave();
 	return tray;
 }
@@ -466,6 +472,11 @@ export function deleteTray(boxId: string, trayId: string): void {
 	if (index === -1) return;
 
 	box.trays.splice(index, 1);
+
+	// Clear manual layout and custom dimensions so auto layout takes over
+	box.manualLayout = undefined;
+	box.customWidth = undefined;
+	box.customDepth = undefined;
 
 	// Update selection
 	if (project.selectedTrayId === trayId) {

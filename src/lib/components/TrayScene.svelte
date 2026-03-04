@@ -977,14 +977,17 @@
 				position.z={groupZ}
 				rotation.y={isRotated ? Math.PI / 2 : 0}
 			>
-				<T.Mesh geometry={trayData.geometry} rotation.x={-Math.PI / 2}>
-					<T.MeshStandardMaterial
-						color={getTrayColor(trayData.trayId, trayIndex)}
-						roughness={0.6}
-						metalness={0.1}
-						side={THREE.DoubleSide}
-					/>
-				</T.Mesh>
+				{@const isSelectedTray = !selectedTrayId || trayData.trayId === selectedTrayId}
+			<T.Mesh geometry={trayData.geometry} rotation.x={-Math.PI / 2}>
+				<T.MeshStandardMaterial
+					color={getTrayColor(trayData.trayId, trayIndex)}
+					roughness={0.6}
+					metalness={0.1}
+					side={THREE.DoubleSide}
+					transparent={!isSelectedTray}
+					opacity={isSelectedTray ? 1.0 : 0.25}
+				/>
+			</T.Mesh>
 
 				<!-- Counter previews for this tray - positions are in tray-local coords -->
 				{#if showCounters && trayData.counterStacks}

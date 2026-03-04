@@ -245,7 +245,7 @@
 			emissive={getTrayEmissive(placement)}
 			emissiveIntensity={isSelected ? 0.3 : isHovered ? 0.15 : 0}
 			transparent
-			opacity={0.9}
+			opacity={isSelected || isHovered ? 1.0 : 0.25}
 		/>
 	</T.Mesh>
 

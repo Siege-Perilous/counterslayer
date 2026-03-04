@@ -38,15 +38,15 @@ importers:
       marked:
         specifier: ^17.0.2
         version: 17.0.3
-      maxrects-packer:
-        specifier: ^2.7.3
-        version: 2.7.3
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.53.3)
       paneforge:
         specifier: ^1.0.2
         version: 1.0.2(svelte@5.53.3)
+      rectangle-packer:
+        specifier: ^1.0.4
+        version: 1.0.4
       svg2pdf.js:
         specifier: ^2.7.0
         version: 2.7.0(jspdf@4.1.0)
@@ -1376,9 +1376,6 @@ packages:
     engines: {node: '>= 20'}
     hasBin: true
 
-  maxrects-packer@2.7.3:
-    resolution: {integrity: sha512-bG6qXujJ1QgttZVIH4WDanhoJtvbud/xP/XPyf6A69C9RdA61BM4TomFALCq2nrTa+tARRIBB4LuIFsnUQU2wA==}
-
   mdast-util-to-hast@13.2.1:
     resolution: {integrity: sha512-cctsq2wp5vTsLIcaymblUriiTcZd0CwWtCbLvrOzYCDZoWyMNV8sZ7krj09FSnsiJi3WVsHLM4k6Dq/yaPyCXA==}
 
@@ -1628,6 +1625,9 @@ packages:
   readdirp@4.1.2:
     resolution: {integrity: sha512-GDhwkLfywWL2s6vEjyhri+eXmfH6j1L7JE27WhqLeYzoh/A3DBaYGEj2H/HFZCn/kMfim73FXxEJTw06WtxQwg==}
     engines: {node: '>= 14.18.0'}
+
+  rectangle-packer@1.0.4:
+    resolution: {integrity: sha512-W98uPlDZjhEK2Zf1IqYI2QtziR9VgdzE9pXARQ/qLAPCxKWckMtT7MZvJMpt/X5K5vH6hYJaVwA8OsUDA5v8fw==}
 
   regenerator-runtime@0.13.11:
     resolution: {integrity: sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg==}
@@ -3212,8 +3212,6 @@ snapshots:
 
   marked@17.0.3: {}
 
-  maxrects-packer@2.7.3: {}
-
   mdast-util-to-hast@13.2.1:
     dependencies:
       '@types/hast': 3.0.4
@@ -3485,6 +3483,8 @@ snapshots:
     optional: true
 
   readdirp@4.1.2: {}
+
+  rectangle-packer@1.0.4: {}
 
   regenerator-runtime@0.13.11:
     optional: true

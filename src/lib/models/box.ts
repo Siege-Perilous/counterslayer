@@ -6,7 +6,7 @@ import type { CounterTrayParams } from './counterTray';
 import { getCardDrawTrayDimensions } from './cardTray';
 import { getCardDividerTrayDimensions } from './cardDividerTray';
 import { getCupTrayDimensions } from './cupTray';
-import { MaxRectsPacker, PACKING_LOGIC } from 'maxrects-packer';
+import { GuillotineBinPack, Rect } from 'rectangle-packer';
 
 const { cylinder } = jscad.primitives;
 const { subtract } = jscad.booleans;
@@ -509,14 +509,12 @@ export function arrangeTrays(
 	return arrangeTraysAuto(trays, options);
 }
 
-// Simple row-based bin packing algorithm
-// More reliable than maxrects for counter trays which have similar depths
+// Tray rectangle for packing
 interface TrayRect {
 	tray: Tray;
 	width: number;
 	depth: number;
 	height: number;
-	rotated: boolean;
 }
 
 function arrangeTraysAuto(
@@ -544,8 +542,7 @@ function arrangeTraysAuto(
 			tray,
 			width: dims.width,
 			depth: dims.depth,
-			height: dims.height,
-			rotated: false
+			height: dims.height
 		};
 	});
 
@@ -575,267 +572,124 @@ function arrangeTraysAuto(
 		targetWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
 		targetDepth = options.customBoxDepth - wallThickness * 2 - tolerance * 2;
 	} else if (options?.customBoxWidth) {
-		const interior = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
-		targetWidth = interior;
-		targetDepth = interior;
+		// Only width constrained - use it for width, print bed max for depth
+		targetWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
+		targetDepth = interiorMax;
+	} else if (options?.customBoxDepth) {
+		// Only depth constrained - use print bed max for width
+		targetWidth = interiorMax;
+		targetDepth = options.customBoxDepth - wallThickness * 2 - tolerance * 2;
 	} else {
 		targetWidth = interiorMax;
 		targetDepth = interiorMax;
 	}
 
-	// Row-based packing: try to fit trays into rows
-	// Strategy: pair wide trays with narrow trays to maximize row usage
-	interface PackedRow {
-		trays: { rect: TrayRect; x: number }[];
-		width: number;
-		depth: number;
-	}
+	// Extended Rect class to store tray data
+	class TrayPackRect extends Rect {
+		trayRect: TrayRect;
+		originalWidth: number;
+		originalHeight: number;
 
-	// Try packing with a specific configuration
-	const tryRowPack = (rects: TrayRect[], allowRotation: boolean): TrayPlacement[] | null => {
-		// Create working copies with optional rotation
-		const workingRects: TrayRect[] = rects.map((r) => ({ ...r }));
-
-		// For each rect, decide if rotation helps
-		// Rotation swaps width and depth
-		if (allowRotation) {
-			for (const rect of workingRects) {
-				// Prefer wider orientation (width > depth) for row packing
-				if (rect.depth > rect.width) {
-					const tmp = rect.width;
-					rect.width = rect.depth;
-					rect.depth = tmp;
-					rect.rotated = true;
-				}
-			}
-		}
-
-		// Sort by width (largest first) for first-fit decreasing
-		const sortedRects = [...workingRects].sort((a, b) => b.width - a.width);
-
-		const rows: PackedRow[] = [];
-		const placed = new Set<TrayRect>();
-
-		// First pass: place each wide tray and try to pair with narrower trays
-		for (const rect of sortedRects) {
-			if (placed.has(rect)) continue;
-
-			// Start a new row with this tray
-			const row: PackedRow = {
-				trays: [{ rect, x: 0 }],
-				width: rect.width,
-				depth: rect.depth
-			};
-			placed.add(rect);
-
-			// Try to add more trays to this row
-			let currentX = rect.width;
-			for (const otherRect of sortedRects) {
-				if (placed.has(otherRect)) continue;
-
-				// Check if it fits in remaining width
-				if (currentX + otherRect.width <= targetWidth) {
-					row.trays.push({ rect: otherRect, x: currentX });
-					currentX += otherRect.width;
-					row.width = currentX;
-					row.depth = Math.max(row.depth, otherRect.depth);
-					placed.add(otherRect);
-				}
-			}
-
-			rows.push(row);
-		}
-
-		// Calculate total dimensions
-		let totalDepth = 0;
-		let maxWidth = 0;
-		for (const row of rows) {
-			totalDepth += row.depth;
-			maxWidth = Math.max(maxWidth, row.width);
-		}
-
-		// Check if it fits
-		if (maxWidth > targetWidth || totalDepth > targetDepth) {
-			return null;
-		}
-
-		// Convert to placements
-		const placements: TrayPlacement[] = [];
-		let currentY = 0;
-		for (const row of rows) {
-			for (const { rect, x } of row.trays) {
-				placements.push({
-					tray: rect.tray,
-					dimensions: {
-						width: rect.width,
-						depth: rect.depth,
-						height: rect.height
-					},
-					x,
-					y: currentY,
-					rotated: rect.rotated
-				});
-			}
-			currentY += row.depth;
-		}
-
-		return placements;
-	};
-
-	// Try different sorting strategies
-	const strategies: { sort: (a: TrayRect, b: TrayRect) => number; rotate: boolean }[] = [
-		// Sort by width descending, no forced rotation
-		{ sort: (a, b) => b.width - a.width, rotate: false },
-		// Sort by width descending, allow rotation
-		{ sort: (a, b) => b.width - a.width, rotate: true },
-		// Sort by area descending
-		{ sort: (a, b) => b.width * b.depth - a.width * a.depth, rotate: false },
-		{ sort: (a, b) => b.width * b.depth - a.width * a.depth, rotate: true },
-		// Sort by max dimension
-		{
-			sort: (a, b) => Math.max(b.width, b.depth) - Math.max(a.width, a.depth),
-			rotate: false
-		},
-		{
-			sort: (a, b) => Math.max(b.width, b.depth) - Math.max(a.width, a.depth),
-			rotate: true
-		},
-		// Sort by depth (similar depths together)
-		{ sort: (a, b) => b.depth - a.depth, rotate: false },
-		{ sort: (a, b) => b.depth - a.depth, rotate: true }
-	];
-
-	interface PackResult {
-		placements: TrayPlacement[];
-		area: number;
-		width: number;
-		depth: number;
-	}
-
-	const results: PackResult[] = [];
-
-	for (const strategy of strategies) {
-		const sortedRects = [...trayRects].sort(strategy.sort);
-		const placements = tryRowPack(sortedRects, strategy.rotate);
-		if (placements) {
-			let maxX = 0;
-			let maxY = 0;
-			for (const p of placements) {
-				maxX = Math.max(maxX, p.x + p.dimensions.width);
-				maxY = Math.max(maxY, p.y + p.dimensions.depth);
-			}
-			results.push({
-				placements,
-				area: maxX * maxY,
-				width: maxX,
-				depth: maxY
-			});
+		constructor(trayRect: TrayRect) {
+			super(0, 0, trayRect.width, trayRect.depth);
+			this.trayRect = trayRect;
+			this.originalWidth = trayRect.width;
+			this.originalHeight = trayRect.depth;
 		}
 	}
 
-	// Also try maxrects-packer as fallback
-	const tryMaxRects = () => {
-		const packer = new MaxRectsPacker(targetWidth, targetDepth, 0, {
-			smart: false,
-			pot: false,
-			square: false,
-			allowRotation: true,
-			logic: PACKING_LOGIC.MAX_EDGE
-		});
+	// Try GuillotineBinPack with different heuristics
+	const tryGuillotine = (
+		width: number,
+		height: number,
+		allowFlip: boolean,
+		rectChoice: number,
+		splitMethod: number
+	): TrayPlacement[] | null => {
+		const packer = new GuillotineBinPack<TrayPackRect>(width, height, allowFlip);
 
-		const rects = trayRects.map((r) => ({
-			width: r.width,
-			height: r.depth,
-			data: r
-		}));
+		// Create rect objects for packing
+		const rects = trayRects.map((r) => new TrayPackRect(r));
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		packer.addArray(rects as any);
+		// Insert all rectangles
+		packer.InsertSizes(rects, true, rectChoice, splitMethod);
 
-		if (packer.bins.length !== 1) return null;
-		const bin = packer.bins[0];
-		if (bin.rects.length !== trayRects.length) return null;
+		// Check if all were placed
+		if (packer.usedRectangles.length !== trayRects.length) return null;
 
+		// Calculate bounding box and verify fit
 		let maxX = 0;
 		let maxY = 0;
-		for (const rect of bin.rects) {
+		for (const rect of packer.usedRectangles) {
 			maxX = Math.max(maxX, rect.x + rect.width);
 			maxY = Math.max(maxY, rect.y + rect.height);
 		}
 
 		if (maxX > targetWidth || maxY > targetDepth) return null;
 
+		// Convert to placements
 		const placements: TrayPlacement[] = [];
-		for (const rect of bin.rects) {
-			const data = rect.data as TrayRect;
-			const wasRotated = rect.rot === true;
+		for (const rect of packer.usedRectangles) {
+			const trayRect = rect.trayRect;
+			// Check if rotated by comparing dimensions
+			const wasRotated =
+				Math.abs(rect.width - rect.originalHeight) < 0.01 &&
+				Math.abs(rect.height - rect.originalWidth) < 0.01;
+
 			placements.push({
-				tray: data.tray,
-				dimensions: wasRotated
-					? { width: data.depth, depth: data.width, height: data.height }
-					: { width: data.width, depth: data.depth, height: data.height },
+				tray: trayRect.tray,
+				dimensions: {
+					width: rect.width,
+					depth: rect.height,
+					height: trayRect.height
+				},
 				x: rect.x,
 				y: rect.y,
 				rotated: wasRotated
 			});
 		}
 
-		return { placements, area: maxX * maxY, width: maxX, depth: maxY };
+		return placements;
 	};
 
-	const maxRectsResult = tryMaxRects();
-	if (maxRectsResult) {
-		results.push(maxRectsResult);
+	// Try combinations of heuristics
+	// RectChoice: 0=BestAreaFit, 1=BestShortSideFit, 2=BestLongSideFit (skip "Worst" variants 3-5)
+	// SplitMethod: all 6 are useful (no "worst" variants)
+	const rectChoices = [0, 1, 2];
+	const splitMethods = [0, 1, 2, 3, 4, 5];
+
+	interface PackResult {
+		placements: TrayPlacement[];
+		area: number;
 	}
 
-	// Sort results by area (most compact first)
-	results.sort((a, b) => a.area - b.area);
+	const results: PackResult[] = [];
 
+	// Try all combinations with and without rotation
+	for (const allowFlip of [true, false]) {
+		for (const rectChoice of rectChoices) {
+			for (const splitMethod of splitMethods) {
+				const placements = tryGuillotine(targetWidth, targetDepth, allowFlip, rectChoice, splitMethod);
+				if (placements) {
+					let maxX = 0;
+					let maxY = 0;
+					for (const p of placements) {
+						maxX = Math.max(maxX, p.x + p.dimensions.width);
+						maxY = Math.max(maxY, p.y + p.dimensions.depth);
+					}
+					results.push({ placements, area: maxX * maxY });
+				}
+			}
+		}
+	}
+
+	// If we found valid results, return the most compact one
 	if (results.length > 0) {
+		results.sort((a, b) => a.area - b.area);
 		return results[0].placements;
 	}
 
-	// Final fallback: simple stacking without constraint (will exceed bounds)
-	// This should rarely happen - means trays simply don't fit in the target
-	const fallbackRects = trayRects.map((r) => ({
-		width: r.width,
-		height: r.depth,
-		data: r
-	}));
-
-	const fallbackPacker = new MaxRectsPacker(10000, 10000, 0, {
-		smart: true,
-		pot: false,
-		square: false,
-		allowRotation: true
-	});
-
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	fallbackPacker.addArray(fallbackRects as any);
-
-	if (fallbackPacker.bins.length > 0 && fallbackPacker.bins[0].rects.length > 0) {
-		const bin = fallbackPacker.bins[0];
-		const fallbackPlacements: TrayPlacement[] = [];
-
-		for (const rect of bin.rects) {
-			const data = rect.data as TrayRect;
-			const wasRotated = rect.rot === true;
-
-			fallbackPlacements.push({
-				tray: data.tray,
-				dimensions: wasRotated
-					? { width: data.depth, depth: data.width, height: data.height }
-					: { width: data.width, depth: data.depth, height: data.height },
-				x: rect.x,
-				y: rect.y,
-				rotated: wasRotated
-			});
-		}
-
-		return fallbackPlacements;
-	}
-
-	// Absolute last resort: stack vertically
+	// Fallback: stack vertically (trays don't fit within constraints)
 	let y = 0;
 	return trayRects.map((rect) => {
 		const placement: TrayPlacement = {
