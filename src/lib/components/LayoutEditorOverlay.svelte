@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { Button, Icon } from '@tableslayer/ui';
-	import { IconRotate, IconRefresh, IconX, IconDeviceFloppy, IconGridDots } from '@tabler/icons-svelte';
+	import {
+		IconRotate,
+		IconRefresh,
+		IconX,
+		IconDeviceFloppy,
+		IconGridDots
+	} from '@tabler/icons-svelte';
 	import {
 		layoutEditorState,
 		rotateTray,
@@ -12,9 +18,10 @@
 		onSave: () => void;
 		onCancel: () => void;
 		onResetAuto: () => void;
+		onRotate: () => void;
 	}
 
-	let { onEnterEdit, onSave, onCancel, onResetAuto }: Props = $props();
+	let { onEnterEdit, onSave, onCancel, onResetAuto, onRotate }: Props = $props();
 
 	// Use $derived.by() to properly track reactive reads from store
 	let isEditMode = $derived.by(() => layoutEditorState.isEditMode);
@@ -23,16 +30,8 @@
 
 	// Debug: log when selectedTrayId changes
 	$effect(() => {
-		console.log('[LayoutEditorOverlay] selectedTrayId changed to:', selectedTrayId);
+		console.log('[LayoutEditorOverlay] selectedTrayId:', selectedTrayId, 'isEditMode:', isEditMode);
 	});
-
-	function handleRotate() {
-		console.log('[handleRotate] called, selectedTrayId:', selectedTrayId);
-		if (selectedTrayId) {
-			console.log('[handleRotate] calling rotateTray');
-			rotateTray(selectedTrayId);
-		}
-	}
 </script>
 
 {#if !isEditMode}
@@ -47,9 +46,8 @@
 		<div class="toolbarSection">
 			<Button
 				variant="ghost"
-				onclick={handleRotate}
-				isDisabled={!selectedTrayId}
-				title={selectedTrayId ? `Rotate ${selectedPlacement?.name ?? 'tray'} 90°` : 'Select a tray to rotate'}
+				onclick={onRotate}
+				title="Rotate 90°"
 			>
 				<Icon Icon={IconRotate} />
 				Rotate 90°

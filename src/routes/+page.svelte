@@ -68,7 +68,9 @@
 		layoutEditorState,
 		getIsEditMode,
 		getManualPlacements,
-		calculateBoundingBox
+		calculateBoundingBox,
+		rotateTray,
+		getSelectedTrayId
 	} from '$lib/stores/layoutEditor.svelte';
 
 	type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid';
@@ -959,6 +961,15 @@
 		regenerate(true);
 	}
 
+	function handleRotateLayout() {
+		console.log('handleRotateLayout called');
+		const selectedId = getSelectedTrayId();
+		console.log('selectedId:', selectedId);
+		if (selectedId) {
+			rotateTray(selectedId);
+		}
+	}
+
 	// Cancel edit mode when selection changes (user navigates away)
 	let lastSelectedBoxId = $state<string | null>(null);
 	$effect(() => {
@@ -1062,6 +1073,7 @@
 							onSave={handleSaveLayout}
 							onCancel={handleCancelLayout}
 							onResetAuto={handleResetAutoLayout}
+							onRotate={handleRotateLayout}
 						/>
 					</div>
 				{/if}
@@ -1263,6 +1275,7 @@
 							onSave={handleSaveLayout}
 							onCancel={handleCancelLayout}
 							onResetAuto={handleResetAutoLayout}
+							onRotate={handleRotateLayout}
 						/>
 					</div>
 				{/if}

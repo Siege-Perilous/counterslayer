@@ -195,7 +195,6 @@ export function rotateTray(trayId: string): void {
 		workingPlacements = workingPlacements.map((p, i) =>
 			i === index ? { ...p, rotation: newRotation } : p
 		);
-		console.log('[rotateTray] new array created, placement rotation:', workingPlacements[index].rotation);
 	}
 }
 

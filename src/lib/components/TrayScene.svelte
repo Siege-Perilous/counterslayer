@@ -143,24 +143,20 @@
 	let workingPlacements = $derived.by(() => layoutEditorState.workingPlacements);
 	let layoutSelectedTrayId = $derived.by(() => layoutEditorState.selectedTrayId);
 
-	// Debug: log when workingPlacements changes
+	// Force reactivity tracking by reading all layout editor values in $effect
 	$effect(() => {
-		if (workingPlacements.length > 0) {
-			console.log('[TrayScene] workingPlacements updated, rotations:', workingPlacements.map(p => ({ id: p.trayId.slice(0, 4), rotation: p.rotation })));
-		}
+		// Reading these values ensures Svelte tracks them for reactivity
+		console.log('[TrayScene] layout state:', isLayoutEditMode, 'placements:', workingPlacements.length, 'selected:', layoutSelectedTrayId);
 	});
+
 	let snapGuides = $derived(layoutEditorState.activeSnapGuides);
 
 	// Threlte event handlers for the interaction plane
-	// These use e.point directly from the intersection, no raycasting needed
 	function handlePlanePointerMove(e: IntersectionEvent<PointerEvent>) {
 		if (!isLayoutEditMode || !pendingDrag) return;
 
-		// e.point is the intersection point on the plane (y=0)
 		const floorPos = e.point;
 		if (!floorPos) return;
-
-		console.log('[planeMove] point:', floorPos.x.toFixed(1), floorPos.z.toFixed(1), 'pendingDrag:', !!pendingDrag);
 
 		const deltaX = floorPos.x - pendingDrag.startX;
 		const deltaY = -(floorPos.z - pendingDrag.startY);
@@ -169,7 +165,6 @@
 		// Only process if there's meaningful movement (threshold of 2mm)
 		if (distance > 2) {
 			if (!actualDrag) {
-				console.log('[planeMove] movement threshold exceeded, starting actual drag');
 				actualDrag = true;
 			}
 
@@ -180,7 +175,6 @@
 			const placement = workingPlacements.find((p) => p.trayId === trayId);
 			if (placement) {
 				const snapResult = snapPosition(placement, newX, newY, workingPlacements, printBedSize);
-				console.log('[planeMove] updating to:', snapResult.x.toFixed(1), snapResult.y.toFixed(1));
 				updateTrayPosition(trayId, snapResult.x, snapResult.y);
 				setSnapGuides(snapResult.guides);
 			}
@@ -189,16 +183,16 @@
 
 	function handlePlanePointerUp(e: IntersectionEvent<PointerEvent>) {
 		if (!isLayoutEditMode) return;
-		console.log('[planeUp] pendingDrag:', !!pendingDrag, 'actualDrag:', actualDrag);
 		pendingDrag = null;
 		actualDrag = false;
 		clearSnapGuides();
 	}
 
 	function handlePlanePointerDown(e: IntersectionEvent<PointerEvent>) {
-		// Click on background (plane) deselects
+		// Click on background (plane) deselects - but only if a tray wasn't just clicked
+		// (pendingDrag being set means a tray's onpointerdown already fired for this click)
 		if (!isLayoutEditMode) return;
-		console.log('[planeDown] background click - deselecting');
+		if (pendingDrag) return;
 		pendingDrag = null;
 		actualDrag = false;
 		selectTray(null);
@@ -1225,7 +1219,6 @@
 					position.y={geomHeight / 2}
 					position.z={-geomDepth / 2}
 					onpointerdown={(e: IntersectionEvent<PointerEvent>) => {
-						console.log('[trayDown] clicked tray:', placement.trayId);
 						e.stopPropagation();
 						selectTray(placement.trayId);
 
@@ -1239,7 +1232,6 @@
 							originalTrayY: placement.y
 						};
 						actualDrag = false;
-						console.log('[trayDown] pendingDrag set for', placement.trayId);
 					}}
 					onpointerenter={() => { editModeHoveredTrayId = placement.trayId; }}
 					onpointerleave={() => { editModeHoveredTrayId = null; }}
