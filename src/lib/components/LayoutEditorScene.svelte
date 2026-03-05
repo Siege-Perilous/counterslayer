@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { T, useThrelte } from '@threlte/core';
 	import { OrbitControls } from '@threlte/extras';
+	import SceneLighting from './three/SceneLighting.svelte';
 	import * as THREE from 'three';
 	import { onMount } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -211,8 +212,7 @@
 />
 
 <!-- Lighting -->
-<T.AmbientLight intensity={0.6} />
-<T.DirectionalLight position={[50, 100, 50]} intensity={0.8} castShadow />
+<SceneLighting preset="editor" />
 
 <!-- Print bed floor -->
 <T.Mesh rotation.x={-Math.PI / 2} position={[printBedSize / 2, -0.5, -printBedSize / 2]}>
