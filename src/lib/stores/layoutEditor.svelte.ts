@@ -253,11 +253,25 @@ export function cancelChanges(): void {
 }
 
 // Convert working placements to ManualTrayPlacement for saving
+// Normalizes positions so the bounding box starts at (0,0) - this ensures
+// the box is sized to fit the trays tightly regardless of where they were
+// positioned in the edit area
 export function getManualPlacements(): ManualTrayPlacement[] {
+	if (workingPlacements.length === 0) return [];
+
+	// Find the minimum x and y positions
+	let minX = Infinity;
+	let minY = Infinity;
+	for (const p of workingPlacements) {
+		minX = Math.min(minX, p.x);
+		minY = Math.min(minY, p.y);
+	}
+
+	// Shift all positions so minimum becomes 0
 	return workingPlacements.map((p) => ({
 		trayId: p.trayId,
-		x: p.x,
-		y: p.y,
+		x: p.x - minX,
+		y: p.y - minY,
 		rotation: p.rotation
 	}));
 }
