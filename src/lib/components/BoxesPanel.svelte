@@ -2,11 +2,8 @@
 	import { Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon } from '@tableslayer/ui';
 	import { IconX, IconPlus } from '@tabler/icons-svelte';
 	import type { Box, Project } from '$lib/types/project';
-	import {
-		calculateMinimumBoxDimensions,
-		getLidHeight,
-		getCustomCardSizesFromBoxes
-	} from '$lib/models/box';
+	import { calculateMinimumBoxDimensions, getLidHeight } from '$lib/models/box';
+	import { getCardSizes } from '$lib/stores/project.svelte';
 
 	interface Props {
 		project: Project;
@@ -29,7 +26,7 @@
 	}: Props = $props();
 
 	// Get global card sizes (shared across all boxes)
-	const customCardSizes = $derived(getCustomCardSizesFromBoxes(project.boxes));
+	const customCardSizes = $derived(getCardSizes());
 
 	const minimums = $derived(
 		selectedBox

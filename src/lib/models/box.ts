@@ -608,14 +608,34 @@ function arrangeTraysAuto(
 	): TrayPlacement[] | null => {
 		const packer = new GuillotineBinPack<TrayPackRect>(width, height, allowFlip);
 
-		// Create rect objects for packing
-		const rects = trayRects.map((r) => new TrayPackRect(r));
+		// Sort trays by area (largest first) for better packing
+		const sortedTrayRects = [...trayRects].sort((a, b) => b.width * b.depth - a.width * a.depth);
+
+		// Create rect objects for packing (sorted by area)
+		const rects = sortedTrayRects.map((r) => new TrayPackRect(r));
 
 		// Insert all rectangles
 		packer.InsertSizes(rects, true, rectChoice, splitMethod);
 
 		// Check if all were placed
 		if (packer.usedRectangles.length !== trayRects.length) return null;
+
+		// Verify no overlaps in the packing result
+		const OVERLAP_EPSILON = 0.01;
+		for (let i = 0; i < packer.usedRectangles.length; i++) {
+			for (let j = i + 1; j < packer.usedRectangles.length; j++) {
+				const r1 = packer.usedRectangles[i];
+				const r2 = packer.usedRectangles[j];
+				const noOverlapX =
+					r1.x + r1.width <= r2.x + OVERLAP_EPSILON || r2.x + r2.width <= r1.x + OVERLAP_EPSILON;
+				const noOverlapY =
+					r1.y + r1.height <= r2.y + OVERLAP_EPSILON || r2.y + r2.height <= r1.y + OVERLAP_EPSILON;
+				if (!noOverlapX && !noOverlapY) {
+					// Overlap detected - reject this packing
+					return null;
+				}
+			}
+		}
 
 		// Calculate bounding box and verify fit
 		let maxX = 0;
