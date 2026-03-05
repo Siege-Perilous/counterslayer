@@ -43,6 +43,7 @@
 		type TrayScreenshot
 	} from '$lib/utils/pdfGenerator';
 	import type { CaptureOptions } from '$lib/utils/screenshotCapture';
+	import { exportProjectToJson, importProjectFromJson } from '$lib/utils/storage';
 	import {
 		initProject,
 		getSelectedTray,
@@ -665,7 +666,7 @@
 
 	function handleExportJson() {
 		const project = getProject();
-		const json = JSON.stringify(project, null, 2);
+		const json = exportProjectToJson(project);
 		const blob = new Blob([json], { type: 'application/json' });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
@@ -827,7 +828,7 @@
 
 		try {
 			const text = await file.text();
-			const data = JSON.parse(text) as Project;
+			const data = importProjectFromJson(text);
 			importProject(data);
 			error = '';
 		} catch (e) {
