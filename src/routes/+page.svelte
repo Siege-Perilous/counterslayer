@@ -370,8 +370,12 @@
 			lidGeometry = result.lidGeometry;
 			allBoxGeometries = result.allBoxGeometries;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Unknown error';
-			console.error('Generation error:', e);
+			// Ignore "superseded" errors - these are expected when a newer request replaces an older one
+			const message = e instanceof Error ? e.message : 'Unknown error';
+			if (message !== 'Superseded by newer request') {
+				error = message;
+				console.error('Generation error:', e);
+			}
 		} finally {
 			generating = false;
 			isDirty = false;
