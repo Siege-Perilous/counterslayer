@@ -264,7 +264,7 @@
 			if (currentEditMode && !wasInEditMode) {
 				// Entering edit mode - start fading out normal scene
 				savedCameraPosition = cam.position.clone();
-				savedCameraTarget = new THREE.Vector3(0, 0, 0);
+				savedCameraTarget = new THREE.Vector3(0, 0, printBedSize / 2);
 				transitionPhase = 'fading-to-edit';
 				fadeProgress = 0;
 			} else if (!currentEditMode && wasInEditMode) {
@@ -551,14 +551,19 @@
 
 	// Calculate side-by-side positions for "All" view (box | trays-in-box | lid)
 	// After -90° X rotation, geometry spans from position.z - depth to position.z
-	// To align back edges at Z=0, we set position.z = depth
+	// Base Z offset ensures consistent positioning with other views
 	let sidePositions = $derived.by(() => {
+		const baseZ = printBedSize / 2;
 		if (!showAllTrays || exploded) {
-			return { box: { x: 0, z: 0 }, traysGroup: { x: 0, z: 0 }, lid: { x: 0, z: 0 } };
+			return {
+				box: { x: 0, z: baseZ },
+				traysGroup: { x: 0, z: baseZ },
+				lid: { x: 0, z: baseZ }
+			};
 		}
 
 		// In "All" mode, show: Box | Trays (stacked) | Lid
-		// Each at their own X position, with back edges aligned at Z=0
+		// Each at their own X position, with consistent Z base offset
 		const items: { key: string; width: number; depth: number }[] = [];
 
 		if (boxGeometry && boxBounds) {
@@ -590,16 +595,16 @@
 		const totalWidth = items.reduce((sum, w) => sum + w.width, 0) + (items.length - 1) * sideGap;
 		let currentX = -totalWidth / 2;
 		const positions = {
-			box: { x: 0, z: 0 },
-			traysGroup: { x: 0, z: 0 },
-			lid: { x: 0, z: 0 }
+			box: { x: 0, z: baseZ },
+			traysGroup: { x: 0, z: baseZ },
+			lid: { x: 0, z: baseZ }
 		};
 
 		for (const item of items) {
 			if (item.key === 'box' || item.key === 'traysGroup' || item.key === 'lid') {
 				positions[item.key] = {
 					x: currentX + item.width / 2,
-					z: item.depth // Back edge at Z=0, front at Z=depth
+					z: item.depth + baseZ // Depth offset plus base for consistency
 				};
 			}
 			currentX += item.width + sideGap;
@@ -646,12 +651,14 @@
 		return box;
 	});
 
-	// Mesh offset for single geometry centering
+	// Mesh offset for geometry centering - includes printBedSize/2 base offset
+	// so all views (single tray, box, dimensions) use consistent positioning
 	let meshOffset = $derived.by(() => {
-		if (!combinedBounds) return { x: 0, z: 0 };
+		const baseZ = printBedSize / 2;
+		if (!combinedBounds) return { x: 0, z: baseZ };
 		return {
 			x: -(combinedBounds.max.x + combinedBounds.min.x) / 2,
-			z: (combinedBounds.max.y + combinedBounds.min.y) / 2
+			z: (combinedBounds.max.y + combinedBounds.min.y) / 2 + baseZ
 		};
 	});
 
@@ -1966,7 +1973,7 @@
 	<PrintBed
 		size={visualEditMode ? Math.max(editBoundsWidth, editBoundsDepth) : printBedSize}
 		title={visualEditMode ? '' : viewTitle}
-		position={visualEditMode ? [editModeCenter.x, 0, editModeCenter.z] : [0, 0, 0]}
+		position={visualEditMode ? [editModeCenter.x, 0, editModeCenter.z] : [0, 0, printBedSize / 2]}
 		sizeLabel={visualEditMode
 			? `${Math.max(editBoundsWidth, editBoundsDepth)}mm max box cavity`
 			: undefined}
