@@ -11,7 +11,8 @@ import {
 } from '$lib/models/cardDividerTray';
 import { defaultCupTrayParams, type CupTrayParams } from '$lib/models/cupTray';
 import { defaultLidParams } from '$lib/models/lid';
-import { saveProject, loadProject, migrateProjectData } from '$lib/utils/storage';
+import { loadProject, migrateProjectData } from '$lib/utils/storage';
+import { scheduleSave, saveNow } from '$lib/stores/saveManager';
 import type {
 	Tray,
 	Box,
@@ -299,9 +300,14 @@ export function initProject(): void {
 	}
 }
 
-// Auto-save helper
+// Auto-save helper (now uses debounced save manager)
 function autosave(): void {
-	saveProject(project);
+	scheduleSave(project);
+}
+
+// Force immediate save (use before page unload or critical operations)
+export function saveProjectNow(): void {
+	saveNow(project);
 }
 
 // Getters

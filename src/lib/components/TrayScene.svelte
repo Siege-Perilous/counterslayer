@@ -193,12 +193,6 @@
 	let workingPlacements = $derived.by(() => layoutEditorState.workingPlacements);
 	let layoutSelectedTrayId = $derived.by(() => layoutEditorState.selectedTrayId);
 
-	// Force reactivity tracking by reading all layout editor values in $effect
-	$effect(() => {
-		// Reading these values ensures Svelte tracks them for reactivity
-		void [isLayoutEditMode, workingPlacements.length, layoutSelectedTrayId];
-	});
-
 	let snapGuides = $derived(layoutEditorState.activeSnapGuides);
 
 	// Threlte event handlers for the interaction plane
