@@ -729,7 +729,7 @@
 
 <T.PerspectiveCamera
 	makeDefault
-	position={[printBedSize * 0.7, printBedSize * 0.5, printBedSize * 0.7]}
+	position={[printBedSize * 1.0, printBedSize * 0.8, printBedSize * 1.5]}
 	fov={50}
 >
 	{@const isTransitioning =
@@ -738,7 +738,7 @@
 		(transitionPhase === 'edit' && editSceneOpacity < 1) ||
 		(transitionPhase === 'normal' && normalSceneOpacity < 1)}
 	<OrbitControls
-		target={visualEditMode ? [editModeCenter.x, 0, editModeCenter.z] : [0, 0, 0]}
+		target={visualEditMode ? [editModeCenter.x, 0, editModeCenter.z] : [0, 0, printBedSize / 2]}
 		enableDamping={!isTransitioning}
 		enabled={!isTransitioning}
 		enableRotate={!visualEditMode && !isTransitioning}
