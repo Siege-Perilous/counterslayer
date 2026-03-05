@@ -143,7 +143,8 @@ export class GeometryWorkerManager {
 
 				// Check if this is a stale generate request (a newer one was made)
 				if (pending.isGenerateRequest && result.id < this.latestGenerateId) {
-					// Silently ignore stale results
+					// Reject stale requests so the caller's finally block runs
+					pending.reject(new Error('Superseded by newer request'));
 					return;
 				}
 

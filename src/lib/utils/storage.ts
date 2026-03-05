@@ -371,3 +371,30 @@ export function clearProject(): void {
 		console.error('Failed to clear project:', e);
 	}
 }
+
+/**
+ * Export project to JSON string.
+ * Use for file downloads or clipboard operations.
+ */
+export function exportProjectToJson(project: Project): string {
+	return JSON.stringify(project, null, 2);
+}
+
+/**
+ * Import project from JSON string.
+ * Handles migration from older formats automatically.
+ * @throws {Error} if JSON is invalid
+ */
+export function importProjectFromJson(json: string): Project {
+	const data = JSON.parse(json) as Project;
+	return migrateProjectData(data);
+}
+
+// Re-export save manager functions for unified API
+export {
+	scheduleSave,
+	saveNow,
+	batchUpdates,
+	flushPendingSave,
+	hasPendingSave
+} from '$lib/stores/saveManager';

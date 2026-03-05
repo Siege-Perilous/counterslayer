@@ -9,6 +9,9 @@
 		type IntersectionEvent
 	} from '@threlte/extras';
 	import PrintBed from './PrintBed.svelte';
+	import CounterMesh from './three/CounterMesh.svelte';
+	import SceneLighting from './three/SceneLighting.svelte';
+	import { getAlternateColor, getSleeveColors } from '$lib/three/materials';
 
 	// Enable interactivity for pointer events on 3D objects
 	interactivity();
@@ -192,13 +195,6 @@
 	// Get layout editor state - use $derived.by() to properly track reactive reads from store
 	let workingPlacements = $derived.by(() => layoutEditorState.workingPlacements);
 	let layoutSelectedTrayId = $derived.by(() => layoutEditorState.selectedTrayId);
-
-	// Force reactivity tracking by reading all layout editor values in $effect
-	$effect(() => {
-		// Reading these values ensures Svelte tracks them for reactivity
-		void [isLayoutEditMode, workingPlacements.length, layoutSelectedTrayId];
-	});
-
 	let snapGuides = $derived(layoutEditorState.activeSnapGuides);
 
 	// Threlte event handlers for the interaction plane
@@ -767,13 +763,7 @@
 	{/if}
 </T.PerspectiveCamera>
 
-<T.DirectionalLight position={[50, 100, 50]} intensity={1.5} />
-<T.DirectionalLight position={[-50, 50, -50]} intensity={0.5} />
-<T.DirectionalLight
-	position={[0, 20, -80]}
-	intensity={0.3}
-/><!-- Subtle backlight for rim definition -->
-<T.AmbientLight intensity={0.4} />
+<SceneLighting preset="default" />
 
 <!-- Background grid for multi-box view (subtle, at world origin for alignment) -->
 {#if showAllBoxes && !hidePrintBed}
@@ -921,144 +911,55 @@
 												: Math.max(stack.width, stack.length)}
 								{@const counterY = stack.z + standingHeight / 2}
 								{@const isAlt = counterIdx % 2 === 1}
-								{@const counterColor = isAlt
-									? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
-									: stack.color}
+								{@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
+								{@const triGeom =
+									effectiveShape === 'triangle'
+										? createRoundedTriangleGeometry(
+												stack.width,
+												stack.thickness,
+												triangleCornerRadius
+											)
+										: null}
 								{#if stack.edgeOrientation === 'lengthwise'}
 									{@const counterSpacing =
 										(stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
 									{@const posX = stack.x + (counterIdx + 0.5) * counterSpacing}
 									{@const posZ = -stack.y - (stack.slotDepth ?? stack.length) / 2}
-									{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
-										<T.Mesh position.x={posX} position.y={counterY} position.z={posZ}>
-											<T.BoxGeometry args={[stack.thickness, standingHeight, stack.length]} />
-											<T.MeshStandardMaterial
-												color={counterColor}
-												roughness={0.4}
-												metalness={0.2}
-											/>
-										</T.Mesh>
-									{:else if effectiveShape === 'circle'}
-										<T.Mesh
-											position.x={posX}
-											position.y={counterY}
-											position.z={posZ}
-											rotation.z={Math.PI / 2}
-										>
-											<T.CylinderGeometry
-												args={[stack.width / 2, stack.width / 2, stack.thickness, 32]}
-											/>
-											<T.MeshStandardMaterial
-												color={counterColor}
-												roughness={0.4}
-												metalness={0.2}
-											/>
-										</T.Mesh>
-									{:else if effectiveShape === 'hex'}
-										<T.Mesh
-											position.x={posX}
-											position.y={counterY}
-											position.z={posZ}
-											rotation.z={Math.PI / 2}
-											rotation.x={stack.hexPointyTop ? 0 : Math.PI / 6}
-										>
-											<T.CylinderGeometry
-												args={[stack.width / 2, stack.width / 2, stack.thickness, 6]}
-											/>
-											<T.MeshStandardMaterial
-												color={counterColor}
-												roughness={0.4}
-												metalness={0.2}
-											/>
-										</T.Mesh>
-									{:else}
-										{@const triGeom = createRoundedTriangleGeometry(
-											stack.width,
-											stack.thickness,
-											triangleCornerRadius
-										)}
-										<T.Mesh
-											geometry={triGeom}
-											position.x={posX}
-											position.y={counterY}
-											position.z={posZ}
-											rotation.y={Math.PI / 2}
-											rotation.x={Math.PI}
-										>
-											<T.MeshStandardMaterial
-												color={counterColor}
-												roughness={0.4}
-												metalness={0.2}
-											/>
-										</T.Mesh>
-									{/if}
+									<CounterMesh
+										shape={effectiveShape}
+										{posX}
+										posY={counterY}
+										{posZ}
+										width={stack.width}
+										length={stack.length}
+										thickness={stack.thickness}
+										color={counterColor}
+										hexPointyTop={stack.hexPointyTop}
+										triangleGeometry={triGeom}
+										isEdgeLoaded={true}
+										edgeOrientation="lengthwise"
+										{standingHeight}
+									/>
 								{:else}
 									{@const counterSpacing =
 										(stack.slotDepth ?? stack.count * stack.thickness) / stack.count}
 									{@const posX = stack.x + (stack.slotWidth ?? stack.length) / 2}
 									{@const posZ = -stack.y - (counterIdx + 0.5) * counterSpacing}
-									{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
-										<T.Mesh position.x={posX} position.y={counterY} position.z={posZ}>
-											<T.BoxGeometry args={[stack.length, standingHeight, stack.thickness]} />
-											<T.MeshStandardMaterial
-												color={counterColor}
-												roughness={0.4}
-												metalness={0.2}
-											/>
-										</T.Mesh>
-									{:else if effectiveShape === 'circle'}
-										<T.Mesh
-											position.x={posX}
-											position.y={counterY}
-											position.z={posZ}
-											rotation.x={Math.PI / 2}
-										>
-											<T.CylinderGeometry
-												args={[stack.width / 2, stack.width / 2, stack.thickness, 32]}
-											/>
-											<T.MeshStandardMaterial
-												color={counterColor}
-												roughness={0.4}
-												metalness={0.2}
-											/>
-										</T.Mesh>
-									{:else if effectiveShape === 'hex'}
-										<T.Mesh
-											position.x={posX}
-											position.y={counterY}
-											position.z={posZ}
-											rotation.x={Math.PI / 2}
-											rotation.y={stack.hexPointyTop ? Math.PI / 6 : 0}
-										>
-											<T.CylinderGeometry
-												args={[stack.width / 2, stack.width / 2, stack.thickness, 6]}
-											/>
-											<T.MeshStandardMaterial
-												color={counterColor}
-												roughness={0.4}
-												metalness={0.2}
-											/>
-										</T.Mesh>
-									{:else}
-										{@const triGeom = createRoundedTriangleGeometry(
-											stack.width,
-											stack.thickness,
-											triangleCornerRadius
-										)}
-										<T.Mesh
-											geometry={triGeom}
-											position.x={posX}
-											position.y={counterY}
-											position.z={posZ}
-											rotation.x={Math.PI}
-										>
-											<T.MeshStandardMaterial
-												color={counterColor}
-												roughness={0.4}
-												metalness={0.2}
-											/>
-										</T.Mesh>
-									{/if}
+									<CounterMesh
+										shape={effectiveShape}
+										{posX}
+										posY={counterY}
+										{posZ}
+										width={stack.width}
+										length={stack.length}
+										thickness={stack.thickness}
+										color={counterColor}
+										hexPointyTop={stack.hexPointyTop}
+										triangleGeometry={triGeom}
+										isEdgeLoaded={true}
+										edgeOrientation="crosswise"
+										{standingHeight}
+									/>
 								{/if}
 							{/each}
 						{:else}
@@ -1069,101 +970,39 @@
 								{@const posY = counterZ}
 								{@const posZ = -stack.y}
 								{@const isAlt = counterIdx % 2 === 1}
-								{@const counterColor = isAlt
-									? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
-									: stack.color}
+								{@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
 								{@const effectiveShape =
 									stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
-								{@const isSleevedCard = stack.innerWidth && stack.innerLength}
-								{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
-									{#if isSleevedCard}
-										<!-- Sleeved card: transparent sleeve with inner card -->
-										{@const sleeveColor = isAlt ? '#88c8e8' : '#78b8d8'}
-										{@const innerCardColor = isAlt ? '#2a5a74' : '#1a4a64'}
-										<T.Mesh
-											position.x={posX}
-											position.y={posY}
-											position.z={posZ}
-											rotation.x={stack.slopeAngle ?? 0}
-										>
-											<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
-											<T.MeshStandardMaterial
-												color={sleeveColor}
-												transparent
-												opacity={0.4}
-												roughness={0.3}
-												metalness={0.1}
-											/>
-										</T.Mesh>
-										<T.Mesh
-											position.x={posX}
-											position.y={posY}
-											position.z={posZ}
-											rotation.x={stack.slopeAngle ?? 0}
-										>
-											<T.BoxGeometry
-												args={[stack.innerWidth, stack.thickness * 0.6, stack.innerLength]}
-											/>
-											<T.MeshStandardMaterial
-												color={innerCardColor}
-												roughness={0.5}
-												metalness={0.1}
-											/>
-										</T.Mesh>
-									{:else}
-										<T.Mesh
-											position.x={posX}
-											position.y={posY}
-											position.z={posZ}
-											rotation.x={stack.slopeAngle ?? 0}
-										>
-											<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
-											<T.MeshStandardMaterial
-												color={counterColor}
-												roughness={0.4}
-												metalness={0.2}
-											/>
-										</T.Mesh>
-									{/if}
-								{:else if effectiveShape === 'circle'}
-									<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
-										<T.CylinderGeometry
-											args={[stack.width / 2, stack.width / 2, stack.thickness, 32]}
-										/>
-										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-									</T.Mesh>
-								{:else if effectiveShape === 'hex'}
-									<T.Mesh
-										position.x={posX}
-										position.y={posY}
-										position.z={posZ}
-										rotation.y={stack.hexPointyTop ? 0 : Math.PI / 6}
-									>
-										<T.CylinderGeometry
-											args={[stack.width / 2, stack.width / 2, stack.thickness, 6]}
-										/>
-										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-									</T.Mesh>
-								{:else}
-									<!-- Back-row triangles need 180° rotation around Z to face their finger cutout -->
-									{@const triGeom = createRoundedTriangleGeometry(
-										stack.width,
-										stack.thickness,
-										triangleCornerRadius
-									)}
-									{@const isBackRow = stack.rowAssignment === 'back'}
-									<T.Mesh
-										geometry={triGeom}
-										position.x={posX}
-										position.y={posY}
-										position.z={posZ}
-										rotation.x={-Math.PI / 2}
-										rotation.y={Math.PI}
-										rotation.z={isBackRow ? Math.PI : 0}
-									>
-										<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-									</T.Mesh>
-								{/if}
+								{@const isSleevedCard = !!(stack.innerWidth && stack.innerLength)}
+								{@const sleeveColors = getSleeveColors(isAlt)}
+								{@const triGeom =
+									effectiveShape === 'triangle'
+										? createRoundedTriangleGeometry(
+												stack.width,
+												stack.thickness,
+												triangleCornerRadius
+											)
+										: null}
+								<CounterMesh
+									shape={effectiveShape}
+									{posX}
+									{posY}
+									{posZ}
+									width={stack.width}
+									length={stack.length}
+									thickness={stack.thickness}
+									color={counterColor}
+									hexPointyTop={stack.hexPointyTop}
+									triangleGeometry={triGeom}
+									isEdgeLoaded={false}
+									slopeAngle={stack.slopeAngle ?? 0}
+									rowAssignment={stack.rowAssignment}
+									{isSleevedCard}
+									innerWidth={stack.innerWidth}
+									innerLength={stack.innerLength}
+									sleeveColor={sleeveColors.sleeve}
+									innerCardColor={sleeveColors.innerCard}
+								/>
 							{/each}
 						{/if}
 					{/each}
@@ -1489,117 +1328,55 @@
 					stack.isCardDivider && stack.cardDividerHeight
 						? stack.cardDividerHeight
 						: effectiveShape === 'triangle'
-							? stack.length // Triangle geometric height (point down)
+							? stack.length
 							: stack.shape === 'custom'
 								? Math.min(stack.width, stack.length)
 								: Math.max(stack.width, stack.length)}
-				{@const triangleLift = 0}
-				{@const counterY = stack.z + standingHeight / 2 + triangleLift}
+				{@const counterY = stack.z + standingHeight / 2}
 				{@const isAlt = counterIdx % 2 === 1}
-				{@const counterColor = isAlt
-					? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
-					: stack.color}
+				{@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
+				{@const triGeom =
+					effectiveShape === 'triangle'
+						? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
+						: null}
 				{#if stack.edgeOrientation === 'lengthwise'}
-					<!-- Lengthwise: counters arranged along X axis, standing on edge -->
 					{@const counterSpacing = (stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
 					{@const posX = meshOffset.x + stack.x + (counterIdx + 0.5) * counterSpacing}
 					{@const posZ = meshOffset.z - stack.y - (stack.slotDepth ?? stack.length) / 2}
-					{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
-						<!-- Standing on edge: thickness along X (stacking), height along Y, length along Z -->
-						<T.Mesh position.x={posX} position.y={counterY} position.z={posZ}>
-							<T.BoxGeometry args={[stack.thickness, standingHeight, stack.length]} />
-							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-						</T.Mesh>
-					{:else if effectiveShape === 'circle'}
-						<!-- Cylinder standing on edge: rotate so axis is along X -->
-						<T.Mesh
-							position.x={posX}
-							position.y={counterY}
-							position.z={posZ}
-							rotation.z={Math.PI / 2}
-						>
-							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
-							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-						</T.Mesh>
-					{:else if effectiveShape === 'hex'}
-						<!-- hex: rotate so axis is along X -->
-						<T.Mesh
-							position.x={posX}
-							position.y={counterY}
-							position.z={posZ}
-							rotation.z={Math.PI / 2}
-							rotation.x={stack.hexPointyTop ? 0 : Math.PI / 6}
-						>
-							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
-							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-						</T.Mesh>
-					{:else}
-						<!-- triangle: standing on edge lengthwise, axis=X, point down, flat up, rounded corners -->
-						{@const triGeom = createRoundedTriangleGeometry(
-							stack.width,
-							stack.thickness,
-							triangleCornerRadius
-						)}
-						<T.Mesh
-							geometry={triGeom}
-							position.x={posX}
-							position.y={counterY}
-							position.z={posZ}
-							rotation.y={Math.PI / 2}
-							rotation.x={Math.PI}
-						>
-							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-						</T.Mesh>
-					{/if}
+					<CounterMesh
+						shape={effectiveShape}
+						{posX}
+						posY={counterY}
+						{posZ}
+						width={stack.width}
+						length={stack.length}
+						thickness={stack.thickness}
+						color={counterColor}
+						hexPointyTop={stack.hexPointyTop}
+						triangleGeometry={triGeom}
+						isEdgeLoaded={true}
+						edgeOrientation="lengthwise"
+						{standingHeight}
+					/>
 				{:else}
-					<!-- Crosswise: counters arranged along Y axis (Z in Three.js) -->
 					{@const counterSpacing = (stack.slotDepth ?? stack.count * stack.thickness) / stack.count}
 					{@const posX = meshOffset.x + stack.x + (stack.slotWidth ?? stack.length) / 2}
 					{@const posZ = meshOffset.z - stack.y - (counterIdx + 0.5) * counterSpacing}
-					{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
-						<T.Mesh position.x={posX} position.y={counterY} position.z={posZ}>
-							<T.BoxGeometry args={[stack.length, standingHeight, stack.thickness]} />
-							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-						</T.Mesh>
-					{:else if effectiveShape === 'circle'}
-						<T.Mesh
-							position.x={posX}
-							position.y={counterY}
-							position.z={posZ}
-							rotation.x={Math.PI / 2}
-						>
-							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
-							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-						</T.Mesh>
-					{:else if effectiveShape === 'hex'}
-						<!-- hex -->
-						<T.Mesh
-							position.x={posX}
-							position.y={counterY}
-							position.z={posZ}
-							rotation.x={Math.PI / 2}
-							rotation.y={stack.hexPointyTop ? Math.PI / 6 : 0}
-						>
-							<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
-							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-						</T.Mesh>
-					{:else}
-						<!-- triangle: standing on edge crosswise, point down, flat up, rounded corners -->
-						{@const triGeom = createRoundedTriangleGeometry(
-							stack.width,
-							stack.thickness,
-							triangleCornerRadius
-						)}
-						<T.Mesh
-							geometry={triGeom}
-							position.x={posX}
-							position.y={counterY}
-							position.z={posZ}
-							rotation.x={Math.PI}
-						>
-							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-						</T.Mesh>
-					{/if}
+					<CounterMesh
+						shape={effectiveShape}
+						{posX}
+						posY={counterY}
+						{posZ}
+						width={stack.width}
+						length={stack.length}
+						thickness={stack.thickness}
+						color={counterColor}
+						hexPointyTop={stack.hexPointyTop}
+						triangleGeometry={triGeom}
+						isEdgeLoaded={true}
+						edgeOrientation="crosswise"
+						{standingHeight}
+					/>
 				{/if}
 			{/each}
 		{:else}
@@ -1610,89 +1387,35 @@
 				{@const posY = counterZ}
 				{@const posZ = meshOffset.z - stack.y}
 				{@const isAlt = counterIdx % 2 === 1}
-				{@const counterColor = isAlt
-					? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
-					: stack.color}
+				{@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
 				{@const effectiveShape =
 					stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
-				{@const isSleevedCard = stack.innerWidth && stack.innerLength}
-				{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
-					{#if isSleevedCard}
-						<!-- Sleeved card: transparent sleeve with inner card -->
-						{@const sleeveColor = isAlt ? '#88c8e8' : '#78b8d8'}
-						{@const innerCardColor = isAlt ? '#2a5a74' : '#1a4a64'}
-						<T.Mesh
-							position.x={posX}
-							position.y={posY}
-							position.z={posZ}
-							rotation.x={stack.slopeAngle ?? 0}
-						>
-							<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
-							<T.MeshStandardMaterial
-								color={sleeveColor}
-								transparent
-								opacity={0.4}
-								roughness={0.3}
-								metalness={0.1}
-							/>
-						</T.Mesh>
-						<T.Mesh
-							position.x={posX}
-							position.y={posY}
-							position.z={posZ}
-							rotation.x={stack.slopeAngle ?? 0}
-						>
-							<T.BoxGeometry args={[stack.innerWidth, stack.thickness * 0.6, stack.innerLength]} />
-							<T.MeshStandardMaterial color={innerCardColor} roughness={0.5} metalness={0.1} />
-						</T.Mesh>
-					{:else}
-						<T.Mesh
-							position.x={posX}
-							position.y={posY}
-							position.z={posZ}
-							rotation.x={stack.slopeAngle ?? 0}
-						>
-							<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
-							<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-						</T.Mesh>
-					{/if}
-				{:else if effectiveShape === 'circle'}
-					<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
-						<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 32]} />
-						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-					</T.Mesh>
-				{:else if effectiveShape === 'hex'}
-					<!-- hex -->
-					<T.Mesh
-						position.x={posX}
-						position.y={posY}
-						position.z={posZ}
-						rotation.y={stack.hexPointyTop ? 0 : Math.PI / 6}
-					>
-						<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
-						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-					</T.Mesh>
-				{:else}
-					<!-- triangle: rounded corners, geometry is centered -->
-					<!-- Back-row triangles need 180° rotation around Z to face their finger cutout -->
-					{@const triGeom = createRoundedTriangleGeometry(
-						stack.width,
-						stack.thickness,
-						triangleCornerRadius
-					)}
-					{@const isBackRow = stack.rowAssignment === 'back'}
-					<T.Mesh
-						geometry={triGeom}
-						position.x={posX}
-						position.y={posY}
-						position.z={posZ}
-						rotation.x={-Math.PI / 2}
-						rotation.y={Math.PI}
-						rotation.z={isBackRow ? Math.PI : 0}
-					>
-						<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-					</T.Mesh>
-				{/if}
+				{@const isSleevedCard = !!(stack.innerWidth && stack.innerLength)}
+				{@const sleeveColors = getSleeveColors(isAlt)}
+				{@const triGeom =
+					effectiveShape === 'triangle'
+						? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
+						: null}
+				<CounterMesh
+					shape={effectiveShape}
+					{posX}
+					{posY}
+					{posZ}
+					width={stack.width}
+					length={stack.length}
+					thickness={stack.thickness}
+					color={counterColor}
+					hexPointyTop={stack.hexPointyTop}
+					triangleGeometry={triGeom}
+					isEdgeLoaded={false}
+					slopeAngle={stack.slopeAngle ?? 0}
+					rowAssignment={stack.rowAssignment}
+					{isSleevedCard}
+					innerWidth={stack.innerWidth}
+					innerLength={stack.innerLength}
+					sleeveColor={sleeveColors.sleeve}
+					innerCardColor={sleeveColors.innerCard}
+				/>
 			{/each}
 		{/if}
 	{/each}
@@ -1744,113 +1467,51 @@
 										: Math.max(stack.width, stack.length)}
 						{@const counterY = stack.z + standingHeight / 2}
 						{@const isAlt = counterIdx % 2 === 1}
-						{@const counterColor = isAlt
-							? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
-							: stack.color}
+						{@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
+						{@const triGeom =
+							effectiveShape === 'triangle'
+								? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
+								: null}
 						{#if stack.edgeOrientation === 'lengthwise'}
 							{@const counterSpacing =
 								(stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
 							{@const posX = stack.x + (counterIdx + 0.5) * counterSpacing}
 							{@const posZ = -stack.y - (stack.slotDepth ?? stack.length) / 2}
-							{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
-								<T.Mesh position.x={posX} position.y={counterY} position.z={posZ}>
-									<T.BoxGeometry args={[stack.thickness, standingHeight, stack.length]} />
-									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-								</T.Mesh>
-							{:else if effectiveShape === 'circle'}
-								<T.Mesh
-									position.x={posX}
-									position.y={counterY}
-									position.z={posZ}
-									rotation.z={Math.PI / 2}
-								>
-									<T.CylinderGeometry
-										args={[stack.width / 2, stack.width / 2, stack.thickness, 32]}
-									/>
-									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-								</T.Mesh>
-							{:else if effectiveShape === 'hex'}
-								<T.Mesh
-									position.x={posX}
-									position.y={counterY}
-									position.z={posZ}
-									rotation.z={Math.PI / 2}
-									rotation.x={stack.hexPointyTop ? 0 : Math.PI / 6}
-								>
-									<T.CylinderGeometry
-										args={[stack.width / 2, stack.width / 2, stack.thickness, 6]}
-									/>
-									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-								</T.Mesh>
-							{:else}
-								{@const triGeom = createRoundedTriangleGeometry(
-									stack.width,
-									stack.thickness,
-									triangleCornerRadius
-								)}
-								<T.Mesh
-									geometry={triGeom}
-									position.x={posX}
-									position.y={counterY}
-									position.z={posZ}
-									rotation.y={Math.PI / 2}
-									rotation.x={Math.PI}
-								>
-									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-								</T.Mesh>
-							{/if}
+							<CounterMesh
+								shape={effectiveShape}
+								{posX}
+								posY={counterY}
+								{posZ}
+								width={stack.width}
+								length={stack.length}
+								thickness={stack.thickness}
+								color={counterColor}
+								hexPointyTop={stack.hexPointyTop}
+								triangleGeometry={triGeom}
+								isEdgeLoaded={true}
+								edgeOrientation="lengthwise"
+								{standingHeight}
+							/>
 						{:else}
-							<!-- Crosswise: counters arranged along Y axis (Z in Three.js) -->
 							{@const counterSpacing =
 								(stack.slotDepth ?? stack.count * stack.thickness) / stack.count}
 							{@const posX = stack.x + (stack.slotWidth ?? stack.length) / 2}
 							{@const posZ = -stack.y - (counterIdx + 0.5) * counterSpacing}
-							{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
-								<T.Mesh position.x={posX} position.y={counterY} position.z={posZ}>
-									<T.BoxGeometry args={[stack.length, standingHeight, stack.thickness]} />
-									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-								</T.Mesh>
-							{:else if effectiveShape === 'circle'}
-								<T.Mesh
-									position.x={posX}
-									position.y={counterY}
-									position.z={posZ}
-									rotation.x={Math.PI / 2}
-								>
-									<T.CylinderGeometry
-										args={[stack.width / 2, stack.width / 2, stack.thickness, 32]}
-									/>
-									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-								</T.Mesh>
-							{:else if effectiveShape === 'hex'}
-								<T.Mesh
-									position.x={posX}
-									position.y={counterY}
-									position.z={posZ}
-									rotation.x={Math.PI / 2}
-									rotation.y={stack.hexPointyTop ? Math.PI / 6 : 0}
-								>
-									<T.CylinderGeometry
-										args={[stack.width / 2, stack.width / 2, stack.thickness, 6]}
-									/>
-									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-								</T.Mesh>
-							{:else}
-								{@const triGeom = createRoundedTriangleGeometry(
-									stack.width,
-									stack.thickness,
-									triangleCornerRadius
-								)}
-								<T.Mesh
-									geometry={triGeom}
-									position.x={posX}
-									position.y={counterY}
-									position.z={posZ}
-									rotation.x={Math.PI}
-								>
-									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-								</T.Mesh>
-							{/if}
+							<CounterMesh
+								shape={effectiveShape}
+								{posX}
+								posY={counterY}
+								{posZ}
+								width={stack.width}
+								length={stack.length}
+								thickness={stack.thickness}
+								color={counterColor}
+								hexPointyTop={stack.hexPointyTop}
+								triangleGeometry={triGeom}
+								isEdgeLoaded={true}
+								edgeOrientation="crosswise"
+								{standingHeight}
+							/>
 						{/if}
 					{/each}
 				{:else}
@@ -1861,90 +1522,35 @@
 						{@const posY = counterZ}
 						{@const posZ = -stack.y}
 						{@const isAlt = counterIdx % 2 === 1}
-						{@const counterColor = isAlt
-							? `hsl(${[15, 25, 160, 35, 170][stackIdx % 5]}, 45%, 35%)`
-							: stack.color}
+						{@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
 						{@const effectiveShape =
 							stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
-						{@const isSleevedCard = stack.innerWidth && stack.innerLength}
-						{#if effectiveShape === 'square' || effectiveShape === 'rectangle'}
-							{#if isSleevedCard}
-								<!-- Sleeved card: transparent sleeve with inner card -->
-								{@const sleeveColor = isAlt ? '#88c8e8' : '#78b8d8'}
-								{@const innerCardColor = isAlt ? '#2a5a74' : '#1a4a64'}
-								<T.Mesh
-									position.x={posX}
-									position.y={posY}
-									position.z={posZ}
-									rotation.x={stack.slopeAngle ?? 0}
-								>
-									<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
-									<T.MeshStandardMaterial
-										color={sleeveColor}
-										transparent
-										opacity={0.4}
-										roughness={0.3}
-										metalness={0.1}
-									/>
-								</T.Mesh>
-								<T.Mesh
-									position.x={posX}
-									position.y={posY}
-									position.z={posZ}
-									rotation.x={stack.slopeAngle ?? 0}
-								>
-									<T.BoxGeometry
-										args={[stack.innerWidth, stack.thickness * 0.6, stack.innerLength]}
-									/>
-									<T.MeshStandardMaterial color={innerCardColor} roughness={0.5} metalness={0.1} />
-								</T.Mesh>
-							{:else}
-								<T.Mesh
-									position.x={posX}
-									position.y={posY}
-									position.z={posZ}
-									rotation.x={stack.slopeAngle ?? 0}
-								>
-									<T.BoxGeometry args={[stack.width, stack.thickness, stack.length]} />
-									<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-								</T.Mesh>
-							{/if}
-						{:else if effectiveShape === 'circle'}
-							<T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
-								<T.CylinderGeometry
-									args={[stack.width / 2, stack.width / 2, stack.thickness, 32]}
-								/>
-								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-							</T.Mesh>
-						{:else if effectiveShape === 'hex'}
-							<T.Mesh
-								position.x={posX}
-								position.y={posY}
-								position.z={posZ}
-								rotation.y={stack.hexPointyTop ? 0 : Math.PI / 6}
-							>
-								<T.CylinderGeometry args={[stack.width / 2, stack.width / 2, stack.thickness, 6]} />
-								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-							</T.Mesh>
-						{:else}
-							{@const triGeom = createRoundedTriangleGeometry(
-								stack.width,
-								stack.thickness,
-								triangleCornerRadius
-							)}
-							{@const isBackRow = stack.rowAssignment === 'back'}
-							<T.Mesh
-								geometry={triGeom}
-								position.x={posX}
-								position.y={posY}
-								position.z={posZ}
-								rotation.x={-Math.PI / 2}
-								rotation.y={Math.PI}
-								rotation.z={isBackRow ? Math.PI : 0}
-							>
-								<T.MeshStandardMaterial color={counterColor} roughness={0.4} metalness={0.2} />
-							</T.Mesh>
-						{/if}
+						{@const isSleevedCard = !!(stack.innerWidth && stack.innerLength)}
+						{@const sleeveColors = getSleeveColors(isAlt)}
+						{@const triGeom =
+							effectiveShape === 'triangle'
+								? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
+								: null}
+						<CounterMesh
+							shape={effectiveShape}
+							{posX}
+							{posY}
+							{posZ}
+							width={stack.width}
+							length={stack.length}
+							thickness={stack.thickness}
+							color={counterColor}
+							hexPointyTop={stack.hexPointyTop}
+							triangleGeometry={triGeom}
+							isEdgeLoaded={false}
+							slopeAngle={stack.slopeAngle ?? 0}
+							rowAssignment={stack.rowAssignment}
+							{isSleevedCard}
+							innerWidth={stack.innerWidth}
+							innerLength={stack.innerLength}
+							sleeveColor={sleeveColors.sleeve}
+							innerCardColor={sleeveColors.innerCard}
+						/>
 					{/each}
 				{/if}
 			{/each}
