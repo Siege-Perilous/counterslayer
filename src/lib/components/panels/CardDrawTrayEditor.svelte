@@ -48,8 +48,8 @@
 		{#if selectedCardSize}
 			<Spacer size="0.25rem" />
 			<p class="cardSizeInfo">
-				{selectedCardSize.width}mm × {selectedCardSize.length}mm, {selectedCardSize.thickness}mm thick
-				(sleeved)
+				{selectedCardSize.width}mm × {selectedCardSize.length}mm, {selectedCardSize.thickness}mm
+				thick (sleeved)
 			</p>
 		{/if}
 	</section>

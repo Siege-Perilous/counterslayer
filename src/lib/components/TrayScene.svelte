@@ -912,9 +912,14 @@
 								{@const counterY = stack.z + standingHeight / 2}
 								{@const isAlt = counterIdx % 2 === 1}
 								{@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
-								{@const triGeom = effectiveShape === 'triangle'
-									? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
-									: null}
+								{@const triGeom =
+									effectiveShape === 'triangle'
+										? createRoundedTriangleGeometry(
+												stack.width,
+												stack.thickness,
+												triangleCornerRadius
+											)
+										: null}
 								{#if stack.edgeOrientation === 'lengthwise'}
 									{@const counterSpacing =
 										(stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
@@ -970,9 +975,14 @@
 									stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 								{@const isSleevedCard = !!(stack.innerWidth && stack.innerLength)}
 								{@const sleeveColors = getSleeveColors(isAlt)}
-								{@const triGeom = effectiveShape === 'triangle'
-									? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
-									: null}
+								{@const triGeom =
+									effectiveShape === 'triangle'
+										? createRoundedTriangleGeometry(
+												stack.width,
+												stack.thickness,
+												triangleCornerRadius
+											)
+										: null}
 								<CounterMesh
 									shape={effectiveShape}
 									{posX}
@@ -1325,9 +1335,10 @@
 				{@const counterY = stack.z + standingHeight / 2}
 				{@const isAlt = counterIdx % 2 === 1}
 				{@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
-				{@const triGeom = effectiveShape === 'triangle'
-					? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
-					: null}
+				{@const triGeom =
+					effectiveShape === 'triangle'
+						? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
+						: null}
 				{#if stack.edgeOrientation === 'lengthwise'}
 					{@const counterSpacing = (stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
 					{@const posX = meshOffset.x + stack.x + (counterIdx + 0.5) * counterSpacing}
@@ -1381,9 +1392,10 @@
 					stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 				{@const isSleevedCard = !!(stack.innerWidth && stack.innerLength)}
 				{@const sleeveColors = getSleeveColors(isAlt)}
-				{@const triGeom = effectiveShape === 'triangle'
-					? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
-					: null}
+				{@const triGeom =
+					effectiveShape === 'triangle'
+						? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
+						: null}
 				<CounterMesh
 					shape={effectiveShape}
 					{posX}
@@ -1456,9 +1468,10 @@
 						{@const counterY = stack.z + standingHeight / 2}
 						{@const isAlt = counterIdx % 2 === 1}
 						{@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
-						{@const triGeom = effectiveShape === 'triangle'
-							? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
-							: null}
+						{@const triGeom =
+							effectiveShape === 'triangle'
+								? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
+								: null}
 						{#if stack.edgeOrientation === 'lengthwise'}
 							{@const counterSpacing =
 								(stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
@@ -1514,9 +1527,10 @@
 							stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
 						{@const isSleevedCard = !!(stack.innerWidth && stack.innerLength)}
 						{@const sleeveColors = getSleeveColors(isAlt)}
-						{@const triGeom = effectiveShape === 'triangle'
-							? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
-							: null}
+						{@const triGeom =
+							effectiveShape === 'triangle'
+								? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
+								: null}
 						<CounterMesh
 							shape={effectiveShape}
 							{posX}

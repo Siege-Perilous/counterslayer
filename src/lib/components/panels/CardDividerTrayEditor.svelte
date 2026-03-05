@@ -65,7 +65,11 @@
 	}
 
 	// Stack handlers
-	function updateStack(index: number, field: 'cardSizeId' | 'count' | 'label', value: string | number) {
+	function updateStack(
+		index: number,
+		field: 'cardSizeId' | 'count' | 'label',
+		value: string | number
+	) {
 		const newStacks = [...tray.params.stacks];
 		const current = newStacks[index];
 		if (field === 'cardSizeId') {
