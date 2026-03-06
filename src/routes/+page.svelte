@@ -56,8 +56,7 @@
 		isCardTray,
 		isCardDividerTray,
 		saveManualLayout,
-		clearManualLayout,
-		selectTray
+		clearManualLayout
 	} from '$lib/stores/project.svelte';
 	import type { Project } from '$lib/types/project';
 	import type { BufferGeometry } from 'three';
