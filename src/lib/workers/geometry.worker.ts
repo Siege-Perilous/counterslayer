@@ -28,6 +28,21 @@ import { isCardTray, isCardDividerTray, isCupTray } from '$lib/types/project';
 
 const { geom3 } = jscad.geometries;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const generalize = (jscad.modifiers as any).generalize as (
+	options: { snap?: boolean; simplify?: boolean; triangulate?: boolean },
+	geom: Geom3
+) => Geom3;
+
+/**
+ * Clean geometry before STL export to reduce non-manifold edges.
+ * Applies snap and simplify (merge coplanar polygons).
+ * Note: triangulate is omitted here since the STL serializer handles it.
+ */
+function cleanGeometryForExport(geom: Geom3): Geom3 {
+	return generalize({ snap: true, simplify: true }, geom);
+}
+
 /**
  * Generate a tray letter based on cumulative index across all boxes.
  * A-Z for first 26, then AA, BB, CC... for 26+
@@ -624,7 +639,8 @@ function handleExportStl(msg: ExportStlMessage): void {
 			return;
 		}
 
-		const stlData = stlSerializer.serialize({ binary: true }, geom);
+		const cleanedGeom = cleanGeometryForExport(geom);
+		const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
 		const blob = new Blob(stlData, { type: 'application/octet-stream' });
 
 		// Convert blob to ArrayBuffer
@@ -682,7 +698,8 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
 
 			// Export box
 			if (boxData.boxGeom) {
-				const stlData = stlSerializer.serialize({ binary: true }, boxData.boxGeom);
+				const cleanedGeom = cleanGeometryForExport(boxData.boxGeom);
+				const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
 				const blob = new Blob(stlData, { type: 'application/octet-stream' });
 				const buffer = await blob.arrayBuffer();
 				files.push({ filename: `${boxPrefix}-box.stl`, data: buffer });
@@ -691,7 +708,8 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
 
 			// Export lid
 			if (boxData.lidGeom) {
-				const stlData = stlSerializer.serialize({ binary: true }, boxData.lidGeom);
+				const cleanedGeom = cleanGeometryForExport(boxData.lidGeom);
+				const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
 				const blob = new Blob(stlData, { type: 'application/octet-stream' });
 				const buffer = await blob.arrayBuffer();
 				files.push({ filename: `${boxPrefix}-lid.stl`, data: buffer });
@@ -700,7 +718,8 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
 
 			// Export trays
 			for (const tray of boxData.trays) {
-				const stlData = stlSerializer.serialize({ binary: true }, tray.jscadGeom);
+				const cleanedGeom = cleanGeometryForExport(tray.jscadGeom);
+				const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
 				const blob = new Blob(stlData, { type: 'application/octet-stream' });
 				const buffer = await blob.arrayBuffer();
 				const trayName = sanitizeFilename(tray.name);
