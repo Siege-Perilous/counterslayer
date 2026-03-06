@@ -25,7 +25,23 @@ import {
 	isCupTray
 } from '../src/lib/types/project.js';
 import stlSerializer from '@jscad/stl-serializer';
+import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const generalize = (jscad.modifiers as any).generalize as (
+	options: { snap?: boolean; simplify?: boolean; triangulate?: boolean },
+	geom: Geom3
+) => Geom3;
+
+/**
+ * Clean geometry before STL export to reduce non-manifold edges.
+ * Applies snap and simplify (merge coplanar polygons).
+ * Note: triangulate is omitted here since the STL serializer handles it.
+ */
+function cleanGeometryForExport(geom: Geom3): Geom3 {
+	return generalize({ snap: true, simplify: true }, geom);
+}
 
 const MESH_ANALYSIS_DIR = join(import.meta.dirname, '..', 'mesh-analysis');
 
@@ -64,7 +80,8 @@ async function main() {
 	try {
 		const boxGeom = createBoxWithLidGrooves(box);
 		if (boxGeom) {
-			const boxStl = stlSerializer.serialize({ binary: true }, boxGeom);
+			const cleanedGeom = cleanGeometryForExport(boxGeom);
+			const boxStl = stlSerializer.serialize({ binary: true }, cleanedGeom);
 			const boxPath = join(MESH_ANALYSIS_DIR, 'box.stl');
 			writeFileSync(
 				boxPath,
@@ -83,7 +100,8 @@ async function main() {
 	try {
 		const lidGeom = createLid(box);
 		if (lidGeom) {
-			const lidStl = stlSerializer.serialize({ binary: true }, lidGeom);
+			const cleanedGeom = cleanGeometryForExport(lidGeom);
+			const lidStl = stlSerializer.serialize({ binary: true }, cleanedGeom);
 			const lidPath = join(MESH_ANALYSIS_DIR, 'lid.stl');
 			writeFileSync(
 				lidPath,
@@ -133,7 +151,8 @@ async function main() {
 			}
 
 			if (trayGeom) {
-				const trayStl = stlSerializer.serialize({ binary: true }, trayGeom);
+				const cleanedGeom = cleanGeometryForExport(trayGeom);
+				const trayStl = stlSerializer.serialize({ binary: true }, cleanedGeom);
 				const trayPath = join(MESH_ANALYSIS_DIR, filename);
 				writeFileSync(
 					trayPath,

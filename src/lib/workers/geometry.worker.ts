@@ -22,11 +22,27 @@ import {
 	type TrayPlacement
 } from '$lib/models/box';
 import stlSerializer from '@jscad/stl-serializer';
+import threemfSerializer from '@jscad/3mf-serializer';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { Box, Tray, CardSize, CounterShape } from '$lib/types/project';
 import { isCardTray, isCardDividerTray, isCupTray } from '$lib/types/project';
 
 const { geom3 } = jscad.geometries;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const generalize = (jscad.modifiers as any).generalize as (
+	options: { snap?: boolean; simplify?: boolean; triangulate?: boolean },
+	geom: Geom3
+) => Geom3;
+
+/**
+ * Clean geometry before STL export to reduce non-manifold edges.
+ * Applies snap and simplify (merge coplanar polygons).
+ * Note: triangulate is omitted here since the STL serializer handles it.
+ */
+function cleanGeometryForExport(geom: Geom3): Geom3 {
+	return generalize({ snap: true, simplify: true }, geom);
+}
 
 /**
  * Generate a tray letter based on cumulative index across all boxes.
@@ -77,7 +93,12 @@ interface ExportAllStlsMessage {
 	id: number;
 }
 
-type WorkerMessage = GenerateMessage | ExportStlMessage | ExportAllStlsMessage;
+interface Export3mfMessage {
+	type: 'export-3mf';
+	id: number;
+}
+
+type WorkerMessage = GenerateMessage | ExportStlMessage | ExportAllStlsMessage | Export3mfMessage;
 
 // Geometry data to transfer back (raw arrays for BufferGeometry reconstruction)
 interface GeometryData {
@@ -133,6 +154,14 @@ interface ExportAllStlsResult {
 	type: 'export-all-stls-result';
 	id: number;
 	files: StlFile[];
+	error?: string;
+}
+
+interface Export3mfResult {
+	type: 'export-3mf-result';
+	id: number;
+	data: ArrayBuffer;
+	filename: string;
 	error?: string;
 }
 
@@ -624,7 +653,8 @@ function handleExportStl(msg: ExportStlMessage): void {
 			return;
 		}
 
-		const stlData = stlSerializer.serialize({ binary: true }, geom);
+		const cleanedGeom = cleanGeometryForExport(geom);
+		const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
 		const blob = new Blob(stlData, { type: 'application/octet-stream' });
 
 		// Convert blob to ArrayBuffer
@@ -682,7 +712,8 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
 
 			// Export box
 			if (boxData.boxGeom) {
-				const stlData = stlSerializer.serialize({ binary: true }, boxData.boxGeom);
+				const cleanedGeom = cleanGeometryForExport(boxData.boxGeom);
+				const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
 				const blob = new Blob(stlData, { type: 'application/octet-stream' });
 				const buffer = await blob.arrayBuffer();
 				files.push({ filename: `${boxPrefix}-box.stl`, data: buffer });
@@ -691,7 +722,8 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
 
 			// Export lid
 			if (boxData.lidGeom) {
-				const stlData = stlSerializer.serialize({ binary: true }, boxData.lidGeom);
+				const cleanedGeom = cleanGeometryForExport(boxData.lidGeom);
+				const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
 				const blob = new Blob(stlData, { type: 'application/octet-stream' });
 				const buffer = await blob.arrayBuffer();
 				files.push({ filename: `${boxPrefix}-lid.stl`, data: buffer });
@@ -700,7 +732,8 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
 
 			// Export trays
 			for (const tray of boxData.trays) {
-				const stlData = stlSerializer.serialize({ binary: true }, tray.jscadGeom);
+				const cleanedGeom = cleanGeometryForExport(tray.jscadGeom);
+				const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
 				const blob = new Blob(stlData, { type: 'application/octet-stream' });
 				const buffer = await blob.arrayBuffer();
 				const trayName = sanitizeFilename(tray.name);
@@ -727,6 +760,140 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
 	}
 }
 
+/**
+ * Export all geometries to a single 3MF file
+ * 3MF supports multiple objects in a single file with names and colors
+ */
+async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
+	const { id } = msg;
+
+	try {
+		if (cachedAllBoxes.length === 0) {
+			self.postMessage({
+				type: 'export-3mf-result',
+				id,
+				data: new ArrayBuffer(0),
+				filename: '',
+				error: 'No geometry available for export. Please generate geometry first.'
+			} as Export3mfResult);
+			return;
+		}
+
+		// Collect all geometries with their names and bounds
+		const namedGeometries: { geom: Geom3; name: string }[] = [];
+
+		for (const boxData of cachedAllBoxes) {
+			const boxPrefix = sanitizeFilename(boxData.boxName);
+
+			// Add box
+			if (boxData.boxGeom) {
+				const cleanedGeom = cleanGeometryForExport(boxData.boxGeom);
+				namedGeometries.push({ geom: cleanedGeom, name: `${boxPrefix}-box` });
+			}
+
+			// Add lid
+			if (boxData.lidGeom) {
+				const cleanedGeom = cleanGeometryForExport(boxData.lidGeom);
+				namedGeometries.push({ geom: cleanedGeom, name: `${boxPrefix}-lid` });
+			}
+
+			// Add trays
+			for (const tray of boxData.trays) {
+				const cleanedGeom = cleanGeometryForExport(tray.jscadGeom);
+				const trayName = sanitizeFilename(tray.name);
+				namedGeometries.push({ geom: cleanedGeom, name: `${boxPrefix}-${trayName}` });
+			}
+		}
+
+		if (namedGeometries.length === 0) {
+			self.postMessage({
+				type: 'export-3mf-result',
+				id,
+				data: new ArrayBuffer(0),
+				filename: '',
+				error: 'No geometry available for export'
+			} as Export3mfResult);
+			return;
+		}
+
+		// Arrange geometries in a grid layout so they don't overlap
+		const spacing = 10; // mm between objects
+		const { translate } = jscad.transforms;
+		const { measureBoundingBox } = jscad.measurements;
+
+		// Calculate bounds for each geometry and arrange in rows
+		let currentX = 0;
+		let currentY = 0;
+		let rowMaxDepth = 0;
+		const maxRowWidth = 300; // Start a new row after this width
+
+		const arrangedGeometries: Geom3[] = [];
+
+		for (const { geom, name } of namedGeometries) {
+			const bounds = measureBoundingBox(geom);
+			const width = bounds[1][0] - bounds[0][0];
+			const depth = bounds[1][1] - bounds[0][1];
+
+			// Check if we need to start a new row
+			if (currentX > 0 && currentX + width > maxRowWidth) {
+				currentX = 0;
+				currentY += rowMaxDepth + spacing;
+				rowMaxDepth = 0;
+			}
+
+			// Translate geometry to its position (move min corner to currentX, currentY)
+			const offsetX = currentX - bounds[0][0];
+			const offsetY = currentY - bounds[0][1];
+			const translatedGeom = translate([offsetX, offsetY, -bounds[0][2]], geom);
+
+			// Set the name attribute for 3MF
+			(translatedGeom as Geom3 & { name?: string }).name = name;
+			arrangedGeometries.push(translatedGeom);
+
+			// Update position for next object
+			currentX += width + spacing;
+			rowMaxDepth = Math.max(rowMaxDepth, depth);
+		}
+
+		// Serialize all geometries to a single 3MF file
+		const threemfData = threemfSerializer.serialize(
+			{
+				unit: 'millimeter',
+				metadata: true,
+				compress: true // This creates a proper 3MF ZIP package
+			},
+			...arrangedGeometries
+		);
+
+		const blob = new Blob(threemfData, {
+			type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml'
+		});
+		const buffer = await blob.arrayBuffer();
+
+		// Use first box name for filename
+		const projectName =
+			cachedAllBoxes[0]?.boxName?.toLowerCase().replace(/\s+/g, '-') || 'counterslayer';
+
+		self.postMessage(
+			{
+				type: 'export-3mf-result',
+				id,
+				data: buffer,
+				filename: `${projectName}.3mf`
+			} as Export3mfResult,
+			{ transfer: [buffer] }
+		);
+	} catch (e) {
+		self.postMessage({
+			type: 'export-3mf-result',
+			id,
+			data: new ArrayBuffer(0),
+			filename: '',
+			error: e instanceof Error ? e.message : 'Unknown error during 3MF export'
+		} as Export3mfResult);
+	}
+}
+
 // Message handler
 self.onmessage = (event: MessageEvent<WorkerMessage>) => {
 	const msg = event.data;
@@ -740,6 +907,9 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
 			break;
 		case 'export-all-stls':
 			handleExportAllStls(msg);
+			break;
+		case 'export-3mf':
+			handleExport3mf(msg);
 			break;
 	}
 };
