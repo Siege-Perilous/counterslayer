@@ -335,8 +335,11 @@
 			return;
 		}
 
+		// Capture hash at START of generation to handle params changing during async work
+		const hashAtGenerationStart = currentStateHash;
+
 		// Check if cache is still valid (hash matches what was used to generate it)
-		const cacheValid = lastGeneratedHash && currentStateHash === lastGeneratedHash;
+		const cacheValid = lastGeneratedHash && hashAtGenerationStart === lastGeneratedHash;
 
 		// If cache valid and not forced, try to use cached geometry
 		if (cacheValid && !force && allBoxGeometries.length > 0) {
@@ -375,6 +378,7 @@
 			allTrayGeometries = [];
 		}
 
+		let wasSuperseded = false;
 		try {
 			// Use web worker for geometry generation (non-blocking)
 			const result = await geometryWorker.generate(project, box.id, tray.id);
@@ -388,14 +392,24 @@
 		} catch (e) {
 			// Ignore "superseded" errors - these are expected when a newer request replaces an older one
 			const message = e instanceof Error ? e.message : 'Unknown error';
-			if (message !== 'Superseded by newer request') {
+			if (message === 'Superseded by newer request') {
+				wasSuperseded = true;
+			} else {
 				error = message;
 				console.error('Generation error:', e);
 			}
 		} finally {
-			generating = false;
-			isDirty = false;
-			lastGeneratedHash = currentStateHash;
+			// Don't update state for superseded requests - a newer request will handle it
+			if (!wasSuperseded) {
+				generating = false;
+				// Use the hash captured at generation start, not current
+				// This prevents marking cache as valid if params changed during generation
+				lastGeneratedHash = hashAtGenerationStart;
+				// Only clear dirty if params haven't changed since generation started
+				if (currentStateHash === hashAtGenerationStart) {
+					isDirty = false;
+				}
+			}
 		}
 	}
 
@@ -945,13 +959,19 @@
 		}
 	});
 
-	// Track structural changes (selection, add/delete) but not param edits
-	// Include box-tray membership to detect tray moves between boxes
-	let structuralHash = $derived.by(() => {
+	// Track selection changes (which box/tray is selected)
+	let selectionHash = $derived.by(() => {
 		const project = getProject();
 		return JSON.stringify({
 			selectedBoxId: project.selectedBoxId,
-			selectedTrayId: project.selectedTrayId,
+			selectedTrayId: project.selectedTrayId
+		});
+	});
+
+	// Track true structural changes (boxes/trays added, deleted, or moved)
+	let structureHash = $derived.by(() => {
+		const project = getProject();
+		return JSON.stringify({
 			boxIds: project.boxes.map((b) => b.id),
 			// Include full box->tray mapping to detect moves
 			boxTrayMapping: project.boxes.map((b) => ({
@@ -963,12 +983,13 @@
 
 	// Generate on mount (forced) and when structure changes (selection, add/delete)
 	let hasInitialized = false;
-	let lastStructuralHash = '';
+	let lastSelectionHash = '';
+	let lastStructureHash = '';
 	$effect(() => {
-		// Only track structuralHash - use untrack for selectedTray/selectedBox
-		// to avoid regenerating on every param edit
-		const hash = structuralHash;
-		if (browser && hash) {
+		// Track both hashes separately
+		const selHash = selectionHash;
+		const strHash = structureHash;
+		if (browser && selHash && strHash) {
 			// Check if we have valid selection using direct project reads
 			// This avoids potential timing issues with derived values
 			const project = untrack(() => getProject());
@@ -979,16 +1000,20 @@
 			const selectedTray = selectedBox?.trays.find((t) => t.id === project.selectedTrayId);
 
 			if (hasValidSelection && selectedBox && selectedTray) {
-				// Only regenerate if structural hash actually changed
-				const structureChanged = hash !== lastStructuralHash;
-				lastStructuralHash = hash;
+				const selectionChanged = selHash !== lastSelectionHash;
+				const structureChanged = strHash !== lastStructureHash;
+				lastSelectionHash = selHash;
+				lastStructureHash = strHash;
 
 				if (!hasInitialized) {
 					hasInitialized = true;
 					regenerate(true); // Force on initial load
 				} else if (structureChanged) {
-					// Force regeneration on structural changes to ensure worker gets fresh data
+					// Force regeneration only for true structural changes (add/delete/move)
 					regenerate(true);
+				} else if (selectionChanged) {
+					// Selection-only changes should use the cache
+					regenerate(false);
 				}
 			}
 		}
