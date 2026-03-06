@@ -261,16 +261,17 @@
 
 	// Handle double-click on tray to navigate to it
 	function handleTrayDoubleClick(trayId: string) {
-		// Find which box contains this tray and select it first
+		// Find which box contains this tray and select both box and tray
 		const project = getProject();
 		for (const box of project.boxes) {
 			const tray = box.trays.find((t) => t.id === trayId);
 			if (tray) {
+				// Update both selections together to avoid inconsistent state
 				project.selectedBoxId = box.id;
+				project.selectedTrayId = trayId;
 				break;
 			}
 		}
-		selectTray(trayId);
 		selectionType = 'tray';
 		viewMode = 'tray';
 	}
@@ -343,16 +344,24 @@
 			// Find the selected box in the all-boxes cache
 			const cachedBox = allBoxGeometries.find((b) => b.boxId === box.id);
 			if (cachedBox) {
-				// Find the selected tray within this box
-				const cachedTray = cachedBox.trayGeometries.find((t) => t.trayId === tray.id);
-				if (cachedTray) {
-					// Use cached data for this box
-					selectedTrayGeometry = cachedTray.geometry;
-					selectedTrayCounters = cachedTray.counterStacks;
-					allTrayGeometries = cachedBox.trayGeometries;
-					boxGeometry = cachedBox.boxGeometry;
-					lidGeometry = cachedBox.lidGeometry;
-					return;
+				// Verify the cached tray count matches current state (detects tray moves)
+				const currentTrayCount = box.trays.length;
+				const cachedTrayCount = cachedBox.trayGeometries.length;
+				if (currentTrayCount !== cachedTrayCount) {
+					// Tray count mismatch - cache is stale, force regeneration
+					// This can happen when a tray is moved between boxes
+				} else {
+					// Find the selected tray within this box
+					const cachedTray = cachedBox.trayGeometries.find((t) => t.trayId === tray.id);
+					if (cachedTray) {
+						// Use cached data for this box
+						selectedTrayGeometry = cachedTray.geometry;
+						selectedTrayCounters = cachedTray.counterStacks;
+						allTrayGeometries = cachedBox.trayGeometries;
+						boxGeometry = cachedBox.boxGeometry;
+						lidGeometry = cachedBox.lidGeometry;
+						return;
+					}
 				}
 			}
 		}
@@ -931,13 +940,18 @@
 	});
 
 	// Track structural changes (selection, add/delete) but not param edits
+	// Include box-tray membership to detect tray moves between boxes
 	let structuralHash = $derived.by(() => {
 		const project = getProject();
 		return JSON.stringify({
 			selectedBoxId: project.selectedBoxId,
 			selectedTrayId: project.selectedTrayId,
 			boxIds: project.boxes.map((b) => b.id),
-			trayIds: project.boxes.map((b) => b.trays.map((t) => t.id))
+			// Include full box->tray mapping to detect moves
+			boxTrayMapping: project.boxes.map((b) => ({
+				boxId: b.id,
+				trayIds: b.trays.map((t) => t.id)
+			}))
 		});
 	});
 
@@ -949,10 +963,16 @@
 		// to avoid regenerating on every param edit
 		const hash = structuralHash;
 		if (browser && hash) {
-			// Read these without creating dependencies
-			const hasTray = untrack(() => selectedTray);
-			const hasBox = untrack(() => selectedBox);
-			if (hasTray && hasBox) {
+			// Check if we have valid selection using direct project reads
+			// This avoids potential timing issues with derived values
+			const project = untrack(() => getProject());
+			const hasValidSelection = project.selectedBoxId && project.selectedTrayId;
+
+			// Verify the selected tray exists in the selected box
+			const selectedBox = project.boxes.find((b) => b.id === project.selectedBoxId);
+			const selectedTray = selectedBox?.trays.find((t) => t.id === project.selectedTrayId);
+
+			if (hasValidSelection && selectedBox && selectedTray) {
 				// Only regenerate if structural hash actually changed
 				const structureChanged = hash !== lastStructuralHash;
 				lastStructuralHash = hash;
@@ -961,7 +981,8 @@
 					hasInitialized = true;
 					regenerate(true); // Force on initial load
 				} else if (structureChanged) {
-					regenerate(); // Structure changed (selection, add/delete tray)
+					// Force regeneration on structural changes to ensure worker gets fresh data
+					regenerate(true);
 				}
 			}
 		}
