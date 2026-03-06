@@ -416,7 +416,13 @@ function handleGenerate(msg: GenerateMessage): void {
 				name: placement.tray.name,
 				color: placement.tray.color,
 				geometry: jscadToArrays(jscadGeom),
-				placement,
+				placement: {
+					...placement,
+					dimensions: {
+						...placement.dimensions,
+						height: maxHeight
+					}
+				},
 				counterStacks: getTrayPositions(
 					placement.tray,
 					cardSizes,
@@ -485,7 +491,13 @@ function handleGenerate(msg: GenerateMessage): void {
 					name: placement.tray.name,
 					color: placement.tray.color,
 					geometry: jscadToArrays(jscadGeom),
-					placement,
+					placement: {
+						...placement,
+						dimensions: {
+							...placement.dimensions,
+							height: boxMaxHeight
+						}
+					},
 					counterStacks: getTrayPositions(
 						placement.tray,
 						cardSizes,

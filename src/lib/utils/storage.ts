@@ -71,6 +71,18 @@ interface LegacyCardTrayParams {
 	cardSizeId?: string;
 }
 
+// Legacy cup tray params (old format with individual cup dimensions)
+interface LegacyCupTrayParams {
+	cupWidth?: number;
+	cupDepth?: number;
+	cupHeight?: number;
+	rows?: number;
+	columns?: number;
+	wallThickness?: number;
+	floorThickness?: number;
+	cornerRadius?: number;
+}
+
 // Legacy card divider stack
 interface LegacyCardDividerStack {
 	cardSizeName?: string;
@@ -214,6 +226,51 @@ function migrateCardDrawTrayParams(
 	return { cardSizeId: DEFAULT_CARD_SIZE_IDS.standard };
 }
 
+// Migrate cup tray params from old format (cupWidth/cupDepth/cupHeight) to new format (trayWidth/trayDepth/cupCavityHeight)
+function migrateCupTrayParams(params: LegacyCupTrayParams): {
+	trayWidth: number;
+	trayDepth: number;
+	cupCavityHeight: number | null;
+	rows: number;
+	columns: number;
+	wallThickness: number;
+	floorThickness: number;
+	cornerRadius: number;
+} {
+	const rows = params.rows ?? 2;
+	const columns = params.columns ?? 2;
+	const wallThickness = params.wallThickness ?? 3.0;
+	const floorThickness = params.floorThickness ?? 2.0;
+	const cornerRadius = params.cornerRadius ?? 6;
+
+	// Check if already in new format (has trayWidth)
+	if ('trayWidth' in params) {
+		return params as ReturnType<typeof migrateCupTrayParams>;
+	}
+
+	// Convert old cup dimensions to tray dimensions
+	const cupWidth = params.cupWidth ?? 40;
+	const cupDepth = params.cupDepth ?? 40;
+	const cupHeight = params.cupHeight ?? 25;
+
+	// Calculate tray dimensions from cup dimensions
+	// trayWidth = wall + (columns * cupWidth) + ((columns - 1) * wall) + wall
+	const trayWidth =
+		wallThickness + columns * cupWidth + (columns - 1) * wallThickness + wallThickness;
+	const trayDepth = wallThickness + rows * cupDepth + (rows - 1) * wallThickness + wallThickness;
+
+	return {
+		trayWidth,
+		trayDepth,
+		cupCavityHeight: cupHeight, // Preserve explicit height from old format
+		rows,
+		columns,
+		wallThickness,
+		floorThickness,
+		cornerRadius
+	};
+}
+
 // Migrate card divider stacks to use cardSizeId
 function migrateCardDividerStacks(
 	stacks: LegacyCardDividerStack[],
@@ -271,10 +328,12 @@ function migrateTray(
 	}
 
 	if (trayType === 'cup') {
+		const legacyParams = (tray as { params: LegacyCupTrayParams }).params;
 		return {
 			...tray,
 			type: 'cup',
-			color
+			color,
+			params: migrateCupTrayParams(legacyParams)
 		} as Tray;
 	}
 

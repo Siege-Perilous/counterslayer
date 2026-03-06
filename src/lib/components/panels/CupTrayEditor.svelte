@@ -4,19 +4,40 @@
 	import {
 		type CupTrayParams,
 		getCupTrayDimensions,
-		validateCupTrayParams
+		getCupDimensions,
+		validateCupTrayParams,
+		DEFAULT_CUP_CAVITY_HEIGHT
 	} from '$lib/models/cupTray';
 
 	interface Props {
 		tray: CupTray;
 		onUpdateParams: (params: CupTrayParams) => void;
+		actualHeight?: number;
 	}
 
-	let { tray, onUpdateParams }: Props = $props();
+	let { tray, onUpdateParams, actualHeight }: Props = $props();
 
-	// Compute dimensions
+	// Calculate cup dimensions for display
+	let cupDimensions = $derived.by(() => getCupDimensions(tray.params));
+
+	// Compute auto cup cavity height (used when cupCavityHeight is null)
+	let autoCupCavityHeight = $derived.by(() => {
+		if (actualHeight) {
+			return actualHeight - tray.params.floorThickness;
+		}
+		return DEFAULT_CUP_CAVITY_HEIGHT;
+	});
+
+	// Effective height for display calculations
+	let effectiveCupCavityHeight = $derived(tray.params.cupCavityHeight ?? autoCupCavityHeight);
+
+	// Compute tray dimensions
 	let dimensions = $derived.by(() => {
-		return getCupTrayDimensions(tray.params);
+		const baseDims = getCupTrayDimensions(tray.params, effectiveCupCavityHeight);
+		return {
+			...baseDims,
+			height: actualHeight && actualHeight > baseDims.height ? actualHeight : baseDims.height
+		};
 	});
 
 	// Compute validation warnings
@@ -26,6 +47,19 @@
 
 	function updateParam<K extends keyof CupTrayParams>(key: K, value: CupTrayParams[K]) {
 		onUpdateParams({ ...tray.params, [key]: value });
+	}
+
+	function handleCupCavityHeightChange(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const value = input.value.trim();
+		if (value === '') {
+			updateParam('cupCavityHeight', null);
+		} else {
+			const num = parseFloat(value);
+			if (!isNaN(num)) {
+				updateParam('cupCavityHeight', num);
+			}
+		}
 	}
 </script>
 
@@ -37,8 +71,57 @@
 		<Spacer size="0.5rem" />
 	{/if}
 
+	<!-- Tray Dimensions (Primary Controls) -->
 	<section class="section">
-		<h3 class="sectionTitle">Grid Layout</h3>
+		<div class="sectionHeader">
+			<h3 class="sectionTitle">Tray Dimensions</h3>
+			<span class="dimensionsInfo">
+				{dimensions.width.toFixed(1)} &times; {dimensions.depth.toFixed(1)} &times; {dimensions.height.toFixed(
+					1
+				)} mm
+			</span>
+		</div>
+		<Spacer size="0.5rem" />
+		<div class="formGrid">
+			<FormControl label="Width" name="trayWidth">
+				{#snippet input({ inputProps })}
+					<Input
+						{...inputProps}
+						type="number"
+						step="1"
+						min="20"
+						value={tray.params.trayWidth}
+						onchange={(e) => updateParam('trayWidth', parseFloat(e.currentTarget.value))}
+					/>
+				{/snippet}
+				{#snippet end()}mm{/snippet}
+			</FormControl>
+			<FormControl label="Depth" name="trayDepth">
+				{#snippet input({ inputProps })}
+					<Input
+						{...inputProps}
+						type="number"
+						step="1"
+						min="20"
+						value={tray.params.trayDepth}
+						onchange={(e) => updateParam('trayDepth', parseFloat(e.currentTarget.value))}
+					/>
+				{/snippet}
+				{#snippet end()}mm{/snippet}
+			</FormControl>
+		</div>
+	</section>
+
+	<Spacer size="0.5rem" />
+
+	<!-- Grid Layout -->
+	<section class="section">
+		<div class="sectionHeader">
+			<h3 class="sectionTitle">Grid Layout</h3>
+			<span class="calculatedInfo">
+				Cup: {cupDimensions.cupWidth.toFixed(1)} &times; {cupDimensions.cupDepth.toFixed(1)} mm
+			</span>
+		</div>
 		<Spacer size="0.5rem" />
 		<div class="formGrid">
 			<FormControl label="Columns" name="columns">
@@ -70,45 +153,19 @@
 
 	<Spacer size="0.5rem" />
 
+	<!-- Cup Cavity and Wall Settings -->
 	<section class="section">
-		<h3 class="sectionTitle">Cup Size</h3>
-		<Spacer size="0.5rem" />
 		<div class="formGrid">
-			<FormControl label="Cup width" name="cupWidth">
+			<FormControl label="Cavity height" name="cupCavityHeight">
 				{#snippet input({ inputProps })}
 					<Input
 						{...inputProps}
 						type="number"
 						step="1"
 						min="10"
-						value={tray.params.cupWidth}
-						onchange={(e) => updateParam('cupWidth', parseFloat(e.currentTarget.value))}
-					/>
-				{/snippet}
-				{#snippet end()}mm{/snippet}
-			</FormControl>
-			<FormControl label="Cup depth" name="cupDepth">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="number"
-						step="1"
-						min="10"
-						value={tray.params.cupDepth}
-						onchange={(e) => updateParam('cupDepth', parseFloat(e.currentTarget.value))}
-					/>
-				{/snippet}
-				{#snippet end()}mm{/snippet}
-			</FormControl>
-			<FormControl label="Cup height" name="cupHeight">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="number"
-						step="1"
-						min="10"
-						value={tray.params.cupHeight}
-						onchange={(e) => updateParam('cupHeight', parseFloat(e.currentTarget.value))}
+						placeholder="Auto"
+						value={tray.params.cupCavityHeight ?? ''}
+						onchange={handleCupCavityHeightChange}
 					/>
 				{/snippet}
 				{#snippet end()}mm{/snippet}
@@ -127,24 +184,6 @@
 				{/snippet}
 				{#snippet end()}mm{/snippet}
 			</FormControl>
-		</div>
-	</section>
-
-	<Spacer size="0.5rem" />
-
-	<section class="section">
-		<div class="sectionHeader">
-			<h3 class="sectionTitle">Tray Settings</h3>
-			{#if dimensions}
-				<span class="dimensionsInfo">
-					{dimensions.width.toFixed(1)} × {dimensions.depth.toFixed(1)} × {dimensions.height.toFixed(
-						1
-					)} mm
-				</span>
-			{/if}
-		</div>
-		<Spacer size="0.5rem" />
-		<div class="formGrid">
 			<FormControl label="Wall" name="wallThickness">
 				{#snippet input({ inputProps })}
 					<Input
@@ -209,6 +248,12 @@
 	}
 
 	.dimensionsInfo {
+		font-size: 0.75rem;
+		color: var(--fgMuted);
+		margin: 0;
+	}
+
+	.calculatedInfo {
 		font-size: 0.75rem;
 		color: var(--fgMuted);
 		margin: 0;

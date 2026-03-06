@@ -27,7 +27,14 @@
 	import type { CardDrawTrayParams } from '$lib/models/cardTray';
 	import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
 	import type { CupTrayParams } from '$lib/models/cupTray';
-	import { getProject, getCumulativeTrayLetter, moveTray } from '$lib/stores/project.svelte';
+	import { getTrayDimensionsForTray } from '$lib/models/box';
+	import {
+		getProject,
+		getCumulativeTrayLetter,
+		moveTray,
+		getCardSizes,
+		getCounterShapes
+	} from '$lib/stores/project.svelte';
 
 	// Editor components
 	import CounterTrayEditor from './panels/CounterTrayEditor.svelte';
@@ -78,6 +85,19 @@
 		const trayIdx = selectedBox.trays.findIndex((t) => t.id === selectedTray.id);
 		if (boxIdx < 0 || trayIdx < 0) return 'A';
 		return getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx);
+	});
+
+	// Compute max tray height across all trays in the box (used for cup tray expansion)
+	let maxTrayHeight = $derived.by(() => {
+		if (!selectedBox) return 0;
+		const cardSizes = getCardSizes();
+		const counterShapes = getCounterShapes();
+		return Math.max(
+			...selectedBox.trays.map(
+				(tray) => getTrayDimensionsForTray(tray, cardSizes, counterShapes).height
+			),
+			0
+		);
 	});
 
 	function getTrayStats(tray: Tray): {
@@ -280,20 +300,27 @@
 					tray={selectedTray as CounterTray}
 					{trayLetter}
 					onUpdateParams={onUpdateCounterParams}
+					actualHeight={maxTrayHeight}
 				/>
 			{:else if isCardDividerTray(selectedTray) && onUpdateCardDividerParams}
 				<CardDividerTrayEditor
 					tray={selectedTray as CardDividerTray}
 					{trayLetter}
 					onUpdateParams={onUpdateCardDividerParams}
+					actualHeight={maxTrayHeight}
 				/>
 			{:else if isCardTray(selectedTray) && onUpdateCardParams}
 				<CardDrawTrayEditor
 					tray={selectedTray as CardDrawTray}
 					onUpdateParams={onUpdateCardParams}
+					actualHeight={maxTrayHeight}
 				/>
 			{:else if isCupTray(selectedTray) && onUpdateCupParams}
-				<CupTrayEditor tray={selectedTray as CupTray} onUpdateParams={onUpdateCupParams} />
+				<CupTrayEditor
+					tray={selectedTray as CupTray}
+					onUpdateParams={onUpdateCupParams}
+					actualHeight={maxTrayHeight}
+				/>
 			{/if}
 		</div>
 	{:else}

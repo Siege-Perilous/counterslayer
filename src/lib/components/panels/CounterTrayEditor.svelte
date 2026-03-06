@@ -11,9 +11,10 @@
 		tray: CounterTray;
 		trayLetter: string;
 		onUpdateParams: (params: CounterTrayParams) => void;
+		actualHeight?: number;
 	}
 
-	let { tray, trayLetter, onUpdateParams }: Props = $props();
+	let { tray, trayLetter, onUpdateParams, actualHeight }: Props = $props();
 
 	// Drag and drop state
 	let draggedIndex: number | null = $state(null);
@@ -31,9 +32,13 @@
 		return getTrayDimensions(paramsWithoutOverride, getCounterShapes()).width;
 	});
 
-	// Compute dimensions
+	// Compute dimensions, using actualHeight if provided (when tray expands to match box height)
 	let dimensions = $derived.by(() => {
-		return getTrayDimensions(tray.params, getCounterShapes());
+		const baseDims = getTrayDimensions(tray.params, getCounterShapes());
+		return {
+			...baseDims,
+			height: actualHeight && actualHeight > baseDims.height ? actualHeight : baseDims.height
+		};
 	});
 
 	// Get combined stack reference (top-loaded first, then edge-loaded)

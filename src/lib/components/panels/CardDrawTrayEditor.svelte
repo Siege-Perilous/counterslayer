@@ -7,16 +7,21 @@
 	interface Props {
 		tray: CardDrawTray;
 		onUpdateParams: (params: CardDrawTrayParams) => void;
+		actualHeight?: number;
 	}
 
-	let { tray, onUpdateParams }: Props = $props();
+	let { tray, onUpdateParams, actualHeight }: Props = $props();
 
 	let cardSizes = $derived(getCardSizes());
 	let selectedCardSize = $derived(cardSizes.find((s) => s.id === tray.params.cardSizeId));
 
-	// Compute dimensions
+	// Compute dimensions, using actualHeight if provided (when tray expands to match box height)
 	let dimensions = $derived.by(() => {
-		return getCardDrawTrayDimensions(tray.params, getCardSizes());
+		const baseDims = getCardDrawTrayDimensions(tray.params, getCardSizes());
+		return {
+			...baseDims,
+			height: actualHeight && actualHeight > baseDims.height ? actualHeight : baseDims.height
+		};
 	});
 
 	function updateParam<K extends keyof CardDrawTrayParams>(key: K, value: CardDrawTrayParams[K]) {
