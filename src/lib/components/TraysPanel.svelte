@@ -27,7 +27,7 @@
 	import type { CardDrawTrayParams } from '$lib/models/cardTray';
 	import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
 	import type { CupTrayParams } from '$lib/models/cupTray';
-	import { getTrayDimensionsForTray } from '$lib/models/box';
+	import { getTrayDimensionsForTray, arrangeTrays } from '$lib/models/box';
 	import {
 		getProject,
 		getCumulativeTrayLetter,
@@ -98,6 +98,29 @@
 			),
 			0
 		);
+	});
+
+	// Compute rotated dimensions for the selected tray (accounting for layout rotation)
+	let selectedTrayDimensions = $derived.by(() => {
+		if (!selectedBox || !selectedTray) return null;
+		const cardSizes = getCardSizes();
+		const counterShapes = getCounterShapes();
+		const placements = arrangeTrays(selectedBox.trays, {
+			customBoxWidth: selectedBox.customWidth,
+			wallThickness: selectedBox.wallThickness,
+			tolerance: selectedBox.tolerance,
+			cardSizes,
+			counterShapes,
+			manualLayout: selectedBox.manualLayout
+		});
+		const placement = placements.find((p) => p.tray.id === selectedTray.id);
+		if (!placement) return null;
+		// Use placement dimensions (already rotated) but override height with maxTrayHeight if larger
+		return {
+			width: placement.dimensions.width,
+			depth: placement.dimensions.depth,
+			height: maxTrayHeight > placement.dimensions.height ? maxTrayHeight : placement.dimensions.height
+		};
 	});
 
 	function getTrayStats(tray: Tray): {
@@ -301,6 +324,7 @@
 					{trayLetter}
 					onUpdateParams={onUpdateCounterParams}
 					actualHeight={maxTrayHeight}
+					displayDimensions={selectedTrayDimensions}
 				/>
 			{:else if isCardDividerTray(selectedTray) && onUpdateCardDividerParams}
 				<CardDividerTrayEditor
@@ -308,18 +332,21 @@
 					{trayLetter}
 					onUpdateParams={onUpdateCardDividerParams}
 					actualHeight={maxTrayHeight}
+					displayDimensions={selectedTrayDimensions}
 				/>
 			{:else if isCardTray(selectedTray) && onUpdateCardParams}
 				<CardDrawTrayEditor
 					tray={selectedTray as CardDrawTray}
 					onUpdateParams={onUpdateCardParams}
 					actualHeight={maxTrayHeight}
+					displayDimensions={selectedTrayDimensions}
 				/>
 			{:else if isCupTray(selectedTray) && onUpdateCupParams}
 				<CupTrayEditor
 					tray={selectedTray as CupTray}
 					onUpdateParams={onUpdateCupParams}
 					actualHeight={maxTrayHeight}
+					displayDimensions={selectedTrayDimensions}
 				/>
 			{/if}
 		</div>

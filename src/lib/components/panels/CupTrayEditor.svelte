@@ -13,9 +13,10 @@
 		tray: CupTray;
 		onUpdateParams: (params: CupTrayParams) => void;
 		actualHeight?: number;
+		displayDimensions?: { width: number; depth: number; height: number } | null;
 	}
 
-	let { tray, onUpdateParams, actualHeight }: Props = $props();
+	let { tray, onUpdateParams, actualHeight, displayDimensions }: Props = $props();
 
 	// Calculate cup dimensions for display
 	let cupDimensions = $derived.by(() => getCupDimensions(tray.params));
@@ -32,7 +33,11 @@
 	let effectiveCupCavityHeight = $derived(tray.params.cupCavityHeight ?? autoCupCavityHeight);
 
 	// Compute tray dimensions
+	// If displayDimensions is provided (with rotation applied), use those for display
 	let dimensions = $derived.by(() => {
+		if (displayDimensions) {
+			return displayDimensions;
+		}
 		const baseDims = getCupTrayDimensions(tray.params, effectiveCupCavityHeight);
 		return {
 			...baseDims,

@@ -930,12 +930,14 @@
 	}
 
 	// Create a hash of current state to detect changes (includes all boxes for multi-box view)
+	// Includes names because they are embossed on geometry
 	let currentStateHash = $derived.by(() => {
 		const project = getProject();
 		if (project.boxes.length === 0) return '';
 		return JSON.stringify({
 			boxes: project.boxes.map((box) => ({
 				id: box.id,
+				name: box.name,
 				tolerance: box.tolerance,
 				wallThickness: box.wallThickness,
 				floorThickness: box.floorThickness,
@@ -945,6 +947,7 @@
 				fillSolidEmpty: box.fillSolidEmpty,
 				trays: box.trays.map((t) => ({
 					id: t.id,
+					name: t.name,
 					params: t.params,
 					rotationOverride: t.rotationOverride
 				}))

@@ -14,16 +14,21 @@
 		trayLetter: string;
 		onUpdateParams: (params: CardDividerTrayParams) => void;
 		actualHeight?: number;
+		displayDimensions?: { width: number; depth: number; height: number } | null;
 	}
 
-	let { tray, trayLetter, onUpdateParams, actualHeight }: Props = $props();
+	let { tray, trayLetter, onUpdateParams, actualHeight, displayDimensions }: Props = $props();
 
 	// Drag and drop state
 	let draggedIndex: number | null = $state(null);
 	let dragOverIndex: number | null = $state(null);
 
 	// Compute dimensions, using actualHeight if provided (when tray expands to match box height)
+	// If displayDimensions is provided (with rotation applied), use those for display
 	let dimensions = $derived.by(() => {
+		if (displayDimensions) {
+			return displayDimensions;
+		}
 		const baseDims = getCardDividerTrayDimensions(tray.params, getCardSizes());
 		return {
 			...baseDims,

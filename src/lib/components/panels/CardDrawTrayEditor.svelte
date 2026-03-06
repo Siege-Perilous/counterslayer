@@ -8,15 +8,20 @@
 		tray: CardDrawTray;
 		onUpdateParams: (params: CardDrawTrayParams) => void;
 		actualHeight?: number;
+		displayDimensions?: { width: number; depth: number; height: number } | null;
 	}
 
-	let { tray, onUpdateParams, actualHeight }: Props = $props();
+	let { tray, onUpdateParams, actualHeight, displayDimensions }: Props = $props();
 
 	let cardSizes = $derived(getCardSizes());
 	let selectedCardSize = $derived(cardSizes.find((s) => s.id === tray.params.cardSizeId));
 
 	// Compute dimensions, using actualHeight if provided (when tray expands to match box height)
+	// If displayDimensions is provided (with rotation applied), use those for display
 	let dimensions = $derived.by(() => {
+		if (displayDimensions) {
+			return displayDimensions;
+		}
 		const baseDims = getCardDrawTrayDimensions(tray.params, getCardSizes());
 		return {
 			...baseDims,
