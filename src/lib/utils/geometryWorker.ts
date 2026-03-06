@@ -65,6 +65,14 @@ interface ExportAllStlsResult {
 	error?: string;
 }
 
+interface Export3mfResult {
+	type: 'export-3mf-result';
+	id: number;
+	data: ArrayBuffer;
+	filename: string;
+	error?: string;
+}
+
 // Result interfaces with BufferGeometry
 export interface TrayGeometryData {
 	trayId: string;
@@ -94,7 +102,7 @@ export interface GenerationResult {
 	allBoxGeometries: BoxGeometryData[];
 }
 
-type WorkerResult = GenerateResult | ExportStlResult | ExportAllStlsResult;
+type WorkerResult = GenerateResult | ExportStlResult | ExportAllStlsResult | Export3mfResult;
 
 /**
  * Convert raw geometry data to Three.js BufferGeometry
@@ -317,6 +325,32 @@ export class GeometryWorkerManager {
 
 			this.worker!.postMessage({
 				type: 'export-all-stls',
+				id
+			});
+		});
+	}
+
+	/**
+	 * Export all geometries to a single 3MF file
+	 */
+	async export3mf(): Promise<{ data: ArrayBuffer; filename: string }> {
+		if (!this.worker) {
+			await this.init();
+		}
+
+		const id = ++this.messageId;
+
+		return new Promise((resolve, reject) => {
+			this.pendingRequests.set(id, {
+				resolve: (result) => {
+					const r = result as Export3mfResult;
+					resolve({ data: r.data, filename: r.filename });
+				},
+				reject
+			});
+
+			this.worker!.postMessage({
+				type: 'export-3mf',
 				id
 			});
 		});

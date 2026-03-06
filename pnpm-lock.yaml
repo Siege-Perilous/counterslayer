@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@jscad/3mf-serializer':
+        specifier: ^2.1.17
+        version: 2.1.17
       '@jscad/modeling':
         specifier: ^2.12.2
         version: 2.12.6
@@ -368,11 +371,17 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
+  '@jscad/3mf-serializer@2.1.17':
+    resolution: {integrity: sha512-n6rfk7m1unRucB0TdGs+YzplsKI4TE75N+pu2WXOoUNqWYRuuIOU/igGCNAuws5/FKJ9/zMQaZ0GTRJJIrH/nA==}
+
   '@jscad/array-utils@2.1.4':
     resolution: {integrity: sha512-c31r4zSKsE+4Xfwk2V8monDA0hx5G89QGzaakWVUvuGNowYS9WSsYCwHiTIXodjR+HEnDu4okQ7k/whmP0Ne2g==}
 
   '@jscad/modeling@2.12.6':
     resolution: {integrity: sha512-RyT7hrxuq9UHuBmsC8o+KzimQCY6En2IFiSYPDbSlNFKLFdOc3Kyq9NXpt5+RNQhrhLz6uo15XDtnE43EFF3YQ==}
+
+  '@jscad/modeling@2.13.0':
+    resolution: {integrity: sha512-Thv/JJZZOMzQ9rfhP+75PbgrNbBTZduRL+ClaGfGFts9+JdIXcUueqRL3NtZZ/v/hyZCUBkPSRxHIi4icz04tQ==}
 
   '@jscad/stl-serializer@2.1.21':
     resolution: {integrity: sha512-XHNBCxoMSiimNjL5kmWId1ToWdLYzbNWo2B3LKaxaxMnH0g6qZ36YHqTu5+SUxSARXRyFo/dFuwEwDPQc/vINA==}
@@ -1135,6 +1144,9 @@ packages:
       picomatch:
         optional: true
 
+  fflate@0.7.3:
+    resolution: {integrity: sha512-0Zz1jOzJWERhyhsimS54VTqOteCNwRtIlh8isdL0AXLo0g7xNTfTL7oWrkmCnPhZGocKIkWHBistBrrpoNH3aw==}
+
   fflate@0.8.2:
     resolution: {integrity: sha512-cPJU47OaAoCbg0pBvzsgpTPhmhqI5eJjh/JIu8tPj5q+T7iLvW/JAYUqmE7KOB4R1ZyEhzBaIQpQpardBF5z8A==}
 
@@ -1448,6 +1460,9 @@ packages:
   oniguruma-to-es@4.3.4:
     resolution: {integrity: sha512-3VhUGN3w2eYxnTzHn+ikMI+fp/96KoRSVK9/kMTcFqj1NRDh2IhQCKvYxDnWePKRXY/AqH+Fuiyb7VHSzBjHfA==}
 
+  onml@1.2.0:
+    resolution: {integrity: sha512-olqYAg18XoHAhm7tK9DdBCOVdts70DGmMgCNLOWyqZokht2utgGSKBB4JHi6pBZpmioAhcYlxK+91L3tsrz+GA==}
+
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
     engines: {node: '>= 0.8.0'}
@@ -1679,6 +1694,10 @@ packages:
   sade@1.8.1:
     resolution: {integrity: sha512-xal3CZX1Xlo/k4ApwCFrHVACi9fBqJ7V+mwhBsuf/1IOKbBy098Fex+Wa/5QMubw09pSZ/u8EY8PWgevJsXp1A==}
     engines: {node: '>=6'}
+
+  sax@1.5.0:
+    resolution: {integrity: sha512-21IYA3Q5cQf089Z6tgaUTr7lDAyzoTPx5HRtbhsME8Udispad8dC/+sziTNugOEx54ilvatQ9YCzl4KQLPcRHA==}
+    engines: {node: '>=11.0.0'}
 
   semver@7.7.3:
     resolution: {integrity: sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q==}
@@ -2157,9 +2176,18 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
+  '@jscad/3mf-serializer@2.1.17':
+    dependencies:
+      '@jscad/array-utils': 2.1.4
+      '@jscad/modeling': 2.13.0
+      fflate: 0.7.3
+      onml: 1.2.0
+
   '@jscad/array-utils@2.1.4': {}
 
   '@jscad/modeling@2.12.6': {}
+
+  '@jscad/modeling@2.13.0': {}
 
   '@jscad/stl-serializer@2.1.21':
     dependencies:
@@ -2996,6 +3024,8 @@ snapshots:
     optionalDependencies:
       picomatch: 4.0.3
 
+  fflate@0.7.3: {}
+
   fflate@0.8.2: {}
 
   file-entry-cache@8.0.0:
@@ -3283,6 +3313,10 @@ snapshots:
       regex: 6.1.0
       regex-recursion: 6.0.2
 
+  onml@1.2.0:
+    dependencies:
+      sax: 1.5.0
+
   optionator@0.9.4:
     dependencies:
       deep-is: 0.1.4
@@ -3557,6 +3591,8 @@ snapshots:
   sade@1.8.1:
     dependencies:
       mri: 1.2.0
+
+  sax@1.5.0: {}
 
   semver@7.7.3: {}
 

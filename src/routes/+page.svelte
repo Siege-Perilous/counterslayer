@@ -135,6 +135,7 @@
 	let exportingPdf = $state(false);
 	let exportingStl = $state(false);
 	let exportStlProgress = $state('');
+	let exporting3mf = $state(false);
 	let captureTrayLetter = $state<string | null>(null); // Override during PDF export
 	let debugExporting = $state(false);
 
@@ -451,6 +452,62 @@
 		} finally {
 			exportingStl = false;
 			exportStlProgress = '';
+		}
+	}
+
+	async function handleExport3mf() {
+		const project = getProject();
+		if (project.boxes.length === 0) return;
+
+		exporting3mf = true;
+
+		const loadingToast = addToast({
+			data: {
+				title: 'Exporting 3MF',
+				body: 'Generating 3MF file...',
+				type: 'info'
+			}
+		});
+
+		try {
+			const { data, filename } = await geometryWorker.export3mf();
+
+			if (data.byteLength === 0) {
+				throw new Error('No geometry available for export');
+			}
+
+			// Download file
+			const blob = new Blob([data], {
+				type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml'
+			});
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = filename;
+			a.click();
+			URL.revokeObjectURL(url);
+
+			removeToast(loadingToast.id);
+			addToast({
+				data: {
+					title: '3MF export complete',
+					body: `Downloaded ${filename}`,
+					type: 'success'
+				}
+			});
+		} catch (e) {
+			removeToast(loadingToast.id);
+			const message = e instanceof Error ? e.message : 'Export failed';
+			addToast({
+				data: {
+					title: '3MF export failed',
+					body: message,
+					type: 'danger'
+				}
+			});
+			console.error('3MF export error:', e);
+		} finally {
+			exporting3mf = false;
 		}
 	}
 
@@ -1393,6 +1450,15 @@
 									style="width: 100%; justify-content: flex-start;"
 								>
 									{exportingStl ? exportStlProgress : 'Export STLs'}
+								</Button>
+								<Button
+									variant="ghost"
+									onclick={handleExport3mf}
+									disabled={generating || exporting3mf || getProject().boxes.length === 0}
+									isLoading={exporting3mf}
+									style="width: 100%; justify-content: flex-start;"
+								>
+									{exporting3mf ? 'Generating 3MF...' : 'Export 3MF'}
 								</Button>
 								<Button
 									variant="ghost"

@@ -17,6 +17,7 @@
 		"test": "npm run test:e2e"
 	},
 	"dependencies": {
+		"@jscad/3mf-serializer": "^2.1.17",
 		"@jscad/modeling": "^2.12.2",
 		"@jscad/stl-serializer": "^2.1.17",
 		"@melt-ui/svelte": "^0.86.4",
