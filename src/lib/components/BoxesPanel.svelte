@@ -248,6 +248,18 @@
 					onchange={(e) => onUpdateBox({ fillSolidEmpty: (e.target as HTMLInputElement).checked })}
 					label="Fill empty space solid"
 				/>
+				<Spacer size="0.5rem" />
+				<InputCheckbox
+					checked={selectedBox.lidParams?.showName ?? true}
+					onchange={(e) =>
+						onUpdateBox({
+							lidParams: {
+								...selectedBox.lidParams,
+								showName: (e.target as HTMLInputElement).checked
+							}
+						})}
+					label="Emboss name on lid top"
+				/>
 			</div>
 		</div>
 	{:else}

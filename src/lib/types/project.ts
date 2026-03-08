@@ -33,6 +33,7 @@ interface BaseTray {
 	name: string;
 	color: string;
 	rotationOverride?: 'auto' | 0 | 90; // User can force rotation: 'auto' = algorithm decides, 0 = no rotation, 90 = rotated
+	showEmboss?: boolean; // Whether to emboss the tray name on the bottom (default: true)
 }
 
 // Counter tray for cardboard counter tokens
@@ -51,6 +52,7 @@ export interface CardDrawTray extends BaseTray {
 export interface CardDividerTray extends BaseTray {
 	type: 'cardDivider';
 	params: CardDividerTrayParams;
+	showStackLabels?: boolean; // Whether to emboss stack labels on floor (default: true)
 }
 
 // Cup tray for loose game components (dice, tokens, meeples) in bowl-shaped cups

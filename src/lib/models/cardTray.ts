@@ -178,7 +178,8 @@ export function createCardDrawTray(
 	customCardSizes: CustomCardSize[],
 	_trayName?: string,
 	targetHeight?: number,
-	floorSpacerHeight?: number
+	floorSpacerHeight?: number,
+	showEmboss: boolean = true
 ): Geom3 {
 	const { cardSizeId, cardCount, wallThickness, floorThickness, clearance } = params;
 
@@ -377,7 +378,7 @@ export function createCardDrawTray(
 	tray = subtract(tray, frontFillet, cutoutFrontFillet, cutoutBackFillet);
 
 	// === EMBOSS TRAY NAME ON BOTTOM ===
-	if (_trayName && _trayName.trim().length > 0) {
+	if (showEmboss && _trayName && _trayName.trim().length > 0) {
 		const textDepth = 0.6;
 		const strokeWidth = 1.2;
 		const textHeightParam = 6;

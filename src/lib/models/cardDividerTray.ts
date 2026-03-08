@@ -444,7 +444,9 @@ export function createCardDividerTray(
 	customCardSizes: CustomCardSize[],
 	_trayName?: string,
 	targetHeight?: number,
-	floorSpacerHeight?: number
+	floorSpacerHeight?: number,
+	showEmboss: boolean = true,
+	showStackLabels: boolean = true
 ): Geom3 {
 	const {
 		stacks: originalStacks,
@@ -648,7 +650,7 @@ export function createCardDividerTray(
 	}
 
 	// Emboss tray name on bottom
-	if (_trayName && _trayName.trim().length > 0) {
+	if (showEmboss && _trayName && _trayName.trim().length > 0) {
 		const textDepth = 0.6;
 		const strokeWidth = 1.2;
 		const textHeightParam = 6;
@@ -715,78 +717,80 @@ export function createCardDividerTray(
 	}
 
 	// Emboss stack labels on walls
-	const stackLabelCuts: Geom3[] = [];
+	if (showStackLabels) {
+		const stackLabelCuts: Geom3[] = [];
 
-	if (stackDirection === 'sideBySide') {
-		// Labels on front wall, beneath each stack
-		let currentX = wallThickness;
+		if (stackDirection === 'sideBySide') {
+			// Labels on front wall, beneath each stack
+			let currentX = wallThickness;
 
-		for (const stack of stacks) {
-			const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
-			if (!cardSize) continue;
+			for (const stack of stacks) {
+				const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
+				if (!cardSize) continue;
 
-			const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
+				const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
 
-			const slotWidth =
-				orientation === 'vertical' ? cardWidth + clearance * 2 : cardLength + clearance * 2;
-			const slotDepth = stack.count * cardThickness + clearance * 2;
-			const slotCenterX = currentX + slotWidth / 2;
-			const slotCenterY = trayDepth / 2;
+				const slotWidth =
+					orientation === 'vertical' ? cardWidth + clearance * 2 : cardLength + clearance * 2;
+				const slotDepth = stack.count * cardThickness + clearance * 2;
+				const slotCenterX = currentX + slotWidth / 2;
+				const slotCenterY = trayDepth / 2;
 
-			if (stack.label?.trim()) {
-				const labelGeom = createStackLabelGeometry(
-					stack.label,
-					slotCenterX,
-					slotCenterY,
-					slotWidth,
-					slotDepth,
-					trayHeight,
-					floorThickness,
-					wallThickness,
-					stackDirection
-				);
-				if (labelGeom) stackLabelCuts.push(labelGeom);
+				if (stack.label?.trim()) {
+					const labelGeom = createStackLabelGeometry(
+						stack.label,
+						slotCenterX,
+						slotCenterY,
+						slotWidth,
+						slotDepth,
+						trayHeight,
+						floorThickness,
+						wallThickness,
+						stackDirection
+					);
+					if (labelGeom) stackLabelCuts.push(labelGeom);
+				}
+
+				currentX += slotWidth + wallThickness;
 			}
+		} else {
+			// Labels on left wall, next to each stack
+			let currentY = wallThickness;
 
-			currentX += slotWidth + wallThickness;
-		}
-	} else {
-		// Labels on left wall, next to each stack
-		let currentY = wallThickness;
+			for (const stack of stacks) {
+				const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
+				if (!cardSize) continue;
 
-		for (const stack of stacks) {
-			const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
-			if (!cardSize) continue;
+				const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
 
-			const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
+				const slotWidth =
+					orientation === 'vertical' ? cardWidth + clearance * 2 : cardLength + clearance * 2;
+				const slotDepth = stack.count * cardThickness + clearance * 2;
+				const slotCenterX = trayWidth / 2;
+				const slotCenterY = currentY + slotDepth / 2;
 
-			const slotWidth =
-				orientation === 'vertical' ? cardWidth + clearance * 2 : cardLength + clearance * 2;
-			const slotDepth = stack.count * cardThickness + clearance * 2;
-			const slotCenterX = trayWidth / 2;
-			const slotCenterY = currentY + slotDepth / 2;
+				if (stack.label?.trim()) {
+					const labelGeom = createStackLabelGeometry(
+						stack.label,
+						slotCenterX,
+						slotCenterY,
+						slotWidth,
+						slotDepth,
+						trayHeight,
+						floorThickness,
+						wallThickness,
+						stackDirection
+					);
+					if (labelGeom) stackLabelCuts.push(labelGeom);
+				}
 
-			if (stack.label?.trim()) {
-				const labelGeom = createStackLabelGeometry(
-					stack.label,
-					slotCenterX,
-					slotCenterY,
-					slotWidth,
-					slotDepth,
-					trayHeight,
-					floorThickness,
-					wallThickness,
-					stackDirection
-				);
-				if (labelGeom) stackLabelCuts.push(labelGeom);
+				currentY += slotDepth + wallThickness;
 			}
-
-			currentY += slotDepth + wallThickness;
 		}
-	}
 
-	if (stackLabelCuts.length > 0) {
-		tray = subtract(tray, ...stackLabelCuts);
+		if (stackLabelCuts.length > 0) {
+			tray = subtract(tray, ...stackLabelCuts);
+		}
 	}
 
 	return tray;

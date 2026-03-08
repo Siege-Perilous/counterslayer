@@ -604,13 +604,15 @@
 
 					// Generate geometry for this tray based on tray type
 					let jscadGeom;
+					const showEmboss = placement.tray.showEmboss ?? true;
 					if (isCounterTray(placement.tray)) {
 						jscadGeom = createCounterTray(
 							placement.tray.params,
 							counterShapes,
 							placement.tray.name,
 							maxHeight,
-							spacerHeight
+							spacerHeight,
+							showEmboss
 						);
 						selectedTrayCounters = getCounterPositions(
 							placement.tray.params,
@@ -619,12 +621,15 @@
 							spacerHeight
 						);
 					} else if (isCardDividerTray(placement.tray)) {
+						const showStackLabels = placement.tray.showStackLabels ?? true;
 						jscadGeom = createCardDividerTray(
 							placement.tray.params,
 							cardSizes,
 							placement.tray.name,
 							maxHeight,
-							spacerHeight
+							spacerHeight,
+							showEmboss,
+							showStackLabels
 						);
 						// Get card divider positions for reference labels
 						const dividerPositions = getCardDividerPositions(
@@ -660,7 +665,8 @@
 							cardSizes,
 							placement.tray.name,
 							maxHeight,
-							spacerHeight
+							spacerHeight,
+							showEmboss
 						);
 						selectedTrayCounters = getCardDrawPositions(
 							placement.tray.params,
@@ -949,7 +955,9 @@
 					id: t.id,
 					name: t.name,
 					params: t.params,
-					rotationOverride: t.rotationOverride
+					rotationOverride: t.rotationOverride,
+					showEmboss: t.showEmboss,
+					showStackLabels: isCardDividerTray(t) ? t.showStackLabels : undefined
 				}))
 			}))
 		});

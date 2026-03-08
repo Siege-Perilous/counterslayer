@@ -1,5 +1,14 @@
 <script lang="ts">
-	import { Input, FormControl, Spacer, Select, Link, IconButton, Icon } from '@tableslayer/ui';
+	import {
+		Input,
+		InputCheckbox,
+		FormControl,
+		Spacer,
+		Select,
+		Link,
+		IconButton,
+		Icon
+	} from '@tableslayer/ui';
 	import { IconX, IconMenu } from '@tabler/icons-svelte';
 	import type { CardDividerTray } from '$lib/types/project';
 	import {
@@ -13,11 +22,13 @@
 		tray: CardDividerTray;
 		trayLetter: string;
 		onUpdateParams: (params: CardDividerTrayParams) => void;
+		onUpdateTray?: (updates: Partial<CardDividerTray>) => void;
 		actualHeight?: number;
 		displayDimensions?: { width: number; depth: number; height: number } | null;
 	}
 
-	let { tray, trayLetter, onUpdateParams, actualHeight, displayDimensions }: Props = $props();
+	let { tray, trayLetter, onUpdateParams, onUpdateTray, actualHeight, displayDimensions }: Props =
+		$props();
 
 	// Drag and drop state
 	let draggedIndex: number | null = $state(null);
@@ -279,6 +290,12 @@
 				{#snippet end()}mm{/snippet}
 			</FormControl>
 		</div>
+		<Spacer size="1rem" />
+		<InputCheckbox
+			label="Emboss stack labels on tray"
+			checked={tray.showStackLabels ?? true}
+			onchange={(e) => onUpdateTray?.({ showStackLabels: e.currentTarget.checked })}
+		/>
 	</section>
 </div>
 

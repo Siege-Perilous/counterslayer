@@ -236,7 +236,8 @@ export function createCupTray(
 	params: CupTrayParams,
 	trayName?: string,
 	targetHeight?: number,
-	floorSpacerHeight?: number
+	floorSpacerHeight?: number,
+	showEmboss: boolean = true
 ): Geom3 {
 	const { wallThickness, cornerRadius, floorThickness, cupCavityHeight } = params;
 
@@ -325,7 +326,7 @@ export function createCupTray(
 	let result = subtract(trayBody, ...cupCuts);
 
 	// Emboss tray name on bottom (Z=0 face)
-	if (trayName && trayName.trim().length > 0) {
+	if (showEmboss && trayName && trayName.trim().length > 0) {
 		const textDepth = 0.6;
 		const strokeWidth = 1.2;
 		const textHeightParam = 6;

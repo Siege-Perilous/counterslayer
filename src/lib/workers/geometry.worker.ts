@@ -203,17 +203,41 @@ function createTrayGeometry(
 	maxHeight: number,
 	spacerHeight: number
 ): Geom3 {
+	const showEmboss = tray.showEmboss ?? true;
 	if (isCupTray(tray)) {
-		return createCupTray(tray.params, tray.name, maxHeight, spacerHeight);
+		return createCupTray(tray.params, tray.name, maxHeight, spacerHeight, showEmboss);
 	}
 	if (isCardDividerTray(tray)) {
-		return createCardDividerTray(tray.params, cardSizes, tray.name, maxHeight, spacerHeight);
+		const showStackLabels = tray.showStackLabels ?? true;
+		return createCardDividerTray(
+			tray.params,
+			cardSizes,
+			tray.name,
+			maxHeight,
+			spacerHeight,
+			showEmboss,
+			showStackLabels
+		);
 	}
 	if (isCardTray(tray)) {
-		return createCardDrawTray(tray.params, cardSizes, tray.name, maxHeight, spacerHeight);
+		return createCardDrawTray(
+			tray.params,
+			cardSizes,
+			tray.name,
+			maxHeight,
+			spacerHeight,
+			showEmboss
+		);
 	}
 	// Default to counter tray
-	return createCounterTray(tray.params, counterShapes, tray.name, maxHeight, spacerHeight);
+	return createCounterTray(
+		tray.params,
+		counterShapes,
+		tray.name,
+		maxHeight,
+		spacerHeight,
+		showEmboss
+	);
 }
 
 /**

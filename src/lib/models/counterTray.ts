@@ -720,7 +720,8 @@ export function createCounterTray(
 	counterShapes: CounterShape[],
 	trayName?: string,
 	targetHeight?: number,
-	floorSpacerHeight?: number
+	floorSpacerHeight?: number,
+	showEmboss: boolean = true
 ) {
 	const {
 		clearance,
@@ -1622,7 +1623,7 @@ export function createCounterTray(
 	let result = subtract(trayBody, ...pocketCuts, ...fingerCuts);
 
 	// Emboss tray name on bottom (Z=0 face)
-	if (trayName && trayName.trim().length > 0) {
+	if (showEmboss && trayName && trayName.trim().length > 0) {
 		const textDepth = 0.6;
 		const strokeWidth = 1.2;
 		const textHeightParam = 6;

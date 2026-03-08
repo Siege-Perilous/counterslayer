@@ -1,6 +1,7 @@
 <script lang="ts">
 	import {
 		Input,
+		InputCheckbox,
 		FormControl,
 		Spacer,
 		Hr,
@@ -316,6 +317,15 @@
 						/>
 					{/snippet}
 				</FormControl>
+
+				<Spacer size="1rem" />
+
+				<!-- Emboss Name -->
+				<InputCheckbox
+					label="Emboss name on tray bottom"
+					checked={selectedTray.showEmboss ?? true}
+					onchange={(e) => onUpdateTray({ showEmboss: e.currentTarget.checked })}
+				/>
 			</div>
 
 			<Hr />
@@ -333,6 +343,7 @@
 					tray={selectedTray as CardDividerTray}
 					{trayLetter}
 					onUpdateParams={onUpdateCardDividerParams}
+					{onUpdateTray}
 					actualHeight={maxTrayHeight}
 					displayDimensions={selectedTrayDimensions}
 				/>
