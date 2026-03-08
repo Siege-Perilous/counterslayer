@@ -1,7 +1,7 @@
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { CupLayout, CupLayoutNode, CupId } from '$lib/types/cupLayout';
-import { isCupLeaf, isCupSplit, createDefaultCupLayout } from '$lib/types/cupLayout';
+import { isCupLeaf, isCupSplit, generateCupId } from '$lib/types/cupLayout';
 
 const { cuboid, roundedCuboid } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
@@ -28,9 +28,28 @@ export const MIN_CUP_SIZE = 20;
 // Default cup cavity height when auto-calculated and no box context
 export const DEFAULT_CUP_CAVITY_HEIGHT = 25;
 
+// Default 3-cup layout: vertical split, then one side split horizontally
+function createDefault3CupLayout(): CupLayout {
+	return {
+		root: {
+			type: 'split',
+			direction: 'vertical',
+			ratio: 0.5,
+			first: { type: 'cup', id: generateCupId() },
+			second: {
+				type: 'split',
+				direction: 'horizontal',
+				ratio: 0.5,
+				first: { type: 'cup', id: generateCupId() },
+				second: { type: 'cup', id: generateCupId() }
+			}
+		}
+	};
+}
+
 // Default parameters
 export const defaultCupTrayParams: CupTrayParams = {
-	layout: createDefaultCupLayout(), // Single cup by default
+	layout: createDefault3CupLayout(),
 	trayWidth: 89,
 	trayDepth: 89,
 	cupCavityHeight: null, // Auto by default
