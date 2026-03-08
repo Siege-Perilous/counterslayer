@@ -40,7 +40,7 @@ export const defaultCardDividerTrayParams: CardDividerTrayParams = {
 	],
 	orientation: 'horizontal',
 	stackDirection: 'frontToBack',
-	wallThickness: 3.0,
+	wallThickness: 2.0,
 	floorThickness: 2.0,
 	clearance: 1.5,
 	rimHeight: 3.0
