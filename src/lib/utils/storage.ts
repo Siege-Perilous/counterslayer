@@ -13,7 +13,8 @@ import {
 import {
 	TRAY_COLORS,
 	DEFAULT_COUNTER_SHAPES,
-	DEFAULT_CARD_SIZES
+	DEFAULT_CARD_SIZES,
+	DEFAULT_COUNTER_THICKNESS
 } from '$lib/stores/project.svelte';
 const STORAGE_KEY = 'counter-tray-project';
 
@@ -123,6 +124,21 @@ function buildCardSizeIdMapping(cardSizes: CardSize[]): Map<string, string> {
 
 // Extract counter shapes from old format (stored in counter tray params)
 function extractCounterShapesFromLegacy(boxes: Box[]): CounterShape[] {
+	// First, get the default thickness from any counter tray
+	let legacyThickness = DEFAULT_COUNTER_THICKNESS;
+	for (const box of boxes) {
+		for (const tray of box.trays) {
+			if (tray.type === 'counter') {
+				const params = tray.params as CounterTrayParams;
+				if (params.counterThickness && params.counterThickness > 0) {
+					legacyThickness = params.counterThickness;
+					break;
+				}
+			}
+		}
+		if (legacyThickness !== DEFAULT_COUNTER_THICKNESS) break;
+	}
+
 	for (const box of boxes) {
 		for (const tray of box.trays) {
 			const legacyParams = (tray as { params?: LegacyTrayParams }).params;
@@ -133,6 +149,7 @@ function extractCounterShapesFromLegacy(boxes: Box[]): CounterShape[] {
 					baseShape: shape.baseShape,
 					width: shape.width,
 					length: shape.length,
+					thickness: legacyThickness,
 					cornerRadius: shape.cornerRadius,
 					pointyTop: shape.pointyTop
 				}));
@@ -415,6 +432,26 @@ export function migrateProjectData(project: Project): Project {
 		counterShapes = extractCounterShapesFromLegacy(project.boxes);
 		cardSizes = extractCardSizesFromLegacy(project.boxes);
 	}
+
+	// Migrate counterShapes to include thickness if missing
+	// Get default thickness from first counter tray's params, or use default
+	let defaultThickness = DEFAULT_COUNTER_THICKNESS;
+	for (const box of project.boxes) {
+		for (const tray of box.trays) {
+			if (tray.type === 'counter') {
+				const params = tray.params as CounterTrayParams;
+				if (params.counterThickness && params.counterThickness > 0) {
+					defaultThickness = params.counterThickness;
+					break;
+				}
+			}
+		}
+		if (defaultThickness !== DEFAULT_COUNTER_THICKNESS) break;
+	}
+	counterShapes = counterShapes.map((s) => ({
+		...s,
+		thickness: s.thickness ?? defaultThickness
+	}));
 
 	// Build ID mappings for migration
 	const shapeIdMapping = buildShapeIdMapping(counterShapes);

@@ -13,6 +13,7 @@ export interface CounterShape {
 	baseShape: CounterBaseShape;
 	width: number;
 	length: number;
+	thickness: number; // Counter thickness in mm
 	cornerRadius?: number; // For triangle shapes
 	pointyTop?: boolean; // For hex shapes
 }
@@ -134,10 +135,16 @@ export interface Box {
 	manualLayout?: ManualTrayPlacement[];
 }
 
+// Project-level global settings (used as defaults and shown even without counter trays)
+export interface GlobalSettings {
+	printBedSize: number;
+}
+
 export interface Project {
 	boxes: Box[];
 	counterShapes: CounterShape[];
 	cardSizes: CardSize[];
 	selectedBoxId: string | null;
 	selectedTrayId: string | null;
+	globalSettings?: GlobalSettings;
 }

@@ -70,7 +70,6 @@ export function getCounterTrayDimensions(
 	counterShapes: CounterShape[] = []
 ): TrayDimensions {
 	const {
-		counterThickness,
 		clearance,
 		wallThickness,
 		floorThickness,
@@ -85,7 +84,7 @@ export function getCounterTrayDimensions(
 
 	// Helper to get counter shape by ID
 	// Falls back to matching by name if ID not found (for legacy data)
-	const getShape = (shapeId: string): CounterShape | null => {
+	const getShape = (shapeId: string): CounterShape => {
 		// First try by ID
 		let shape = counterShapes.find((s) => s.id === shapeId);
 		if (shape) return shape;
@@ -97,7 +96,21 @@ export function getCounterTrayDimensions(
 			return shape;
 		}
 
-		return null;
+		// Ultimate fallback: use first available shape, or a default
+		if (counterShapes.length > 0) {
+			console.warn(`Shape "${shapeId}" not found by ID or name, using first available shape`);
+			return counterShapes[0];
+		}
+
+		// No shapes at all - return a minimal default
+		return {
+			id: 'default',
+			name: 'Default',
+			baseShape: 'square',
+			width: 20,
+			length: 20,
+			thickness: 1.3
+		};
 	};
 
 	// Get effective dimensions for counter shapes based on their base shape
@@ -138,7 +151,14 @@ export function getCounterTrayDimensions(
 			return counterShapes[0];
 		}
 		// No shapes at all - return a minimal default
-		return { id: 'default', name: 'Default', baseShape: 'square', width: 20, length: 20 };
+		return {
+			id: 'default',
+			name: 'Default',
+			baseShape: 'square',
+			width: 20,
+			length: 20,
+			thickness: 1.3
+		};
 	};
 
 	// For top-loaded/crosswise custom shapes: LONGER side = width (X), SHORTER side = length (Y)
@@ -233,7 +253,7 @@ export function getCounterTrayDimensions(
 	// Track max top-loaded stack height
 	let maxStackHeight = 0;
 	for (const { stack } of sortedStacks) {
-		const stackHeight = stack[1] * counterThickness;
+		const stackHeight = stack[1] * getShape(stack[0]).thickness;
 		maxStackHeight = Math.max(maxStackHeight, stackHeight);
 	}
 
@@ -256,7 +276,7 @@ export function getCounterTrayDimensions(
 
 	if (edgeLoadedStacks && edgeLoadedStacks.length > 0) {
 		for (const stack of edgeLoadedStacks) {
-			const counterSpan = stack[1] * counterThickness + (stack[1] - 1) * clearance;
+			const counterSpan = stack[1] * getShape(stack[0]).thickness + (stack[1] - 1) * clearance;
 			const orientation = stack[2] || 'lengthwise';
 
 			if (orientation === 'lengthwise') {

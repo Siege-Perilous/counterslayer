@@ -136,7 +136,6 @@ export function getCounterPositions(
 ): CounterStack[] {
 	const spacerOffset = floorSpacerHeight ?? 0;
 	const {
-		counterThickness,
 		clearance,
 		wallThickness,
 		floorThickness,
@@ -174,7 +173,14 @@ export function getCounterPositions(
 		}
 
 		// No shapes at all - return a minimal default
-		return { id: 'default', name: 'Default', baseShape: 'square', width: 20, length: 20 };
+		return {
+			id: 'default',
+			name: 'Default',
+			baseShape: 'square',
+			width: 20,
+			length: 20,
+			thickness: 1.3
+		};
 	};
 
 	// Get effective dimensions for counter shapes based on their base shape
@@ -324,8 +330,9 @@ export function getCounterPositions(
 	const edgeLoadedSlots: EdgeLoadedSlot[] = [];
 	if (edgeLoadedStacks && edgeLoadedStacks.length > 0) {
 		for (let i = 0; i < edgeLoadedStacks.length; i++) {
-			const [shape, count, orientationPref, label] = edgeLoadedStacks[i];
-			const counterSpan = count * counterThickness + (count - 1) * clearance;
+			const [shapeId, count, orientationPref, label] = edgeLoadedStacks[i];
+			const shape = getShape(shapeId);
+			const counterSpan = count * shape.thickness + (count - 1) * clearance;
 
 			// Default to lengthwise if not specified
 			const orientation: 'lengthwise' | 'crosswise' = orientationPref || 'lengthwise';
@@ -333,10 +340,10 @@ export function getCounterPositions(
 			if (orientation === 'lengthwise') {
 				// Lengthwise: counters stack along X (left to right), takes a row at front
 				// For custom shapes: longer side along Y (perpendicular to tray), shorter side is height
-				const slotDepthDim = getPocketLengthLengthwise(shape);
-				const standingHeight = getStandingHeightLengthwise(shape);
+				const slotDepthDim = getPocketLengthLengthwise(shapeId);
+				const standingHeight = getStandingHeightLengthwise(shapeId);
 				edgeLoadedSlots.push({
-					shape,
+					shape: shapeId,
 					count,
 					orientation,
 					slotWidth: counterSpan, // Counters stack along X (left to right)
@@ -348,10 +355,10 @@ export function getCounterPositions(
 			} else {
 				// Crosswise: counters stack along Y (front to back), takes a column
 				// For custom shapes: longer side along X (parallel to tray width), shorter side is height
-				const slotWidthDim = getPocketWidth(shape); // Longer side along X
-				const standingHeight = getStandingHeightCrosswise(shape);
+				const slotWidthDim = getPocketWidth(shapeId); // Longer side along X
+				const standingHeight = getStandingHeightCrosswise(shapeId);
 				edgeLoadedSlots.push({
-					shape,
+					shape: shapeId,
 					count,
 					orientation,
 					slotWidth: slotWidthDim, // Counter dimension along X (longer side)
@@ -544,7 +551,7 @@ export function getCounterPositions(
 	// Calculate tray height from top-loaded stacks
 	let maxTopLoadedHeight = 0;
 	for (const placement of topLoadedPlacements) {
-		const stackHeight = placement.count * counterThickness;
+		const stackHeight = placement.count * getShape(placement.shapeRef).thickness;
 		maxTopLoadedHeight = Math.max(maxTopLoadedHeight, stackHeight);
 	}
 
@@ -592,7 +599,7 @@ export function getCounterPositions(
 			z: pocketFloorZ + spacerOffset,
 			width: getCounterWidthLengthwise(slot.shape),
 			length: getCounterLengthLengthwise(slot.shape),
-			thickness: counterThickness,
+			thickness: counterShape.thickness,
 			count: slot.count,
 			hexPointyTop: counterShape?.pointyTop ?? false,
 			color: generateStackColor(100 + i),
@@ -651,7 +658,7 @@ export function getCounterPositions(
 			z: pocketFloorZ + spacerOffset,
 			width: counterWidth,
 			length: counterLength,
-			thickness: counterThickness,
+			thickness: counterShape.thickness,
 			count: slot.count,
 			hexPointyTop: counterShape?.pointyTop ?? false,
 			color: generateStackColor(200 + i),
@@ -666,7 +673,8 @@ export function getCounterPositions(
 	// Add top-loaded stacks (using greedy bin-packing placements)
 	for (const placement of topLoadedPlacements) {
 		const { shapeType, customName, customBaseShape } = parseShapeId(placement.shapeRef);
-		const pocketDepth = placement.count * counterThickness;
+		const counterShape = getShape(placement.shapeRef);
+		const pocketDepth = placement.count * counterShape.thickness;
 		const pocketFloorZ = trayHeight - rimHeight - pocketDepth;
 
 		// X center is at the middle of the pocket
@@ -685,7 +693,6 @@ export function getCounterPositions(
 				placement.pocketLength / 2;
 		}
 
-		const counterShape = getShape(placement.shapeRef);
 		counterStacks.push({
 			shape: shapeType,
 			shapeId: placement.shapeRef,
@@ -696,7 +703,7 @@ export function getCounterPositions(
 			z: pocketFloorZ + spacerOffset,
 			width: getCounterWidth(placement.shapeRef),
 			length: getCounterLength(placement.shapeRef),
-			thickness: counterThickness,
+			thickness: counterShape.thickness,
 			count: placement.count,
 			hexPointyTop: counterShape?.pointyTop ?? false,
 			color: generateStackColor(placement.originalIndex),
@@ -716,7 +723,6 @@ export function createCounterTray(
 	floorSpacerHeight?: number
 ) {
 	const {
-		counterThickness,
 		clearance,
 		wallThickness,
 		floorThickness,
@@ -736,11 +742,6 @@ export function createCounterTray(
 	// Validate stacks - allow empty if there are edge-loaded stacks
 	if ((!stacks || stacks.length === 0) && (!edgeLoadedStacks || edgeLoadedStacks.length === 0)) {
 		throw new Error(`${nameLabel}: No counter stacks defined. Add at least one stack.`);
-	}
-
-	// Validate counter dimensions
-	if (counterThickness <= 0) {
-		throw new Error(`${nameLabel}: Counter thickness must be greater than zero.`);
 	}
 
 	// Helper to get counter shape by ID
@@ -764,7 +765,14 @@ export function createCounterTray(
 		}
 
 		// No shapes at all - return a minimal default
-		return { id: 'default', name: 'Default', baseShape: 'square', width: 20, length: 20 };
+		return {
+			id: 'default',
+			name: 'Default',
+			baseShape: 'square',
+			width: 20,
+			length: 20,
+			thickness: 1.3
+		};
 	};
 
 	// Get effective dimensions for counter shapes based on their base shape
@@ -880,8 +888,9 @@ export function createCounterTray(
 	const edgeLoadedSlots: EdgeLoadedSlot[] = [];
 	if (edgeLoadedStacks && edgeLoadedStacks.length > 0) {
 		for (let i = 0; i < edgeLoadedStacks.length; i++) {
-			const [shape, count, orientationPref, label] = edgeLoadedStacks[i];
-			const counterSpan = count * counterThickness + (count - 1) * clearance;
+			const [shapeId, count, orientationPref, label] = edgeLoadedStacks[i];
+			const shape = getShape(shapeId);
+			const counterSpan = count * shape.thickness + (count - 1) * clearance;
 
 			// Default to lengthwise if not specified
 			const orientation: 'lengthwise' | 'crosswise' = orientationPref || 'lengthwise';
@@ -889,10 +898,10 @@ export function createCounterTray(
 			if (orientation === 'lengthwise') {
 				// Lengthwise: counters stack along X (left to right), takes a row at front
 				// For custom shapes: longer side along Y (perpendicular to tray), shorter side is height
-				const slotDepthDim = getPocketLengthLengthwise(shape);
-				const standingHeight = getStandingHeightLengthwise(shape);
+				const slotDepthDim = getPocketLengthLengthwise(shapeId);
+				const standingHeight = getStandingHeightLengthwise(shapeId);
 				edgeLoadedSlots.push({
-					shape,
+					shape: shapeId,
 					count,
 					orientation,
 					slotWidth: counterSpan, // Counters stack along X (left to right)
@@ -904,10 +913,10 @@ export function createCounterTray(
 			} else {
 				// Crosswise: counters stack along Y (front to back), takes a column
 				// For custom shapes: longer side along X (parallel to tray width), shorter side is height
-				const slotWidthDim = getPocketWidth(shape); // Longer side along X
-				const standingHeight = getStandingHeightCrosswise(shape);
+				const slotWidthDim = getPocketWidth(shapeId); // Longer side along X
+				const standingHeight = getStandingHeightCrosswise(shapeId);
 				edgeLoadedSlots.push({
-					shape,
+					shape: shapeId,
 					count,
 					orientation,
 					slotWidth: slotWidthDim, // Counter dimension along X (longer side)
@@ -1128,7 +1137,7 @@ export function createCounterTray(
 	// Calculate max top-loaded stack height from placements
 	let maxTopLoadedHeight = 0;
 	for (const placement of topLoadedPlacements) {
-		const stackHeight = placement.count * counterThickness;
+		const stackHeight = placement.count * getShape(placement.shapeRef).thickness;
 		maxTopLoadedHeight = Math.max(maxTopLoadedHeight, stackHeight);
 	}
 
@@ -1563,7 +1572,8 @@ export function createCounterTray(
 
 	// Top-loaded pockets (using greedy bin-packing placements)
 	for (const placement of topLoadedPlacements) {
-		const pocketDepth = placement.count * counterThickness;
+		const counterShape = getShape(placement.shapeRef);
+		const pocketDepth = placement.count * counterShape.thickness;
 		// Use original rimHeight (not effectiveRimHeight) so pocket depth stays constant
 		const pocketFloorZ = trayHeight - rimHeight - pocketDepth;
 
@@ -1576,7 +1586,6 @@ export function createCounterTray(
 		// Rotate triangles so flat side faces the finger cutout (at the tray edge)
 		// Front row: cutout at Y=0, flat side should face low Y (default orientation)
 		// Back row: cutout at Y=trayDepth, flat side should face high Y (rotate 180°)
-		const counterShape = getShape(placement.shapeRef);
 		if (counterShape?.baseShape === 'triangle' && !isFrontRow) {
 			// Rotate around the pocket center so it stays in place
 			const pw = placement.pocketWidth;

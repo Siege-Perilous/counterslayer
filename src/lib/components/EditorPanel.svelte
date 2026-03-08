@@ -18,6 +18,8 @@
 		isCardTray,
 		isCardDividerTray,
 		isCupTray,
+		getGlobalSettings,
+		updateGlobalSettings,
 		type Box,
 		type Tray
 	} from '$lib/stores/project.svelte';
@@ -58,30 +60,22 @@
 		}
 	}
 
-	// Find any counter tray in the project to get global params from
-	function findAnyCounterTray(): { trayId: string; params: CounterTrayParams } | null {
+	// Get global settings from project store
+	let globalSettings = $derived(getGlobalSettings());
+
+	function handleGlobalSettingsChange(updates: { printBedSize?: number }) {
+		updateGlobalSettings(updates);
+	}
+
+	function handleCounterParamsChange(newParams: CounterTrayParams) {
+		// Find any counter tray to update (for backwards compatibility with tray-specific params)
 		for (const box of project.boxes) {
 			for (const tray of box.trays) {
 				if (isCounterTray(tray)) {
-					return { trayId: tray.id, params: tray.params };
+					updateTrayParams(tray.id, newParams);
+					return;
 				}
 			}
-		}
-		return null;
-	}
-
-	// Get global params - prefer selected tray if it's a counter tray, otherwise find any counter tray
-	let globalCounterParams = $derived.by(() => {
-		if (selectedTray && isCounterTray(selectedTray)) {
-			return { trayId: selectedTray.id, params: selectedTray.params };
-		}
-		return findAnyCounterTray();
-	});
-
-	function handleCounterParamsChange(newParams: CounterTrayParams) {
-		// Use the tray we got the params from (could be selected or any counter tray)
-		if (globalCounterParams) {
-			updateTrayParams(globalCounterParams.trayId, newParams);
 		}
 	}
 
@@ -206,13 +200,7 @@
 					</div>
 				</div>
 			{:else if selectionType === 'dimensions'}
-				{#if globalCounterParams}
-					<GlobalsPanel params={globalCounterParams.params} onchange={handleCounterParamsChange} />
-				{:else}
-					<div class="emptyState">
-						<p>No counter trays in project</p>
-					</div>
-				{/if}
+				<GlobalsPanel {globalSettings} onGlobalSettingsChange={handleGlobalSettingsChange} />
 			{:else if selectionType === 'box'}
 				{#if selectedBox}
 					<BoxesPanel

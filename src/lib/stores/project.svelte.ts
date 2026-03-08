@@ -49,15 +49,26 @@ export type {
 };
 export { isCounterTray, isCardTray, isCardDrawTray, isCardDividerTray, isCupTray };
 
+// Default counter thickness (used when migrating old shapes without thickness)
+export const DEFAULT_COUNTER_THICKNESS = 1.3;
+
 // Default counter shapes (global)
 export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
-	{ id: DEFAULT_SHAPE_IDS.square, name: 'Square', baseShape: 'square', width: 15.9, length: 15.9 },
+	{
+		id: DEFAULT_SHAPE_IDS.square,
+		name: 'Square',
+		baseShape: 'square',
+		width: 15.9,
+		length: 15.9,
+		thickness: DEFAULT_COUNTER_THICKNESS
+	},
 	{
 		id: DEFAULT_SHAPE_IDS.hex,
 		name: 'Hex',
 		baseShape: 'hex',
 		width: 15.9,
 		length: 15.9,
+		thickness: DEFAULT_COUNTER_THICKNESS,
 		pointyTop: false
 	},
 	{
@@ -65,7 +76,8 @@ export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
 		name: 'Circle',
 		baseShape: 'circle',
 		width: 15.9,
-		length: 15.9
+		length: 15.9,
+		thickness: DEFAULT_COUNTER_THICKNESS
 	},
 	{
 		id: DEFAULT_SHAPE_IDS.triangle,
@@ -73,6 +85,7 @@ export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
 		baseShape: 'triangle',
 		width: 15.9,
 		length: 15.9,
+		thickness: DEFAULT_COUNTER_THICKNESS,
 		cornerRadius: 1.5
 	}
 ];
@@ -405,7 +418,6 @@ export function updateBox(boxId: string, updates: Partial<Omit<Box, 'id' | 'tray
 
 // Global params that should be shared across counter trays
 const GLOBAL_PARAM_KEYS: (keyof CounterTrayParams)[] = [
-	'counterThickness',
 	'clearance',
 	'wallThickness',
 	'floorThickness',
@@ -607,6 +619,54 @@ export function deleteCardSize(id: string): void {
 		// Note: We don't auto-delete card trays using this size - let them show an error
 		autosave();
 	}
+}
+
+// Default global settings
+export const DEFAULT_GLOBAL_SETTINGS = {
+	printBedSize: 256
+};
+
+// Global settings operations
+export function getGlobalSettings(): { printBedSize: number } {
+	// If project has explicit global settings, use those
+	if (project.globalSettings) {
+		return { printBedSize: project.globalSettings.printBedSize };
+	}
+	// Otherwise, try to get from existing counter tray
+	for (const box of project.boxes) {
+		for (const tray of box.trays) {
+			if (isCounterTray(tray)) {
+				return {
+					printBedSize: tray.params.printBedSize
+				};
+			}
+		}
+	}
+	// Fall back to defaults
+	return DEFAULT_GLOBAL_SETTINGS;
+}
+
+export function updateGlobalSettings(updates: { printBedSize?: number }): void {
+	// Initialize global settings if not present
+	if (!project.globalSettings) {
+		project.globalSettings = { ...DEFAULT_GLOBAL_SETTINGS };
+	}
+	// Update project-level settings
+	if (updates.printBedSize !== undefined) {
+		project.globalSettings.printBedSize = updates.printBedSize;
+	}
+
+	// Propagate to all counter trays (these are "global" params)
+	for (const box of project.boxes) {
+		for (const tray of box.trays) {
+			if (isCounterTray(tray)) {
+				if (updates.printBedSize !== undefined) {
+					tray.params.printBedSize = updates.printBedSize;
+				}
+			}
+		}
+	}
+	autosave();
 }
 
 // Update card draw tray params

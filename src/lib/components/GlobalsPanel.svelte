@@ -21,7 +21,6 @@
 		IconRectangle,
 		IconCards
 	} from '@tabler/icons-svelte';
-	import type { CounterTrayParams } from '$lib/models/counterTray';
 	import type { CounterShape, CounterBaseShape, CardSize } from '$lib/types/project';
 	import {
 		getProject,
@@ -35,15 +34,16 @@
 		deleteCounterShape,
 		addCardSize,
 		updateCardSize,
-		deleteCardSize
+		deleteCardSize,
+		DEFAULT_COUNTER_THICKNESS
 	} from '$lib/stores/project.svelte';
 
 	interface Props {
-		params: CounterTrayParams;
-		onchange: (params: CounterTrayParams) => void;
+		globalSettings: { printBedSize: number };
+		onGlobalSettingsChange: (updates: { printBedSize?: number }) => void;
 	}
 
-	let { params, onchange }: Props = $props();
+	let { globalSettings, onGlobalSettingsChange }: Props = $props();
 
 	// Track which counter is expanded (null = none)
 	let expandedIndex: number | null = $state(null);
@@ -98,10 +98,6 @@
 		{ value: 'triangle', label: 'Triangle' }
 	];
 
-	function updateParam<K extends keyof CounterTrayParams>(key: K, value: CounterTrayParams[K]) {
-		onchange({ ...params, [key]: value });
-	}
-
 	// Custom shape handlers - now using project-level store functions
 	function handleAddShape() {
 		const newName = `Custom ${counterShapes.length + 1}`;
@@ -109,7 +105,8 @@
 			name: newName,
 			baseShape: 'rectangle',
 			width: 20,
-			length: 30
+			length: 30,
+			thickness: DEFAULT_COUNTER_THICKNESS
 		});
 		// Find the index of the newly added shape
 		const newIndex = getCounterShapes().findIndex((s) => s.id === newShape.id);
@@ -244,27 +241,9 @@
 					type="number"
 					step="1"
 					min="100"
-					value={params.printBedSize}
-					onchange={(e) => updateParam('printBedSize', parseInt(e.currentTarget.value))}
-				/>
-			{/snippet}
-			{#snippet end()}mm{/snippet}
-		</FormControl>
-	</section>
-
-	<Hr />
-
-	<section class="section">
-		<h3 class="sectionTitle">Counter Settings</h3>
-		<Spacer size="0.5rem" />
-		<FormControl label="Thickness" name="counterThickness">
-			{#snippet input({ inputProps })}
-				<Input
-					{...inputProps}
-					type="number"
-					step="0.1"
-					value={params.counterThickness}
-					onchange={(e) => updateParam('counterThickness', parseFloat(e.currentTarget.value))}
+					value={globalSettings.printBedSize}
+					onchange={(e) =>
+						onGlobalSettingsChange({ printBedSize: parseInt(e.currentTarget.value) })}
 				/>
 			{/snippet}
 			{#snippet end()}mm{/snippet}
@@ -306,6 +285,20 @@
 											{...inputProps}
 										/>
 									{/snippet}
+								</FormControl>
+								<FormControl label="Thickness" name="thickness-{index}">
+									{#snippet input({ inputProps })}
+										<Input
+											{...inputProps}
+											type="number"
+											step="0.1"
+											min="0.1"
+											value={shape.thickness}
+											onchange={(e) =>
+												handleUpdateShape(shape.id, 'thickness', parseFloat(e.currentTarget.value))}
+										/>
+									{/snippet}
+									{#snippet end()}mm{/snippet}
 								</FormControl>
 								{#if baseShape === 'rectangle'}
 									<FormControl label="Width" name="width-{index}">
