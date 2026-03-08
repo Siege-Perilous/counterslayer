@@ -25,6 +25,7 @@
 	import type { CardDrawTrayParams } from '$lib/models/cardTray';
 	import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
 	import type { CupTrayParams } from '$lib/models/cupTray';
+	import { countCups } from '$lib/types/cupLayout';
 	import { layoutEditorState } from '$lib/stores/layoutEditor.svelte';
 
 	type SelectionType = 'dimensions' | 'box' | 'tray';
@@ -116,7 +117,7 @@
 		let isCups = false;
 
 		if (isCupTray(tray)) {
-			stacks = tray.params.rows * tray.params.columns;
+			stacks = countCups(tray.params.layout);
 			counters = stacks;
 			isCups = true;
 		} else if (isCardDividerTray(tray)) {

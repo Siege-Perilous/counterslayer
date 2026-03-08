@@ -1,4 +1,6 @@
 import type { Project, Box, LidParams, Tray, CounterShape, CardSize } from '$lib/types/project';
+import type { CupLayout } from '$lib/types/cupLayout';
+import { gridToSplitLayout } from '$lib/types/cupLayout';
 import { defaultLidParams } from '$lib/models/lid';
 import {
 	defaultParams,
@@ -71,13 +73,17 @@ interface LegacyCardTrayParams {
 	cardSizeId?: string;
 }
 
-// Legacy cup tray params (old format with individual cup dimensions)
+// Legacy cup tray params (old format with individual cup dimensions or rows/columns)
 interface LegacyCupTrayParams {
 	cupWidth?: number;
 	cupDepth?: number;
 	cupHeight?: number;
 	rows?: number;
 	columns?: number;
+	trayWidth?: number;
+	trayDepth?: number;
+	cupCavityHeight?: number | null;
+	layout?: CupLayout;
 	wallThickness?: number;
 	floorThickness?: number;
 	cornerRadius?: number;
@@ -226,29 +232,51 @@ function migrateCardDrawTrayParams(
 	return { cardSizeId: DEFAULT_CARD_SIZE_IDS.standard };
 }
 
-// Migrate cup tray params from old format (cupWidth/cupDepth/cupHeight) to new format (trayWidth/trayDepth/cupCavityHeight)
+// Migrate cup tray params from old format (cupWidth/cupDepth/cupHeight or rows/columns) to new format (layout)
 function migrateCupTrayParams(params: LegacyCupTrayParams): {
+	layout: CupLayout;
 	trayWidth: number;
 	trayDepth: number;
 	cupCavityHeight: number | null;
-	rows: number;
-	columns: number;
 	wallThickness: number;
 	floorThickness: number;
 	cornerRadius: number;
 } {
-	const rows = params.rows ?? 2;
-	const columns = params.columns ?? 2;
 	const wallThickness = params.wallThickness ?? 3.0;
 	const floorThickness = params.floorThickness ?? 2.0;
 	const cornerRadius = params.cornerRadius ?? 6;
 
-	// Check if already in new format (has trayWidth)
-	if ('trayWidth' in params) {
-		return params as ReturnType<typeof migrateCupTrayParams>;
+	// Check if already has layout (new format)
+	if (params.layout) {
+		return {
+			layout: params.layout,
+			trayWidth: params.trayWidth ?? 89,
+			trayDepth: params.trayDepth ?? 89,
+			cupCavityHeight: params.cupCavityHeight ?? null,
+			wallThickness,
+			floorThickness,
+			cornerRadius
+		};
 	}
 
-	// Convert old cup dimensions to tray dimensions
+	// Check if has rows/columns (intermediate format) - convert to layout
+	if (params.rows !== undefined && params.columns !== undefined && params.trayWidth !== undefined) {
+		const rows = params.rows;
+		const columns = params.columns;
+		return {
+			layout: gridToSplitLayout(rows, columns),
+			trayWidth: params.trayWidth,
+			trayDepth: params.trayDepth ?? 89,
+			cupCavityHeight: params.cupCavityHeight ?? null,
+			wallThickness,
+			floorThickness,
+			cornerRadius
+		};
+	}
+
+	// Oldest format: cupWidth/cupDepth/cupHeight
+	const rows = params.rows ?? 2;
+	const columns = params.columns ?? 2;
 	const cupWidth = params.cupWidth ?? 40;
 	const cupDepth = params.cupDepth ?? 40;
 	const cupHeight = params.cupHeight ?? 25;
@@ -260,11 +288,10 @@ function migrateCupTrayParams(params: LegacyCupTrayParams): {
 	const trayDepth = wallThickness + rows * cupDepth + (rows - 1) * wallThickness + wallThickness;
 
 	return {
+		layout: gridToSplitLayout(rows, columns),
 		trayWidth,
 		trayDepth,
 		cupCavityHeight: cupHeight, // Preserve explicit height from old format
-		rows,
-		columns,
 		wallThickness,
 		floorThickness,
 		cornerRadius

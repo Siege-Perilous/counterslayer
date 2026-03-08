@@ -19,6 +19,7 @@
 		type Tray,
 		type TrayType
 	} from '$lib/stores/project.svelte';
+	import { countCups } from '$lib/types/cupLayout';
 
 	type SelectionType = 'dimensions' | 'box' | 'tray';
 
@@ -89,10 +90,10 @@
 		isCupTray: boolean;
 	} {
 		if (isCupTray(tray)) {
-			const cupCount = tray.params.rows * tray.params.columns;
+			const cupTotal = countCups(tray.params.layout);
 			return {
-				stacks: cupCount,
-				counters: cupCount,
+				stacks: cupTotal,
+				counters: cupTotal,
 				isCardTray: false,
 				isCardDivider: false,
 				isCupTray: true

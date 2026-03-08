@@ -27,6 +27,7 @@
 	import type { CardDrawTrayParams } from '$lib/models/cardTray';
 	import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
 	import type { CupTrayParams } from '$lib/models/cupTray';
+	import { countCups } from '$lib/types/cupLayout';
 	import { getTrayDimensionsForTray, arrangeTrays } from '$lib/models/box';
 	import {
 		getProject,
@@ -119,7 +120,8 @@
 		return {
 			width: placement.dimensions.width,
 			depth: placement.dimensions.depth,
-			height: maxTrayHeight > placement.dimensions.height ? maxTrayHeight : placement.dimensions.height
+			height:
+				maxTrayHeight > placement.dimensions.height ? maxTrayHeight : placement.dimensions.height
 		};
 	});
 
@@ -131,10 +133,10 @@
 		isCupTray: boolean;
 	} {
 		if (isCupTray(tray)) {
-			const cupCount = tray.params.rows * tray.params.columns;
+			const cupTotal = countCups(tray.params.layout);
 			return {
-				stacks: cupCount,
-				counters: cupCount,
+				stacks: cupTotal,
+				counters: cupTotal,
 				isCardTray: false,
 				isCardDivider: false,
 				isCupTray: true

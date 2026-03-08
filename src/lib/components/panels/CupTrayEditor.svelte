@@ -1,13 +1,15 @@
 <script lang="ts">
 	import { Input, FormControl, Spacer } from '@tableslayer/ui';
 	import type { CupTray } from '$lib/types/project';
+	import type { CupLayout } from '$lib/types/cupLayout';
+	import { countCups } from '$lib/types/cupLayout';
 	import {
 		type CupTrayParams,
 		getCupTrayDimensions,
-		getCupDimensions,
 		validateCupTrayParams,
 		DEFAULT_CUP_CAVITY_HEIGHT
 	} from '$lib/models/cupTray';
+	import CupLayoutEditor from './CupLayoutEditor.svelte';
 
 	interface Props {
 		tray: CupTray;
@@ -18,8 +20,8 @@
 
 	let { tray, onUpdateParams, actualHeight, displayDimensions }: Props = $props();
 
-	// Calculate cup dimensions for display
-	let cupDimensions = $derived.by(() => getCupDimensions(tray.params));
+	// Cup count for display
+	let cupCount = $derived(countCups(tray.params.layout));
 
 	// Compute auto cup cavity height (used when cupCavityHeight is null)
 	let autoCupCavityHeight = $derived.by(() => {
@@ -54,6 +56,10 @@
 		onUpdateParams({ ...tray.params, [key]: value });
 	}
 
+	function handleLayoutUpdate(layout: CupLayout) {
+		updateParam('layout', layout);
+	}
+
 	function handleCupCavityHeightChange(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
 		const value = input.value.trim();
@@ -69,13 +75,6 @@
 </script>
 
 <div class="panelFormSection">
-	{#if warnings.length > 0}
-		{#each warnings as warning, i (i)}
-			<p class="warningText">{warning}</p>
-		{/each}
-		<Spacer size="0.5rem" />
-	{/if}
-
 	<!-- Tray Dimensions (Primary Controls) -->
 	<section class="section">
 		<div class="sectionHeader">
@@ -119,41 +118,28 @@
 
 	<Spacer size="0.5rem" />
 
-	<!-- Grid Layout -->
+	<!-- Cup Layout -->
 	<section class="section">
 		<div class="sectionHeader">
-			<h3 class="sectionTitle">Grid Layout</h3>
+			<h3 class="sectionTitle">Cup Layout</h3>
 			<span class="calculatedInfo">
-				Cup: {cupDimensions.cupWidth.toFixed(1)} &times; {cupDimensions.cupDepth.toFixed(1)} mm
+				{cupCount} cup{cupCount !== 1 ? 's' : ''}
 			</span>
 		</div>
 		<Spacer size="0.5rem" />
-		<div class="formGrid">
-			<FormControl label="Columns" name="columns">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="number"
-						step="1"
-						min="1"
-						value={tray.params.columns}
-						onchange={(e) => updateParam('columns', parseInt(e.currentTarget.value))}
-					/>
-				{/snippet}
-			</FormControl>
-			<FormControl label="Rows" name="rows">
-				{#snippet input({ inputProps })}
-					<Input
-						{...inputProps}
-						type="number"
-						step="1"
-						min="1"
-						value={tray.params.rows}
-						onchange={(e) => updateParam('rows', parseInt(e.currentTarget.value))}
-					/>
-				{/snippet}
-			</FormControl>
-		</div>
+		<CupLayoutEditor
+			layout={tray.params.layout}
+			wallThickness={tray.params.wallThickness}
+			trayWidth={tray.params.trayWidth}
+			trayDepth={tray.params.trayDepth}
+			onUpdateLayout={handleLayoutUpdate}
+		/>
+		{#if warnings.length > 0}
+			<Spacer size="0.5rem" />
+			{#each warnings as warning, i (i)}
+				<p class="warningText">{warning}</p>
+			{/each}
+		{/if}
 	</section>
 
 	<Spacer size="0.5rem" />

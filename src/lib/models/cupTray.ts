@@ -1,5 +1,7 @@
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
+import type { CupLayout, CupLayoutNode, CupId } from '$lib/types/cupLayout';
+import { isCupLeaf, isCupSplit, createDefaultCupLayout } from '$lib/types/cupLayout';
 
 const { cuboid, roundedCuboid } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
@@ -11,8 +13,7 @@ const { extrudeLinear } = jscad.extrusions;
 
 // Cup tray parameters
 export interface CupTrayParams {
-	rows: number; // Number of rows (default: 2)
-	columns: number; // Number of columns (default: 2)
+	layout: CupLayout; // Split-based layout tree (replaces rows/columns)
 	trayWidth: number; // Total tray X dimension in mm
 	trayDepth: number; // Total tray Y dimension in mm
 	cupCavityHeight: number | null; // Cup cavity Z dimension in mm, null = auto (calculated from box height)
@@ -21,17 +22,16 @@ export interface CupTrayParams {
 	cornerRadius: number; // Corner radius in mm (default: 6)
 }
 
-// Minimum cup size warning threshold
-export const MIN_CUP_SIZE = 30;
+// Minimum cup size warning threshold (reduced from 30mm since custom layouts may intentionally have smaller cups)
+export const MIN_CUP_SIZE = 20;
 
 // Default cup cavity height when auto-calculated and no box context
 export const DEFAULT_CUP_CAVITY_HEIGHT = 25;
 
 // Default parameters
 export const defaultCupTrayParams: CupTrayParams = {
-	rows: 2,
-	columns: 2,
-	trayWidth: 89, // Equivalent to old 2x40mm cups + 3x3mm walls
+	layout: createDefaultCupLayout(), // Single cup by default
+	trayWidth: 89,
 	trayDepth: 89,
 	cupCavityHeight: null, // Auto by default
 	wallThickness: 3.0,
@@ -41,8 +41,7 @@ export const defaultCupTrayParams: CupTrayParams = {
 
 // Cup position data for visualization
 export interface CupPosition {
-	row: number;
-	column: number;
+	id: CupId; // Unique cup identifier
 	x: number; // Center X position
 	y: number; // Center Y position
 	z: number; // Bottom Z position
@@ -52,20 +51,98 @@ export interface CupPosition {
 	cornerRadius: number; // Corner radius in mm
 }
 
-// Calculate individual cup dimensions from tray dimensions
-export function getCupDimensions(params: CupTrayParams): {
-	cupWidth: number;
-	cupDepth: number;
+// Computed cup data (intermediate calculation before final positioning)
+export interface ComputedCup {
+	id: CupId;
+	x: number; // Left edge in mm (relative to tray interior)
+	y: number; // Front edge in mm
+	width: number; // Cup width in mm
+	depth: number; // Cup depth in mm
+}
+
+// Compute cup positions from layout tree
+export function computeCupPositions(
+	layout: CupLayout,
+	trayWidth: number,
+	trayDepth: number,
+	wallThickness: number
+): ComputedCup[] {
+	const cups: ComputedCup[] = [];
+
+	// Interior bounds (inside outer walls)
+	const interiorX = wallThickness;
+	const interiorY = wallThickness;
+	const interiorWidth = trayWidth - 2 * wallThickness;
+	const interiorDepth = trayDepth - 2 * wallThickness;
+
+	function traverseNode(
+		node: CupLayoutNode,
+		x: number,
+		y: number,
+		width: number,
+		depth: number
+	): void {
+		if (isCupLeaf(node)) {
+			// This is a cup - add it to the list
+			cups.push({
+				id: node.id,
+				x,
+				y,
+				width,
+				depth
+			});
+		} else if (isCupSplit(node)) {
+			// Split this space into two children
+			if (node.direction === 'vertical') {
+				// Left/right split
+				const leftWidth = width * node.ratio - wallThickness / 2;
+				const rightWidth = width * (1 - node.ratio) - wallThickness / 2;
+				const rightX = x + leftWidth + wallThickness;
+
+				traverseNode(node.first, x, y, leftWidth, depth);
+				traverseNode(node.second, rightX, y, rightWidth, depth);
+			} else {
+				// Top/bottom split (horizontal = top/bottom, "first" is top which is higher Y)
+				const topDepth = depth * node.ratio - wallThickness / 2;
+				const bottomDepth = depth * (1 - node.ratio) - wallThickness / 2;
+				const bottomY = y + topDepth + wallThickness;
+
+				traverseNode(node.first, x, y, width, topDepth);
+				traverseNode(node.second, x, bottomY, width, bottomDepth);
+			}
+		}
+	}
+
+	traverseNode(layout.root, interiorX, interiorY, interiorWidth, interiorDepth);
+
+	return cups;
+}
+
+// Get minimum cup dimensions from layout (for validation)
+export function getMinCupDimensions(params: CupTrayParams): {
+	minWidth: number;
+	minDepth: number;
 } {
-	const { trayWidth, trayDepth, rows, columns, wallThickness } = params;
+	const cups = computeCupPositions(
+		params.layout,
+		params.trayWidth,
+		params.trayDepth,
+		params.wallThickness
+	);
 
-	// cupWidth = (trayWidth - (columns + 1) * wallThickness) / columns
-	const cupWidth = (trayWidth - (columns + 1) * wallThickness) / columns;
+	if (cups.length === 0) {
+		return { minWidth: 0, minDepth: 0 };
+	}
 
-	// cupDepth = (trayDepth - (rows + 1) * wallThickness) / rows
-	const cupDepth = (trayDepth - (rows + 1) * wallThickness) / rows;
+	let minWidth = Infinity;
+	let minDepth = Infinity;
 
-	return { cupWidth, cupDepth };
+	for (const cup of cups) {
+		minWidth = Math.min(minWidth, cup.width);
+		minDepth = Math.min(minDepth, cup.depth);
+	}
+
+	return { minWidth, minDepth };
 }
 
 // Calculate tray dimensions from parameters
@@ -100,8 +177,7 @@ export function getCupPositions(
 	targetHeight?: number,
 	floorSpacerHeight?: number
 ): CupPosition[] {
-	const { rows, columns, wallThickness, cornerRadius, floorThickness, cupCavityHeight } = params;
-	const { cupWidth, cupDepth } = getCupDimensions(params);
+	const { wallThickness, cornerRadius, floorThickness, cupCavityHeight } = params;
 	const spacerOffset = floorSpacerHeight ?? 0;
 
 	// Resolve cup cavity height:
@@ -115,30 +191,25 @@ export function getCupPositions(
 	const baseTrayHeight = dims.height;
 	const trayHeight = targetHeight && targetHeight > baseTrayHeight ? targetHeight : baseTrayHeight;
 
-	const positions: CupPosition[] = [];
+	// Get computed cup positions from layout tree
+	const computedCups = computeCupPositions(
+		params.layout,
+		params.trayWidth,
+		params.trayDepth,
+		wallThickness
+	);
 
-	for (let row = 0; row < rows; row++) {
-		for (let col = 0; col < columns; col++) {
-			// Calculate center position for this cup
-			const x = wallThickness + col * (cupWidth + wallThickness) + cupWidth / 2;
-			const y = wallThickness + row * (cupDepth + wallThickness) + cupDepth / 2;
-			const z = trayHeight - effectiveCupHeight + spacerOffset;
-
-			positions.push({
-				row,
-				column: col,
-				x,
-				y,
-				z,
-				width: cupWidth,
-				depth: cupDepth,
-				height: effectiveCupHeight,
-				cornerRadius
-			});
-		}
-	}
-
-	return positions;
+	// Convert to CupPosition format (with center coordinates)
+	return computedCups.map((cup) => ({
+		id: cup.id,
+		x: cup.x + cup.width / 2, // Convert to center
+		y: cup.y + cup.depth / 2, // Convert to center
+		z: trayHeight - effectiveCupHeight + spacerOffset,
+		width: cup.width,
+		depth: cup.depth,
+		height: effectiveCupHeight,
+		cornerRadius
+	}));
 }
 
 // Create cup tray geometry
@@ -148,20 +219,30 @@ export function createCupTray(
 	targetHeight?: number,
 	floorSpacerHeight?: number
 ): Geom3 {
-	const { rows, columns, wallThickness, cornerRadius, floorThickness, cupCavityHeight } = params;
-	const { cupWidth, cupDepth } = getCupDimensions(params);
+	const { wallThickness, cornerRadius, floorThickness, cupCavityHeight } = params;
 
 	const nameLabel = trayName ? `Tray "${trayName}"` : 'Tray';
 
-	// Validate parameters
-	if (rows < 1 || columns < 1) {
-		throw new Error(`${nameLabel}: Must have at least 1 row and 1 column.`);
+	// Get computed cup positions from layout tree
+	const computedCups = computeCupPositions(
+		params.layout,
+		params.trayWidth,
+		params.trayDepth,
+		wallThickness
+	);
+
+	// Validate that we have at least one cup
+	if (computedCups.length === 0) {
+		throw new Error(`${nameLabel}: Layout must contain at least one cup.`);
 	}
 
-	if (cupWidth <= 0 || cupDepth <= 0) {
-		throw new Error(
-			`${nameLabel}: Calculated cup dimensions must be greater than zero. Check tray width/depth vs wall thickness.`
-		);
+	// Check for cups with invalid dimensions
+	for (const cup of computedCups) {
+		if (cup.width <= 0 || cup.depth <= 0) {
+			throw new Error(
+				`${nameLabel}: Cup dimensions must be greater than zero. Check tray width/depth vs wall thickness.`
+			);
+		}
 	}
 
 	// Resolve cup cavity height:
@@ -190,34 +271,36 @@ export function createCupTray(
 		center: [trayWidth / 2, trayDepth / 2, trayHeight / 2]
 	});
 
-	// Create cup cavities
+	// Create cup cavities from computed positions
 	const cupCuts: Geom3[] = [];
+	const cupFloorZ = trayHeight - cupHeight;
 
-	for (let row = 0; row < rows; row++) {
-		for (let col = 0; col < columns; col++) {
-			// Calculate center position for this cup
-			const cupCenterX = wallThickness + col * (cupWidth + wallThickness) + cupWidth / 2;
-			const cupCenterY = wallThickness + row * (cupDepth + wallThickness) + cupDepth / 2;
-			const cupFloorZ = trayHeight - cupHeight;
+	for (const cup of computedCups) {
+		// Calculate center position for this cup
+		const cupCenterX = cup.x + cup.width / 2;
+		const cupCenterY = cup.y + cup.depth / 2;
 
-			// Cup cavity height - extend above tray top by cornerRadius*2 so the
-			// rounded top edge is completely outside the tray (only bottom rounds inside)
-			const cavityHeight = cupHeight + cornerRadius * 2 + 1;
+		// Determine corner radius for this cup - constrain to half the smallest dimension
+		const maxRadius = Math.min(cup.width, cup.depth) / 2;
+		const effectiveCornerRadius = Math.min(cornerRadius, maxRadius);
 
-			// Simple rounded cuboid for the cup cavity
-			// Bottom at cupFloorZ, top extends well above tray surface
-			const cupCavity = translate(
-				[cupCenterX, cupCenterY, cupFloorZ + cavityHeight / 2],
-				roundedCuboid({
-					size: [cupWidth, cupDepth, cavityHeight],
-					roundRadius: cornerRadius,
-					segments: 32,
-					center: [0, 0, 0]
-				})
-			);
+		// Cup cavity height - extend above tray top by cornerRadius*2 so the
+		// rounded top edge is completely outside the tray (only bottom rounds inside)
+		const cavityHeight = cupHeight + effectiveCornerRadius * 2 + 1;
 
-			cupCuts.push(cupCavity);
-		}
+		// Simple rounded cuboid for the cup cavity
+		// Bottom at cupFloorZ, top extends well above tray surface
+		const cupCavity = translate(
+			[cupCenterX, cupCenterY, cupFloorZ + cavityHeight / 2],
+			roundedCuboid({
+				size: [cup.width, cup.depth, cavityHeight],
+				roundRadius: effectiveCornerRadius,
+				segments: 32,
+				center: [0, 0, 0]
+			})
+		);
+
+		cupCuts.push(cupCavity);
 	}
 
 	let result = subtract(trayBody, ...cupCuts);
@@ -295,34 +378,34 @@ export function createCupTray(
 // Validate cup tray parameters and return warnings
 export function validateCupTrayParams(params: CupTrayParams): string[] {
 	const warnings: string[] = [];
-	const { cupWidth, cupDepth } = getCupDimensions(params);
+	const { minWidth, minDepth } = getMinCupDimensions(params);
 
-	if (cupWidth < MIN_CUP_SIZE) {
+	if (minWidth < MIN_CUP_SIZE) {
 		warnings.push(
-			`Calculated cup width (${cupWidth.toFixed(1)}mm) is below minimum (${MIN_CUP_SIZE}mm). Increase tray width or reduce columns.`
+			`Smallest cup width (${minWidth.toFixed(1)}mm) is below minimum (${MIN_CUP_SIZE}mm). Increase tray size or adjust layout.`
 		);
 	}
 
-	if (cupDepth < MIN_CUP_SIZE) {
+	if (minDepth < MIN_CUP_SIZE) {
 		warnings.push(
-			`Calculated cup depth (${cupDepth.toFixed(1)}mm) is below minimum (${MIN_CUP_SIZE}mm). Increase tray depth or reduce rows.`
+			`Smallest cup depth (${minDepth.toFixed(1)}mm) is below minimum (${MIN_CUP_SIZE}mm). Increase tray size or adjust layout.`
 		);
 	}
 
-	if (cupWidth <= 0) {
-		warnings.push(`Tray width is too small for the number of columns and wall thickness.`);
+	if (minWidth <= 0) {
+		warnings.push(`Tray width is too small for the current layout and wall thickness.`);
 	}
 
-	if (cupDepth <= 0) {
-		warnings.push(`Tray depth is too small for the number of rows and wall thickness.`);
+	if (minDepth <= 0) {
+		warnings.push(`Tray depth is too small for the current layout and wall thickness.`);
 	}
 
-	const maxRadius = Math.min(Math.max(cupWidth, 0), Math.max(cupDepth, 0)) / 2;
+	const maxRadius = Math.min(Math.max(minWidth, 0), Math.max(minDepth, 0)) / 2;
 	if (params.cornerRadius < 0) {
 		warnings.push(`Corner radius cannot be negative`);
 	} else if (maxRadius > 0 && params.cornerRadius > maxRadius) {
 		warnings.push(
-			`Corner radius (${params.cornerRadius}mm) exceeds maximum (${maxRadius.toFixed(1)}mm)`
+			`Corner radius (${params.cornerRadius}mm) exceeds maximum for smallest cup (${maxRadius.toFixed(1)}mm)`
 		);
 	}
 
