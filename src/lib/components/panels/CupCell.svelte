@@ -3,10 +3,10 @@
 
 	interface Props {
 		id: CupId;
-		x: number; // Left edge in percent
-		y: number; // Top edge in percent
-		width: number; // Width in percent
-		height: number; // Height in percent
+		x: number; // Left edge in pixels
+		y: number; // Bottom edge in pixels
+		width: number; // Width in pixels
+		height: number; // Height in pixels
 		selected: boolean;
 		onSelect: (id: CupId) => void;
 	}
@@ -27,19 +27,19 @@
 </script>
 
 <button
-	class="cup-cell"
-	class:selected
-	style="left: {x}%; bottom: {y}%; width: {width}%; height: {height}%;"
+	class="cupCell"
+	class:cupCell--selected={selected}
+	style="left: {x}px; bottom: {y}px; width: {width}px; height: {height}px;"
 	onclick={handleClick}
 	onkeydown={handleKeydown}
 	aria-label="Cup {id}"
 	aria-pressed={selected}
 >
-	<span class="cup-label">Cup</span>
+	<span class="cupCell__label">Cup</span>
 </button>
 
 <style>
-	.cup-cell {
+	.cupCell {
 		position: absolute;
 		background: var(--inputBg);
 		border: 1px solid transparent;
@@ -56,15 +56,15 @@
 		color: inherit;
 	}
 
-	.cup-cell:hover {
+	.cupCell:hover {
 		border-color: var(--fgPrimary);
 	}
 
-	.cup-cell.selected {
+	.cupCell--selected {
 		background: var(--contrastMedium);
 	}
 
-	.cup-label {
+	.cupCell__label {
 		font-size: 0.65rem;
 		color: var(--fgMuted);
 		text-transform: uppercase;
@@ -73,7 +73,7 @@
 		pointer-events: none;
 	}
 
-	.cup-cell.selected .cup-label {
+	.cupCell--selected .cupCell__label {
 		color: var(--fg);
 	}
 </style>

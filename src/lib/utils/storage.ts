@@ -242,7 +242,7 @@ function migrateCupTrayParams(params: LegacyCupTrayParams): {
 	floorThickness: number;
 	cornerRadius: number;
 } {
-	const wallThickness = params.wallThickness ?? 3.0;
+	const wallThickness = params.wallThickness ?? 2.0;
 	const floorThickness = params.floorThickness ?? 2.0;
 	const cornerRadius = params.cornerRadius ?? 6;
 

@@ -7,28 +7,24 @@
 	interface Props {
 		layout: CupLayout;
 		selectedCupId: CupId | null;
-		wallThickness: number; // Wall thickness in mm (for calculating gap percentages)
 		trayWidth: number; // Tray width in mm
 		trayDepth: number; // Tray depth in mm
 		onSelectCup: (id: CupId) => void;
 		onUpdateRatio: (splitPath: string, newRatio: number) => void;
 	}
 
-	let {
-		layout,
-		selectedCupId,
-		wallThickness,
-		trayWidth,
-		trayDepth,
-		onSelectCup,
-		onUpdateRatio
-	}: Props = $props();
+	let { layout, selectedCupId, trayWidth, trayDepth, onSelectCup, onUpdateRatio }: Props = $props();
 
-	// Calculate gap percentage based on wall thickness
-	let gapPercentX = $derived((wallThickness / trayWidth) * 100);
-	let gapPercentY = $derived((wallThickness / trayDepth) * 100);
+	// Track container dimensions
+	let containerWidth = $state(0);
+	let containerHeight = $state(0);
 
-	// Data structure for rendered elements
+	// Fixed pixel gap between cups
+	const GAP_PX = 8;
+	// Inset from container edges to prevent border clipping
+	const EDGE_INSET = 1;
+
+	// Data structure for rendered elements (all in pixels)
 	interface RenderedCup {
 		id: CupId;
 		x: number;
@@ -39,20 +35,25 @@
 
 	interface RenderedDivider {
 		key: string;
-		splitPath: string; // Path to the split node in the tree (e.g., "root", "root-L")
+		splitPath: string;
 		direction: 'horizontal' | 'vertical';
-		position: number; // Position in percent within containing area
-		absolutePosition: number; // Absolute position in container (percent)
+		ratio: number; // Original ratio (0-1)
+		absolutePosition: number; // Absolute position in container (pixels)
 		x: number;
 		y: number;
 		width: number;
 		height: number;
 	}
 
-	// Compute rendered elements from layout tree
+	// Compute rendered elements from layout tree (in pixels)
 	let renderedElements = $derived.by(() => {
 		const cups: RenderedCup[] = [];
 		const dividers: RenderedDivider[] = [];
+
+		// Need valid dimensions to compute
+		if (containerWidth === 0 || containerHeight === 0) {
+			return { cups, dividers };
+		}
 
 		function traverse(
 			node: CupLayoutNode,
@@ -65,23 +66,20 @@
 			if (isCupLeaf(node)) {
 				cups.push({
 					id: node.id,
-					x,
-					y,
-					width,
-					height
+					x: Math.round(x),
+					y: Math.round(y),
+					width: Math.round(width),
+					height: Math.round(height)
 				});
 				return;
 			}
 
 			if (isCupSplit(node)) {
-				const gapX = gapPercentX;
-				const gapY = gapPercentY;
-
 				if (node.direction === 'vertical') {
 					// Left/right split
-					const leftWidth = width * node.ratio - gapX / 2;
-					const rightWidth = width * (1 - node.ratio) - gapX / 2;
-					const rightX = x + leftWidth + gapX;
+					const leftWidth = width * node.ratio - GAP_PX / 2;
+					const rightWidth = width * (1 - node.ratio) - GAP_PX / 2;
+					const rightX = x + leftWidth + GAP_PX;
 
 					traverse(node.first, x, y, leftWidth, height, `${splitPath}-L`);
 					traverse(node.second, rightX, y, rightWidth, height, `${splitPath}-R`);
@@ -92,7 +90,7 @@
 						key: `${splitPath}-div`,
 						splitPath,
 						direction: 'vertical',
-						position: node.ratio * 100,
+						ratio: node.ratio,
 						absolutePosition,
 						x,
 						y,
@@ -101,12 +99,12 @@
 					});
 				} else {
 					// Top/bottom split
-					const topHeight = height * node.ratio - gapY / 2;
-					const bottomHeight = height * (1 - node.ratio) - gapY / 2;
-					const bottomY = y + topHeight + gapY;
+					const bottomHeight = height * node.ratio - GAP_PX / 2;
+					const topHeight = height * (1 - node.ratio) - GAP_PX / 2;
+					const topY = y + bottomHeight + GAP_PX;
 
-					traverse(node.first, x, y, width, topHeight, `${splitPath}-L`);
-					traverse(node.second, x, bottomY, width, bottomHeight, `${splitPath}-R`);
+					traverse(node.first, x, y, width, bottomHeight, `${splitPath}-L`);
+					traverse(node.second, x, topY, width, topHeight, `${splitPath}-R`);
 
 					// Add divider
 					const absolutePosition = y + node.ratio * height;
@@ -114,7 +112,7 @@
 						key: `${splitPath}-div`,
 						splitPath,
 						direction: 'horizontal',
-						position: node.ratio * 100,
+						ratio: node.ratio,
 						absolutePosition,
 						x,
 						y,
@@ -125,8 +123,15 @@
 			}
 		}
 
-		// Start at full bounds (no outer padding in preview - cups fill the area)
-		traverse(layout.root, 0, 0, 100, 100, 'root');
+		// Start with edge inset to prevent border clipping
+		traverse(
+			layout.root,
+			EDGE_INSET,
+			EDGE_INSET,
+			containerWidth - 2 * EDGE_INSET,
+			containerHeight - 2 * EDGE_INSET,
+			'root'
+		);
 
 		return { cups, dividers };
 	});
@@ -141,9 +146,8 @@
 			.map((d) => ({ key: d.key, absolutePosition: d.absolutePosition }));
 	}
 
-	function handleDividerDrag(splitPath: string, newPosition: number) {
-		// Convert position (0-100) to ratio (0-1)
-		onUpdateRatio(splitPath, newPosition / 100);
+	function handleDividerDrag(splitPath: string, newRatio: number) {
+		onUpdateRatio(splitPath, newRatio);
 	}
 
 	function handleSnapChange(key: string | null) {
@@ -151,7 +155,12 @@
 	}
 </script>
 
-<div class="cup-layout-preview" style="aspect-ratio: {trayWidth} / {trayDepth};">
+<div
+	class="cupLayoutPreview"
+	style="aspect-ratio: {trayWidth} / {trayDepth};"
+	bind:clientWidth={containerWidth}
+	bind:clientHeight={containerHeight}
+>
 	{#each renderedElements.cups as cup (cup.id)}
 		<CupCell
 			id={cup.id}
@@ -167,21 +176,21 @@
 	{#each renderedElements.dividers as divider (divider.key)}
 		<SplitDivider
 			direction={divider.direction}
-			position={divider.position}
+			position={divider.ratio}
 			x={divider.x}
 			y={divider.y}
 			width={divider.width}
 			height={divider.height}
 			snapTargets={getSnapTargets(divider.key, divider.direction)}
 			isSnapTarget={snapTargetKey === divider.key}
-			onDrag={(pos) => handleDividerDrag(divider.splitPath, pos)}
+			onDrag={(ratio) => handleDividerDrag(divider.splitPath, ratio)}
 			onSnapChange={handleSnapChange}
 		/>
 	{/each}
 </div>
 
 <style>
-	.cup-layout-preview {
+	.cupLayoutPreview {
 		position: relative;
 		width: 100%;
 		overflow: hidden;

@@ -129,7 +129,6 @@
 		<Spacer size="0.5rem" />
 		<CupLayoutEditor
 			layout={tray.params.layout}
-			wallThickness={tray.params.wallThickness}
 			trayWidth={tray.params.trayWidth}
 			trayDepth={tray.params.trayDepth}
 			onUpdateLayout={handleLayoutUpdate}

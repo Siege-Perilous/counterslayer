@@ -13,13 +13,12 @@
 
 	interface Props {
 		layout: CupLayout;
-		wallThickness: number;
 		trayWidth: number;
 		trayDepth: number;
 		onUpdateLayout: (layout: CupLayout) => void;
 	}
 
-	let { layout, wallThickness, trayWidth, trayDepth, onUpdateLayout }: Props = $props();
+	let { layout, trayWidth, trayDepth, onUpdateLayout }: Props = $props();
 
 	// Selected cup state
 	let selectedCupId = $state<CupId | null>(null);
@@ -74,10 +73,10 @@
 	}
 </script>
 
-<div class="cup-layout-editor">
-	<div class="toolbar">
-		<span class="hint">Select cup, drag border to resize</span>
-		<div class="toolbar-buttons">
+<div class="cupLayoutEditor">
+	<div class="cupLayoutEditor__toolbar">
+		<span class="cupLayoutEditor__hint">Select cup, drag border to resize</span>
+		<div class="cupLayoutEditor__toolbarButtons">
 			<IconButton
 				variant="ghost"
 				onclick={handleSplitVertical}
@@ -110,7 +109,6 @@
 	<CupLayoutPreview
 		{layout}
 		{selectedCupId}
-		{wallThickness}
 		{trayWidth}
 		{trayDepth}
 		onSelectCup={handleSelectCup}
@@ -119,23 +117,23 @@
 </div>
 
 <style>
-	.cup-layout-editor {
+	.cupLayoutEditor {
 		display: flex;
 		flex-direction: column;
 	}
 
-	.toolbar {
+	.cupLayoutEditor__toolbar {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 	}
 
-	.toolbar-buttons {
+	.cupLayoutEditor__toolbarButtons {
 		display: flex;
 		gap: 0.25rem;
 	}
 
-	.hint {
+	.cupLayoutEditor__hint {
 		font-size: 0.7rem;
 		color: var(--fgMuted);
 		margin: 0;

@@ -277,3 +277,21 @@ Available colors: `red`, `green`, `blue`, `yellow`, `cyan`, `magenta`, `orange`,
 - `scripts/mesh-analyzer.py` - Python mesh analysis
 - `scripts/render-view.py` - Scriptable 3D camera renderer
 - `mesh-analysis/` - Generated debug files (gitignored)
+
+## CSS Naming Convention
+
+Use BEM with camelCase for all CSS class names:
+
+```
+.componentName__elementName--modifier
+```
+
+Examples:
+
+- `.cupCell` - Block (component root)
+- `.cupCell__label` - Element (child of component)
+- `.cupCell--selected` - Modifier (state/variant)
+- `.splitDivider--vertical` - Modifier
+- `.splitDivider__handle` - Element
+- `.cupLayoutEditor__toolbar` - Element
+- `.cupLayoutEditor__toolbarButtons` - Element (camelCase for multi-word)

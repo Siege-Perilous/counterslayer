@@ -17,7 +17,7 @@ export interface CupTrayParams {
 	trayWidth: number; // Total tray X dimension in mm
 	trayDepth: number; // Total tray Y dimension in mm
 	cupCavityHeight: number | null; // Cup cavity Z dimension in mm, null = auto (calculated from box height)
-	wallThickness: number; // Wall thickness in mm (default: 3.0)
+	wallThickness: number; // Wall thickness in mm (default: 2.0)
 	floorThickness: number; // Floor thickness in mm (default: 2.0)
 	cornerRadius: number; // Corner radius in mm (default: 6)
 }
@@ -34,7 +34,7 @@ export const defaultCupTrayParams: CupTrayParams = {
 	trayWidth: 89,
 	trayDepth: 89,
 	cupCavityHeight: null, // Auto by default
-	wallThickness: 3.0,
+	wallThickness: 2.0,
 	floorThickness: 2.0,
 	cornerRadius: 6
 };

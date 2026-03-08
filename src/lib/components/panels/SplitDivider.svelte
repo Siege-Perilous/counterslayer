@@ -1,20 +1,20 @@
 <script lang="ts">
-	// Snap target: absolute position in the container (percent)
+	// Snap target: absolute position in the container (pixels)
 	interface SnapTarget {
 		key: string;
-		absolutePosition: number; // Position in container percent (0-100)
+		absolutePosition: number; // Position in container pixels
 	}
 
 	interface Props {
 		direction: 'horizontal' | 'vertical'; // horizontal = top/bottom split, vertical = left/right split
-		position: number; // Position in percent (0-100)
-		x: number; // Left edge of containing area (percent)
-		y: number; // Top edge of containing area (percent)
-		width: number; // Width of containing area (percent)
-		height: number; // Height of containing area (percent)
+		position: number; // Position as ratio (0-1) within containing area
+		x: number; // Left edge of containing area (pixels)
+		y: number; // Bottom edge of containing area (pixels)
+		width: number; // Width of containing area (pixels)
+		height: number; // Height of containing area (pixels)
 		snapTargets?: SnapTarget[]; // Other dividers to snap to
 		isSnapTarget?: boolean; // Whether another divider is snapping to this one
-		onDrag: (newPosition: number) => void; // Called with new position in percent (0-100)
+		onDrag: (newRatio: number) => void; // Called with new ratio (0-1)
 		onSnapChange?: (snapKey: string | null) => void; // Called when snapping state changes
 	}
 
@@ -34,7 +34,7 @@
 	let isDragging = $state(false);
 	let containerRef: HTMLElement | null = $state(null);
 
-	const SNAP_THRESHOLD = 3; // Snap within 3% of target
+	const SNAP_THRESHOLD_PX = 6; // Snap within 6 pixels
 
 	function handlePointerDown(e: PointerEvent) {
 		e.preventDefault();
@@ -50,51 +50,45 @@
 
 		// Get the parent container bounds
 		const target = e.currentTarget as HTMLElement;
-		const container = target.closest('.cup-layout-preview') as HTMLElement;
+		const container = target.closest('.cupLayoutPreview') as HTMLElement;
 		if (!container) return;
 
 		const rect = container.getBoundingClientRect();
 
-		let newPosition: number;
+		let newRatio: number;
 		let absolutePosition: number;
 
 		if (direction === 'vertical') {
 			// Left/right split - calculate X position
-			const containerX = rect.left + (x / 100) * rect.width;
-			const containerWidth = (width / 100) * rect.width;
-			const relativeX = e.clientX - containerX;
-			newPosition = Math.max(15, Math.min(85, (relativeX / containerWidth) * 100));
-			// Convert to absolute position in container
-			absolutePosition = x + (newPosition / 100) * width;
+			const relativeX = e.clientX - rect.left - x;
+			newRatio = Math.max(0.15, Math.min(0.85, relativeX / width));
+			absolutePosition = x + newRatio * width;
 		} else {
 			// Top/bottom split - calculate Y position (inverted for bottom positioning)
-			const containerBottom = rect.bottom - (y / 100) * rect.height;
-			const containerHeight = (height / 100) * rect.height;
-			const relativeY = containerBottom - e.clientY;
-			newPosition = Math.max(15, Math.min(85, (relativeY / containerHeight) * 100));
-			// Convert to absolute position in container
-			absolutePosition = y + (newPosition / 100) * height;
+			const relativeY = rect.bottom - e.clientY - y;
+			newRatio = Math.max(0.15, Math.min(0.85, relativeY / height));
+			absolutePosition = y + newRatio * height;
 		}
 
 		// Check for snap targets
 		let snappedKey: string | null = null;
 		for (const target of snapTargets) {
-			if (Math.abs(absolutePosition - target.absolutePosition) < SNAP_THRESHOLD) {
-				// Snap to this target - convert back to local position
+			if (Math.abs(absolutePosition - target.absolutePosition) < SNAP_THRESHOLD_PX) {
+				// Snap to this target - convert back to local ratio
 				if (direction === 'vertical') {
-					newPosition = ((target.absolutePosition - x) / width) * 100;
+					newRatio = (target.absolutePosition - x) / width;
 				} else {
-					newPosition = ((target.absolutePosition - y) / height) * 100;
+					newRatio = (target.absolutePosition - y) / height;
 				}
 				// Clamp to valid range
-				newPosition = Math.max(15, Math.min(85, newPosition));
+				newRatio = Math.max(0.15, Math.min(0.85, newRatio));
 				snappedKey = target.key;
 				break;
 			}
 		}
 
 		onSnapChange?.(snappedKey);
-		onDrag(newPosition);
+		onDrag(newRatio);
 	}
 
 	function handlePointerUp(e: PointerEvent) {
@@ -106,16 +100,16 @@
 		target.releasePointerCapture(e.pointerId);
 	}
 
-	// Calculate position style based on direction
+	// Calculate position style based on direction (all in pixels)
 	let dividerStyle = $derived.by(() => {
 		if (direction === 'vertical') {
 			// Vertical divider line (for left/right split)
-			const dividerX = x + (position / 100) * width;
-			return `left: ${dividerX}%; bottom: ${y}%; height: ${height}%; width: 8px; transform: translateX(-50%);`;
+			const dividerX = x + position * width;
+			return `left: ${dividerX}px; bottom: ${y}px; height: ${height}px; width: 8px; transform: translateX(-50%);`;
 		} else {
 			// Horizontal divider line (for top/bottom split)
-			const dividerY = y + (position / 100) * height;
-			return `left: ${x}%; bottom: ${dividerY}%; width: ${width}%; height: 8px; transform: translateY(50%);`;
+			const dividerY = y + position * height;
+			return `left: ${x}px; bottom: ${dividerY}px; width: ${width}px; height: 8px; transform: translateY(50%);`;
 		}
 	});
 </script>
@@ -123,15 +117,15 @@
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
 	bind:this={containerRef}
-	class="split-divider"
-	class:vertical={direction === 'vertical'}
-	class:horizontal={direction === 'horizontal'}
-	class:dragging={isDragging}
-	class:snap-target={isSnapTarget}
+	class="splitDivider"
+	class:splitDivider--vertical={direction === 'vertical'}
+	class:splitDivider--horizontal={direction === 'horizontal'}
+	class:splitDivider--dragging={isDragging}
+	class:splitDivider--snapTarget={isSnapTarget}
 	style={dividerStyle}
 	role="separator"
 	aria-orientation={direction}
-	aria-valuenow={position}
+	aria-valuenow={Math.round(position * 100)}
 	aria-valuemin={15}
 	aria-valuemax={85}
 	tabindex="0"
@@ -139,12 +133,12 @@
 	onpointermove={handlePointerMove}
 	onpointerup={handlePointerUp}
 >
-	<div class="divider-line"></div>
-	<div class="divider-handle"></div>
+	<div class="splitDivider__line"></div>
+	<div class="splitDivider__handle"></div>
 </div>
 
 <style>
-	.split-divider {
+	.splitDivider {
 		position: absolute;
 		display: flex;
 		align-items: center;
@@ -153,32 +147,32 @@
 		touch-action: none;
 	}
 
-	.split-divider.vertical {
+	.splitDivider--vertical {
 		cursor: ew-resize;
 		flex-direction: column;
 	}
 
-	.split-divider.horizontal {
+	.splitDivider--horizontal {
 		cursor: ns-resize;
 		flex-direction: row;
 	}
 
-	.divider-line {
+	.splitDivider__line {
 		background: var(--contrastMedium);
 		transition: background 0.15s ease;
 	}
 
-	.split-divider.vertical .divider-line {
+	.splitDivider--vertical .splitDivider__line {
 		width: 2px;
 		height: 100%;
 	}
 
-	.split-divider.horizontal .divider-line {
+	.splitDivider--horizontal .splitDivider__line {
 		height: 2px;
 		width: 100%;
 	}
 
-	.divider-handle {
+	.splitDivider__handle {
 		position: absolute;
 		background: var(--fg);
 		border-radius: 2px;
@@ -186,27 +180,27 @@
 		transition: opacity 0.15s ease;
 	}
 
-	.split-divider.vertical .divider-handle {
+	.splitDivider--vertical .splitDivider__handle {
 		width: 8px;
 		height: 24px;
 	}
 
-	.split-divider.horizontal .divider-handle {
+	.splitDivider--horizontal .splitDivider__handle {
 		width: 24px;
 		height: 8px;
 	}
 
-	.split-divider:hover .divider-handle,
-	.split-divider.dragging .divider-handle {
+	.splitDivider:hover .splitDivider__handle,
+	.splitDivider--dragging .splitDivider__handle {
 		opacity: 1;
 	}
 
-	.split-divider:hover .divider-line,
-	.split-divider.dragging .divider-line {
+	.splitDivider:hover .splitDivider__line,
+	.splitDivider--dragging .splitDivider__line {
 		background: var(--fgPrimary);
 	}
 
-	.split-divider.snap-target .divider-line {
+	.splitDivider--snapTarget .splitDivider__line {
 		background: var(--fgPrimary);
 	}
 </style>
