@@ -20,9 +20,10 @@
   import { createCounterTray, getCounterPositions, type CounterStack } from '$lib/models/counterTray';
   import { createCardDrawTray, getCardDrawPositions, type CardStack } from '$lib/models/cardTray';
   import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
-  import { arrangeTrays, calculateTraySpacers } from '$lib/models/box';
+  import { arrangeTrays, calculateTraySpacers, getBoxExteriorDimensions } from '$lib/models/box';
+  import { arrangeLayerContents, type BoxPlacement, type LooseTrayPlacement } from '$lib/models/layer';
   import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
-  import { getGeometryWorker, type TrayGeometryData, type BoxGeometryData } from '$lib/utils/geometryWorker';
+  import { getGeometryWorker, type TrayGeometryData, type BoxGeometryData, type LooseTrayGeometryData } from '$lib/utils/geometryWorker';
   import { BlobWriter, ZipWriter } from '@zip.js/zip.js';
   import { exportPdfReference, exportPdfWithScreenshots, type TrayScreenshot } from '$lib/utils/pdfGenerator';
   import type { CaptureOptions } from '$lib/utils/screenshotCapture';
@@ -31,14 +32,18 @@
     initProject,
     getSelectedTray,
     getSelectedBox,
+    getSelectedLayer,
     getProject,
     getGlobalSettings,
     importProject,
     resetProject,
     getCumulativeTrayLetter,
+    getTrayLetterById,
+    getAllBoxes,
     isCounterTray,
     isCardTray,
     isCardDividerTray,
+    findTrayLocation,
     saveManualLayout,
     clearManualLayout
   } from '$lib/stores/project.svelte';
@@ -58,8 +63,8 @@
   } from '$lib/stores/layoutEditor.svelte';
   import { findAllOverlaps } from '$lib/utils/layoutSnapping';
 
-  type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid';
-  type SelectionType = 'dimensions' | 'box' | 'tray';
+  type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid' | 'layer';
+  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
 
   interface CommunityProject {
     id: string;
@@ -98,6 +103,7 @@
   let selectedTrayCounters = $state<(CounterStack | CardStack)[]>([]);
   let allTrayGeometries = $state<TrayGeometryData[]>([]);
   let allBoxGeometries = $state<BoxGeometryData[]>([]);
+  let allLooseTrayGeometries = $state<LooseTrayGeometryData[]>([]);
   let boxGeometry = $state<BufferGeometry | null>(null);
   let lidGeometry = $state<BufferGeometry | null>(null);
   let generating = $state(false);
@@ -152,6 +158,7 @@
 
   let selectedTray = $derived(getSelectedTray());
   let selectedBox = $derived(getSelectedBox());
+  let selectedLayer = $derived(getSelectedLayer());
   let globalSettings = $derived(getGlobalSettings());
   let gameContainerWidth = $derived(globalSettings.gameContainerWidth);
   let gameContainerDepth = $derived(globalSettings.gameContainerDepth);
@@ -159,11 +166,8 @@
     // Use override during PDF capture
     if (captureTrayLetter) return captureTrayLetter;
     const proj = getProject();
-    if (!selectedBox || !selectedTray) return 'A';
-    const boxIdx = proj.boxes.findIndex((b: { id: string }) => b.id === selectedBox.id);
-    const trayIdx = selectedBox.trays.findIndex((t) => t.id === selectedTray.id);
-    if (boxIdx < 0 || trayIdx < 0) return 'A';
-    return getCumulativeTrayLetter(proj.boxes, boxIdx, trayIdx);
+    if (!selectedTray) return 'A';
+    return getTrayLetterById(proj.layers, selectedTray.id) || 'A';
   });
 
   // Title for the print bed based on current view
@@ -171,8 +175,23 @@
     if (viewMode === 'tray') {
       return selectedTray?.name ?? '';
     }
+    if (viewMode === 'layer') {
+      return selectedLayer?.name ?? '';
+    }
     // For box views (all, exploded), show box name
     return selectedBox?.name ?? '';
+  });
+
+  // Compute layer arrangement when in layer view
+  let layerArrangement = $derived.by(() => {
+    if (viewMode !== 'layer' || !selectedLayer) return null;
+    const project = getProject();
+    return arrangeLayerContents(selectedLayer, {
+      gameContainerWidth,
+      gameContainerDepth,
+      cardSizes: project.cardSizes || [],
+      counterShapes: project.counterShapes || []
+    });
   });
 
   // Compute which geometries to show based on view mode
@@ -181,20 +200,28 @@
       tray: BufferGeometry | null;
       allTrays: TrayGeometryData[];
       allBoxes: BoxGeometryData[];
+      allLooseTrays: LooseTrayGeometryData[];
       box: BufferGeometry | null;
       lid: BufferGeometry | null;
       exploded: boolean;
       showAllTrays: boolean;
       showAllBoxes: boolean;
+      showLayerView: boolean;
+      layerBoxPlacements: BoxPlacement[];
+      layerLooseTrayPlacements: LooseTrayPlacement[];
     } = {
       tray: null,
       allTrays: [],
       allBoxes: [],
+      allLooseTrays: [],
       box: null,
       lid: null,
       exploded: false,
       showAllTrays: false,
-      showAllBoxes: false
+      showAllBoxes: false,
+      showLayerView: false,
+      layerBoxPlacements: [],
+      layerLooseTrayPlacements: []
     };
 
     // In layout edit mode, only show trays (no box/lid since layout isn't finalized)
@@ -222,6 +249,17 @@
         result.exploded = !inEditMode; // Don't explode in edit mode
         result.showAllTrays = true;
         break;
+      case 'layer':
+        // Show layer view with boxes and loose trays arranged on game container
+        if (layerArrangement) {
+          result.showLayerView = true;
+          result.layerBoxPlacements = layerArrangement.boxes;
+          result.layerLooseTrayPlacements = layerArrangement.looseTrays;
+          // Include allBoxes and allLooseTrays so we can render actual geometry
+          result.allBoxes = allBoxGeometries;
+          result.allLooseTrays = allLooseTrayGeometries;
+        }
+        break;
     }
     return result;
   });
@@ -232,6 +270,9 @@
     switch (type) {
       case 'dimensions':
         viewMode = 'all-no-lid';
+        break;
+      case 'layer':
+        viewMode = 'layer';
         break;
       case 'box':
         viewMode = 'exploded';
@@ -246,17 +287,27 @@
   function handleTrayDoubleClick(trayId: string) {
     // Find which box contains this tray and select both box and tray
     const project = getProject();
-    for (const box of project.boxes) {
-      const tray = box.trays.find((t) => t.id === trayId);
-      if (tray) {
-        // Update both selections together to avoid inconsistent state
-        project.selectedBoxId = box.id;
+    for (const layer of project.layers) {
+      for (const box of layer.boxes) {
+        const tray = box.trays.find((t) => t.id === trayId);
+        if (tray) {
+          // Update both selections together to avoid inconsistent state
+          project.selectedBoxId = box.id;
+          project.selectedTrayId = trayId;
+          selectionType = 'tray';
+          viewMode = 'tray';
+          return;
+        }
+      }
+      // Also check loose trays
+      const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+      if (looseTray) {
         project.selectedTrayId = trayId;
-        break;
+        selectionType = 'tray';
+        viewMode = 'tray';
+        return;
       }
     }
-    selectionType = 'tray';
-    viewMode = 'tray';
   }
 
   function handleExpandPanel() {
@@ -312,8 +363,18 @@
     const box = getSelectedBox();
     const tray = getSelectedTray();
 
-    if (!box || !tray) {
-      error = 'No box or tray selected';
+    if (!tray) {
+      error = 'No tray selected';
+      return;
+    }
+
+    // Check if this is a loose tray (not in a box)
+    const trayLocation = findTrayLocation(project, tray.id);
+    const isLoose = trayLocation && trayLocation.boxId === null;
+
+    // For boxed trays, we need a box
+    if (!isLoose && !box) {
+      error = 'No box selected';
       return;
     }
 
@@ -323,8 +384,8 @@
     // Check if cache is still valid (hash matches what was used to generate it)
     const cacheValid = lastGeneratedHash && hashAtGenerationStart === lastGeneratedHash;
 
-    // If cache valid and not forced, try to use cached geometry
-    if (cacheValid && !force && allBoxGeometries.length > 0) {
+    // If cache valid and not forced, try to use cached geometry (only for boxed trays)
+    if (!isLoose && cacheValid && !force && allBoxGeometries.length > 0 && box) {
       // Find the selected box in the all-boxes cache
       const cachedBox = allBoxGeometries.find((b) => b.boxId === box.id);
       if (cachedBox) {
@@ -362,8 +423,9 @@
 
     let wasSuperseded = false;
     try {
-      // Use web worker for geometry generation (non-blocking)
-      const result = await geometryWorker.generate(project, box.id, tray.id);
+      // Use web worker for geometry generation (handles both boxed and loose trays)
+      // Pass empty string for boxId if it's a loose tray - worker handles this case
+      const result = await geometryWorker.generate(project, box?.id ?? '', tray.id);
 
       selectedTrayGeometry = result.selectedTrayGeometry;
       selectedTrayCounters = result.selectedTrayCounters;
@@ -371,6 +433,7 @@
       boxGeometry = result.boxGeometry;
       lidGeometry = result.lidGeometry;
       allBoxGeometries = result.allBoxGeometries;
+      allLooseTrayGeometries = result.allLooseTrayGeometries;
     } catch (e) {
       // Ignore "superseded" errors - these are expected when a newer request replaces an older one
       const message = e instanceof Error ? e.message : 'Unknown error';
@@ -397,7 +460,8 @@
 
   async function handleExportAll() {
     const project = getProject();
-    if (project.boxes.length === 0) return;
+    const allBoxes = getAllBoxes();
+    if (allBoxes.length === 0) return;
 
     exportingStl = true;
     exportStlProgress = 'Generating STL files...';
@@ -432,7 +496,7 @@
       const zipBlob = await zipWriter.close();
 
       // Download zip - use first box name or default
-      const projectName = project.boxes[0]?.name?.toLowerCase().replace(/\s+/g, '-') || 'counterslayer';
+      const projectName = allBoxes[0]?.name?.toLowerCase().replace(/\s+/g, '-') || 'counterslayer';
       const url = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -466,8 +530,7 @@
   }
 
   async function handleExport3mf() {
-    const project = getProject();
-    if (project.boxes.length === 0) return;
+    if (getAllBoxes().length === 0) return;
 
     exporting3mf = true;
 
@@ -523,7 +586,8 @@
 
   async function handleExportPdf() {
     const project = getProject();
-    if (project.boxes.length === 0) return;
+    const allBoxes = getAllBoxes();
+    if (allBoxes.length === 0) return;
 
     // If we don't have a capture function yet, fall back to SVG-based PDF
     if (!captureFunction) {
@@ -564,8 +628,8 @@
       const counterShapes = project.counterShapes;
 
       // Capture each tray
-      for (let boxIdx = 0; boxIdx < project.boxes.length; boxIdx++) {
-        const box = project.boxes[boxIdx];
+      for (let boxIdx = 0; boxIdx < allBoxes.length; boxIdx++) {
+        const box = allBoxes[boxIdx];
         const placements = arrangeTrays(box.trays, {
           customBoxWidth: box.customWidth,
           wallThickness: box.wallThickness,
@@ -581,7 +645,7 @@
           const placement = placements[trayIdx];
           const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
           const spacerHeight = spacer?.floorSpacerHeight ?? 0;
-          const trayLetter = getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx);
+          const trayLetter = getTrayLetterById(project.layers, placement.tray.id) || 'A';
 
           // Generate geometry for this tray based on tray type
           let jscadGeom;
@@ -739,11 +803,28 @@
     const box = getSelectedBox();
     const tray = getSelectedTray();
 
-    if (!box || !tray || !selectedTrayGeometry) {
+    // Check if this is a loose tray
+    const trayLocation = tray ? findTrayLocation(project, tray.id) : null;
+    const isLoose = trayLocation && trayLocation.boxId === null;
+
+    // For loose trays, we don't need a box
+    if (!tray || !selectedTrayGeometry) {
       addToast({
         data: {
           title: 'Debug export failed',
           body: 'No tray selected or geometry not generated',
+          type: 'danger'
+        }
+      });
+      return;
+    }
+
+    // For boxed trays, we need a box
+    if (!isLoose && !box) {
+      addToast({
+        data: {
+          title: 'Debug export failed',
+          body: 'No box selected',
           type: 'danger'
         }
       });
@@ -789,8 +870,9 @@
 
       // Build context with all tray info including counter stacks
       const context = {
-        box_name: box.name,
-        box_id: box.id,
+        box_name: box?.name ?? '(loose tray)',
+        box_id: box?.id ?? null,
+        is_loose_tray: isLoose,
         selected_tray_name: tray.name,
         selected_tray_id: tray.id,
         selected_tray_letter: selectedTrayLetter,
@@ -901,25 +983,35 @@
   // Includes names because they are embossed on geometry
   let currentStateHash = $derived.by(() => {
     const project = getProject();
-    if (project.boxes.length === 0) return '';
+    const allBoxes = getAllBoxes();
+    if (allBoxes.length === 0) return '';
     return JSON.stringify({
-      boxes: project.boxes.map((box) => ({
-        id: box.id,
-        name: box.name,
-        tolerance: box.tolerance,
-        wallThickness: box.wallThickness,
-        floorThickness: box.floorThickness,
-        lidParams: box.lidParams,
-        customWidth: box.customWidth,
-        customBoxHeight: box.customBoxHeight,
-        fillSolidEmpty: box.fillSolidEmpty,
-        trays: box.trays.map((t) => ({
+      layers: project.layers.map((layer) => ({
+        id: layer.id,
+        boxes: layer.boxes.map((box) => ({
+          id: box.id,
+          name: box.name,
+          tolerance: box.tolerance,
+          wallThickness: box.wallThickness,
+          floorThickness: box.floorThickness,
+          lidParams: box.lidParams,
+          customWidth: box.customWidth,
+          customBoxHeight: box.customBoxHeight,
+          fillSolidEmpty: box.fillSolidEmpty,
+          trays: box.trays.map((t) => ({
+            id: t.id,
+            name: t.name,
+            params: t.params,
+            rotationOverride: t.rotationOverride,
+            showEmboss: t.showEmboss,
+            showStackLabels: isCardDividerTray(t) ? t.showStackLabels : undefined
+          }))
+        })),
+        looseTrays: layer.looseTrays.map((t) => ({
           id: t.id,
           name: t.name,
           params: t.params,
-          rotationOverride: t.rotationOverride,
-          showEmboss: t.showEmboss,
-          showStackLabels: isCardDividerTray(t) ? t.showStackLabels : undefined
+          showEmboss: t.showEmboss
         }))
       }))
     });
@@ -941,15 +1033,19 @@
     });
   });
 
-  // Track true structural changes (boxes/trays added, deleted, or moved)
+  // Track true structural changes (layers/boxes/trays added, deleted, or moved)
   let structureHash = $derived.by(() => {
     const project = getProject();
     return JSON.stringify({
-      boxIds: project.boxes.map((b) => b.id),
-      // Include full box->tray mapping to detect moves
-      boxTrayMapping: project.boxes.map((b) => ({
-        boxId: b.id,
-        trayIds: b.trays.map((t) => t.id)
+      layerIds: project.layers.map((l) => l.id),
+      // Include full layer->box->tray mapping to detect moves
+      layerMapping: project.layers.map((l) => ({
+        layerId: l.id,
+        boxes: l.boxes.map((b) => ({
+          boxId: b.id,
+          trayIds: b.trays.map((t) => t.id)
+        })),
+        looseTrayIds: l.looseTrays.map((t) => t.id)
       }))
     });
   });
@@ -966,13 +1062,28 @@
       // Check if we have valid selection using direct project reads
       // This avoids potential timing issues with derived values
       const project = untrack(() => getProject());
-      const hasValidSelection = project.selectedBoxId && project.selectedTrayId;
 
-      // Verify the selected tray exists in the selected box
-      const selectedBox = project.boxes.find((b) => b.id === project.selectedBoxId);
-      const selectedTray = selectedBox?.trays.find((t) => t.id === project.selectedTrayId);
+      // Verify the selected tray exists in the selected box (or is a loose tray)
+      let selectedBox = null;
+      let selectedTray = null;
+      for (const layer of project.layers) {
+        const box = layer.boxes.find((b) => b.id === project.selectedBoxId);
+        if (box) {
+          selectedBox = box;
+          selectedTray = box.trays.find((t) => t.id === project.selectedTrayId);
+          break;
+        }
+        // Check loose trays
+        const looseTray = layer.looseTrays.find((t) => t.id === project.selectedTrayId);
+        if (looseTray) {
+          selectedTray = looseTray;
+          break;
+        }
+      }
 
-      if (hasValidSelection && selectedBox && selectedTray) {
+      // Valid selection: either a tray in a box, or a loose tray
+      // For loose trays, selectedBox is null but selectedTray is set
+      if (selectedTray) {
         const selectionChanged = selHash !== lastSelectionHash;
         const structureChanged = strHash !== lastStructureHash;
         lastSelectionHash = selHash;
@@ -1155,6 +1266,7 @@
               geometry={visibleGeometries.tray}
               allTrays={visibleGeometries.allTrays}
               allBoxes={visibleGeometries.allBoxes}
+              allLooseTrays={visibleGeometries.allLooseTrays}
               boxGeometry={visibleGeometries.box}
               lidGeometry={visibleGeometries.lid}
               {gameContainerWidth}
@@ -1177,6 +1289,9 @@
               onCaptureReady={(fn) => (captureFunction = fn)}
               {isLayoutEditMode}
               onTrayDoubleClick={handleTrayDoubleClick}
+              showLayerView={visibleGeometries.showLayerView}
+              layerBoxPlacements={visibleGeometries.layerBoxPlacements}
+              layerLooseTrayPlacements={visibleGeometries.layerLooseTrayPlacements}
               {generating}
             />
           {/await}
@@ -1258,7 +1373,7 @@
                   <Button
                     variant="ghost"
                     onclick={handleExportAll}
-                    disabled={generating || exportingStl || getProject().boxes.length === 0}
+                    disabled={generating || exportingStl || getAllBoxes().length === 0}
                     isLoading={exportingStl}
                     style="width: 100%; justify-content: flex-start;"
                   >
@@ -1267,7 +1382,7 @@
                   <Button
                     variant="ghost"
                     onclick={handleExportPdf}
-                    disabled={getProject().boxes.length === 0 || exportingPdf}
+                    disabled={getAllBoxes().length === 0 || exportingPdf}
                     isLoading={exportingPdf}
                     style="width: 100%; justify-content: flex-start;"
                   >
@@ -1351,6 +1466,7 @@
               geometry={visibleGeometries.tray}
               allTrays={visibleGeometries.allTrays}
               allBoxes={visibleGeometries.allBoxes}
+              allLooseTrays={visibleGeometries.allLooseTrays}
               boxGeometry={visibleGeometries.box}
               lidGeometry={visibleGeometries.lid}
               {gameContainerWidth}
@@ -1373,6 +1489,9 @@
               onCaptureReady={(fn) => (captureFunction = fn)}
               {isLayoutEditMode}
               onTrayDoubleClick={handleTrayDoubleClick}
+              showLayerView={visibleGeometries.showLayerView}
+              layerBoxPlacements={visibleGeometries.layerBoxPlacements}
+              layerLooseTrayPlacements={visibleGeometries.layerLooseTrayPlacements}
               {generating}
             />
           {/await}
@@ -1453,7 +1572,7 @@
                 <Button
                   variant="ghost"
                   onclick={handleExportAll}
-                  disabled={generating || exportingStl || getProject().boxes.length === 0}
+                  disabled={generating || exportingStl || getAllBoxes().length === 0}
                   isLoading={exportingStl}
                   style="width: 100%; justify-content: flex-start;"
                 >
@@ -1462,7 +1581,7 @@
                 <Button
                   variant="ghost"
                   onclick={handleExport3mf}
-                  disabled={generating || exporting3mf || getProject().boxes.length === 0}
+                  disabled={generating || exporting3mf || getAllBoxes().length === 0}
                   isLoading={exporting3mf}
                   style="width: 100%; justify-content: flex-start;"
                 >
@@ -1471,7 +1590,7 @@
                 <Button
                   variant="ghost"
                   onclick={handleExportPdf}
-                  disabled={getProject().boxes.length === 0 || exportingPdf}
+                  disabled={getAllBoxes().length === 0 || exportingPdf}
                   isLoading={exportingPdf}
                   style="width: 100%; justify-content: flex-start;"
                 >

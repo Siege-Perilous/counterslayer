@@ -12,6 +12,7 @@
   import type { BufferGeometry } from 'three';
   import * as THREE from 'three';
   import { arrangeBoxes, type TrayPlacement } from '$lib/models/box';
+  import type { BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
   import type { CounterStack } from '$lib/models/counterTray';
   import type { CardStack } from '$lib/models/cardTray';
   import { captureSceneToDataUrl, type CaptureOptions } from '$lib/utils/screenshotCapture';
@@ -50,6 +51,17 @@
     boxDimensions: { width: number; depth: number; height: number };
   }
 
+  interface LooseTrayGeometryData {
+    trayId: string;
+    layerId: string;
+    name: string;
+    color: string;
+    geometry: BufferGeometry;
+    dimensions: { width: number; depth: number; height: number };
+    counterStacks: CounterStack[];
+    trayLetter: string;
+  }
+
   interface TrayClickInfo {
     trayId: string;
     name: string;
@@ -64,6 +76,7 @@
     geometry: BufferGeometry | null;
     allTrays?: TrayGeometryData[];
     allBoxes?: BoxGeometryData[];
+    allLooseTrays?: LooseTrayGeometryData[];
     boxGeometry?: BufferGeometry | null;
     lidGeometry?: BufferGeometry | null;
     printBedSize?: number; // Legacy (deprecated) - use gameContainerWidth/gameContainerDepth
@@ -89,12 +102,16 @@
     onTrayClick?: (info: TrayClickInfo | null) => void;
     onTrayDoubleClick?: (trayId: string) => void;
     generating?: boolean;
+    showLayerView?: boolean;
+    layerBoxPlacements?: BoxPlacement[];
+    layerLooseTrayPlacements?: LooseTrayPlacement[];
   }
 
   let {
     geometry,
     allTrays = [],
     allBoxes = [],
+    allLooseTrays = [],
     boxGeometry = null,
     lidGeometry = null,
     printBedSize: legacyPrintBedSize,
@@ -119,7 +136,10 @@
     isLayoutEditMode = false,
     onTrayClick,
     onTrayDoubleClick,
-    generating = false
+    generating = false,
+    showLayerView = false,
+    layerBoxPlacements = [],
+    layerLooseTrayPlacements = []
   }: Props = $props();
 
   // Compute actual container dimensions (prefer new props, fallback to legacy printBedSize)
@@ -718,9 +738,13 @@
   // Get live tray color from project store (for reactive updates)
   function getTrayColor(trayId: string, fallbackIndex: number): string {
     const project = getProject();
-    for (const box of project.boxes) {
-      const tray = box.trays.find((t) => t.id === trayId);
-      if (tray?.color) return tray.color;
+    for (const layer of project.layers) {
+      for (const box of layer.boxes) {
+        const tray = box.trays.find((t) => t.id === trayId);
+        if (tray?.color) return tray.color;
+      }
+      const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+      if (looseTray?.color) return looseTray.color;
     }
     return TRAY_COLORS[fallbackIndex % TRAY_COLORS.length];
   }
@@ -979,8 +1003,187 @@
   {/each}
 {/if}
 
+<!-- Layer view: Boxes and loose trays arranged on game container -->
+{#if !generating && showLayerView}
+  <!-- Grid background for layer view (large, subtle) -->
+  <Grid
+    position.y={-0.51}
+    cellColor="#2a2a2a"
+    sectionColor="#5a3530"
+    sectionThickness={1}
+    cellSize={10}
+    sectionSize={50}
+    gridSize={[2000, 2000]}
+    fadeDistance={800}
+    fadeStrength={1}
+  />
+
+  <!-- Print bed showing game container bounds (positioned like standard views) -->
+  <PrintBed
+    width={gameContainerWidth}
+    depth={gameContainerDepth}
+    title={viewTitle}
+    position={[0, 0, printBedSize / 2]}
+  />
+
+  <!-- Render boxes with actual geometry -->
+  <!-- Offset to center content on the PrintBed (like other views) -->
+  {@const layerOffsetX = -gameContainerWidth / 2}
+  {@const layerOffsetZ = printBedSize / 2 + gameContainerDepth / 2}
+  {#each layerBoxPlacements as boxPlacement (boxPlacement.box.id)}
+    {@const boxData = allBoxes.find((b) => b.boxId === boxPlacement.box.id)}
+    {@const boxGeomBounds = boxData?.boxGeometry ? getGeomBounds(boxData.boxGeometry) : null}
+    {@const lidGeomBounds = boxData?.lidGeometry ? getGeomBounds(boxData.lidGeometry) : null}
+    {@const boxHeight = boxPlacement.dimensions.height}
+    <!-- Position for the box group: center of placement area -->
+    {@const isRotated = boxPlacement.rotation === 90 || boxPlacement.rotation === 270}
+    {@const baseX = layerOffsetX + boxPlacement.x + boxPlacement.dimensions.width / 2}
+    {@const baseZ = layerOffsetZ - boxPlacement.y - boxPlacement.dimensions.depth / 2}
+
+    <!-- Group for entire box assembly - rotation applied to group -->
+    <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
+      {#if boxData?.boxGeometry}
+        <!-- Centering offsets for geometry within the group -->
+        {@const boxCenterX = boxGeomBounds ? -(boxGeomBounds.max.x + boxGeomBounds.min.x) / 2 : 0}
+        {@const boxCenterZ = boxGeomBounds ? (boxGeomBounds.max.y + boxGeomBounds.min.y) / 2 : 0}
+
+        <!-- Box geometry -->
+        <T.Mesh
+          geometry={boxData.boxGeometry}
+          rotation.x={-Math.PI / 2}
+          position.x={boxCenterX}
+          position.y={0}
+          position.z={boxCenterZ}
+        >
+          <T.MeshStandardMaterial color="#333333" roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
+        </T.Mesh>
+
+        <!-- Lid on top of box (flipped vertically to sit on box with grooves facing down) -->
+        {#if boxData.lidGeometry}
+          <!-- Lid lip overlaps with box walls by wallThickness amount -->
+          {@const lidOverlap = boxWallThickness}
+          <!-- Lid slide direction determines if we need Z rotation to keep text readable -->
+          <!-- slidesAlongX = width > depth; if NOT sliding along X, add PI rotation -->
+          {@const slidesAlongX = boxData.boxDimensions.width > boxData.boxDimensions.depth}
+          {@const lidRotZ = slidesAlongX ? 0 : Math.PI}
+          <!-- When flipped (rotation.x = PI/2), Y direction reverses, so negate Z center -->
+          <!-- When also rotated by PI around Z, X and Z are negated again -->
+          {@const baseLidCenterX = lidGeomBounds ? -(lidGeomBounds.max.x + lidGeomBounds.min.x) / 2 : 0}
+          {@const baseLidCenterZ = lidGeomBounds ? -(lidGeomBounds.max.y + lidGeomBounds.min.y) / 2 : 0}
+          {@const lidCenterX = slidesAlongX ? baseLidCenterX : -baseLidCenterX}
+          {@const lidCenterZ = slidesAlongX ? baseLidCenterZ : -baseLidCenterZ}
+          <T.Mesh
+            geometry={boxData.lidGeometry}
+            rotation.x={Math.PI / 2}
+            rotation.z={lidRotZ}
+            position.x={lidCenterX}
+            position.y={boxHeight - lidOverlap}
+            position.z={lidCenterZ}
+          >
+            <T.MeshStandardMaterial color="#444444" roughness={0.5} metalness={0.1} side={THREE.DoubleSide} />
+          </T.Mesh>
+        {/if}
+
+        <!-- Trays inside the box -->
+        {#each boxData.trayGeometries as trayData, trayIndex (trayData.trayId)}
+          {@const placement = trayData.placement}
+          {@const trayIsRotated = placement.rotated}
+          {@const trayX = boxCenterX + (boxGeomBounds?.min.x ?? 0) + boxWallThickness + boxTolerance + placement.x + (trayIsRotated ? placement.dimensions.width : 0)}
+          {@const trayZ = boxCenterZ - (boxGeomBounds?.min.y ?? 0) - boxWallThickness - boxTolerance - placement.y}
+          <T.Group position.x={trayX} position.y={boxFloorThickness} position.z={trayZ} rotation.y={trayIsRotated ? Math.PI / 2 : 0}>
+            <T.Mesh
+              geometry={trayData.geometry}
+              rotation.x={-Math.PI / 2}
+            >
+              <T.MeshStandardMaterial
+                color={getTrayColor(trayData.trayId, trayIndex)}
+                roughness={0.6}
+                metalness={0.1}
+                side={THREE.DoubleSide}
+              />
+            </T.Mesh>
+          </T.Group>
+        {/each}
+      {:else}
+        <!-- Fallback: simple box geometry if actual geometry not available -->
+        <T.Mesh position.y={boxHeight / 2}>
+          <T.BoxGeometry args={[boxPlacement.dimensions.width, boxHeight, boxPlacement.dimensions.depth]} />
+          <T.MeshStandardMaterial color="#444444" roughness={0.7} metalness={0.1} />
+        </T.Mesh>
+      {/if}
+    </T.Group>
+
+    <!-- Box label -->
+    <Text
+      text={boxPlacement.box.name}
+      font={monoFont}
+      fontSize={6}
+      position={[baseX, boxHeight + 5, baseZ]}
+      quaternion={labelQuaternion}
+      color="#ffffff"
+      anchorX="center"
+      anchorY="bottom"
+    />
+  {/each}
+
+  <!-- Render loose trays with actual geometry -->
+  {#each layerLooseTrayPlacements as trayPlacement (trayPlacement.tray.id)}
+    {@const looseTrayGeom = allLooseTrays.find((lt) => lt.trayId === trayPlacement.tray.id)}
+    {@const trayHeight = trayPlacement.dimensions.height}
+    {@const trayColor = trayPlacement.tray.color || TRAY_COLORS[0]}
+    {@const isRotated = trayPlacement.rotation === 90 || trayPlacement.rotation === 270}
+    <!-- Position: placed on floor at placement coords -->
+    {@const baseX = layerOffsetX + trayPlacement.x + (isRotated ? trayPlacement.dimensions.width : 0)}
+    {@const baseZ = layerOffsetZ - trayPlacement.y}
+
+    {#if looseTrayGeom}
+      <!-- Render actual tray geometry -->
+      <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
+        <T.Mesh
+          geometry={looseTrayGeom.geometry}
+          rotation.x={-Math.PI / 2}
+        >
+          <T.MeshStandardMaterial
+            color={trayColor}
+            roughness={0.6}
+            metalness={0.1}
+            side={THREE.DoubleSide}
+          />
+        </T.Mesh>
+      </T.Group>
+    {:else}
+      <!-- Fallback: simple box geometry if actual geometry not available -->
+      {@const fallbackX = layerOffsetX + trayPlacement.x + trayPlacement.dimensions.width / 2}
+      {@const fallbackZ = layerOffsetZ - trayPlacement.y - trayPlacement.dimensions.depth / 2}
+      <T.Mesh
+        position.x={fallbackX}
+        position.y={trayHeight / 2}
+        position.z={fallbackZ}
+        rotation.y={isRotated ? Math.PI / 2 : 0}
+      >
+        <T.BoxGeometry args={[trayPlacement.dimensions.width, trayHeight, trayPlacement.dimensions.depth]} />
+        <T.MeshStandardMaterial color={trayColor} roughness={0.5} metalness={0.1} />
+      </T.Mesh>
+    {/if}
+
+    <!-- Tray label -->
+    {@const labelX = layerOffsetX + trayPlacement.x + trayPlacement.dimensions.width / 2}
+    {@const labelZ = layerOffsetZ - trayPlacement.y - trayPlacement.dimensions.depth / 2}
+    <Text
+      text={trayPlacement.tray.name}
+      font={monoFont}
+      fontSize={4}
+      position={[labelX, trayHeight + 3, labelZ]}
+      quaternion={labelQuaternion}
+      color="#ffffff"
+      anchorX="center"
+      anchorY="bottom"
+    />
+  {/each}
+{/if}
+
 <!-- Box geometry (single box view) - hidden during edit mode -->
-{#if !generating && boxGeometry && !showAllBoxes && !visualEditMode}
+{#if !generating && boxGeometry && !showAllBoxes && !showLayerView && !visualEditMode}
   {@const boxWidth = boxBounds ? boxBounds.max.x - boxBounds.min.x : 0}
   <T.Mesh
     geometry={boxGeometry}
@@ -1113,7 +1316,7 @@
       </T.Line>
     {/each}
     <!-- All trays with positions (when showAllTrays is true, single box view) -->
-  {:else if showAllTrays && !showAllBoxes && allTrays.length > 0}
+  {:else if showAllTrays && !showAllBoxes && !showLayerView && allTrays.length > 0}
     {@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
     {@const maxTrayHeight = Math.max(...allTrays.map((t) => t.placement.dimensions.height))}
     {@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
@@ -1158,7 +1361,7 @@
         </T.Mesh>
       </T.Group>
     {/each}
-  {:else if geometry}
+  {:else if geometry && !showLayerView}
     <!-- Single selected tray -->
     <T.Mesh {geometry} rotation.x={-Math.PI / 2} position.x={meshOffset.x} position.y={0} position.z={meshOffset.z}>
       <T.MeshStandardMaterial
@@ -1172,7 +1375,7 @@
 {/if}
 
 <!-- Lid geometry (single box view) - hidden during edit mode -->
-{#if !generating && lidGeometry && !showAllBoxes && !visualEditMode}
+{#if !generating && lidGeometry && !showAllBoxes && !showLayerView && !visualEditMode}
   {@const lidWidth = lidBounds ? lidBounds.max.x - lidBounds.min.x : 0}
   {@const lidHeight = lidBounds ? lidBounds.max.z - lidBounds.min.z : 0}
   {@const lidDepth = lidBounds ? lidBounds.max.y - lidBounds.min.y : 0}
@@ -1210,7 +1413,7 @@
 {/if}
 
 <!-- Counter preview for single tray view (only when tray geometry is visible, hidden in edit mode) -->
-{#if !generating && showCounters && !isLayoutEditMode && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
+{#if !generating && showCounters && !isLayoutEditMode && !showAllTrays && !showAllBoxes && !showLayerView && geometry && selectedTrayCounters.length > 0}
   {#each selectedTrayCounters as stack, stackIdx (stackIdx)}
     {#if !isCounterStack(stack)}
       <!-- CardStack: render sleeved cards with transparent sleeve and inner card -->
@@ -1451,7 +1654,7 @@
   {/each}
 {/if}
 
-{#if !hidePrintBed && !showAllBoxes}
+{#if !hidePrintBed && !showAllBoxes && !showLayerView}
   <!-- Background grid for single box view (subtle) - hidden in edit mode -->
   {#if !visualEditMode}
     <Grid
@@ -1479,7 +1682,7 @@
 {/if}
 
 <!-- Reference labels for PDF capture - single tray view (hidden in edit mode) -->
-{#if showReferenceLabels && !isLayoutEditMode && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
+{#if showReferenceLabels && !isLayoutEditMode && !showAllTrays && !showAllBoxes && !showLayerView && geometry && selectedTrayCounters.length > 0}
   {@const counterStacks = selectedTrayCounters.filter(isCounterStack)}
   {@const cardStacks = selectedTrayCounters.filter((s): s is CardStack => !isCounterStack(s))}
   {@const counterMaxHeight =

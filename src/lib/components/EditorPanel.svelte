@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Panel, Title } from '@tableslayer/ui';
+  import { Panel, Title, Input, FormControl, Spacer } from '@tableslayer/ui';
   import GlobalsPanel from './GlobalsPanel.svelte';
   import BoxesPanel from './BoxesPanel.svelte';
   import TraysPanel from './TraysPanel.svelte';
@@ -7,13 +7,15 @@
     getProject,
     getSelectedBox,
     getSelectedTray,
+    getSelectedLayer,
     updateBox,
     updateTray,
     updateTrayParams,
     updateCardTrayParams,
     updateCardDividerTrayParams,
     updateCupTrayParams,
-    getCumulativeTrayLetter,
+    updateLayer,
+    getTrayLetterById,
     isCounterTray,
     isCardTray,
     isCardDividerTray,
@@ -21,6 +23,7 @@
     getGlobalSettings,
     updateGlobalSettings,
     type Box,
+    type Layer,
     type Tray
   } from '$lib/stores/project.svelte';
   import type { CounterTrayParams } from '$lib/models/counterTray';
@@ -30,7 +33,7 @@
   import { countCups } from '$lib/types/cupLayout';
   import { layoutEditorState } from '$lib/stores/layoutEditor.svelte';
 
-  type SelectionType = 'dimensions' | 'box' | 'tray';
+  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
 
   interface Props {
     selectionType: SelectionType;
@@ -46,8 +49,15 @@
   let interiorDepth = $derived(layoutEditorState.boundsDepth);
 
   let project = $derived(getProject());
+  let selectedLayer = $derived(getSelectedLayer());
   let selectedBox = $derived(getSelectedBox());
   let selectedTray = $derived(getSelectedTray());
+
+  function handleLayerUpdate(updates: Partial<Omit<Layer, 'id' | 'boxes' | 'looseTrays'>>) {
+    if (selectedLayer) {
+      updateLayer(selectedLayer.id, updates);
+    }
+  }
 
   function handleBoxUpdate(updates: Partial<Omit<Box, 'id' | 'trays'>>) {
     if (selectedBox) {
@@ -70,8 +80,16 @@
 
   function handleCounterParamsChange(newParams: CounterTrayParams) {
     // Find any counter tray to update (for backwards compatibility with tray-specific params)
-    for (const box of project.boxes) {
-      for (const tray of box.trays) {
+    for (const layer of project.layers) {
+      for (const box of layer.boxes) {
+        for (const tray of box.trays) {
+          if (isCounterTray(tray)) {
+            updateTrayParams(tray.id, newParams);
+            return;
+          }
+        }
+      }
+      for (const tray of layer.looseTrays) {
         if (isCounterTray(tray)) {
           updateTrayParams(tray.id, newParams);
           return;
@@ -130,14 +148,10 @@
       isCards = true;
     }
 
-    let letter = 'A';
     const project = getProject();
-    if (selectedBox) {
-      const boxIdx = project.boxes.findIndex((b) => b.id === selectedBox.id);
-      const trayIdx = selectedBox.trays.findIndex((t) => t.id === tray.id);
-      if (boxIdx >= 0 && trayIdx >= 0) {
-        letter = getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx);
-      }
+    let letter = getTrayLetterById(project.layers, tray.id);
+    if (!letter) {
+      letter = 'A';
     }
     return { stacks, counters, letter, isCards, isCups };
   }
@@ -146,6 +160,8 @@
     switch (selectionType) {
       case 'dimensions':
         return 'Dimensions';
+      case 'layer':
+        return selectedLayer?.name ?? 'Layer';
       case 'box':
         return selectedBox?.name ?? 'Box';
       case 'tray':
@@ -161,7 +177,11 @@
       <Title as="h2" size="sm">
         {panelTitle}
       </Title>
-      {#if selectionType === 'box' && selectedBox}
+      {#if selectionType === 'layer' && selectedLayer}
+        {@const boxCount = selectedLayer.boxes.length}
+        {@const looseCount = selectedLayer.looseTrays.length}
+        <span class="headerStats">{boxCount} {boxCount === 1 ? 'box' : 'boxes'}, {looseCount} loose</span>
+      {:else if selectionType === 'box' && selectedBox}
         <span class="headerStats">{selectedBox.trays.length} {selectedBox.trays.length === 1 ? 'tray' : 'trays'}</span>
       {:else if selectionType === 'tray' && selectedTray}
         {@const stats = getTrayStats(selectedTray)}
@@ -196,10 +216,41 @@
         </div>
       {:else if selectionType === 'dimensions'}
         <GlobalsPanel {globalSettings} onGlobalSettingsChange={handleGlobalSettingsChange} />
+      {:else if selectionType === 'layer'}
+        {#if selectedLayer}
+          <div class="layerSettings">
+            <div class="panelFormSection">
+              <FormControl label="Layer Name" name="layerName">
+                {#snippet input({ inputProps })}
+                  <Input
+                    {...inputProps}
+                    type="text"
+                    value={selectedLayer.name}
+                    onchange={(e) => handleLayerUpdate({ name: (e.target as HTMLInputElement).value })}
+                  />
+                {/snippet}
+              </FormControl>
+              <Spacer size="1rem" />
+              <div class="layerSummary">
+                <div class="summaryItem">
+                  <span class="summaryLabel">Boxes</span>
+                  <span class="summaryValue">{selectedLayer.boxes.length}</span>
+                </div>
+                <div class="summaryItem">
+                  <span class="summaryLabel">Loose trays</span>
+                  <span class="summaryValue">{selectedLayer.looseTrays.length}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        {:else}
+          <div class="emptyState">
+            <p>No layer selected</p>
+          </div>
+        {/if}
       {:else if selectionType === 'box'}
         {#if selectedBox}
           <BoxesPanel
-            {project}
             {selectedBox}
             onSelectBox={() => {}}
             onAddBox={() => {}}
@@ -213,9 +264,9 @@
           </div>
         {/if}
       {:else if selectionType === 'tray'}
-        {#if selectedTray && selectedBox}
+        {#if selectedTray}
           <TraysPanel
-            {selectedBox}
+            selectedBox={selectedBox}
             {selectedTray}
             onSelectTray={() => {}}
             onAddTray={() => {}}
@@ -330,5 +381,37 @@
     font-family: var(--font-mono);
     font-size: 0.75rem;
     color: var(--fgMuted);
+  }
+
+  .layerSettings {
+    padding: 0.75rem 0;
+  }
+
+  .panelFormSection {
+    padding: 0 0.75rem;
+  }
+
+  .layerSummary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: var(--contrastLowest);
+    border-radius: var(--radius-2);
+  }
+
+  .summaryItem {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+  }
+
+  .summaryLabel {
+    color: var(--fgMuted);
+  }
+
+  .summaryValue {
+    font-family: var(--font-mono);
+    color: var(--fg);
   }
 </style>

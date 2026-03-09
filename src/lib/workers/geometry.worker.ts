@@ -7,6 +7,7 @@ import {
   arrangeTrays,
   calculateTraySpacers,
   getBoxDimensions,
+  getTrayDimensionsForTray,
   validateCustomDimensions,
   type TrayPlacement
 } from '$lib/models/box';
@@ -20,7 +21,7 @@ import {
 } from '$lib/models/counterTray';
 import { createCupTray } from '$lib/models/cupTray';
 import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
-import type { Box, CardSize, CounterShape, Tray } from '$lib/types/project';
+import type { Box, CardSize, CounterShape, Layer, Tray } from '$lib/types/project';
 import { isCardDividerTray, isCardTray, isCupTray } from '$lib/types/project';
 import threemfSerializer from '@jscad/3mf-serializer';
 import jscad from '@jscad/modeling';
@@ -45,7 +46,7 @@ function cleanGeometryForExport(geom: Geom3): Geom3 {
 }
 
 /**
- * Generate a tray letter based on cumulative index across all boxes.
+ * Generate a tray letter based on cumulative index across all layers.
  * A-Z for first 26, then AA, BB, CC... for 26+
  */
 function getTrayLetter(index: number): string {
@@ -58,14 +59,41 @@ function getTrayLetter(index: number): string {
 }
 
 /**
- * Get cumulative tray index across all boxes.
+ * Get all boxes from all layers.
  */
-function getCumulativeTrayIndex(boxes: Box[], boxIndex: number, trayIndex: number): number {
-  let cumulative = 0;
-  for (let i = 0; i < boxIndex; i++) {
-    cumulative += boxes[i].trays.length;
+function getAllBoxes(layers: Layer[]): Box[] {
+  const boxes: Box[] = [];
+  for (const layer of layers) {
+    boxes.push(...layer.boxes);
   }
-  return cumulative + trayIndex;
+  return boxes;
+}
+
+/**
+ * Get cumulative tray index across all layers.
+ * Order: For each layer, count box trays first, then loose trays.
+ */
+function getCumulativeTrayIndexForTray(layers: Layer[], trayId: string): number {
+  let cumulative = 0;
+  for (const layer of layers) {
+    // Count box trays
+    for (const box of layer.boxes) {
+      for (const tray of box.trays) {
+        if (tray.id === trayId) {
+          return cumulative;
+        }
+        cumulative++;
+      }
+    }
+    // Count loose trays
+    for (const tray of layer.looseTrays) {
+      if (tray.id === trayId) {
+        return cumulative;
+      }
+      cumulative++;
+    }
+  }
+  return cumulative;
 }
 
 // Message types
@@ -73,7 +101,7 @@ interface GenerateMessage {
   type: 'generate';
   id: number;
   project: {
-    boxes: Box[];
+    layers: Layer[];
     cardSizes?: CardSize[];
     counterShapes?: CounterShape[];
   };
@@ -125,6 +153,17 @@ interface BoxGeometryResult {
   boxDimensions: { width: number; depth: number; height: number };
 }
 
+interface LooseTrayGeometryResult {
+  trayId: string;
+  layerId: string;
+  name: string;
+  color: string;
+  geometry: GeometryData;
+  dimensions: { width: number; depth: number; height: number };
+  counterStacks: CounterStack[];
+  trayLetter: string;
+}
+
 interface GenerateResult {
   type: 'generate-result';
   id: number;
@@ -134,6 +173,7 @@ interface GenerateResult {
   boxGeometry: GeometryData | null;
   lidGeometry: GeometryData | null;
   allBoxGeometries: BoxGeometryResult[];
+  allLooseTrayGeometries: LooseTrayGeometryResult[];
   error?: string;
 }
 
@@ -180,6 +220,13 @@ interface CachedBoxData {
   trays: { jscadGeom: Geom3; name: string }[];
 }
 let cachedAllBoxes: CachedBoxData[] = [];
+
+// Cache for all loose trays (for export all)
+interface CachedLooseTrayData {
+  trayName: string;
+  trayGeom: Geom3;
+}
+let cachedAllLooseTrays: CachedLooseTrayData[] = [];
 
 /**
  * Sanitize a string for use in filenames (replace slashes, spaces, etc.)
@@ -367,21 +414,48 @@ function jscadToArrays(jscadGeom: Geom3): GeometryData {
 }
 
 /**
+ * Find a box by ID across all layers
+ */
+function findBoxById(layers: Layer[], boxId: string): Box | undefined {
+  for (const layer of layers) {
+    const box = layer.boxes.find((b) => b.id === boxId);
+    if (box) return box;
+  }
+  return undefined;
+}
+
+/**
+ * Find a tray by ID across all layers (boxes and loose trays)
+ */
+function findTrayById(layers: Layer[], trayId: string): Tray | undefined {
+  for (const layer of layers) {
+    // Check boxes
+    for (const box of layer.boxes) {
+      const tray = box.trays.find((t) => t.id === trayId);
+      if (tray) return tray;
+    }
+    // Check loose trays
+    const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+    if (looseTray) return looseTray;
+  }
+  return undefined;
+}
+
+/**
  * Generate all geometries for the project
  */
 function handleGenerate(msg: GenerateMessage): void {
   const { id, project, selectedBoxId, selectedTrayId } = msg;
 
   try {
-    const selectedBoxIndex = project.boxes.findIndex((b) => b.id === selectedBoxId);
-    const box = selectedBoxIndex >= 0 ? project.boxes[selectedBoxIndex] : undefined;
-    const tray = box?.trays.find((t) => t.id === selectedTrayId);
+    const box = selectedBoxId ? findBoxById(project.layers, selectedBoxId) : undefined;
+    const tray = findTrayById(project.layers, selectedTrayId);
 
-    if (!box || !tray) {
+    if (!tray) {
       self.postMessage({
         type: 'generate-result',
         id,
-        error: 'No box or tray selected'
+        error: 'No tray selected'
       } as GenerateResult);
       return;
     }
@@ -390,76 +464,123 @@ function handleGenerate(msg: GenerateMessage): void {
     const cardSizes = project.cardSizes ?? [];
     const counterShapes = project.counterShapes ?? [];
 
-    // Validate custom dimensions
-    const validation = validateCustomDimensions(box, cardSizes, counterShapes);
-    if (!validation.valid) {
-      self.postMessage({
-        type: 'generate-result',
-        id,
-        error: validation.errors.join('; ')
-      } as GenerateResult);
-      return;
+    // If tray is in a box, generate box-related geometry
+    let selectedTrayGeometry: GeometryData;
+    let selectedTrayCounters: CounterStack[];
+    let allTrayGeometries: TrayGeometryResult[] = [];
+    let boxGeometry: GeometryData | null = null;
+    let lidGeometry: GeometryData | null = null;
+
+    if (box) {
+      // Validate custom dimensions
+      const validation = validateCustomDimensions(box, cardSizes, counterShapes);
+      if (!validation.valid) {
+        self.postMessage({
+          type: 'generate-result',
+          id,
+          error: validation.errors.join('; ')
+        } as GenerateResult);
+        return;
+      }
+
+      // Generate all trays with their placements for selected box
+      const placements = arrangeTrays(box.trays, {
+        customBoxWidth: box.customWidth,
+        wallThickness: box.wallThickness,
+        tolerance: box.tolerance,
+        cardSizes,
+        counterShapes,
+        manualLayout: box.manualLayout
+      });
+
+      const spacerInfo = calculateTraySpacers(box, cardSizes, counterShapes);
+      const maxHeight = Math.max(...placements.map((p) => p.dimensions.height));
+
+      // Find spacer for selected tray
+      const selectedSpacer = spacerInfo.find((s) => s.trayId === tray.id);
+      const selectedSpacerHeight = selectedSpacer?.floorSpacerHeight ?? 0;
+
+      // Generate selected tray
+      cachedSelectedTray = createTrayGeometry(tray, cardSizes, counterShapes, maxHeight, selectedSpacerHeight);
+      selectedTrayGeometry = jscadToArrays(cachedSelectedTray);
+      selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, maxHeight, selectedSpacerHeight);
+
+      // Generate all trays for selected box
+      cachedAllTrays = [];
+      allTrayGeometries = placements.map((placement) => {
+        const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
+        const spacerHeight = spacer?.floorSpacerHeight ?? 0;
+        const jscadGeom = createTrayGeometry(placement.tray, cardSizes, counterShapes, maxHeight, spacerHeight);
+
+        cachedAllTrays.push({ jscadGeom, name: placement.tray.name });
+
+        return {
+          trayId: placement.tray.id,
+          name: placement.tray.name,
+          color: placement.tray.color,
+          geometry: jscadToArrays(jscadGeom),
+          placement: {
+            ...placement,
+            dimensions: {
+              ...placement.dimensions,
+              height: maxHeight
+            }
+          },
+          counterStacks: getTrayPositions(placement.tray, cardSizes, counterShapes, maxHeight, spacerHeight),
+          trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, placement.tray.id))
+        };
+      });
+
+      // Generate box and lid
+      cachedBox = createBoxWithLidGrooves(box, cardSizes, counterShapes);
+      cachedLid = createLid(box, cardSizes, counterShapes);
+      cachedBoxName = box.name;
+
+      boxGeometry = cachedBox ? jscadToArrays(cachedBox) : null;
+      lidGeometry = cachedLid ? jscadToArrays(cachedLid) : null;
+    } else {
+      // Loose tray - no box context
+      // Calculate tray dimensions for proper sizing
+      const trayDims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
+      const maxHeight = trayDims.height;
+      const spacerHeight = 0; // No spacer for loose trays
+
+      // Generate standalone tray
+      cachedSelectedTray = createTrayGeometry(tray, cardSizes, counterShapes, maxHeight, spacerHeight);
+      selectedTrayGeometry = jscadToArrays(cachedSelectedTray);
+      selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, maxHeight, spacerHeight);
+
+      cachedAllTrays = [{ jscadGeom: cachedSelectedTray, name: tray.name }];
+      cachedBox = null;
+      cachedLid = null;
+      cachedBoxName = '';
+
+      // Add the loose tray to allTrayGeometries with proper dimensions
+      allTrayGeometries = [
+        {
+          trayId: tray.id,
+          name: tray.name,
+          color: tray.color,
+          geometry: selectedTrayGeometry,
+          placement: {
+            tray,
+            x: 0,
+            y: 0,
+            rotated: false,
+            dimensions: { width: trayDims.width, depth: trayDims.depth, height: maxHeight }
+          },
+          counterStacks: selectedTrayCounters,
+          trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, tray.id))
+        }
+      ];
     }
 
-    // Generate all trays with their placements for selected box
-    const placements = arrangeTrays(box.trays, {
-      customBoxWidth: box.customWidth,
-      wallThickness: box.wallThickness,
-      tolerance: box.tolerance,
-      cardSizes,
-      counterShapes,
-      manualLayout: box.manualLayout
-    });
-
-    const spacerInfo = calculateTraySpacers(box, cardSizes, counterShapes);
-    const maxHeight = Math.max(...placements.map((p) => p.dimensions.height));
-
-    // Find spacer for selected tray
-    const selectedSpacer = spacerInfo.find((s) => s.trayId === tray.id);
-    const selectedSpacerHeight = selectedSpacer?.floorSpacerHeight ?? 0;
-
-    // Generate selected tray
-    cachedSelectedTray = createTrayGeometry(tray, cardSizes, counterShapes, maxHeight, selectedSpacerHeight);
-    const selectedTrayGeometry = jscadToArrays(cachedSelectedTray);
-    const selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, maxHeight, selectedSpacerHeight);
-
-    // Generate all trays for selected box
-    cachedAllTrays = [];
-    const allTrayGeometries: TrayGeometryResult[] = placements.map((placement, index) => {
-      const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
-      const spacerHeight = spacer?.floorSpacerHeight ?? 0;
-      const jscadGeom = createTrayGeometry(placement.tray, cardSizes, counterShapes, maxHeight, spacerHeight);
-
-      cachedAllTrays.push({ jscadGeom, name: placement.tray.name });
-
-      return {
-        trayId: placement.tray.id,
-        name: placement.tray.name,
-        color: placement.tray.color,
-        geometry: jscadToArrays(jscadGeom),
-        placement: {
-          ...placement,
-          dimensions: {
-            ...placement.dimensions,
-            height: maxHeight
-          }
-        },
-        counterStacks: getTrayPositions(placement.tray, cardSizes, counterShapes, maxHeight, spacerHeight),
-        trayLetter: getTrayLetter(getCumulativeTrayIndex(project.boxes, selectedBoxIndex, index))
-      };
-    });
-
-    // Generate box and lid
-    cachedBox = createBoxWithLidGrooves(box, cardSizes, counterShapes);
-    cachedLid = createLid(box, cardSizes, counterShapes);
-    cachedBoxName = box.name;
-
-    const boxGeometry = cachedBox ? jscadToArrays(cachedBox) : null;
-    const lidGeometry = cachedLid ? jscadToArrays(cachedLid) : null;
+    // Get all boxes from all layers
+    const allBoxes = getAllBoxes(project.layers);
 
     // Generate geometries for ALL boxes (for all-no-lid view) and cache JSCAD for STL export
     cachedAllBoxes = [];
-    const allBoxGeometries: BoxGeometryResult[] = project.boxes.map((projectBox, boxIndex) => {
+    const allBoxGeometries: BoxGeometryResult[] = allBoxes.map((projectBox) => {
       const boxValidation = validateCustomDimensions(projectBox, cardSizes, counterShapes);
       if (!boxValidation.valid) {
         console.warn(`Box "${projectBox.name}" validation failed:`, boxValidation.errors);
@@ -487,7 +608,7 @@ function handleGenerate(msg: GenerateMessage): void {
       // Cache JSCAD geometries for this box's trays
       const cachedTraysForBox: { jscadGeom: Geom3; name: string }[] = [];
 
-      const trayGeoms: TrayGeometryResult[] = boxPlacements.map((placement, index) => {
+      const trayGeoms: TrayGeometryResult[] = boxPlacements.map((placement) => {
         const spacer = boxSpacerInfo.find((s) => s.trayId === placement.tray.id);
         const spacerHeight = spacer?.floorSpacerHeight ?? 0;
         const jscadGeom = createTrayGeometry(placement.tray, cardSizes, counterShapes, boxMaxHeight, spacerHeight);
@@ -508,7 +629,7 @@ function handleGenerate(msg: GenerateMessage): void {
             }
           },
           counterStacks: getTrayPositions(placement.tray, cardSizes, counterShapes, boxMaxHeight, spacerHeight),
-          trayLetter: getTrayLetter(getCumulativeTrayIndex(project.boxes, boxIndex, index))
+          trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, placement.tray.id))
         };
       });
 
@@ -530,41 +651,83 @@ function handleGenerate(msg: GenerateMessage): void {
       };
     });
 
-    // Collect all transferable arrays
-    const transferables: Transferable[] = [
-      selectedTrayGeometry.positions.buffer as ArrayBuffer,
-      selectedTrayGeometry.normals.buffer as ArrayBuffer
-    ];
+    // Generate geometries for all loose trays across all layers
+    cachedAllLooseTrays = [];
+    const allLooseTrayGeometries: LooseTrayGeometryResult[] = [];
+
+    for (const layer of project.layers) {
+      for (const looseTray of layer.looseTrays) {
+        // Calculate tray dimensions
+        const trayDims = getTrayDimensionsForTray(looseTray, cardSizes, counterShapes);
+        const maxHeight = trayDims.height;
+        const spacerHeight = 0; // No spacer for loose trays
+
+        // Generate tray geometry
+        const jscadGeom = createTrayGeometry(looseTray, cardSizes, counterShapes, maxHeight, spacerHeight);
+
+        // Cache for STL export
+        cachedAllLooseTrays.push({
+          trayName: looseTray.name,
+          trayGeom: jscadGeom
+        });
+
+        // Add to result
+        allLooseTrayGeometries.push({
+          trayId: looseTray.id,
+          layerId: layer.id,
+          name: looseTray.name,
+          color: looseTray.color,
+          geometry: jscadToArrays(jscadGeom),
+          dimensions: { width: trayDims.width, depth: trayDims.depth, height: maxHeight },
+          counterStacks: getTrayPositions(looseTray, cardSizes, counterShapes, maxHeight, spacerHeight),
+          trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, looseTray.id))
+        });
+      }
+    }
+
+    // Collect all transferable arrays (use Set to avoid duplicates when same geometry is referenced multiple times)
+    const transferableSet = new Set<ArrayBuffer>();
+
+    transferableSet.add(selectedTrayGeometry.positions.buffer as ArrayBuffer);
+    transferableSet.add(selectedTrayGeometry.normals.buffer as ArrayBuffer);
 
     for (const tray of allTrayGeometries) {
-      transferables.push(tray.geometry.positions.buffer as ArrayBuffer);
-      transferables.push(tray.geometry.normals.buffer as ArrayBuffer);
+      transferableSet.add(tray.geometry.positions.buffer as ArrayBuffer);
+      transferableSet.add(tray.geometry.normals.buffer as ArrayBuffer);
     }
 
     if (boxGeometry) {
-      transferables.push(boxGeometry.positions.buffer as ArrayBuffer);
-      transferables.push(boxGeometry.normals.buffer as ArrayBuffer);
+      transferableSet.add(boxGeometry.positions.buffer as ArrayBuffer);
+      transferableSet.add(boxGeometry.normals.buffer as ArrayBuffer);
     }
 
     if (lidGeometry) {
-      transferables.push(lidGeometry.positions.buffer as ArrayBuffer);
-      transferables.push(lidGeometry.normals.buffer as ArrayBuffer);
+      transferableSet.add(lidGeometry.positions.buffer as ArrayBuffer);
+      transferableSet.add(lidGeometry.normals.buffer as ArrayBuffer);
     }
 
     for (const boxData of allBoxGeometries) {
       if (boxData.boxGeometry) {
-        transferables.push(boxData.boxGeometry.positions.buffer as ArrayBuffer);
-        transferables.push(boxData.boxGeometry.normals.buffer as ArrayBuffer);
+        transferableSet.add(boxData.boxGeometry.positions.buffer as ArrayBuffer);
+        transferableSet.add(boxData.boxGeometry.normals.buffer as ArrayBuffer);
       }
       if (boxData.lidGeometry) {
-        transferables.push(boxData.lidGeometry.positions.buffer as ArrayBuffer);
-        transferables.push(boxData.lidGeometry.normals.buffer as ArrayBuffer);
+        transferableSet.add(boxData.lidGeometry.positions.buffer as ArrayBuffer);
+        transferableSet.add(boxData.lidGeometry.normals.buffer as ArrayBuffer);
       }
       for (const tray of boxData.trayGeometries) {
-        transferables.push(tray.geometry.positions.buffer as ArrayBuffer);
-        transferables.push(tray.geometry.normals.buffer as ArrayBuffer);
+        transferableSet.add(tray.geometry.positions.buffer as ArrayBuffer);
+        transferableSet.add(tray.geometry.normals.buffer as ArrayBuffer);
       }
     }
+
+    // Add loose tray geometry transferables
+    for (const looseTray of allLooseTrayGeometries) {
+      transferableSet.add(looseTray.geometry.positions.buffer as ArrayBuffer);
+      transferableSet.add(looseTray.geometry.normals.buffer as ArrayBuffer);
+    }
+
+    const transferables: Transferable[] = Array.from(transferableSet);
 
     const result: GenerateResult = {
       type: 'generate-result',
@@ -574,7 +737,8 @@ function handleGenerate(msg: GenerateMessage): void {
       allTrayGeometries,
       boxGeometry,
       lidGeometry,
-      allBoxGeometries
+      allBoxGeometries,
+      allLooseTrayGeometries
     };
 
     self.postMessage(result, { transfer: transferables });

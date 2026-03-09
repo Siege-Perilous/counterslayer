@@ -15,7 +15,17 @@ import {
 } from '$lib/stores/project.svelte';
 import type { CupLayout } from '$lib/types/cupLayout';
 import { gridToSplitLayout } from '$lib/types/cupLayout';
-import type { Box, CardSize, CounterShape, LidParams, Project, Tray } from '$lib/types/project';
+import type {
+  Box,
+  CardSize,
+  CounterShape,
+  Layer,
+  LegacyProject,
+  LidParams,
+  Project,
+  Tray
+} from '$lib/types/project';
+import { isLegacyProject } from '$lib/types/project';
 const STORAGE_KEY = 'counter-tray-project';
 
 function generateId(): string {
@@ -415,17 +425,48 @@ function migrateBox(
   };
 }
 
+// Get all boxes from a project (handles both legacy and new formats)
+function getBoxesFromProject(project: Project | LegacyProject): Box[] {
+  if (isLegacyProject(project)) {
+    return project.boxes;
+  }
+  const boxes: Box[] = [];
+  for (const layer of project.layers) {
+    boxes.push(...layer.boxes);
+  }
+  return boxes;
+}
+
+// Get all trays from a project (handles both legacy and new formats)
+function getAllTraysFromProject(project: Project | LegacyProject): Tray[] {
+  const boxes = getBoxesFromProject(project);
+  const trays: Tray[] = [];
+  for (const box of boxes) {
+    trays.push(...box.trays);
+  }
+  // Include loose trays if new format
+  if (!isLegacyProject(project)) {
+    for (const layer of project.layers) {
+      trays.push(...layer.looseTrays);
+    }
+  }
+  return trays;
+}
+
 // Migrate a full project to ensure all fields have valid values
-export function migrateProjectData(project: Project): Project {
+export function migrateProjectData(project: Project | LegacyProject): Project {
   // Check if project already has new format (counterShapes/cardSizes at project level)
-  const hasNewFormat =
+  const hasCounterShapesAndCardSizes =
     Array.isArray((project as { counterShapes?: unknown }).counterShapes) &&
     Array.isArray((project as { cardSizes?: unknown }).cardSizes);
+
+  // Get all boxes (from legacy or new format)
+  const allBoxes = getBoxesFromProject(project);
 
   let counterShapes: CounterShape[];
   let cardSizes: CardSize[];
 
-  if (hasNewFormat) {
+  if (hasCounterShapesAndCardSizes) {
     // Already migrated, just ensure arrays are valid
     counterShapes = (project as { counterShapes: CounterShape[] }).counterShapes;
     cardSizes = (project as { cardSizes: CardSize[] }).cardSizes;
@@ -435,8 +476,8 @@ export function migrateProjectData(project: Project): Project {
     cardSizes = cardSizes.map((s) => (s.id ? s : { ...s, id: generateId() }));
   } else {
     // Legacy format - extract from counter tray params
-    counterShapes = extractCounterShapesFromLegacy(project.boxes);
-    cardSizes = extractCardSizesFromLegacy(project.boxes);
+    counterShapes = extractCounterShapesFromLegacy(allBoxes);
+    cardSizes = extractCardSizesFromLegacy(allBoxes);
   }
 
   // Ensure DEFAULT_CARD_SIZES are always present (they may be missing if cardSizes was empty)
@@ -458,7 +499,7 @@ export function migrateProjectData(project: Project): Project {
   // Migrate counterShapes to include thickness if missing
   // Get default thickness from first counter tray's params, or use default
   let defaultThickness = DEFAULT_COUNTER_THICKNESS;
-  for (const box of project.boxes) {
+  for (const box of allBoxes) {
     for (const tray of box.trays) {
       if (tray.type === 'counter') {
         const params = tray.params as CounterTrayParams;
@@ -479,14 +520,6 @@ export function migrateProjectData(project: Project): Project {
   const shapeIdMapping = buildShapeIdMapping(counterShapes);
   const cardSizeIdMapping = buildCardSizeIdMapping(cardSizes);
 
-  // Migrate boxes
-  let cumulativeIndex = 0;
-  const migratedBoxes = project.boxes.map((box) => {
-    const migratedBox = migrateBox(box, cumulativeIndex, shapeIdMapping, cardSizeIdMapping);
-    cumulativeIndex += box.trays.length;
-    return migratedBox;
-  });
-
   // Migrate globalSettings from printBedSize to gameContainerWidth/gameContainerDepth
   let globalSettings = project.globalSettings;
   if (globalSettings) {
@@ -499,9 +532,63 @@ export function migrateProjectData(project: Project): Project {
     }
   }
 
+  // Handle legacy vs new format
+  if (isLegacyProject(project)) {
+    // Legacy format: wrap all boxes into a single layer
+    let cumulativeIndex = 0;
+    const migratedBoxes = project.boxes.map((box) => {
+      const migratedBox = migrateBox(box, cumulativeIndex, shapeIdMapping, cardSizeIdMapping);
+      cumulativeIndex += box.trays.length;
+      return migratedBox;
+    });
+
+    // Create a single layer containing all boxes
+    const layerId = generateId();
+    const layer: Layer = {
+      id: layerId,
+      name: 'Layer 1',
+      boxes: migratedBoxes,
+      looseTrays: []
+    };
+
+    return {
+      version: 2,
+      layers: [layer],
+      counterShapes,
+      cardSizes,
+      selectedLayerId: layerId,
+      selectedBoxId: project.selectedBoxId,
+      selectedTrayId: project.selectedTrayId,
+      globalSettings
+    };
+  }
+
+  // New format: migrate boxes within layers and loose trays
+  let cumulativeIndex = 0;
+  const migratedLayers = project.layers.map((layer) => {
+    const migratedBoxes = layer.boxes.map((box) => {
+      const migratedBox = migrateBox(box, cumulativeIndex, shapeIdMapping, cardSizeIdMapping);
+      cumulativeIndex += box.trays.length;
+      return migratedBox;
+    });
+
+    const migratedLooseTrays = layer.looseTrays.map((tray, idx) => {
+      const migrated = migrateTray(tray, cumulativeIndex + idx, shapeIdMapping, cardSizeIdMapping);
+      return migrated;
+    });
+    cumulativeIndex += layer.looseTrays.length;
+
+    return {
+      ...layer,
+      boxes: migratedBoxes,
+      looseTrays: migratedLooseTrays
+    };
+  });
+
   return {
     ...project,
-    boxes: migratedBoxes,
+    version: 2,
+    layers: migratedLayers,
     counterShapes,
     cardSizes,
     globalSettings

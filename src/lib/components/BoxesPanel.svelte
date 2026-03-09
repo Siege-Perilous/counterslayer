@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon } from '@tableslayer/ui';
+  import { Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon, Select } from '@tableslayer/ui';
   import { IconX, IconPlus } from '@tabler/icons-svelte';
-  import type { Box, Project } from '$lib/types/project';
+  import type { Box } from '$lib/types/project';
+  import { getAllBoxes, getProject, moveBoxToLayer, findTrayLocation } from '$lib/stores/project.svelte';
   import { calculateMinimumBoxDimensions, getLidHeight } from '$lib/models/box';
   import { getCardSizes, getCounterShapes } from '$lib/stores/project.svelte';
 
   interface Props {
-    project: Project;
     selectedBox: Box | null;
     onSelectBox: (box: Box) => void;
     onAddBox: () => void;
@@ -15,7 +15,37 @@
     hideList?: boolean;
   }
 
-  let { project, selectedBox, onSelectBox, onAddBox, onDeleteBox, onUpdateBox, hideList = false }: Props = $props();
+  let { selectedBox, onSelectBox, onAddBox, onDeleteBox, onUpdateBox, hideList = false }: Props = $props();
+
+  // Get all boxes from all layers
+  const allBoxes = $derived(getAllBoxes());
+
+  // Get layer options for move dropdown
+  const layerOptions = $derived.by(() => {
+    const project = getProject();
+    return project.layers.map((layer) => ({
+      value: layer.id,
+      label: layer.name
+    }));
+  });
+
+  // Get current layer for the selected box
+  const currentLayerId = $derived.by(() => {
+    if (!selectedBox) return '';
+    const project = getProject();
+    for (const layer of project.layers) {
+      if (layer.boxes.some((b) => b.id === selectedBox.id)) {
+        return layer.id;
+      }
+    }
+    return '';
+  });
+
+  // Handle layer change
+  function handleLayerChange(layerId: string) {
+    if (!selectedBox || layerId === currentLayerId) return;
+    moveBoxToLayer(selectedBox.id, layerId);
+  }
 
   // Get global card sizes and counter shapes (shared across all boxes)
   const customCardSizes = $derived(getCardSizes());
@@ -61,7 +91,7 @@
         </IconButton>
       </div>
       <div class="panelListItems">
-        {#each project.boxes as box (box.id)}
+        {#each allBoxes as box (box.id)}
           <div
             class="listItem {selectedBox?.id === box.id ? 'listItem--selected' : ''}"
             onclick={() => onSelectBox(box)}
@@ -70,7 +100,7 @@
             onkeydown={(e) => e.key === 'Enter' && onSelectBox(box)}
           >
             <span style="overflow: hidden; text-overflow: ellipsis;">{box.name}</span>
-            {#if project.boxes.length > 1}
+            {#if allBoxes.length > 1}
               <IconButton
                 onclick={(e: MouseEvent) => {
                   e.stopPropagation();
@@ -105,6 +135,26 @@
         </FormControl>
 
         <Spacer size="0.75rem" />
+
+        <!-- Move to Layer -->
+        {#if layerOptions.length > 1}
+          <FormControl label="Layer" name="moveToLayer">
+            {#snippet input({ inputProps })}
+              <Select
+                {...inputProps}
+                selected={currentLayerId ? [currentLayerId] : []}
+                options={layerOptions}
+                onSelectedChange={(selected) => {
+                  if (selected[0]) {
+                    handleLayerChange(selected[0]);
+                  }
+                }}
+              />
+            {/snippet}
+          </FormControl>
+
+          <Spacer size="0.75rem" />
+        {/if}
 
         <div class="formGrid">
           <FormControl label="Tolerance" name="tolerance">

@@ -992,6 +992,27 @@ export function getBoxDimensions(box: Box): TrayDimensions | null {
   };
 }
 
+// Get box exterior dimensions with cardSizes and counterShapes
+// Returns full exterior dimensions including walls and floor
+export function getBoxExteriorDimensions(
+  box: Box,
+  cardSizes: CardSize[] = [],
+  counterShapes: CounterShape[] = []
+): TrayDimensions {
+  if (box.trays.length === 0) {
+    return { width: 0, depth: 0, height: 0 };
+  }
+
+  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
+  const lidHeight = getLidHeight(box);
+
+  return {
+    width: box.customWidth ?? minimums.minWidth,
+    depth: box.customDepth ?? minimums.minDepth,
+    height: (box.customBoxHeight ?? minimums.minHeight) + lidHeight
+  };
+}
+
 // Get lid height for a box (lid thickness is 2x wall thickness)
 export function getLidHeight(box: Box): number {
   return box.wallThickness * 2;

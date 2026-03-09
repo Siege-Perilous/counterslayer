@@ -3,6 +3,7 @@
   import TrayScene from './TrayScene.svelte';
   import type { BufferGeometry } from 'three';
   import type { TrayPlacement } from '$lib/models/box';
+  import type { BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
   import type { CounterStack } from '$lib/models/counterTray';
   import type { CardStack } from '$lib/models/cardTray';
   import type { CaptureOptions } from '$lib/utils/screenshotCapture';
@@ -24,6 +25,17 @@
     lidGeometry: BufferGeometry | null;
     trayGeometries: TrayGeometryData[];
     boxDimensions: { width: number; depth: number; height: number };
+  }
+
+  interface LooseTrayGeometryData {
+    trayId: string;
+    layerId: string;
+    name: string;
+    color: string;
+    geometry: BufferGeometry;
+    dimensions: { width: number; depth: number; height: number };
+    counterStacks: CounterStack[];
+    trayLetter: string;
   }
 
   interface TrayClickInfo {
@@ -57,6 +69,7 @@
     geometry: BufferGeometry | null;
     allTrays?: TrayGeometryData[];
     allBoxes?: BoxGeometryData[];
+    allLooseTrays?: LooseTrayGeometryData[];
     boxGeometry?: BufferGeometry | null;
     lidGeometry?: BufferGeometry | null;
     printBedSize?: number; // Legacy (deprecated) - use gameContainerWidth/gameContainerDepth
@@ -81,12 +94,16 @@
     isLayoutEditMode?: boolean;
     onTrayDoubleClick?: (trayId: string) => void;
     generating?: boolean;
+    showLayerView?: boolean;
+    layerBoxPlacements?: BoxPlacement[];
+    layerLooseTrayPlacements?: LooseTrayPlacement[];
   }
 
   let {
     geometry,
     allTrays = [],
     allBoxes = [],
+    allLooseTrays = [],
     boxGeometry = null,
     lidGeometry = null,
     printBedSize: legacyPrintBedSize,
@@ -110,7 +127,10 @@
     onCaptureReady,
     isLayoutEditMode = false,
     onTrayDoubleClick,
-    generating = false
+    generating = false,
+    showLayerView = false,
+    layerBoxPlacements = [],
+    layerLooseTrayPlacements = []
   }: Props = $props();
 
   // Compute actual container dimensions (prefer new props, fallback to legacy printBedSize)
@@ -144,6 +164,7 @@
       {geometry}
       {allTrays}
       {allBoxes}
+      {allLooseTrays}
       {boxGeometry}
       {lidGeometry}
       {gameContainerWidth}
@@ -168,6 +189,9 @@
       onTrayClick={handleTrayClick}
       {onTrayDoubleClick}
       {generating}
+      {showLayerView}
+      {layerBoxPlacements}
+      {layerLooseTrayPlacements}
     />
   </Canvas>
 

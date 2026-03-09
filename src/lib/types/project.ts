@@ -111,12 +111,40 @@ export interface LidParams {
   showName: boolean; // Emboss box name on lid top (default true)
 }
 
-// Manual tray placement for layout editor
+// Manual tray placement for layout editor (within a box)
 export interface ManualTrayPlacement {
   trayId: string;
   x: number; // Position in box interior (mm)
   y: number;
   rotation: 0 | 90 | 180 | 270; // Rotation in degrees
+}
+
+// Manual box placement for layer layout editor
+export interface ManualBoxPlacement {
+  boxId: string;
+  x: number; // Position in layer (mm)
+  y: number;
+  rotation: 0 | 90 | 180 | 270; // Rotation in degrees
+}
+
+// Manual loose tray placement for layer layout editor
+export interface ManualLooseTrayPlacement {
+  trayId: string;
+  x: number; // Position in layer (mm)
+  y: number;
+  rotation: 0 | 90 | 180 | 270; // Rotation in degrees
+}
+
+// Layer containing boxes and/or loose trays
+export interface Layer {
+  id: string;
+  name: string;
+  boxes: Box[];
+  looseTrays: Tray[];
+  manualLayout?: {
+    boxes: ManualBoxPlacement[];
+    looseTrays: ManualLooseTrayPlacement[];
+  };
 }
 
 export interface Box {
@@ -144,10 +172,58 @@ export interface GlobalSettings {
 }
 
 export interface Project {
+  version?: number; // For migration (2 = layers format)
+  layers: Layer[];
+  counterShapes: CounterShape[];
+  cardSizes: CardSize[];
+  selectedLayerId: string | null;
+  selectedBoxId: string | null;
+  selectedTrayId: string | null;
+  globalSettings?: GlobalSettings;
+}
+
+// Legacy project format (pre-layers)
+export interface LegacyProject {
   boxes: Box[];
   counterShapes: CounterShape[];
   cardSizes: CardSize[];
   selectedBoxId: string | null;
   selectedTrayId: string | null;
   globalSettings?: GlobalSettings;
+}
+
+// Check if a tray is a loose tray (not in a box)
+export function isLooseTray(project: Project, trayId: string): boolean {
+  for (const layer of project.layers) {
+    if (layer.looseTrays.some((t) => t.id === trayId)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Find where a tray is located (layer + box or loose)
+export function findTrayLocation(
+  project: Project,
+  trayId: string
+): { layerId: string; boxId: string | null } | null {
+  for (const layer of project.layers) {
+    // Check loose trays first
+    if (layer.looseTrays.some((t) => t.id === trayId)) {
+      return { layerId: layer.id, boxId: null };
+    }
+    // Check boxes
+    for (const box of layer.boxes) {
+      if (box.trays.some((t) => t.id === trayId)) {
+        return { layerId: layer.id, boxId: box.id };
+      }
+    }
+  }
+  return null;
+}
+
+// Check if project is in legacy format (has boxes[] but no layers[])
+export function isLegacyProject(data: unknown): data is LegacyProject {
+  const obj = data as Record<string, unknown>;
+  return Array.isArray(obj.boxes) && !Array.isArray(obj.layers);
 }

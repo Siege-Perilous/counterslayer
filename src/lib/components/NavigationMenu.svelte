@@ -1,27 +1,35 @@
 <script lang="ts">
   import { IconButton, Icon, ConfirmActionButton, Hr, Panel, Popover, Text } from '@tableslayer/ui';
-  import { IconX, IconPackage, IconRuler } from '@tabler/icons-svelte';
+  import { IconX, IconPackage, IconRuler, IconStack2 } from '@tabler/icons-svelte';
   import {
     getProject,
     getSelectedBox,
     getSelectedTray,
+    getSelectedLayer,
     selectBox,
     selectTray,
+    selectLayer,
     addBox,
     deleteBox,
     addTray,
     deleteTray,
-    getCumulativeTrayLetter,
+    addLayer,
+    deleteLayer,
+    addLooseTray,
+    deleteLooseTray,
+    getTrayLetterById,
     isCardTray,
     isCardDividerTray,
     isCupTray,
+    isLooseTray,
     type Box,
+    type Layer,
     type Tray,
     type TrayType
   } from '$lib/stores/project.svelte';
   import { countCups } from '$lib/types/cupLayout';
 
-  type SelectionType = 'dimensions' | 'box' | 'tray';
+  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
 
   interface Props {
     selectionType: SelectionType;
@@ -33,11 +41,18 @@
   let { selectionType, onSelectionChange, onExpandPanel, isMobile = false }: Props = $props();
 
   let project = $derived(getProject());
+  let selectedLayer = $derived(getSelectedLayer());
   let selectedBox = $derived(getSelectedBox());
   let selectedTray = $derived(getSelectedTray());
 
   function handleDimensionsClick() {
     onSelectionChange('dimensions');
+    onExpandPanel();
+  }
+
+  function handleLayerClick(layer: Layer) {
+    selectLayer(layer.id);
+    onSelectionChange('layer');
     onExpandPanel();
   }
 
@@ -47,15 +62,23 @@
     onExpandPanel();
   }
 
-  function handleTrayClick(tray: Tray, box: Box) {
-    selectBox(box.id);
+  function handleTrayClick(tray: Tray, box: Box | null) {
+    if (box) {
+      selectBox(box.id);
+    }
     selectTray(tray.id);
     onSelectionChange('tray');
     onExpandPanel();
   }
 
-  function handleAddBox(trayType: TrayType) {
-    addBox(trayType);
+  function handleAddLayer() {
+    addLayer();
+    onSelectionChange('layer');
+    onExpandPanel();
+  }
+
+  function handleAddBox(layerId: string, trayType: TrayType) {
+    addBox(layerId, trayType);
     onSelectionChange('tray');
     onExpandPanel();
   }
@@ -66,19 +89,37 @@
     onExpandPanel();
   }
 
-  function handleDeleteBox(boxId: string) {
-    deleteBox(boxId);
-    // If we deleted the selected box, switch to dimensions
-    if (selectedBox?.id === boxId) {
-      onSelectionChange('dimensions');
+  function handleAddLooseTray(layerId: string, trayType: TrayType) {
+    addLooseTray(layerId, trayType);
+    onSelectionChange('tray');
+    onExpandPanel();
+  }
+
+  function handleDeleteLayer(layerId: string) {
+    deleteLayer(layerId);
+    // If we deleted the selected layer, switch to first layer
+    if (selectedLayer?.id === layerId) {
+      onSelectionChange('layer');
     }
   }
 
-  function handleDeleteTray(boxId: string, trayId: string) {
-    deleteTray(boxId, trayId);
-    // If we deleted the selected tray, switch to box view
+  function handleDeleteBox(boxId: string) {
+    deleteBox(boxId);
+    // If we deleted the selected box, switch to layer view
+    if (selectedBox?.id === boxId) {
+      onSelectionChange('layer');
+    }
+  }
+
+  function handleDeleteTray(boxId: string | null, trayId: string) {
+    if (boxId) {
+      deleteTray(boxId, trayId);
+    } else {
+      deleteLooseTray(trayId);
+    }
+    // If we deleted the selected tray, switch to layer view
     if (selectedTray?.id === trayId) {
-      onSelectionChange('box');
+      onSelectionChange('layer');
     }
   }
 
@@ -143,24 +184,25 @@
   </button>
   <Hr />
 
-  <!-- Boxes and Trays -->
+  <!-- Layers, Boxes, and Trays -->
   <div class="navTree">
-    {#each project.boxes as box, boxIdx (box.id)}
-      {@const isBoxSelected = selectedBox?.id === box.id && selectionType === 'box'}
+    {#each project.layers as layer (layer.id)}
+      {@const isLayerSelected = selectedLayer?.id === layer.id && selectionType === 'layer'}
+      {@const totalItems = layer.boxes.length + layer.looseTrays.length}
 
-      <div class="navBoxGroup">
-        <!-- Box Item -->
+      <div class="navLayerGroup">
+        <!-- Layer Item -->
         <button
-          class="navItem navItem--box {isBoxSelected ? 'navItem--selected' : ''}"
-          onclick={() => handleBoxClick(box)}
+          class="navItem navItem--layer {isLayerSelected ? 'navItem--selected' : ''}"
+          onclick={() => handleLayerClick(layer)}
         >
           <span class="navItemIcon">
-            <Icon Icon={IconPackage} size="1rem" />
+            <Icon Icon={IconStack2} size="1rem" />
           </span>
           <span class="navItemLabel">
-            {box.name}
+            {layer.name}
           </span>
-          {#if project.boxes.length > 1}
+          {#if project.layers.length > 1}
             <span
               class="navItemDelete"
               role="none"
@@ -168,36 +210,186 @@
               onkeydown={(e) => e.stopPropagation()}
             >
               <ConfirmActionButton
-                action={() => handleDeleteBox(box.id)}
-                actionButtonText="Delete box"
+                action={() => handleDeleteLayer(layer.id)}
+                actionButtonText="Delete layer"
                 positioning={{ placement: 'right' }}
                 portal=".appContainer"
               >
                 {#snippet trigger({ triggerProps })}
-                  <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete box">
+                  <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete layer">
                     <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
                   </IconButton>
                 {/snippet}
                 {#snippet actionMessage()}
-                  <p>Delete this box and all its trays?</p>
+                  <p>Delete this layer and all its contents?</p>
                 {/snippet}
               </ConfirmActionButton>
             </span>
           {/if}
         </button>
 
-        <!-- Trays within Box -->
-        <div class="navTrayList">
-          {#each box.trays as tray, trayIdx (tray.id)}
-            {@const isTraySelected =
-              selectedTray?.id === tray.id && selectedBox?.id === box.id && selectionType === 'tray'}
-            {@const letter = getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx)}
+        <!-- Content within Layer -->
+        <div class="navLayerContent">
+          <!-- Boxes within Layer -->
+          {#each layer.boxes as box (box.id)}
+            {@const isBoxSelected = selectedBox?.id === box.id && selectionType === 'box'}
+
+            <div class="navBoxGroup">
+              <!-- Box Item -->
+              <button
+                class="navItem navItem--box {isBoxSelected ? 'navItem--selected' : ''}"
+                onclick={() => handleBoxClick(box)}
+              >
+                <span class="navItemIcon">
+                  <Icon Icon={IconPackage} size="1rem" />
+                </span>
+                <span class="navItemLabel">
+                  {box.name}
+                </span>
+                {#if totalItems > 1}
+                  <span
+                    class="navItemDelete"
+                    role="none"
+                    onclick={(e) => e.stopPropagation()}
+                    onkeydown={(e) => e.stopPropagation()}
+                  >
+                    <ConfirmActionButton
+                      action={() => handleDeleteBox(box.id)}
+                      actionButtonText="Delete box"
+                      positioning={{ placement: 'right' }}
+                      portal=".appContainer"
+                    >
+                      {#snippet trigger({ triggerProps })}
+                        <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete box">
+                          <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
+                        </IconButton>
+                      {/snippet}
+                      {#snippet actionMessage()}
+                        <p>Delete this box and all its trays?</p>
+                      {/snippet}
+                    </ConfirmActionButton>
+                  </span>
+                {/if}
+              </button>
+
+              <!-- Trays within Box -->
+              <div class="navTrayList">
+                {#each box.trays as tray (tray.id)}
+                  {@const isTraySelected = selectedTray?.id === tray.id && selectionType === 'tray'}
+                  {@const letter = getTrayLetterById(project.layers, tray.id)}
+                  {@const stats = getTrayStats(tray)}
+
+                  <button
+                    class="navItem navItem--tray {isTraySelected ? 'navItem--selected' : ''}"
+                    onclick={() => handleTrayClick(tray, box)}
+                    title="{tray.name} ({letter}: {stats.isCardTray
+                      ? stats.counters + ' cards'
+                      : stats.isCardDivider
+                        ? stats.counters + ' cards/' + stats.stacks + 's'
+                        : stats.isCupTray
+                          ? stats.stacks + ' cups'
+                          : stats.counters + 'c in ' + stats.stacks + 's'})"
+                  >
+                    <span class="navItemLabel">
+                      <span class="trayLetter">{letter}</span>
+                      {tray.name}
+                    </span>
+                    {#if box.trays.length > 1}
+                      <span
+                        class="navItemDelete"
+                        role="none"
+                        onclick={(e) => e.stopPropagation()}
+                        onkeydown={(e) => e.stopPropagation()}
+                      >
+                        <ConfirmActionButton
+                          action={() => handleDeleteTray(box.id, tray.id)}
+                          actionButtonText="Delete tray"
+                          positioning={{ placement: 'right' }}
+                          portal=".appContainer"
+                        >
+                          {#snippet trigger({ triggerProps })}
+                            <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete tray">
+                              <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
+                            </IconButton>
+                          {/snippet}
+                          {#snippet actionMessage()}
+                            <p>Delete this tray?</p>
+                          {/snippet}
+                        </ConfirmActionButton>
+                      </span>
+                    {/if}
+                  </button>
+                {/each}
+
+                <!-- Add Tray Button with Popover -->
+                <Popover
+                  positioning={{ placement: 'right-start' }}
+                  portal=".appContainer"
+                  contentClass="trayTypePopover"
+                >
+                  {#snippet trigger()}
+                    <button class="navItem navItem--add navItem--tray">
+                      <span class="addIcon">+</span>
+                      <span class="addLabel">Add tray</span>
+                    </button>
+                  {/snippet}
+                  {#snippet content({ contentProps })}
+                    <button
+                      class="trayTypeOption"
+                      onclick={() => {
+                        handleAddTray(box.id, 'counter');
+                        contentProps.close();
+                      }}
+                    >
+                      <Text weight={500}>Counters</Text>
+                      <Text size="0.75rem" color="var(--fgMuted)">Stacks of geometric tokens</Text>
+                    </button>
+                    <button
+                      class="trayTypeOption"
+                      onclick={() => {
+                        handleAddTray(box.id, 'cardDraw');
+                        contentProps.close();
+                      }}
+                    >
+                      <Text weight={500}>Card draw</Text>
+                      <Text size="0.75rem" color="var(--fgMuted)">Single stack of cards, draw from top</Text>
+                    </button>
+                    <button
+                      class="trayTypeOption"
+                      onclick={() => {
+                        handleAddTray(box.id, 'cardDivider');
+                        contentProps.close();
+                      }}
+                    >
+                      <Text weight={500}>Card divider</Text>
+                      <Text size="0.75rem" color="var(--fgMuted)">Divided stacks of cards, divided by walls</Text>
+                    </button>
+                    <button
+                      class="trayTypeOption"
+                      onclick={() => {
+                        handleAddTray(box.id, 'cup');
+                        contentProps.close();
+                      }}
+                    >
+                      <Text weight={500}>Cups</Text>
+                      <Text size="0.75rem" color="var(--fgMuted)">Segmented cups for loose objects</Text>
+                    </button>
+                  {/snippet}
+                </Popover>
+              </div>
+            </div>
+          {/each}
+
+          <!-- Loose Trays within Layer -->
+          {#each layer.looseTrays as tray (tray.id)}
+            {@const isTraySelected = selectedTray?.id === tray.id && selectionType === 'tray'}
+            {@const letter = getTrayLetterById(project.layers, tray.id)}
             {@const stats = getTrayStats(tray)}
 
             <button
-              class="navItem navItem--tray {isTraySelected ? 'navItem--selected' : ''}"
-              onclick={() => handleTrayClick(tray, box)}
-              title="{tray.name} ({letter}: {stats.isCardTray
+              class="navItem navItem--looseTray {isTraySelected ? 'navItem--selected' : ''}"
+              onclick={() => handleTrayClick(tray, null)}
+              title="{tray.name} (Loose {letter}: {stats.isCardTray
                 ? stats.counters + ' cards'
                 : stats.isCardDivider
                   ? stats.counters + ' cards/' + stats.stacks + 's'
@@ -208,8 +400,9 @@
               <span class="navItemLabel">
                 <span class="trayLetter">{letter}</span>
                 {tray.name}
+                <span class="looseBadge">loose</span>
               </span>
-              {#if box.trays.length > 1}
+              {#if totalItems > 1}
                 <span
                   class="navItemDelete"
                   role="none"
@@ -217,7 +410,7 @@
                   onkeydown={(e) => e.stopPropagation()}
                 >
                   <ConfirmActionButton
-                    action={() => handleDeleteTray(box.id, tray.id)}
+                    action={() => handleDeleteTray(null, tray.id)}
                     actionButtonText="Delete tray"
                     positioning={{ placement: 'right' }}
                     portal=".appContainer"
@@ -228,7 +421,7 @@
                       </IconButton>
                     {/snippet}
                     {#snippet actionMessage()}
-                      <p>Delete this tray?</p>
+                      <p>Delete this loose tray?</p>
                     {/snippet}
                   </ConfirmActionButton>
                 </span>
@@ -236,19 +429,19 @@
             </button>
           {/each}
 
-          <!-- Add Tray Button with Popover -->
+          <!-- Add Box Button with Popover -->
           <Popover positioning={{ placement: 'right-start' }} portal=".appContainer" contentClass="trayTypePopover">
             {#snippet trigger()}
-              <button class="navItem navItem--add navItem--tray">
+              <button class="navItem navItem--add navItem--box">
                 <span class="addIcon">+</span>
-                <span class="addLabel">Add tray</span>
+                <span class="addLabel">Add box</span>
               </button>
             {/snippet}
             {#snippet content({ contentProps })}
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddTray(box.id, 'counter');
+                  handleAddBox(layer.id, 'counter');
                   contentProps.close();
                 }}
               >
@@ -258,7 +451,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddTray(box.id, 'cardDraw');
+                  handleAddBox(layer.id, 'cardDraw');
                   contentProps.close();
                 }}
               >
@@ -268,7 +461,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddTray(box.id, 'cardDivider');
+                  handleAddBox(layer.id, 'cardDivider');
                   contentProps.close();
                 }}
               >
@@ -278,12 +471,64 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddTray(box.id, 'cup');
+                  handleAddBox(layer.id, 'cup');
                   contentProps.close();
                 }}
               >
-                <Text weight={500}>Cups</Text>
-                <Text size="0.75rem" color="var(--fgMuted)">Segmented cups for loose ojbects</Text>
+                <Text weight={500}>Cup tray</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Bowl-shaped cups for dice and tokens</Text>
+              </button>
+            {/snippet}
+          </Popover>
+
+          <!-- Add Loose Tray Button with Popover -->
+          <Popover positioning={{ placement: 'right-start' }} portal=".appContainer" contentClass="trayTypePopover">
+            {#snippet trigger()}
+              <button class="navItem navItem--add navItem--looseTray">
+                <span class="addIcon">+</span>
+                <span class="addLabel">Add loose tray</span>
+              </button>
+            {/snippet}
+            {#snippet content({ contentProps })}
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLooseTray(layer.id, 'counter');
+                  contentProps.close();
+                }}
+              >
+                <Text weight={500}>Counters</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Stacks of geometric tokens</Text>
+              </button>
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLooseTray(layer.id, 'cardDraw');
+                  contentProps.close();
+                }}
+              >
+                <Text weight={500}>Card draw</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Single stack of cards, draw from top</Text>
+              </button>
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLooseTray(layer.id, 'cardDivider');
+                  contentProps.close();
+                }}
+              >
+                <Text weight={500}>Card divider</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Divided stacks of cards, divided by walls</Text>
+              </button>
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLooseTray(layer.id, 'cup');
+                  contentProps.close();
+                }}
+              >
+                <Text weight={500}>Cup tray</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Bowl-shaped cups for dice and tokens</Text>
               </button>
             {/snippet}
           </Popover>
@@ -292,57 +537,11 @@
       </div>
     {/each}
 
-    <!-- Add Box Button with Popover -->
-    <Popover positioning={{ placement: 'right-start' }} portal=".appContainer" contentClass="trayTypePopover">
-      {#snippet trigger()}
-        <button class="navItem navItem--add">
-          <span class="addIcon">+</span>
-          <span class="addLabel">Add box</span>
-        </button>
-      {/snippet}
-      {#snippet content({ contentProps })}
-        <button
-          class="trayTypeOption"
-          onclick={() => {
-            handleAddBox('counter');
-            contentProps.close();
-          }}
-        >
-          <Text weight={500}>Counters</Text>
-          <Text size="0.75rem" color="var(--fgMuted)">Stacks of geometric tokens</Text>
-        </button>
-        <button
-          class="trayTypeOption"
-          onclick={() => {
-            handleAddBox('cardDraw');
-            contentProps.close();
-          }}
-        >
-          <Text weight={500}>Card draw</Text>
-          <Text size="0.75rem" color="var(--fgMuted)">Single stack of cards, draw from top</Text>
-        </button>
-        <button
-          class="trayTypeOption"
-          onclick={() => {
-            handleAddBox('cardDivider');
-            contentProps.close();
-          }}
-        >
-          <Text weight={500}>Card divider</Text>
-          <Text size="0.75rem" color="var(--fgMuted)">Divided stacks of cards, divided by walls</Text>
-        </button>
-        <button
-          class="trayTypeOption"
-          onclick={() => {
-            handleAddBox('cup');
-            contentProps.close();
-          }}
-        >
-          <Text weight={500}>Cup tray</Text>
-          <Text size="0.75rem" color="var(--fgMuted)">Bowl-shaped cups for dice and tokens</Text>
-        </button>
-      {/snippet}
-    </Popover>
+    <!-- Add Layer Button -->
+    <button class="navItem navItem--add" onclick={handleAddLayer}>
+      <span class="addIcon">+</span>
+      <span class="addLabel">Add layer</span>
+    </button>
   </div>
 </Panel>
 
@@ -433,6 +632,26 @@
     flex-direction: column;
   }
 
+  .navLayerGroup {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .navLayerContent {
+    display: flex;
+    flex-direction: column;
+
+    .navItem--box,
+    .navItem--looseTray {
+      padding-left: 1.5rem;
+    }
+
+    .navItem--add.navItem--box,
+    .navItem--add.navItem--looseTray {
+      padding-left: 1.5rem;
+    }
+  }
+
   .navBoxGroup {
     display: flex;
     flex-direction: column;
@@ -443,8 +662,17 @@
     flex-direction: column;
 
     .navItem {
-      padding-left: 2rem;
+      padding-left: 3rem;
     }
+  }
+
+  .looseBadge {
+    font-size: 0.625rem;
+    padding: 0.125rem 0.25rem;
+    background: var(--contrastLow);
+    border-radius: 2px;
+    color: var(--fgMuted);
+    margin-left: 0.25rem;
   }
 
   .addLabel {

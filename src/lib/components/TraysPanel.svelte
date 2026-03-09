@@ -32,8 +32,10 @@
   import { getTrayDimensionsForTray, arrangeTrays } from '$lib/models/box';
   import {
     getProject,
-    getCumulativeTrayLetter,
+    getTrayLetterById,
     moveTray,
+    moveTrayToLoose,
+    getAllBoxes,
     getCardSizes,
     getCounterShapes
   } from '$lib/stores/project.svelte';
@@ -72,22 +74,65 @@
     hideList = false
   }: Props = $props();
 
-  // Get current box index for cumulative tray letters
-  let currentBoxIdx = $derived.by(() => {
-    const project = getProject();
-    if (!selectedBox) return 0;
-    return project.boxes.findIndex((b) => b.id === selectedBox.id);
-  });
-
-  // Get the tray letter based on cumulative position across all boxes
+  // Get the tray letter based on cumulative position across all layers
   let trayLetter = $derived.by(() => {
     const project = getProject();
-    if (!selectedBox || !selectedTray) return 'A';
-    const boxIdx = project.boxes.findIndex((b) => b.id === selectedBox.id);
-    const trayIdx = selectedBox.trays.findIndex((t) => t.id === selectedTray.id);
-    if (boxIdx < 0 || trayIdx < 0) return 'A';
-    return getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx);
+    if (!selectedTray) return 'A';
+    return getTrayLetterById(project.layers, selectedTray.id) || 'A';
   });
+
+  // Build move destination options: all boxes + loose tray options per layer
+  let moveDestinations = $derived.by(() => {
+    const project = getProject();
+    const options: { value: string; label: string; group?: string }[] = [];
+
+    for (const layer of project.layers) {
+      // Add boxes in this layer
+      for (const box of layer.boxes) {
+        options.push({
+          value: `box:${box.id}`,
+          label: box.name,
+          group: layer.name
+        });
+      }
+      // Add loose tray option for this layer
+      options.push({
+        value: `loose:${layer.id}`,
+        label: `Loose in ${layer.name}`,
+        group: layer.name
+      });
+    }
+
+    return options;
+  });
+
+  // Get current tray location for the select
+  let currentTrayLocation = $derived.by(() => {
+    if (!selectedTray) return '';
+    if (selectedBox) {
+      return `box:${selectedBox.id}`;
+    }
+    // Check if it's a loose tray
+    const project = getProject();
+    for (const layer of project.layers) {
+      if (layer.looseTrays.some((t) => t.id === selectedTray.id)) {
+        return `loose:${layer.id}`;
+      }
+    }
+    return '';
+  });
+
+  // Handle move destination change
+  function handleMoveDestination(value: string) {
+    if (!selectedTray || !value) return;
+    const [type, id] = value.split(':');
+
+    if (type === 'box' && id !== selectedBox?.id) {
+      moveTray(selectedTray.id, id);
+    } else if (type === 'loose') {
+      moveTrayToLoose(selectedTray.id, id);
+    }
+  }
 
   // Compute max tray height across all trays in the box (used for cup tray expansion)
   let maxTrayHeight = $derived.by(() => {
@@ -200,7 +245,7 @@
       <div class="panelListItems">
         {#each selectedBox.trays as tray, trayIdx (tray.id)}
           {@const stats = getTrayStats(tray)}
-          {@const letter = getCumulativeTrayLetter(getProject().boxes, currentBoxIdx, trayIdx)}
+          {@const letter = getTrayLetterById(getProject().layers, tray.id)}
           <div
             class="listItem {selectedTray?.id === tray.id ? 'listItem--selected' : ''}"
             onclick={() => onSelectTray(tray)}
@@ -264,19 +309,16 @@
 
         <Spacer size="1rem" />
 
-        <!-- Move to Box -->
-        <FormControl label="Box" name="moveToBox">
+        <!-- Move to Box/Layer -->
+        <FormControl label="Location" name="moveToLocation">
           {#snippet input({ inputProps })}
             <Select
               {...inputProps}
-              selected={selectedBox ? [selectedBox.id] : []}
-              options={[
-                ...getProject().boxes.map((box) => ({ value: box.id, label: box.name })),
-                { value: 'new', label: 'Create new box' }
-              ]}
+              selected={currentTrayLocation ? [currentTrayLocation] : []}
+              options={moveDestinations}
               onSelectedChange={(selected) => {
-                if (selected[0] && selectedTray && selected[0] !== selectedBox?.id) {
-                  moveTray(selectedTray.id, selected[0]);
+                if (selected[0]) {
+                  handleMoveDestination(selected[0]);
                 }
               }}
             />

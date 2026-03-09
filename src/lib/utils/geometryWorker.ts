@@ -33,6 +33,17 @@ interface BoxGeometryResult {
   boxDimensions: { width: number; depth: number; height: number };
 }
 
+interface LooseTrayGeometryResult {
+  trayId: string;
+  layerId: string;
+  name: string;
+  color: string;
+  geometry: GeometryData;
+  dimensions: { width: number; depth: number; height: number };
+  counterStacks: CounterStack[];
+  trayLetter: string;
+}
+
 interface GenerateResult {
   type: 'generate-result';
   id: number;
@@ -42,6 +53,7 @@ interface GenerateResult {
   boxGeometry: GeometryData | null;
   lidGeometry: GeometryData | null;
   allBoxGeometries: BoxGeometryResult[];
+  allLooseTrayGeometries: LooseTrayGeometryResult[];
   error?: string;
 }
 
@@ -93,6 +105,17 @@ export interface BoxGeometryData {
   boxDimensions: { width: number; depth: number; height: number };
 }
 
+export interface LooseTrayGeometryData {
+  trayId: string;
+  layerId: string;
+  name: string;
+  color: string;
+  geometry: THREE.BufferGeometry;
+  dimensions: { width: number; depth: number; height: number };
+  counterStacks: CounterStack[];
+  trayLetter: string;
+}
+
 export interface GenerationResult {
   selectedTrayGeometry: THREE.BufferGeometry;
   selectedTrayCounters: CounterStack[];
@@ -100,6 +123,7 @@ export interface GenerationResult {
   boxGeometry: THREE.BufferGeometry | null;
   lidGeometry: THREE.BufferGeometry | null;
   allBoxGeometries: BoxGeometryData[];
+  allLooseTrayGeometries: LooseTrayGeometryData[];
 }
 
 type WorkerResult = GenerateResult | ExportStlResult | ExportAllStlsResult | Export3mfResult;
@@ -213,13 +237,19 @@ export class GeometryWorkerManager {
             }))
           }));
 
+          const allLooseTrayGeometries: LooseTrayGeometryData[] = (r.allLooseTrayGeometries || []).map((lt) => ({
+            ...lt,
+            geometry: arrayToBufferGeometry(lt.geometry)
+          }));
+
           resolve({
             selectedTrayGeometry,
             selectedTrayCounters: r.selectedTrayCounters,
             allTrayGeometries,
             boxGeometry,
             lidGeometry,
-            allBoxGeometries
+            allBoxGeometries,
+            allLooseTrayGeometries
           });
         },
         reject
@@ -228,7 +258,7 @@ export class GeometryWorkerManager {
       // Deep clone to strip Svelte 5 Proxy wrappers (can't be cloned for postMessage)
       const plainProject = JSON.parse(
         JSON.stringify({
-          boxes: project.boxes,
+          layers: project.layers,
           cardSizes: project.cardSizes,
           counterShapes: project.counterShapes
         })
