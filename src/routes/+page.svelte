@@ -459,7 +459,7 @@
 			a.click();
 			URL.revokeObjectURL(url);
 
-			removeToast(loadingToast.id);
+			removeToast(loadingToast);
 			addToast({
 				data: {
 					title: 'STL export complete',
@@ -468,7 +468,7 @@
 				}
 			});
 		} catch (e) {
-			removeToast(loadingToast.id);
+			removeToast(loadingToast);
 			const message = e instanceof Error ? e.message : 'Export failed';
 			addToast({
 				data: {
@@ -516,7 +516,7 @@
 			a.click();
 			URL.revokeObjectURL(url);
 
-			removeToast(loadingToast.id);
+			removeToast(loadingToast);
 			addToast({
 				data: {
 					title: '3MF export complete',
@@ -525,7 +525,7 @@
 				}
 			});
 		} catch (e) {
-			removeToast(loadingToast.id);
+			removeToast(loadingToast);
 			const message = e instanceof Error ? e.message : 'Export failed';
 			addToast({
 				data: {
@@ -736,7 +736,7 @@
 			// Generate PDF with screenshots
 			await exportPdfWithScreenshots(project, screenshots);
 
-			removeToast(loadingToast.id);
+			removeToast(loadingToast);
 			addToast({
 				data: {
 					title: 'PDF export complete',
@@ -745,7 +745,7 @@
 				}
 			});
 		} catch (e) {
-			removeToast(loadingToast.id);
+			removeToast(loadingToast);
 			const message = e instanceof Error ? e.message : 'Failed to export PDF';
 			addToast({
 				data: {
@@ -881,7 +881,7 @@
 
 			const result = await response.json();
 
-			removeToast(loadingToast.id);
+			removeToast(loadingToast);
 			if (!result.success) {
 				const errorMsg = result.error || 'Analysis failed';
 				addToast({
@@ -902,7 +902,7 @@
 				});
 			}
 		} catch (e) {
-			removeToast(loadingToast.id);
+			removeToast(loadingToast);
 			const message = e instanceof Error ? e.message : 'Failed to export debug info';
 			addToast({
 				data: {
