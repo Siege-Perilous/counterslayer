@@ -4,16 +4,22 @@
   import * as THREE from 'three';
 
   interface Props {
-    size: number;
+    size?: number; // Legacy: square size (deprecated)
+    width?: number; // New: explicit width
+    depth?: number; // New: explicit depth
     title?: string;
     position?: [number, number, number];
     sizeLabel?: string;
   }
 
-  let { size, title = '', position = [0, 0, 0], sizeLabel }: Props = $props();
+  let { size, width, depth, title = '', position = [0, 0, 0], sizeLabel }: Props = $props();
+
+  // Compute actual width and depth (prefer new props, fallback to size)
+  let bedWidth = $derived(width ?? size ?? 256);
+  let bedDepth = $derived(depth ?? size ?? 256);
 
   // Default size label if not provided
-  let displaySizeLabel = $derived(sizeLabel ?? `${size}mm bed`);
+  let displaySizeLabel = $derived(sizeLabel ?? `${bedWidth} × ${bedDepth}mm`);
 
   // Make position values reactive
   let posX = $derived(position[0]);
@@ -25,21 +31,22 @@
   const sectionSize = 50;
 
   // Create noise texture for the bed surface
-  function createNoiseTexture(): THREE.CanvasTexture {
+  function createNoiseTexture(texWidth: number, texDepth: number): THREE.CanvasTexture {
     const pixelsPerMm = 4;
-    const canvasSize = size * pixelsPerMm;
+    const canvasWidth = texWidth * pixelsPerMm;
+    const canvasHeight = texDepth * pixelsPerMm;
 
     const canvas = document.createElement('canvas');
-    canvas.width = canvasSize;
-    canvas.height = canvasSize;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
     const ctx = canvas.getContext('2d')!;
 
     // Mid-gray base (will be tinted by material color)
     ctx.fillStyle = '#808080';
-    ctx.fillRect(0, 0, canvasSize, canvasSize);
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
     // Add subtle noise texture
-    const imageData = ctx.getImageData(0, 0, canvasSize, canvasSize);
+    const imageData = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
     const data = imageData.data;
     for (let i = 0; i < data.length; i += 4) {
       const noise = (Math.random() - 0.5) * 30;
@@ -57,10 +64,10 @@
 
   // Generate grid line geometries
   let cellGeometry = $derived.by(() => {
-    const worldXMin = posX - size / 2;
-    const worldXMax = posX + size / 2;
-    const worldZMin = posZ - size / 2;
-    const worldZMax = posZ + size / 2;
+    const worldXMin = posX - bedWidth / 2;
+    const worldXMax = posX + bedWidth / 2;
+    const worldZMin = posZ - bedDepth / 2;
+    const worldZMax = posZ + bedDepth / 2;
 
     const firstCellX = Math.ceil(worldXMin / cellSize) * cellSize;
     const firstCellZ = Math.ceil(worldZMin / cellSize) * cellSize;
@@ -89,10 +96,10 @@
   });
 
   let sectionGeometry = $derived.by(() => {
-    const worldXMin = posX - size / 2;
-    const worldXMax = posX + size / 2;
-    const worldZMin = posZ - size / 2;
-    const worldZMax = posZ + size / 2;
+    const worldXMin = posX - bedWidth / 2;
+    const worldXMax = posX + bedWidth / 2;
+    const worldZMin = posZ - bedDepth / 2;
+    const worldZMax = posZ + bedDepth / 2;
 
     const firstSectionX = Math.ceil(worldXMin / sectionSize) * sectionSize;
     const firstSectionZ = Math.ceil(worldZMin / sectionSize) * sectionSize;
@@ -118,25 +125,29 @@
     return geometry;
   });
 
-  let noiseTexture = $derived.by(() => createNoiseTexture());
+  let noiseTexture = $derived.by(() => createNoiseTexture(bedWidth, bedDepth));
 
   // Calculate label positions - outside the bed, under the bottom edge
   const labelOffset = 8; // Distance below the bed edge
 
   // Title: bottom left corner (outside)
-  let titleLabelPos: [number, number, number] = $derived([posX - size / 2, posY + 0.5, posZ + size / 2 + labelOffset]);
-
-  // Bed size: bottom right corner (outside)
-  let bedSizeLabelPos: [number, number, number] = $derived([
-    posX + size / 2,
+  let titleLabelPos: [number, number, number] = $derived([
+    posX - bedWidth / 2,
     posY + 0.5,
-    posZ + size / 2 + labelOffset
+    posZ + bedDepth / 2 + labelOffset
+  ]);
+
+  // Container size: bottom right corner (outside)
+  let containerSizeLabelPos: [number, number, number] = $derived([
+    posX + bedWidth / 2,
+    posY + 0.5,
+    posZ + bedDepth / 2 + labelOffset
   ]);
 </script>
 
 <!-- Print bed surface with noise texture (reacts to lighting) -->
 <T.Mesh position={[posX, posY + 0.01, posZ]} rotation.x={-Math.PI / 2}>
-  <T.PlaneGeometry args={[size, size]} />
+  <T.PlaneGeometry args={[bedWidth, bedDepth]} />
   <T.MeshStandardMaterial map={noiseTexture} color="#3a3a3a" roughness={0.8} metalness={0.05} />
 </T.Mesh>
 
@@ -161,18 +172,18 @@
       attach="attributes-position"
       args={[
         new Float32Array([
-          -size / 2,
+          -bedWidth / 2,
           0,
-          -size / 2,
-          size / 2,
+          -bedDepth / 2,
+          bedWidth / 2,
           0,
-          -size / 2,
-          size / 2,
+          -bedDepth / 2,
+          bedWidth / 2,
           0,
-          size / 2,
-          -size / 2,
+          bedDepth / 2,
+          -bedWidth / 2,
           0,
-          size / 2
+          bedDepth / 2
         ]),
         3
       ]}
@@ -194,11 +205,11 @@
   />
 {/if}
 
-<!-- Bed size label - bottom right corner (outside bed) -->
+<!-- Container size label - bottom right corner (outside bed) -->
 <Text
   text={displaySizeLabel}
-  fontSize={8}
-  position={bedSizeLabelPos}
+  fontSize={5}
+  position={containerSizeLabelPos}
   rotation={[-Math.PI / 2, 0, 0]}
   color="#c9503c"
   anchorX="right"

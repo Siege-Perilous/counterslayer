@@ -226,6 +226,16 @@ function migrateCounterTrayParams(
   delete (migrated as { extraTrayCols?: number }).extraTrayCols;
   delete (migrated as { extraTrayRows?: number }).extraTrayRows;
 
+  // Migrate printBedSize to gameContainerWidth/gameContainerDepth
+  // Check the ORIGINAL params (not migrated) to see if it has old format
+  const legacyPrintBedSize = (params as { printBedSize?: number }).printBedSize;
+  const originalHasNewFormat = (params as { gameContainerWidth?: number }).gameContainerWidth !== undefined;
+  if (legacyPrintBedSize !== undefined && !originalHasNewFormat) {
+    migrated.gameContainerWidth = legacyPrintBedSize;
+    migrated.gameContainerDepth = legacyPrintBedSize;
+  }
+  delete (migrated as { printBedSize?: number }).printBedSize;
+
   return migrated;
 }
 
@@ -429,6 +439,22 @@ export function migrateProjectData(project: Project): Project {
     cardSizes = extractCardSizesFromLegacy(project.boxes);
   }
 
+  // Ensure DEFAULT_CARD_SIZES are always present (they may be missing if cardSizes was empty)
+  const existingCardSizeIds = new Set(cardSizes.map((s) => s.id));
+  for (const defaultSize of DEFAULT_CARD_SIZES) {
+    if (!existingCardSizeIds.has(defaultSize.id)) {
+      cardSizes.push({ ...defaultSize });
+    }
+  }
+
+  // Ensure DEFAULT_COUNTER_SHAPES are always present (they may be missing if counterShapes was empty)
+  const existingShapeIds = new Set(counterShapes.map((s) => s.id));
+  for (const defaultShape of DEFAULT_COUNTER_SHAPES) {
+    if (!existingShapeIds.has(defaultShape.id)) {
+      counterShapes.push({ ...defaultShape });
+    }
+  }
+
   // Migrate counterShapes to include thickness if missing
   // Get default thickness from first counter tray's params, or use default
   let defaultThickness = DEFAULT_COUNTER_THICKNESS;
@@ -461,11 +487,24 @@ export function migrateProjectData(project: Project): Project {
     return migratedBox;
   });
 
+  // Migrate globalSettings from printBedSize to gameContainerWidth/gameContainerDepth
+  let globalSettings = project.globalSettings;
+  if (globalSettings) {
+    const legacyPrintBedSize = (globalSettings as { printBedSize?: number }).printBedSize;
+    if (legacyPrintBedSize !== undefined) {
+      globalSettings = {
+        gameContainerWidth: legacyPrintBedSize,
+        gameContainerDepth: legacyPrintBedSize
+      };
+    }
+  }
+
   return {
     ...project,
     boxes: migratedBoxes,
     counterShapes,
-    cardSizes
+    cardSizes,
+    globalSettings
   };
 }
 

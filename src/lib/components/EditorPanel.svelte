@@ -35,10 +35,11 @@
   interface Props {
     selectionType: SelectionType;
     isLayoutEditMode?: boolean;
-    printBedSize?: number;
+    gameContainerWidth?: number;
+    gameContainerDepth?: number;
   }
 
-  let { selectionType, isLayoutEditMode = false, printBedSize = 256 }: Props = $props();
+  let { selectionType, isLayoutEditMode = false, gameContainerWidth = 256, gameContainerDepth = 256 }: Props = $props();
 
   // Layout editor dimensions
   let interiorWidth = $derived(layoutEditorState.boundsWidth);
@@ -63,7 +64,7 @@
   // Get global settings from project store
   let globalSettings = $derived(getGlobalSettings());
 
-  function handleGlobalSettingsChange(updates: { printBedSize?: number }) {
+  function handleGlobalSettingsChange(updates: { gameContainerWidth?: number; gameContainerDepth?: number }) {
     updateGlobalSettings(updates);
   }
 
@@ -178,8 +179,8 @@
           <p class="hint">Drag trays to reposition. Save or cancel to continue editing.</p>
           <div class="dimensionsInfo">
             <div class="dimensionRow">
-              <span class="dimensionLabel">Print bed</span>
-              <span class="dimensionValue">{printBedSize} × {printBedSize}mm</span>
+              <span class="dimensionLabel">Game container</span>
+              <span class="dimensionValue">{gameContainerWidth} × {gameContainerDepth}mm</span>
             </div>
             {#if selectedBox}
               <div class="dimensionRow">

@@ -32,8 +32,8 @@
   } from '$lib/stores/project.svelte';
 
   interface Props {
-    globalSettings: { printBedSize: number };
-    onGlobalSettingsChange: (updates: { printBedSize?: number }) => void;
+    globalSettings: { gameContainerWidth: number; gameContainerDepth: number };
+    onGlobalSettingsChange: (updates: { gameContainerWidth?: number; gameContainerDepth?: number }) => void;
   }
 
   let { globalSettings, onGlobalSettingsChange }: Props = $props();
@@ -226,20 +226,35 @@
 
 <div class="globalsPanel">
   <section class="section">
-    <h3 class="sectionTitle">Print Bed</h3>
-    <FormControl label="Bed size" name="printBedSize">
-      {#snippet input({ inputProps })}
-        <Input
-          {...inputProps}
-          type="number"
-          step="1"
-          min="100"
-          value={globalSettings.printBedSize}
-          onchange={(e) => onGlobalSettingsChange({ printBedSize: parseInt(e.currentTarget.value) })}
-        />
-      {/snippet}
-      {#snippet end()}mm{/snippet}
-    </FormControl>
+    <h3 class="sectionTitle">Game Container</h3>
+    <div class="gameContainerInputs">
+      <FormControl label="Width" name="gameContainerWidth">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            step="1"
+            min="100"
+            value={globalSettings.gameContainerWidth}
+            onchange={(e) => onGlobalSettingsChange({ gameContainerWidth: parseInt(e.currentTarget.value) })}
+          />
+        {/snippet}
+        {#snippet end()}mm{/snippet}
+      </FormControl>
+      <FormControl label="Depth" name="gameContainerDepth">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            step="1"
+            min="100"
+            value={globalSettings.gameContainerDepth}
+            onchange={(e) => onGlobalSettingsChange({ gameContainerDepth: parseInt(e.currentTarget.value) })}
+          />
+        {/snippet}
+        {#snippet end()}mm{/snippet}
+      </FormControl>
+    </div>
   </section>
 
   <Hr />
@@ -574,6 +589,12 @@
 
   .section {
     padding: 0 0.75rem;
+  }
+
+  .gameContainerInputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
   }
 
   .sectionTitle {

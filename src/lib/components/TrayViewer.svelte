@@ -59,7 +59,9 @@
     allBoxes?: BoxGeometryData[];
     boxGeometry?: BufferGeometry | null;
     lidGeometry?: BufferGeometry | null;
-    printBedSize: number;
+    printBedSize?: number; // Legacy (deprecated) - use gameContainerWidth/gameContainerDepth
+    gameContainerWidth?: number;
+    gameContainerDepth?: number;
     exploded?: boolean;
     showAllTrays?: boolean;
     showAllBoxes?: boolean;
@@ -87,7 +89,9 @@
     allBoxes = [],
     boxGeometry = null,
     lidGeometry = null,
-    printBedSize,
+    printBedSize: legacyPrintBedSize,
+    gameContainerWidth: propContainerWidth,
+    gameContainerDepth: propContainerDepth,
     exploded = false,
     showAllTrays = false,
     showAllBoxes = false,
@@ -108,6 +112,10 @@
     onTrayDoubleClick,
     generating = false
   }: Props = $props();
+
+  // Compute actual container dimensions (prefer new props, fallback to legacy printBedSize)
+  let gameContainerWidth = $derived(propContainerWidth ?? legacyPrintBedSize ?? 256);
+  let gameContainerDepth = $derived(propContainerDepth ?? legacyPrintBedSize ?? 256);
 
   // Clicked tray info for display overlay
   let clickedTrayInfo = $state<TrayClickInfo | null>(null);
@@ -138,7 +146,8 @@
       {allBoxes}
       {boxGeometry}
       {lidGeometry}
-      {printBedSize}
+      {gameContainerWidth}
+      {gameContainerDepth}
       {exploded}
       {showAllTrays}
       {showAllBoxes}

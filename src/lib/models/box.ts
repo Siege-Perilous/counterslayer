@@ -469,7 +469,9 @@ export function arrangeTrays(
     cardSizes?: CardSize[];
     counterShapes?: CounterShape[];
     manualLayout?: ManualTrayPlacement[];
-    printBedSize?: number;
+    printBedSize?: number; // Legacy - use gameContainerWidth/gameContainerDepth
+    gameContainerWidth?: number;
+    gameContainerDepth?: number;
   }
 ): TrayPlacement[] {
   if (trays.length === 0) return [];
@@ -534,7 +536,9 @@ function arrangeTraysAuto(
     tolerance?: number;
     cardSizes?: CardSize[];
     counterShapes?: CounterShape[];
-    printBedSize?: number;
+    printBedSize?: number; // Legacy - use gameContainerWidth/gameContainerDepth
+    gameContainerWidth?: number;
+    gameContainerDepth?: number;
   }
 ): TrayPlacement[] {
   if (trays.length === 0) return [];
@@ -554,20 +558,28 @@ function arrangeTraysAuto(
   const wallThickness = options?.wallThickness ?? 3;
   const tolerance = options?.tolerance ?? 0.5;
 
-  // Get print bed size from options or extract from first counter tray
-  let printBedSize = options?.printBedSize;
-  if (!printBedSize) {
+  // Get game container dimensions from options or extract from first counter tray
+  let containerWidth = options?.gameContainerWidth ?? options?.printBedSize;
+  let containerDepth = options?.gameContainerDepth ?? options?.printBedSize;
+  if (!containerWidth || !containerDepth) {
     for (const tray of trays) {
-      if (tray.type === 'counter' && tray.params.printBedSize) {
-        printBedSize = tray.params.printBedSize;
-        break;
+      if (tray.type === 'counter') {
+        if (!containerWidth && tray.params.gameContainerWidth) {
+          containerWidth = tray.params.gameContainerWidth;
+        }
+        if (!containerDepth && tray.params.gameContainerDepth) {
+          containerDepth = tray.params.gameContainerDepth;
+        }
+        if (containerWidth && containerDepth) break;
       }
     }
   }
-  printBedSize = printBedSize ?? 256;
+  containerWidth = containerWidth ?? 256;
+  containerDepth = containerDepth ?? 256;
 
-  // Calculate interior cavity max from print bed
-  const interiorMax = printBedSize - (wallThickness + tolerance) * 2;
+  // Calculate interior cavity max from game container
+  const interiorMaxWidth = containerWidth - (wallThickness + tolerance) * 2;
+  const interiorMaxDepth = containerDepth - (wallThickness + tolerance) * 2;
 
   let targetWidth: number;
   let targetDepth: number;
@@ -576,16 +588,16 @@ function arrangeTraysAuto(
     targetWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
     targetDepth = options.customBoxDepth - wallThickness * 2 - tolerance * 2;
   } else if (options?.customBoxWidth) {
-    // Only width constrained - use it for width, print bed max for depth
+    // Only width constrained - use it for width, container max for depth
     targetWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
-    targetDepth = interiorMax;
+    targetDepth = interiorMaxDepth;
   } else if (options?.customBoxDepth) {
-    // Only depth constrained - use print bed max for width
-    targetWidth = interiorMax;
+    // Only depth constrained - use container max for width
+    targetWidth = interiorMaxWidth;
     targetDepth = options.customBoxDepth - wallThickness * 2 - tolerance * 2;
   } else {
-    targetWidth = interiorMax;
-    targetDepth = interiorMax;
+    targetWidth = interiorMaxWidth;
+    targetDepth = interiorMaxDepth;
   }
 
   // Extended Rect class to store tray data
