@@ -3,8 +3,8 @@
  * Replaces scattered autosave() calls throughout project.svelte.ts
  */
 
-import { saveProject } from '$lib/utils/storage';
 import type { Project } from '$lib/types/project';
+import { saveProject } from '$lib/utils/storage';
 
 // Debounce delay in milliseconds
 const SAVE_DELAY_MS = 300;
@@ -18,24 +18,24 @@ let batchMode = false;
  * will be coalesced into a single save.
  */
 export function scheduleSave(project: Project): void {
-	pendingProject = project;
+  pendingProject = project;
 
-	// Don't schedule if we're in batch mode - wait for batch to complete
-	if (batchMode) return;
+  // Don't schedule if we're in batch mode - wait for batch to complete
+  if (batchMode) return;
 
-	// Clear any pending save
-	if (saveTimeout) {
-		clearTimeout(saveTimeout);
-	}
+  // Clear any pending save
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+  }
 
-	// Schedule new save
-	saveTimeout = setTimeout(() => {
-		if (pendingProject) {
-			saveProject(pendingProject);
-			pendingProject = null;
-		}
-		saveTimeout = null;
-	}, SAVE_DELAY_MS);
+  // Schedule new save
+  saveTimeout = setTimeout(() => {
+    if (pendingProject) {
+      saveProject(pendingProject);
+      pendingProject = null;
+    }
+    saveTimeout = null;
+  }, SAVE_DELAY_MS);
 }
 
 /**
@@ -43,14 +43,14 @@ export function scheduleSave(project: Project): void {
  * Use for critical operations like before page unload.
  */
 export function saveNow(project: Project): void {
-	// Clear any pending debounced save
-	if (saveTimeout) {
-		clearTimeout(saveTimeout);
-		saveTimeout = null;
-	}
-	pendingProject = null;
+  // Clear any pending debounced save
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+    saveTimeout = null;
+  }
+  pendingProject = null;
 
-	saveProject(project);
+  saveProject(project);
 }
 
 /**
@@ -64,14 +64,14 @@ export function saveNow(project: Project): void {
  * }, project);
  */
 export function batchUpdates(fn: () => void, project: Project): void {
-	batchMode = true;
-	try {
-		fn();
-	} finally {
-		batchMode = false;
-		// Save once after all updates
-		scheduleSave(project);
-	}
+  batchMode = true;
+  try {
+    fn();
+  } finally {
+    batchMode = false;
+    // Save once after all updates
+    scheduleSave(project);
+  }
 }
 
 /**
@@ -79,17 +79,17 @@ export function batchUpdates(fn: () => void, project: Project): void {
  * Call this before operations that need the latest saved state.
  */
 export function flushPendingSave(): void {
-	if (saveTimeout && pendingProject) {
-		clearTimeout(saveTimeout);
-		saveTimeout = null;
-		saveProject(pendingProject);
-		pendingProject = null;
-	}
+  if (saveTimeout && pendingProject) {
+    clearTimeout(saveTimeout);
+    saveTimeout = null;
+    saveProject(pendingProject);
+    pendingProject = null;
+  }
 }
 
 /**
  * Check if there's a pending save waiting to be flushed.
  */
 export function hasPendingSave(): boolean {
-	return saveTimeout !== null || pendingProject !== null;
+  return saveTimeout !== null || pendingProject !== null;
 }

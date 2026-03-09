@@ -1,6 +1,6 @@
-import type { CounterTrayParams } from '$lib/models/counterTray';
-import type { CardDrawTrayParams } from '$lib/models/cardTray';
 import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
+import type { CardDrawTrayParams } from '$lib/models/cardTray';
+import type { CounterTrayParams } from '$lib/models/counterTray';
 import type { CupTrayParams } from '$lib/models/cupTray';
 
 // Base shape types for counter shapes
@@ -8,57 +8,57 @@ export type CounterBaseShape = 'rectangle' | 'square' | 'circle' | 'hex' | 'tria
 
 // Counter shape definition (global, referenced by ID)
 export interface CounterShape {
-	id: string;
-	name: string;
-	baseShape: CounterBaseShape;
-	width: number;
-	length: number;
-	thickness: number; // Counter thickness in mm
-	cornerRadius?: number; // For triangle shapes
-	pointyTop?: boolean; // For hex shapes
+  id: string;
+  name: string;
+  baseShape: CounterBaseShape;
+  width: number;
+  length: number;
+  thickness: number; // Counter thickness in mm
+  cornerRadius?: number; // For triangle shapes
+  pointyTop?: boolean; // For hex shapes
 }
 
 // Card size definition (global, referenced by ID)
 export interface CardSize {
-	id: string;
-	name: string;
-	width: number; // Sleeved width in mm
-	length: number; // Sleeved length in mm
-	thickness: number; // Sleeved thickness in mm
+  id: string;
+  name: string;
+  width: number; // Sleeved width in mm
+  length: number; // Sleeved length in mm
+  thickness: number; // Sleeved thickness in mm
 }
 
 // Base tray interface shared by all tray types
 interface BaseTray {
-	id: string;
-	name: string;
-	color: string;
-	rotationOverride?: 'auto' | 0 | 90; // User can force rotation: 'auto' = algorithm decides, 0 = no rotation, 90 = rotated
-	showEmboss?: boolean; // Whether to emboss the tray name on the bottom (default: true)
+  id: string;
+  name: string;
+  color: string;
+  rotationOverride?: 'auto' | 0 | 90; // User can force rotation: 'auto' = algorithm decides, 0 = no rotation, 90 = rotated
+  showEmboss?: boolean; // Whether to emboss the tray name on the bottom (default: true)
 }
 
 // Counter tray for cardboard counter tokens
 export interface CounterTray extends BaseTray {
-	type: 'counter';
-	params: CounterTrayParams;
+  type: 'counter';
+  params: CounterTrayParams;
 }
 
 // Card draw tray for drawing cards (face down, sloped floor, finger cutout)
 export interface CardDrawTray extends BaseTray {
-	type: 'cardDraw';
-	params: CardDrawTrayParams;
+  type: 'cardDraw';
+  params: CardDrawTrayParams;
 }
 
 // Card divider tray for card storage (cards standing on edge in multiple stacks)
 export interface CardDividerTray extends BaseTray {
-	type: 'cardDivider';
-	params: CardDividerTrayParams;
-	showStackLabels?: boolean; // Whether to emboss stack labels on floor (default: true)
+  type: 'cardDivider';
+  params: CardDividerTrayParams;
+  showStackLabels?: boolean; // Whether to emboss stack labels on floor (default: true)
 }
 
 // Cup tray for loose game components (dice, tokens, meeples) in bowl-shaped cups
 export interface CupTray extends BaseTray {
-	type: 'cup';
-	params: CupTrayParams;
+  type: 'cup';
+  params: CupTrayParams;
 }
 
 // Legacy alias for backwards compatibility
@@ -69,84 +69,84 @@ export type Tray = CounterTray | CardDrawTray | CardDividerTray | CupTray;
 
 // Type guards for tray types
 export function isCounterTray(tray: Tray): tray is CounterTray {
-	return tray.type === 'counter';
+  return tray.type === 'counter';
 }
 
 export function isCardDrawTray(tray: Tray): tray is CardDrawTray {
-	return tray.type === 'cardDraw';
+  return tray.type === 'cardDraw';
 }
 
 export function isCardDividerTray(tray: Tray): tray is CardDividerTray {
-	return tray.type === 'cardDivider';
+  return tray.type === 'cardDivider';
 }
 
 export function isCupTray(tray: Tray): tray is CupTray {
-	return tray.type === 'cup';
+  return tray.type === 'cup';
 }
 
 // Legacy alias - also matches old 'card' type for migration
 export function isCardTray(tray: Tray): tray is CardDrawTray {
-	return tray.type === 'cardDraw' || (tray as { type: string }).type === 'card';
+  return tray.type === 'cardDraw' || (tray as { type: string }).type === 'card';
 }
 
 export interface LidParams {
-	thickness: number;
-	railHeight: number;
-	railWidth: number;
-	railInset: number; // Channel width (outer wall to inner rail)
-	ledgeHeight: number; // Height of outer wall before step-in
-	fingerNotchRadius: number;
-	fingerNotchDepth: number;
-	// Snap-lock parameters
-	snapEnabled: boolean; // Enable snap-lock mechanism
-	snapBumpHeight: number; // How far bump protrudes (0.4-0.5mm typical)
-	snapBumpWidth: number; // Width of bump along wall (3-5mm typical)
-	railEngagement: number; // Fraction of lip height used for rail (0.0-1.0, default 0.5)
-	// Ramp lock parameters (replaces cylindrical snap bump when enabled)
-	rampLockEnabled: boolean; // Use ramp lock instead of cylindrical snap bump
-	rampHeight: number; // Peak height in mm (default: 0.5)
-	rampLengthIn: number; // Entry slope length in mm (default: 4, longer = easier slide-in)
-	rampLengthOut: number; // Exit slope length in mm (default: 1.5, shorter = harder to remove)
-	// Text embossing
-	showName: boolean; // Emboss box name on lid top (default true)
+  thickness: number;
+  railHeight: number;
+  railWidth: number;
+  railInset: number; // Channel width (outer wall to inner rail)
+  ledgeHeight: number; // Height of outer wall before step-in
+  fingerNotchRadius: number;
+  fingerNotchDepth: number;
+  // Snap-lock parameters
+  snapEnabled: boolean; // Enable snap-lock mechanism
+  snapBumpHeight: number; // How far bump protrudes (0.4-0.5mm typical)
+  snapBumpWidth: number; // Width of bump along wall (3-5mm typical)
+  railEngagement: number; // Fraction of lip height used for rail (0.0-1.0, default 0.5)
+  // Ramp lock parameters (replaces cylindrical snap bump when enabled)
+  rampLockEnabled: boolean; // Use ramp lock instead of cylindrical snap bump
+  rampHeight: number; // Peak height in mm (default: 0.5)
+  rampLengthIn: number; // Entry slope length in mm (default: 4, longer = easier slide-in)
+  rampLengthOut: number; // Exit slope length in mm (default: 1.5, shorter = harder to remove)
+  // Text embossing
+  showName: boolean; // Emboss box name on lid top (default true)
 }
 
 // Manual tray placement for layout editor
 export interface ManualTrayPlacement {
-	trayId: string;
-	x: number; // Position in box interior (mm)
-	y: number;
-	rotation: 0 | 90 | 180 | 270; // Rotation in degrees
+  trayId: string;
+  x: number; // Position in box interior (mm)
+  y: number;
+  rotation: 0 | 90 | 180 | 270; // Rotation in degrees
 }
 
 export interface Box {
-	id: string;
-	name: string;
-	trays: Tray[];
-	tolerance: number;
-	wallThickness: number;
-	floorThickness: number;
-	lidParams: LidParams;
-	// Custom exterior dimensions (undefined = auto-size)
-	customWidth?: number; // Exterior X dimension
-	customDepth?: number; // Exterior Y dimension
-	customBoxHeight?: number; // Exterior Z dimension (box only, excludes lid; UI shows total height)
-	// Gap-filling behavior
-	fillSolidEmpty?: boolean; // true = solid fill (default), false = walls only
-	// Manual layout (when set, overrides auto-arrangement)
-	manualLayout?: ManualTrayPlacement[];
+  id: string;
+  name: string;
+  trays: Tray[];
+  tolerance: number;
+  wallThickness: number;
+  floorThickness: number;
+  lidParams: LidParams;
+  // Custom exterior dimensions (undefined = auto-size)
+  customWidth?: number; // Exterior X dimension
+  customDepth?: number; // Exterior Y dimension
+  customBoxHeight?: number; // Exterior Z dimension (box only, excludes lid; UI shows total height)
+  // Gap-filling behavior
+  fillSolidEmpty?: boolean; // true = solid fill (default), false = walls only
+  // Manual layout (when set, overrides auto-arrangement)
+  manualLayout?: ManualTrayPlacement[];
 }
 
 // Project-level global settings (used as defaults and shown even without counter trays)
 export interface GlobalSettings {
-	printBedSize: number;
+  printBedSize: number;
 }
 
 export interface Project {
-	boxes: Box[];
-	counterShapes: CounterShape[];
-	cardSizes: CardSize[];
-	selectedBoxId: string | null;
-	selectedTrayId: string | null;
-	globalSettings?: GlobalSettings;
+  boxes: Box[];
+  counterShapes: CounterShape[];
+  cardSizes: CardSize[];
+  selectedBoxId: string | null;
+  selectedTrayId: string | null;
+  globalSettings?: GlobalSettings;
 }

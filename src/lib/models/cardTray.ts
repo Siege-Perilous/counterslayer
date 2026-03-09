@@ -18,28 +18,28 @@ import { DEFAULT_CARD_SIZE_IDS } from './counterTray';
 export type CustomCardSize = CardSize;
 
 export interface CardDrawTrayParams {
-	cardSizeId: string; // Reference to a CardSize by ID
-	cardCount: number;
-	wallThickness: number;
-	floorThickness: number;
-	clearance: number;
-	floorSlopeAngle: number;
-	magnetHoleDiameter: number;
-	magnetHoleDepth: number;
+  cardSizeId: string; // Reference to a CardSize by ID
+  cardCount: number;
+  wallThickness: number;
+  floorThickness: number;
+  clearance: number;
+  floorSlopeAngle: number;
+  magnetHoleDiameter: number;
+  magnetHoleDepth: number;
 }
 
 // Legacy alias for backwards compatibility
 export type CardTrayParams = CardDrawTrayParams;
 
 export const defaultCardDrawTrayParams: CardDrawTrayParams = {
-	cardSizeId: DEFAULT_CARD_SIZE_IDS.standard,
-	cardCount: 50,
-	wallThickness: 4.0,
-	floorThickness: 4.0,
-	clearance: 1.5,
-	floorSlopeAngle: 5,
-	magnetHoleDiameter: 6.0,
-	magnetHoleDepth: 3.0
+  cardSizeId: DEFAULT_CARD_SIZE_IDS.standard,
+  cardCount: 50,
+  wallThickness: 4.0,
+  floorThickness: 4.0,
+  clearance: 1.5,
+  floorSlopeAngle: 5,
+  magnetHoleDiameter: 6.0,
+  magnetHoleDepth: 3.0
 };
 
 // Legacy alias for backwards compatibility
@@ -48,403 +48,386 @@ export const defaultCardTrayParams = defaultCardDrawTrayParams;
 // Helper to get card dimensions from global card sizes by ID
 // Falls back to matching by name if ID not found (for legacy data)
 export function getCardSize(cardSizeId: string, cardSizes: CardSize[]): CardSize {
-	// First try by ID
-	let cardSize = cardSizes.find((s) => s.id === cardSizeId);
-	if (cardSize) return cardSize;
+  // First try by ID
+  let cardSize = cardSizes.find((s) => s.id === cardSizeId);
+  if (cardSize) return cardSize;
 
-	// Fall back to matching by name (for legacy data where ID might be stale)
-	cardSize = cardSizes.find((s) => s.name === cardSizeId);
-	if (cardSize) {
-		console.warn(`Card size ID "${cardSizeId}" not found, matched by name instead`);
-		return cardSize;
-	}
+  // Fall back to matching by name (for legacy data where ID might be stale)
+  cardSize = cardSizes.find((s) => s.name === cardSizeId);
+  if (cardSize) {
+    console.warn(`Card size ID "${cardSizeId}" not found, matched by name instead`);
+    return cardSize;
+  }
 
-	// Ultimate fallback: use first available card size, or a default
-	if (cardSizes.length > 0) {
-		console.warn(`Card size "${cardSizeId}" not found by ID or name, using first available size`);
-		return cardSizes[0];
-	}
+  // Ultimate fallback: use first available card size, or a default
+  if (cardSizes.length > 0) {
+    console.warn(`Card size "${cardSizeId}" not found by ID or name, using first available size`);
+    return cardSizes[0];
+  }
 
-	// No card sizes at all - return a minimal default (standard playing card)
-	return { id: 'default', name: 'Default', width: 63, length: 88, thickness: 0.5 };
+  // No card sizes at all - return a minimal default (standard playing card)
+  return { id: 'default', name: 'Default', width: 63, length: 88, thickness: 0.5 };
 }
 
 export interface CardDrawStack {
-	x: number;
-	y: number;
-	z: number;
-	width: number; // Sleeved card width
-	length: number; // Sleeved card length
-	innerWidth: number; // Unsleeved card width (for visual representation)
-	innerLength: number; // Unsleeved card length (for visual representation)
-	thickness: number;
-	count: number;
-	color: string;
-	slopeAngle: number; // Radians - rotation around X axis to match floor slope
+  x: number;
+  y: number;
+  z: number;
+  width: number; // Sleeved card width
+  length: number; // Sleeved card length
+  innerWidth: number; // Unsleeved card width (for visual representation)
+  innerLength: number; // Unsleeved card length (for visual representation)
+  thickness: number;
+  count: number;
+  color: string;
+  slopeAngle: number; // Radians - rotation around X axis to match floor slope
 }
 
 // Legacy alias for backwards compatibility
 export type CardStack = CardDrawStack;
 
 export function getCardDrawTrayDimensions(
-	params: CardDrawTrayParams,
-	customCardSizes: CustomCardSize[]
+  params: CardDrawTrayParams,
+  customCardSizes: CustomCardSize[]
 ): {
-	width: number;
-	depth: number;
-	height: number;
+  width: number;
+  depth: number;
+  height: number;
 } {
-	const { cardSizeId, cardCount, wallThickness, floorThickness, clearance } = params;
+  const { cardSizeId, cardCount, wallThickness, floorThickness, clearance } = params;
 
-	// Look up card size from global card sizes
-	const cardSize = getCardSize(cardSizeId, customCardSizes);
-	const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
+  // Look up card size from global card sizes
+  const cardSize = getCardSize(cardSizeId, customCardSizes);
+  const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
 
-	const interiorWidth = cardWidth + clearance * 2;
-	const interiorLength = cardLength + clearance * 2;
-	const stackHeight = cardCount * cardThickness;
+  const interiorWidth = cardWidth + clearance * 2;
+  const interiorLength = cardLength + clearance * 2;
+  const stackHeight = cardCount * cardThickness;
 
-	const width = interiorWidth + wallThickness * 2;
-	const depth = interiorLength + wallThickness * 2;
+  const width = interiorWidth + wallThickness * 2;
+  const depth = interiorLength + wallThickness * 2;
 
-	// 4% slope - cards are highest at front
-	const slopePercent = 0.04;
-	const slopeRise = depth * slopePercent;
+  // 4% slope - cards are highest at front
+  const slopePercent = 0.04;
+  const slopeRise = depth * slopePercent;
 
-	// Height = floor + wedge rise + card stack + headroom
-	const height = floorThickness + slopeRise + stackHeight + 5;
+  // Height = floor + wedge rise + card stack + headroom
+  const height = floorThickness + slopeRise + stackHeight + 5;
 
-	return { width, depth, height };
+  return { width, depth, height };
 }
 
 // Legacy alias for backwards compatibility
 export const getCardTrayDimensions = getCardDrawTrayDimensions;
 
 export function getCardDrawPositions(
-	params: CardDrawTrayParams,
-	customCardSizes: CustomCardSize[],
-	_targetHeight?: number,
-	_spacerHeight?: number
+  params: CardDrawTrayParams,
+  customCardSizes: CustomCardSize[],
+  _targetHeight?: number,
+  _spacerHeight?: number
 ): CardDrawStack[] {
-	const { cardSizeId, cardCount, wallThickness, clearance, floorThickness } = params;
+  const { cardSizeId, cardCount, wallThickness, clearance, floorThickness } = params;
 
-	// Look up card size from global card sizes
-	const cardSize = getCardSize(cardSizeId, customCardSizes);
-	const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
+  // Look up card size from global card sizes
+  const cardSize = getCardSize(cardSizeId, customCardSizes);
+  const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
 
-	// Calculate tray depth and slope rise (same as in getCardTrayDimensions)
-	const interiorLength = cardLength + clearance * 2;
-	const trayDepth = interiorLength + wallThickness * 2;
-	const slopePercent = 0.04;
-	const slopeRise = trayDepth * slopePercent;
+  // Calculate tray depth and slope rise (same as in getCardTrayDimensions)
+  const interiorLength = cardLength + clearance * 2;
+  const trayDepth = interiorLength + wallThickness * 2;
+  const slopePercent = 0.04;
+  const slopeRise = trayDepth * slopePercent;
 
-	// Calculate slope angle (rotation around X axis, negated for correct direction)
-	const slopeAngle = -Math.atan(slopePercent);
+  // Calculate slope angle (rotation around X axis, negated for correct direction)
+  const slopeAngle = -Math.atan(slopePercent);
 
-	// Card center Y position
-	const centerY = wallThickness + clearance + cardLength / 2;
+  // Card center Y position
+  const centerY = wallThickness + clearance + cardLength / 2;
 
-	// Height of slope at the card center position
-	// Slope goes from slopeRise at Y=0 to 0 at Y=trayDepth
-	const heightAtCenter = floorThickness + slopeRise * (1 - centerY / trayDepth);
+  // Height of slope at the card center position
+  // Slope goes from slopeRise at Y=0 to 0 at Y=trayDepth
+  const heightAtCenter = floorThickness + slopeRise * (1 - centerY / trayDepth);
 
-	// Inner card dimensions (unsleeved) - sleeves typically add ~3mm to each dimension
-	const sleeveOverhang = 3;
-	const innerWidth = cardWidth - sleeveOverhang;
-	const innerLength = cardLength - sleeveOverhang;
+  // Inner card dimensions (unsleeved) - sleeves typically add ~3mm to each dimension
+  const sleeveOverhang = 3;
+  const innerWidth = cardWidth - sleeveOverhang;
+  const innerLength = cardLength - sleeveOverhang;
 
-	return [
-		{
-			x: wallThickness + clearance + cardWidth / 2,
-			y: centerY,
-			z: heightAtCenter,
-			width: cardWidth,
-			length: cardLength,
-			innerWidth,
-			innerLength,
-			thickness: cardThickness,
-			count: cardCount,
-			color: '#4a90a4',
-			slopeAngle
-		}
-	];
+  return [
+    {
+      x: wallThickness + clearance + cardWidth / 2,
+      y: centerY,
+      z: heightAtCenter,
+      width: cardWidth,
+      length: cardLength,
+      innerWidth,
+      innerLength,
+      thickness: cardThickness,
+      count: cardCount,
+      color: '#4a90a4',
+      slopeAngle
+    }
+  ];
 }
 
 // Legacy alias for backwards compatibility
 export const getCardPositions = getCardDrawPositions;
 
 export function createCardDrawTray(
-	params: CardDrawTrayParams,
-	customCardSizes: CustomCardSize[],
-	_trayName?: string,
-	targetHeight?: number,
-	floorSpacerHeight?: number,
-	showEmboss: boolean = true
+  params: CardDrawTrayParams,
+  customCardSizes: CustomCardSize[],
+  _trayName?: string,
+  targetHeight?: number,
+  floorSpacerHeight?: number,
+  showEmboss: boolean = true
 ): Geom3 {
-	const { cardSizeId, cardCount, wallThickness, floorThickness, clearance } = params;
+  const { cardSizeId, cardCount, wallThickness, floorThickness, clearance } = params;
 
-	// Look up card size from global card sizes
-	const cardSize = getCardSize(cardSizeId, customCardSizes);
-	const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
+  // Look up card size from global card sizes
+  const cardSize = getCardSize(cardSizeId, customCardSizes);
+  const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
 
-	// Calculate interior dimensions (space for cards)
-	const interiorWidth = cardWidth + clearance * 2;
-	const interiorLength = cardLength + clearance * 2;
-	const stackHeight = cardCount * cardThickness;
+  // Calculate interior dimensions (space for cards)
+  const interiorWidth = cardWidth + clearance * 2;
+  const interiorLength = cardLength + clearance * 2;
+  const stackHeight = cardCount * cardThickness;
 
-	// Calculate exterior dimensions
-	const trayWidth = interiorWidth + wallThickness * 2;
-	const trayDepth = interiorLength + wallThickness * 2;
+  // Calculate exterior dimensions
+  const trayWidth = interiorWidth + wallThickness * 2;
+  const trayDepth = interiorLength + wallThickness * 2;
 
-	// Calculate slope rise (4% slope - cards are highest at front)
-	const slopePercent = 0.04;
-	const slopeRise = trayDepth * slopePercent;
+  // Calculate slope rise (4% slope - cards are highest at front)
+  const slopePercent = 0.04;
+  const slopeRise = trayDepth * slopePercent;
 
-	// Calculate height (floor + wedge rise + card stack + headroom)
-	// Cards sit on top of the wedge, which is highest at the front
-	const spacerHeight = floorSpacerHeight ?? 0;
-	let trayHeight = floorThickness + slopeRise + stackHeight + 5 + spacerHeight;
-	if (targetHeight && targetHeight > trayHeight) {
-		trayHeight = targetHeight;
-	}
+  // Calculate height (floor + wedge rise + card stack + headroom)
+  // Cards sit on top of the wedge, which is highest at the front
+  const spacerHeight = floorSpacerHeight ?? 0;
+  let trayHeight = floorThickness + slopeRise + stackHeight + 5 + spacerHeight;
+  if (targetHeight && targetHeight > trayHeight) {
+    trayHeight = targetHeight;
+  }
 
-	const wallHeight = trayHeight - floorThickness;
+  const wallHeight = trayHeight - floorThickness;
 
-	// === OPEN-TOP BOX WITH OPEN FRONT ===
-	// Outer solid box
-	const outerBox = translate(
-		[trayWidth / 2, trayDepth / 2, trayHeight / 2],
-		cuboid({ size: [trayWidth, trayDepth, trayHeight] })
-	);
+  // === OPEN-TOP BOX WITH OPEN FRONT ===
+  // Outer solid box
+  const outerBox = translate(
+    [trayWidth / 2, trayDepth / 2, trayHeight / 2],
+    cuboid({ size: [trayWidth, trayDepth, trayHeight] })
+  );
 
-	// Inner cavity - extends to front edge (Y=0) to remove front wall
-	// Cavity sits above the floor
-	const innerCavity = translate(
-		[trayWidth / 2, (trayDepth - wallThickness) / 2, floorThickness + wallHeight / 2 + 0.1],
-		cuboid({ size: [interiorWidth, interiorLength + wallThickness, wallHeight + 0.2] })
-	);
+  // Inner cavity - extends to front edge (Y=0) to remove front wall
+  // Cavity sits above the floor
+  const innerCavity = translate(
+    [trayWidth / 2, (trayDepth - wallThickness) / 2, floorThickness + wallHeight / 2 + 0.1],
+    cuboid({ size: [interiorWidth, interiorLength + wallThickness, wallHeight + 0.2] })
+  );
 
-	// Subtract cavity from outer box
-	let tray = subtract(outerBox, innerCavity);
+  // Subtract cavity from outer box
+  let tray = subtract(outerBox, innerCavity);
 
-	// === SLOPED FLOOR WEDGE ===
-	// Back edge - thin strip at floor level (full tray width)
-	const wedgeBack = translate(
-		[trayWidth / 2, trayDepth - wallThickness, floorThickness + 0.05],
-		cuboid({ size: [trayWidth, 0.1, 0.1] })
-	);
+  // === SLOPED FLOOR WEDGE ===
+  // Back edge - thin strip at floor level (full tray width)
+  const wedgeBack = translate(
+    [trayWidth / 2, trayDepth - wallThickness, floorThickness + 0.05],
+    cuboid({ size: [trayWidth, 0.1, 0.1] })
+  );
 
-	// Front edge - solid block from floor to slope height (full tray width)
-	const wedgeFront = translate(
-		[trayWidth / 2, 0, floorThickness + slopeRise / 2],
-		cuboid({ size: [trayWidth, 0.1, slopeRise] })
-	);
+  // Front edge - solid block from floor to slope height (full tray width)
+  const wedgeFront = translate(
+    [trayWidth / 2, 0, floorThickness + slopeRise / 2],
+    cuboid({ size: [trayWidth, 0.1, slopeRise] })
+  );
 
-	// Create solid wedge using hull (added after cutouts)
-	const slopeWedge = hull(wedgeFront, wedgeBack);
+  // Create solid wedge using hull (added after cutouts)
+  const slopeWedge = hull(wedgeFront, wedgeBack);
 
-	// === FRONT FINGER CUTOUT ===
-	// Rounded rectangle cutout - straight sides with rounded back corners
-	const cutoutWidth = trayWidth * (2 / 3);
-	const cutoutDepth = cutoutWidth / 2;
-	const cutoutHeight = trayHeight * 2;
-	const cornerRadius = 8;
+  // === FRONT FINGER CUTOUT ===
+  // Rounded rectangle cutout - straight sides with rounded back corners
+  const cutoutWidth = trayWidth * (2 / 3);
+  const cutoutDepth = cutoutWidth / 2;
+  const cutoutHeight = trayHeight * 2;
+  const cornerRadius = 8;
 
-	// Front edge - thin slice at Y=0
-	const cutoutFront = translate(
-		[trayWidth / 2, 0, floorThickness + slopeRise],
-		cuboid({ size: [cutoutWidth, 0.1, cutoutHeight] })
-	);
+  // Front edge - thin slice at Y=0
+  const cutoutFront = translate(
+    [trayWidth / 2, 0, floorThickness + slopeRise],
+    cuboid({ size: [cutoutWidth, 0.1, cutoutHeight] })
+  );
 
-	// Back corners - two cylinders for rounded corners
-	const backLeftCorner = translate(
-		[
-			trayWidth / 2 - cutoutWidth / 2 + cornerRadius,
-			cutoutDepth - cornerRadius,
-			floorThickness + slopeRise
-		],
-		cylinder({ radius: cornerRadius, height: cutoutHeight, segments: 32 })
-	);
+  // Back corners - two cylinders for rounded corners
+  const backLeftCorner = translate(
+    [trayWidth / 2 - cutoutWidth / 2 + cornerRadius, cutoutDepth - cornerRadius, floorThickness + slopeRise],
+    cylinder({ radius: cornerRadius, height: cutoutHeight, segments: 32 })
+  );
 
-	const backRightCorner = translate(
-		[
-			trayWidth / 2 + cutoutWidth / 2 - cornerRadius,
-			cutoutDepth - cornerRadius,
-			floorThickness + slopeRise
-		],
-		cylinder({ radius: cornerRadius, height: cutoutHeight, segments: 32 })
-	);
+  const backRightCorner = translate(
+    [trayWidth / 2 + cutoutWidth / 2 - cornerRadius, cutoutDepth - cornerRadius, floorThickness + slopeRise],
+    cylinder({ radius: cornerRadius, height: cutoutHeight, segments: 32 })
+  );
 
-	const fingerCutout = hull(cutoutFront, backLeftCorner, backRightCorner);
+  const fingerCutout = hull(cutoutFront, backLeftCorner, backRightCorner);
 
-	// === SIDE WALL CUTOUTS ===
-	// Cutout through side walls only, centered on length, 33% of tray length
-	const sideSlotLength = trayDepth * (1 / 3);
-	const sideSlotHeight = trayHeight - floorThickness;
+  // === SIDE WALL CUTOUTS ===
+  // Cutout through side walls only, centered on length, 33% of tray length
+  const sideSlotLength = trayDepth * (1 / 3);
+  const sideSlotHeight = trayHeight - floorThickness;
 
-	// Left wall cutout
-	const leftWallCutout = translate(
-		[wallThickness / 2, trayDepth / 2, floorThickness + sideSlotHeight / 2],
-		cuboid({ size: [wallThickness + 0.2, sideSlotLength, sideSlotHeight] })
-	);
+  // Left wall cutout
+  const leftWallCutout = translate(
+    [wallThickness / 2, trayDepth / 2, floorThickness + sideSlotHeight / 2],
+    cuboid({ size: [wallThickness + 0.2, sideSlotLength, sideSlotHeight] })
+  );
 
-	// Right wall cutout
-	const rightWallCutout = translate(
-		[trayWidth - wallThickness / 2, trayDepth / 2, floorThickness + sideSlotHeight / 2],
-		cuboid({ size: [wallThickness + 0.2, sideSlotLength, sideSlotHeight] })
-	);
+  // Right wall cutout
+  const rightWallCutout = translate(
+    [trayWidth - wallThickness / 2, trayDepth / 2, floorThickness + sideSlotHeight / 2],
+    cuboid({ size: [wallThickness + 0.2, sideSlotLength, sideSlotHeight] })
+  );
 
-	tray = subtract(tray, leftWallCutout, rightWallCutout);
+  tray = subtract(tray, leftWallCutout, rightWallCutout);
 
-	// Add wedge after side wall cutouts so it's not removed by them
-	tray = union(tray, slopeWedge);
+  // Add wedge after side wall cutouts so it's not removed by them
+  tray = union(tray, slopeWedge);
 
-	// Subtract finger cutout after wedge so it cuts through wedge too
-	tray = subtract(tray, fingerCutout);
+  // Subtract finger cutout after wedge so it cuts through wedge too
+  tray = subtract(tray, fingerCutout);
 
-	// === MAGNET HOLES ===
-	// 4 cylinder cutouts at bottom corners of side walls
-	// Add 0.1mm tolerance for printing
-	const magnetRadius = (params.magnetHoleDiameter + 0.1) / 2;
-	const magnetDepth = params.magnetHoleDepth + 0.1;
-	const magnetInset = 2; // 2mm from corner edges
+  // === MAGNET HOLES ===
+  // 4 cylinder cutouts at bottom corners of side walls
+  // Add 0.1mm tolerance for printing
+  const magnetRadius = (params.magnetHoleDiameter + 0.1) / 2;
+  const magnetDepth = params.magnetHoleDepth + 0.1;
+  const magnetInset = 2; // 2mm from corner edges
 
-	// Cylinder oriented along X axis (into side walls)
-	const magnetHole = rotateY(
-		Math.PI / 2,
-		cylinder({ radius: magnetRadius, height: magnetDepth * 2, segments: 32 })
-	);
+  // Cylinder oriented along X axis (into side walls)
+  const magnetHole = rotateY(Math.PI / 2, cylinder({ radius: magnetRadius, height: magnetDepth * 2, segments: 32 }));
 
-	// Y and Z positions for hole centers (1mm + radius from edges)
-	const magnetY_front = magnetInset + magnetRadius;
-	const magnetY_back = trayDepth - magnetInset - magnetRadius;
-	const magnetZ = magnetInset + magnetRadius;
+  // Y and Z positions for hole centers (1mm + radius from edges)
+  const magnetY_front = magnetInset + magnetRadius;
+  const magnetY_back = trayDepth - magnetInset - magnetRadius;
+  const magnetZ = magnetInset + magnetRadius;
 
-	// Left wall holes (at X = 0)
-	const leftFrontMagnet = translate([0, magnetY_front, magnetZ], magnetHole);
-	const leftBackMagnet = translate([0, magnetY_back, magnetZ], magnetHole);
+  // Left wall holes (at X = 0)
+  const leftFrontMagnet = translate([0, magnetY_front, magnetZ], magnetHole);
+  const leftBackMagnet = translate([0, magnetY_back, magnetZ], magnetHole);
 
-	// Right wall holes (at X = trayWidth)
-	const rightFrontMagnet = translate([trayWidth, magnetY_front, magnetZ], magnetHole);
-	const rightBackMagnet = translate([trayWidth, magnetY_back, magnetZ], magnetHole);
+  // Right wall holes (at X = trayWidth)
+  const rightFrontMagnet = translate([trayWidth, magnetY_front, magnetZ], magnetHole);
+  const rightBackMagnet = translate([trayWidth, magnetY_back, magnetZ], magnetHole);
 
-	tray = subtract(tray, leftFrontMagnet, leftBackMagnet, rightFrontMagnet, rightBackMagnet);
+  tray = subtract(tray, leftFrontMagnet, leftBackMagnet, rightFrontMagnet, rightBackMagnet);
 
-	// === TOP CORNER FILLETS ===
-	// Round the top corners of wall sections (not along length, but across width)
-	// Creates rounded top profile when viewed from the side
-	const filletRadius = 3;
+  // === TOP CORNER FILLETS ===
+  // Round the top corners of wall sections (not along length, but across width)
+  // Creates rounded top profile when viewed from the side
+  const filletRadius = 3;
 
-	// Calculate side wall section positions
-	const sideSlotStart = trayDepth / 2 - sideSlotLength / 2;
-	const sideSlotEnd = trayDepth / 2 + sideSlotLength / 2;
+  // Calculate side wall section positions
+  const sideSlotStart = trayDepth / 2 - sideSlotLength / 2;
+  const sideSlotEnd = trayDepth / 2 + sideSlotLength / 2;
 
-	// Fillet shape: box minus cylinder, running across full tray width (X axis)
-	// Cylinder axis along X, positioned at each Y location
+  // Fillet shape: box minus cylinder, running across full tray width (X axis)
+  // Cylinder axis along X, positioned at each Y location
 
-	// Fillet 1: At front (Y=0) - rounds the front edge of front wall sections
-	const frontFilletCyl = translate(
-		[trayWidth / 2, filletRadius, trayHeight - filletRadius],
-		rotateY(Math.PI / 2, cylinder({ radius: filletRadius, height: trayWidth + 0.2, segments: 32 }))
-	);
-	const frontFilletBox = translate(
-		[trayWidth / 2, filletRadius / 2, trayHeight - filletRadius / 2],
-		cuboid({ size: [trayWidth + 0.2, filletRadius, filletRadius] })
-	);
-	const frontFillet = subtract(frontFilletBox, frontFilletCyl);
+  // Fillet 1: At front (Y=0) - rounds the front edge of front wall sections
+  const frontFilletCyl = translate(
+    [trayWidth / 2, filletRadius, trayHeight - filletRadius],
+    rotateY(Math.PI / 2, cylinder({ radius: filletRadius, height: trayWidth + 0.2, segments: 32 }))
+  );
+  const frontFilletBox = translate(
+    [trayWidth / 2, filletRadius / 2, trayHeight - filletRadius / 2],
+    cuboid({ size: [trayWidth + 0.2, filletRadius, filletRadius] })
+  );
+  const frontFillet = subtract(frontFilletBox, frontFilletCyl);
 
-	// Fillet 2: At front edge of side cutout (Y=sideSlotStart) - rounds back edge of front sections
-	const cutoutFrontFilletCyl = translate(
-		[trayWidth / 2, sideSlotStart - filletRadius, trayHeight - filletRadius],
-		rotateY(Math.PI / 2, cylinder({ radius: filletRadius, height: trayWidth + 0.2, segments: 32 }))
-	);
-	const cutoutFrontFilletBox = translate(
-		[trayWidth / 2, sideSlotStart - filletRadius / 2, trayHeight - filletRadius / 2],
-		cuboid({ size: [trayWidth + 0.2, filletRadius, filletRadius] })
-	);
-	const cutoutFrontFillet = subtract(cutoutFrontFilletBox, cutoutFrontFilletCyl);
+  // Fillet 2: At front edge of side cutout (Y=sideSlotStart) - rounds back edge of front sections
+  const cutoutFrontFilletCyl = translate(
+    [trayWidth / 2, sideSlotStart - filletRadius, trayHeight - filletRadius],
+    rotateY(Math.PI / 2, cylinder({ radius: filletRadius, height: trayWidth + 0.2, segments: 32 }))
+  );
+  const cutoutFrontFilletBox = translate(
+    [trayWidth / 2, sideSlotStart - filletRadius / 2, trayHeight - filletRadius / 2],
+    cuboid({ size: [trayWidth + 0.2, filletRadius, filletRadius] })
+  );
+  const cutoutFrontFillet = subtract(cutoutFrontFilletBox, cutoutFrontFilletCyl);
 
-	// Fillet 3: At back edge of side cutout (Y=sideSlotEnd) - rounds front edge of back sections
-	const cutoutBackFilletCyl = translate(
-		[trayWidth / 2, sideSlotEnd + filletRadius, trayHeight - filletRadius],
-		rotateY(Math.PI / 2, cylinder({ radius: filletRadius, height: trayWidth + 0.2, segments: 32 }))
-	);
-	const cutoutBackFilletBox = translate(
-		[trayWidth / 2, sideSlotEnd + filletRadius / 2, trayHeight - filletRadius / 2],
-		cuboid({ size: [trayWidth + 0.2, filletRadius, filletRadius] })
-	);
-	const cutoutBackFillet = subtract(cutoutBackFilletBox, cutoutBackFilletCyl);
+  // Fillet 3: At back edge of side cutout (Y=sideSlotEnd) - rounds front edge of back sections
+  const cutoutBackFilletCyl = translate(
+    [trayWidth / 2, sideSlotEnd + filletRadius, trayHeight - filletRadius],
+    rotateY(Math.PI / 2, cylinder({ radius: filletRadius, height: trayWidth + 0.2, segments: 32 }))
+  );
+  const cutoutBackFilletBox = translate(
+    [trayWidth / 2, sideSlotEnd + filletRadius / 2, trayHeight - filletRadius / 2],
+    cuboid({ size: [trayWidth + 0.2, filletRadius, filletRadius] })
+  );
+  const cutoutBackFillet = subtract(cutoutBackFilletBox, cutoutBackFilletCyl);
 
-	tray = subtract(tray, frontFillet, cutoutFrontFillet, cutoutBackFillet);
+  tray = subtract(tray, frontFillet, cutoutFrontFillet, cutoutBackFillet);
 
-	// === EMBOSS TRAY NAME ON BOTTOM ===
-	if (showEmboss && _trayName && _trayName.trim().length > 0) {
-		const textDepth = 0.6;
-		const strokeWidth = 1.2;
-		const textHeightParam = 6;
-		const margin = wallThickness * 2;
+  // === EMBOSS TRAY NAME ON BOTTOM ===
+  if (showEmboss && _trayName && _trayName.trim().length > 0) {
+    const textDepth = 0.6;
+    const strokeWidth = 1.2;
+    const textHeightParam = 6;
+    const margin = wallThickness * 2;
 
-		const textSegments = vectorText(
-			{ height: textHeightParam, align: 'center' },
-			_trayName.trim().toUpperCase()
-		);
+    const textSegments = vectorText({ height: textHeightParam, align: 'center' }, _trayName.trim().toUpperCase());
 
-		if (textSegments.length > 0) {
-			const textShapes: ReturnType<typeof extrudeLinear>[] = [];
-			for (const segment of textSegments) {
-				if (segment.length >= 2) {
-					const pathObj = path2.fromPoints({ closed: false }, segment);
-					const expanded = expand(
-						{ delta: strokeWidth / 2, corners: 'round', segments: 32 },
-						pathObj
-					);
-					const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
-					textShapes.push(extruded);
-				}
-			}
+    if (textSegments.length > 0) {
+      const textShapes: ReturnType<typeof extrudeLinear>[] = [];
+      for (const segment of textSegments) {
+        if (segment.length >= 2) {
+          const pathObj = path2.fromPoints({ closed: false }, segment);
+          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 32 }, pathObj);
+          const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
+          textShapes.push(extruded);
+        }
+      }
 
-			if (textShapes.length > 0) {
-				let minX = Infinity,
-					maxX = -Infinity;
-				let minY = Infinity,
-					maxY = -Infinity;
-				for (const segment of textSegments) {
-					for (const point of segment) {
-						minX = Math.min(minX, point[0]);
-						maxX = Math.max(maxX, point[0]);
-						minY = Math.min(minY, point[1]);
-						maxY = Math.max(maxY, point[1]);
-					}
-				}
-				const textWidthCalc = maxX - minX + strokeWidth;
-				const textHeightY = maxY - minY + strokeWidth;
+      if (textShapes.length > 0) {
+        let minX = Infinity,
+          maxX = -Infinity;
+        let minY = Infinity,
+          maxY = -Infinity;
+        for (const segment of textSegments) {
+          for (const point of segment) {
+            minX = Math.min(minX, point[0]);
+            maxX = Math.max(maxX, point[0]);
+            minY = Math.min(minY, point[1]);
+            maxY = Math.max(maxY, point[1]);
+          }
+        }
+        const textWidthCalc = maxX - minX + strokeWidth;
+        const textHeightY = maxY - minY + strokeWidth;
 
-				// Fit text within tray bounds
-				const availableWidth = trayWidth - margin * 2;
-				const availableDepth = trayDepth - margin * 2;
-				const scaleX = Math.min(1, availableWidth / textWidthCalc);
-				const scaleY = Math.min(1, availableDepth / textHeightY);
-				const textScale = Math.min(scaleX, scaleY);
+        // Fit text within tray bounds
+        const availableWidth = trayWidth - margin * 2;
+        const availableDepth = trayDepth - margin * 2;
+        const scaleX = Math.min(1, availableWidth / textWidthCalc);
+        const scaleY = Math.min(1, availableDepth / textHeightY);
+        const textScale = Math.min(scaleX, scaleY);
 
-				const centerX = trayWidth / 2;
-				const centerY = trayDepth / 2;
-				const textCenterX = (minX + maxX) / 2;
-				const textCenterY = (minY + maxY) / 2;
+        const centerX = trayWidth / 2;
+        const centerY = trayDepth / 2;
+        const textCenterX = (minX + maxX) / 2;
+        const textCenterY = (minY + maxY) / 2;
 
-				let combinedText = union(...textShapes);
-				// Mirror Y so text reads correctly when tray is flipped
-				combinedText = mirrorY(combinedText);
+        let combinedText = union(...textShapes);
+        // Mirror Y so text reads correctly when tray is flipped
+        combinedText = mirrorY(combinedText);
 
-				const positionedText = translate(
-					[centerX - textCenterX * textScale, centerY + textCenterY * textScale, -0.1],
-					scale([textScale, textScale, 1], combinedText)
-				);
-				tray = subtract(tray, positionedText);
-			}
-		}
-	}
+        const positionedText = translate(
+          [centerX - textCenterX * textScale, centerY + textCenterY * textScale, -0.1],
+          scale([textScale, textScale, 1], combinedText)
+        );
+        tray = subtract(tray, positionedText);
+      }
+    }
+  }
 
-	return tray;
+  return tray;
 }
 
 // Legacy alias for backwards compatibility

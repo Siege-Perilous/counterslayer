@@ -226,9 +226,9 @@ Create a JSON file with colored markers at key positions:
 
 ```json
 {
-	"groove_bottom": { "pos": [4.0, 10, 12], "color": "green" },
-	"ramp_position": { "pos": [4.0, 10, 15], "color": "red" },
-	"target_position": { "pos": [4.0, 10, 10], "color": "yellow" }
+  "groove_bottom": { "pos": [4.0, 10, 12], "color": "green" },
+  "ramp_position": { "pos": [4.0, 10, 15], "color": "red" },
+  "target_position": { "pos": [4.0, 10, 10], "color": "yellow" }
 }
 ```
 

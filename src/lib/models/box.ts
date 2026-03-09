@@ -1,12 +1,12 @@
+import type { Box, CardSize, CounterShape, Tray } from '$lib/types/project';
+import { isCardDividerTray, isCardTray, isCupTray } from '$lib/types/project';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
-import type { Box, Tray, CardSize, CounterShape } from '$lib/types/project';
-import { isCardTray, isCardDividerTray, isCupTray } from '$lib/types/project';
-import type { CounterTrayParams } from './counterTray';
-import { getCardDrawTrayDimensions } from './cardTray';
-import { getCardDividerTrayDimensions } from './cardDividerTray';
-import { getCupTrayDimensions } from './cupTray';
 import { GuillotineBinPack, Rect } from 'rectangle-packer';
+import { getCardDividerTrayDimensions } from './cardDividerTray';
+import { getCardDrawTrayDimensions } from './cardTray';
+import type { CounterTrayParams } from './counterTray';
+import { getCupTrayDimensions } from './cupTray';
 
 const { cylinder } = jscad.primitives;
 const { subtract } = jscad.booleans;
@@ -14,447 +14,439 @@ const { translate } = jscad.transforms;
 const { hull } = jscad.hulls;
 
 export interface TrayDimensions {
-	width: number; // X dimension
-	depth: number; // Y dimension
-	height: number; // Z dimension
+  width: number; // X dimension
+  depth: number; // Y dimension
+  height: number; // Z dimension
 }
 
 export interface TrayPlacement {
-	tray: Tray;
-	dimensions: TrayDimensions;
-	x: number;
-	y: number;
-	rotated: boolean; // true if tray is rotated 90° for better packing
+  tray: Tray;
+  dimensions: TrayDimensions;
+  x: number;
+  y: number;
+  rotated: boolean; // true if tray is rotated 90° for better packing
 }
 
 export interface BoxMinimumDimensions {
-	minWidth: number; // Minimum exterior X
-	minDepth: number; // Minimum exterior Y
-	minHeight: number; // Minimum exterior Z
+  minWidth: number; // Minimum exterior X
+  minDepth: number; // Minimum exterior Y
+  minHeight: number; // Minimum exterior Z
 }
 
 export interface ValidationResult {
-	valid: boolean;
-	errors: string[];
-	minimums: BoxMinimumDimensions;
+  valid: boolean;
+  errors: string[];
+  minimums: BoxMinimumDimensions;
 }
 
 export interface TraySpacerInfo {
-	trayId: string;
-	placement: TrayPlacement;
-	floorSpacerHeight: number; // Additional solid material under tray floor
+  trayId: string;
+  placement: TrayPlacement;
+  floorSpacerHeight: number; // Additional solid material under tray floor
 }
 
 // Get dimensions for any tray type (dispatches based on tray type)
 export function getTrayDimensionsForTray(
-	tray: Tray,
-	cardSizes: CardSize[] = [],
-	counterShapes: CounterShape[] = []
+  tray: Tray,
+  cardSizes: CardSize[] = [],
+  counterShapes: CounterShape[] = []
 ): TrayDimensions {
-	if (isCupTray(tray)) {
-		return getCupTrayDimensions(tray.params);
-	}
-	if (isCardDividerTray(tray)) {
-		return getCardDividerTrayDimensions(tray.params, cardSizes);
-	}
-	if (isCardTray(tray)) {
-		return getCardDrawTrayDimensions(tray.params, cardSizes);
-	}
-	// Default to counter tray
-	return getCounterTrayDimensions(tray.params, counterShapes);
+  if (isCupTray(tray)) {
+    return getCupTrayDimensions(tray.params);
+  }
+  if (isCardDividerTray(tray)) {
+    return getCardDividerTrayDimensions(tray.params, cardSizes);
+  }
+  if (isCardTray(tray)) {
+    return getCardDrawTrayDimensions(tray.params, cardSizes);
+  }
+  // Default to counter tray
+  return getCounterTrayDimensions(tray.params, counterShapes);
 }
 
 // Calculate counter tray dimensions from params (same logic as counterTray.ts)
 export function getCounterTrayDimensions(
-	params: CounterTrayParams,
-	counterShapes: CounterShape[] = []
+  params: CounterTrayParams,
+  counterShapes: CounterShape[] = []
 ): TrayDimensions {
-	const {
-		clearance,
-		wallThickness,
-		floorThickness,
-		rimHeight,
-		trayWidthOverride,
-		topLoadedStacks,
-		edgeLoadedStacks
-	} = params;
+  const { clearance, wallThickness, floorThickness, rimHeight, trayWidthOverride, topLoadedStacks, edgeLoadedStacks } =
+    params;
 
-	// Use topLoadedStacks (renamed from stacks)
-	const stacks = topLoadedStacks || [];
+  // Use topLoadedStacks (renamed from stacks)
+  const stacks = topLoadedStacks || [];
 
-	// Helper to get counter shape by ID
-	// Falls back to matching by name if ID not found (for legacy data)
-	const getShape = (shapeId: string): CounterShape => {
-		// First try by ID
-		let shape = counterShapes.find((s) => s.id === shapeId);
-		if (shape) return shape;
+  // Helper to get counter shape by ID
+  // Falls back to matching by name if ID not found (for legacy data)
+  const getShape = (shapeId: string): CounterShape => {
+    // First try by ID
+    let shape = counterShapes.find((s) => s.id === shapeId);
+    if (shape) return shape;
 
-		// Fall back to matching by name (for legacy data where ID might be stale)
-		shape = counterShapes.find((s) => s.name === shapeId);
-		if (shape) {
-			console.warn(`Shape ID "${shapeId}" not found, matched by name instead`);
-			return shape;
-		}
+    // Fall back to matching by name (for legacy data where ID might be stale)
+    shape = counterShapes.find((s) => s.name === shapeId);
+    if (shape) {
+      console.warn(`Shape ID "${shapeId}" not found, matched by name instead`);
+      return shape;
+    }
 
-		// Ultimate fallback: use first available shape, or a default
-		if (counterShapes.length > 0) {
-			console.warn(`Shape "${shapeId}" not found by ID or name, using first available shape`);
-			return counterShapes[0];
-		}
+    // Ultimate fallback: use first available shape, or a default
+    if (counterShapes.length > 0) {
+      console.warn(`Shape "${shapeId}" not found by ID or name, using first available shape`);
+      return counterShapes[0];
+    }
 
-		// No shapes at all - return a minimal default
-		return {
-			id: 'default',
-			name: 'Default',
-			baseShape: 'square',
-			width: 20,
-			length: 20,
-			thickness: 1.3
-		};
-	};
+    // No shapes at all - return a minimal default
+    return {
+      id: 'default',
+      name: 'Default',
+      baseShape: 'square',
+      width: 20,
+      length: 20,
+      thickness: 1.3
+    };
+  };
 
-	// Get effective dimensions for counter shapes based on their base shape
-	// Returns [width, length] accounting for hex point-to-point calculations
-	const getCustomEffectiveDims = (custom: CounterShape): [number, number] => {
-		const baseShape = custom.baseShape ?? 'rectangle';
-		if (baseShape === 'hex') {
-			// width stores flat-to-flat, calculate point-to-point
-			const flatToFlat = custom.width;
-			const pointToPoint = flatToFlat / Math.cos(Math.PI / 6);
-			// Use shape's pointyTop setting
-			const hexPointyTop = custom.pointyTop ?? false;
-			const w = hexPointyTop ? flatToFlat : pointToPoint;
-			const l = hexPointyTop ? pointToPoint : flatToFlat;
-			return [w, l];
-		}
-		if (baseShape === 'triangle') {
-			// width stores side length, height = side * sqrt(3)/2
-			const side = custom.width;
-			const height = side * (Math.sqrt(3) / 2);
-			return [side, height]; // Base (X) x Height (Y)
-		}
-		if (baseShape === 'circle' || baseShape === 'square') {
-			// Both dimensions are equal (diameter or size)
-			return [custom.width, custom.width];
-		}
-		// Rectangle: use width and length directly
-		return [custom.width, custom.length];
-	};
+  // Get effective dimensions for counter shapes based on their base shape
+  // Returns [width, length] accounting for hex point-to-point calculations
+  const getCustomEffectiveDims = (custom: CounterShape): [number, number] => {
+    const baseShape = custom.baseShape ?? 'rectangle';
+    if (baseShape === 'hex') {
+      // width stores flat-to-flat, calculate point-to-point
+      const flatToFlat = custom.width;
+      const pointToPoint = flatToFlat / Math.cos(Math.PI / 6);
+      // Use shape's pointyTop setting
+      const hexPointyTop = custom.pointyTop ?? false;
+      const w = hexPointyTop ? flatToFlat : pointToPoint;
+      const l = hexPointyTop ? pointToPoint : flatToFlat;
+      return [w, l];
+    }
+    if (baseShape === 'triangle') {
+      // width stores side length, height = side * sqrt(3)/2
+      const side = custom.width;
+      const height = side * (Math.sqrt(3) / 2);
+      return [side, height]; // Base (X) x Height (Y)
+    }
+    if (baseShape === 'circle' || baseShape === 'square') {
+      // Both dimensions are equal (diameter or size)
+      return [custom.width, custom.width];
+    }
+    // Rectangle: use width and length directly
+    return [custom.width, custom.length];
+  };
 
-	// Wrapper that ensures we always have a shape (uses first available as ultimate fallback)
-	const getShapeRequired = (shapeId: string): CounterShape => {
-		const shape = getShape(shapeId);
-		if (shape) return shape;
-		// Ultimate fallback: use first available shape, or a default
-		if (counterShapes.length > 0) {
-			console.warn(`Shape "${shapeId}" not found by ID or name, using first available shape`);
-			return counterShapes[0];
-		}
-		// No shapes at all - return a minimal default
-		return {
-			id: 'default',
-			name: 'Default',
-			baseShape: 'square',
-			width: 20,
-			length: 20,
-			thickness: 1.3
-		};
-	};
+  // Wrapper that ensures we always have a shape (uses first available as ultimate fallback)
+  const getShapeRequired = (shapeId: string): CounterShape => {
+    const shape = getShape(shapeId);
+    if (shape) return shape;
+    // Ultimate fallback: use first available shape, or a default
+    if (counterShapes.length > 0) {
+      console.warn(`Shape "${shapeId}" not found by ID or name, using first available shape`);
+      return counterShapes[0];
+    }
+    // No shapes at all - return a minimal default
+    return {
+      id: 'default',
+      name: 'Default',
+      baseShape: 'square',
+      width: 20,
+      length: 20,
+      thickness: 1.3
+    };
+  };
 
-	// For top-loaded/crosswise custom shapes: LONGER side = width (X), SHORTER side = length (Y)
-	const getPocketWidth = (shapeId: string): number => {
-		const shape = getShapeRequired(shapeId);
-		const [w, l] = getCustomEffectiveDims(shape);
-		return Math.max(w, l) + clearance * 2; // Longer side along X (parallel to tray width)
-	};
+  // For top-loaded/crosswise custom shapes: LONGER side = width (X), SHORTER side = length (Y)
+  const getPocketWidth = (shapeId: string): number => {
+    const shape = getShapeRequired(shapeId);
+    const [w, l] = getCustomEffectiveDims(shape);
+    return Math.max(w, l) + clearance * 2; // Longer side along X (parallel to tray width)
+  };
 
-	const getPocketLength = (shapeId: string): number => {
-		const shape = getShapeRequired(shapeId);
-		const [w, l] = getCustomEffectiveDims(shape);
-		return Math.min(w, l) + clearance * 2; // Shorter side along Y
-	};
+  const getPocketLength = (shapeId: string): number => {
+    const shape = getShapeRequired(shapeId);
+    const [w, l] = getCustomEffectiveDims(shape);
+    return Math.min(w, l) + clearance * 2; // Shorter side along Y
+  };
 
-	// For lengthwise edge-loaded: longest dimension runs perpendicular to tray (along Y)
-	// This prevents the slot from receding too far into the tray depth
-	const getPocketLengthLengthwise = (shapeId: string): number => {
-		const shape = getShapeRequired(shapeId);
-		const [w, l] = getCustomEffectiveDims(shape);
-		return Math.max(w, l) + clearance * 2; // Longer side along Y (perpendicular to tray width)
-	};
+  // For lengthwise edge-loaded: longest dimension runs perpendicular to tray (along Y)
+  // This prevents the slot from receding too far into the tray depth
+  const getPocketLengthLengthwise = (shapeId: string): number => {
+    const shape = getShapeRequired(shapeId);
+    const [w, l] = getCustomEffectiveDims(shape);
+    return Math.max(w, l) + clearance * 2; // Longer side along Y (perpendicular to tray width)
+  };
 
-	// For lengthwise custom shapes: shorter dimension is height (longer runs along Y)
-	const getStandingHeightLengthwise = (shapeId: string): number => {
-		const shape = getShapeRequired(shapeId);
-		if (shape.baseShape === 'triangle') {
-			return shape.width * (Math.sqrt(3) / 2); // Triangle geometric height
-		}
-		const [w, l] = getCustomEffectiveDims(shape);
-		return Math.min(w, l); // Shorter side is height
-	};
+  // For lengthwise custom shapes: shorter dimension is height (longer runs along Y)
+  const getStandingHeightLengthwise = (shapeId: string): number => {
+    const shape = getShapeRequired(shapeId);
+    if (shape.baseShape === 'triangle') {
+      return shape.width * (Math.sqrt(3) / 2); // Triangle geometric height
+    }
+    const [w, l] = getCustomEffectiveDims(shape);
+    return Math.min(w, l); // Shorter side is height
+  };
 
-	// For crosswise custom shapes: shorter dimension is height (longer runs along X)
-	const getStandingHeightCrosswise = (shapeId: string): number => {
-		const shape = getShapeRequired(shapeId);
-		if (shape.baseShape === 'triangle') {
-			return shape.width * (Math.sqrt(3) / 2); // Triangle geometric height
-		}
-		const [w, l] = getCustomEffectiveDims(shape);
-		return Math.min(w, l); // Shorter side is height
-	};
+  // For crosswise custom shapes: shorter dimension is height (longer runs along X)
+  const getStandingHeightCrosswise = (shapeId: string): number => {
+    const shape = getShapeRequired(shapeId);
+    if (shape.baseShape === 'triangle') {
+      return shape.width * (Math.sqrt(3) / 2); // Triangle geometric height
+    }
+    const [w, l] = getCustomEffectiveDims(shape);
+    return Math.min(w, l); // Shorter side is height
+  };
 
-	// Get actual counter dimensions (without clearance) for standing height
-	const _getCounterWidth = (shapeId: string): number => {
-		const shape = getShapeRequired(shapeId);
-		const [w, l] = getCustomEffectiveDims(shape);
-		return Math.max(w, l); // Longer side along X
-	};
+  // Get actual counter dimensions (without clearance) for standing height
+  const _getCounterWidth = (shapeId: string): number => {
+    const shape = getShapeRequired(shapeId);
+    const [w, l] = getCustomEffectiveDims(shape);
+    return Math.max(w, l); // Longer side along X
+  };
 
-	const _getCounterLength = (shapeId: string): number => {
-		const shape = getShapeRequired(shapeId);
-		const [w, l] = getCustomEffectiveDims(shape);
-		return Math.min(w, l); // Shorter side along Y
-	};
+  const _getCounterLength = (shapeId: string): number => {
+    const shape = getShapeRequired(shapeId);
+    const [w, l] = getCustomEffectiveDims(shape);
+    return Math.min(w, l); // Shorter side along Y
+  };
 
-	// Get counter standing height (for edge-loaded stacks) - uses actual counter size, not pocket size
-	const _getCounterStandingHeight = (shapeId: string): number => {
-		const shape = getShapeRequired(shapeId);
-		if (shape.baseShape === 'triangle') {
-			return shape.width * (Math.sqrt(3) / 2); // Triangle geometric height
-		}
-		const [w, l] = getCustomEffectiveDims(shape);
-		return Math.max(w, l);
-	};
-	// Suppress unused warnings for future use
-	void _getCounterWidth;
-	void _getCounterLength;
-	void _getCounterStandingHeight;
+  // Get counter standing height (for edge-loaded stacks) - uses actual counter size, not pocket size
+  const _getCounterStandingHeight = (shapeId: string): number => {
+    const shape = getShapeRequired(shapeId);
+    if (shape.baseShape === 'triangle') {
+      return shape.width * (Math.sqrt(3) / 2); // Triangle geometric height
+    }
+    const [w, l] = getCustomEffectiveDims(shape);
+    return Math.max(w, l);
+  };
+  // Suppress unused warnings for future use
+  void _getCounterWidth;
+  void _getCounterLength;
+  void _getCounterStandingHeight;
 
-	// === TOP-LOADED STACK PLACEMENTS (greedy bin-packing) ===
-	interface TopLoadedPlacement {
-		shapeRef: string;
-		count: number;
-		pocketWidth: number;
-		pocketLength: number;
-		rowAssignment: 'front' | 'back';
-		xPosition: number;
-	}
+  // === TOP-LOADED STACK PLACEMENTS (greedy bin-packing) ===
+  interface TopLoadedPlacement {
+    shapeRef: string;
+    count: number;
+    pocketWidth: number;
+    pocketLength: number;
+    rowAssignment: 'front' | 'back';
+    xPosition: number;
+  }
 
-	// Sort top-loaded stacks by area (largest first for better packing)
-	const sortedStacks = [...stacks]
-		.map((s, i) => ({ stack: s, originalIndex: i }))
-		.sort((a, b) => {
-			const areaA = getPocketWidth(a.stack[0]) * getPocketLength(a.stack[0]);
-			const areaB = getPocketWidth(b.stack[0]) * getPocketLength(b.stack[0]);
-			return areaB - areaA; // Largest first
-		});
+  // Sort top-loaded stacks by area (largest first for better packing)
+  const sortedStacks = [...stacks]
+    .map((s, i) => ({ stack: s, originalIndex: i }))
+    .sort((a, b) => {
+      const areaA = getPocketWidth(a.stack[0]) * getPocketLength(a.stack[0]);
+      const areaB = getPocketWidth(b.stack[0]) * getPocketLength(b.stack[0]);
+      return areaB - areaA; // Largest first
+    });
 
-	const topLoadedPlacements: TopLoadedPlacement[] = [];
+  const topLoadedPlacements: TopLoadedPlacement[] = [];
 
-	// Track max top-loaded stack height
-	let maxStackHeight = 0;
-	for (const { stack } of sortedStacks) {
-		const stackHeight = stack[1] * getShape(stack[0]).thickness;
-		maxStackHeight = Math.max(maxStackHeight, stackHeight);
-	}
+  // Track max top-loaded stack height
+  let maxStackHeight = 0;
+  for (const { stack } of sortedStacks) {
+    const stackHeight = stack[1] * getShape(stack[0]).thickness;
+    maxStackHeight = Math.max(maxStackHeight, stackHeight);
+  }
 
-	// Edge-loaded stack calculations
-	let maxEdgeLoadedHeight = 0;
-	let crosswiseMaxDepth = 0;
+  // Edge-loaded stack calculations
+  let maxEdgeLoadedHeight = 0;
+  let crosswiseMaxDepth = 0;
 
-	// Use actual cutout params from tray (not hardcoded defaults)
-	const cutoutRatio = params.cutoutRatio;
-	const cutoutMax = params.cutoutMax;
+  // Use actual cutout params from tray (not hardcoded defaults)
+  const cutoutRatio = params.cutoutRatio;
+  const cutoutMax = params.cutoutMax;
 
-	// Track edge-loaded slots with unified structure (matching counterTray.ts sorting)
-	interface EdgeLoadedSlot {
-		slotDepth: number;
-		slotWidth: number;
-		orientation: 'lengthwise' | 'crosswise';
-		rowAssignment?: 'front' | 'back';
-	}
-	const edgeLoadedSlots: EdgeLoadedSlot[] = [];
+  // Track edge-loaded slots with unified structure (matching counterTray.ts sorting)
+  interface EdgeLoadedSlot {
+    slotDepth: number;
+    slotWidth: number;
+    orientation: 'lengthwise' | 'crosswise';
+    rowAssignment?: 'front' | 'back';
+  }
+  const edgeLoadedSlots: EdgeLoadedSlot[] = [];
 
-	if (edgeLoadedStacks && edgeLoadedStacks.length > 0) {
-		for (const stack of edgeLoadedStacks) {
-			const counterSpan = stack[1] * getShape(stack[0]).thickness + (stack[1] - 1) * clearance;
-			const orientation = stack[2] || 'lengthwise';
+  if (edgeLoadedStacks && edgeLoadedStacks.length > 0) {
+    for (const stack of edgeLoadedStacks) {
+      const counterSpan = stack[1] * getShape(stack[0]).thickness + (stack[1] - 1) * clearance;
+      const orientation = stack[2] || 'lengthwise';
 
-			if (orientation === 'lengthwise') {
-				// For custom shapes: longer side along Y (perpendicular to tray), shorter side is height
-				const standingHeight = getStandingHeightLengthwise(stack[0]);
-				maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);
-				const slotDepthDim = getPocketLengthLengthwise(stack[0]);
-				edgeLoadedSlots.push({
-					slotDepth: slotDepthDim,
-					slotWidth: counterSpan,
-					orientation: 'lengthwise'
-				});
-			} else {
-				// For custom shapes: longer side along X (parallel to tray width), shorter side is height
-				const standingHeight = getStandingHeightCrosswise(stack[0]);
-				maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);
-				const slotWidthDim = getPocketWidth(stack[0]); // Longer side along X
-				crosswiseMaxDepth = Math.max(crosswiseMaxDepth, counterSpan);
-				edgeLoadedSlots.push({
-					slotWidth: slotWidthDim,
-					slotDepth: counterSpan,
-					orientation: 'crosswise'
-				});
-			}
-		}
-	}
+      if (orientation === 'lengthwise') {
+        // For custom shapes: longer side along Y (perpendicular to tray), shorter side is height
+        const standingHeight = getStandingHeightLengthwise(stack[0]);
+        maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);
+        const slotDepthDim = getPocketLengthLengthwise(stack[0]);
+        edgeLoadedSlots.push({
+          slotDepth: slotDepthDim,
+          slotWidth: counterSpan,
+          orientation: 'lengthwise'
+        });
+      } else {
+        // For custom shapes: longer side along X (parallel to tray width), shorter side is height
+        const standingHeight = getStandingHeightCrosswise(stack[0]);
+        maxEdgeLoadedHeight = Math.max(maxEdgeLoadedHeight, standingHeight);
+        const slotWidthDim = getPocketWidth(stack[0]); // Longer side along X
+        crosswiseMaxDepth = Math.max(crosswiseMaxDepth, counterSpan);
+        edgeLoadedSlots.push({
+          slotWidth: slotWidthDim,
+          slotDepth: counterSpan,
+          orientation: 'crosswise'
+        });
+      }
+    }
+  }
 
-	// Sort all edge-loaded slots by area (largest first) - must match counterTray.ts sorting
-	edgeLoadedSlots.sort((a, b) => b.slotWidth * b.slotDepth - a.slotWidth * a.slotDepth);
+  // Sort all edge-loaded slots by area (largest first) - must match counterTray.ts sorting
+  edgeLoadedSlots.sort((a, b) => b.slotWidth * b.slotDepth - a.slotWidth * a.slotDepth);
 
-	// Split into lengthwise and crosswise while preserving sorted order
-	const lengthwiseSlots = edgeLoadedSlots.filter((s) => s.orientation === 'lengthwise');
-	const crosswiseSlots = edgeLoadedSlots.filter((s) => s.orientation === 'crosswise');
+  // Split into lengthwise and crosswise while preserving sorted order
+  const lengthwiseSlots = edgeLoadedSlots.filter((s) => s.orientation === 'lengthwise');
+  const crosswiseSlots = edgeLoadedSlots.filter((s) => s.orientation === 'crosswise');
 
-	// === GREEDY BIN-PACKING FOR LENGTHWISE SLOTS ===
-	// Adjacent slots share a half-cylinder cutout; first slot uses wall cutout (no left space needed)
-	let frontRowX = wallThickness;
-	let backRowX = wallThickness;
+  // === GREEDY BIN-PACKING FOR LENGTHWISE SLOTS ===
+  // Adjacent slots share a half-cylinder cutout; first slot uses wall cutout (no left space needed)
+  let frontRowX = wallThickness;
+  let backRowX = wallThickness;
 
-	for (const slot of lengthwiseSlots) {
-		const cutoutRadius = Math.min(cutoutMax, slot.slotDepth * cutoutRatio);
+  for (const slot of lengthwiseSlots) {
+    const cutoutRadius = Math.min(cutoutMax, slot.slotDepth * cutoutRatio);
 
-		if (frontRowX <= backRowX) {
-			slot.rowAssignment = 'front';
-			frontRowX += slot.slotWidth + cutoutRadius + wallThickness;
-		} else {
-			slot.rowAssignment = 'back';
-			backRowX += slot.slotWidth + cutoutRadius + wallThickness;
-		}
-	}
+    if (frontRowX <= backRowX) {
+      slot.rowAssignment = 'front';
+      frontRowX += slot.slotWidth + cutoutRadius + wallThickness;
+    } else {
+      slot.rowAssignment = 'back';
+      backRowX += slot.slotWidth + cutoutRadius + wallThickness;
+    }
+  }
 
-	// Calculate effective row depths (including lengthwise) - needed before crosswise bin-packing
-	let effectiveFrontRowDepth = 0;
-	let effectiveBackRowDepth = 0;
-	for (const slot of lengthwiseSlots) {
-		if (slot.rowAssignment === 'front') {
-			effectiveFrontRowDepth = Math.max(effectiveFrontRowDepth, slot.slotDepth);
-		} else {
-			effectiveBackRowDepth = Math.max(effectiveBackRowDepth, slot.slotDepth);
-		}
-	}
+  // Calculate effective row depths (including lengthwise) - needed before crosswise bin-packing
+  let effectiveFrontRowDepth = 0;
+  let effectiveBackRowDepth = 0;
+  for (const slot of lengthwiseSlots) {
+    if (slot.rowAssignment === 'front') {
+      effectiveFrontRowDepth = Math.max(effectiveFrontRowDepth, slot.slotDepth);
+    } else {
+      effectiveBackRowDepth = Math.max(effectiveBackRowDepth, slot.slotDepth);
+    }
+  }
 
-	// === CROSSWISE SLOT BIN-PACKING ===
-	// Try to pair crosswise slots into columns (one at front, one at back) when they fit
-	interface CrosswiseColumn {
-		frontSlot: EdgeLoadedSlot | null;
-		backSlot: EdgeLoadedSlot | null;
-		columnWidth: number;
-	}
-	const crosswiseColumns: CrosswiseColumn[] = [];
+  // === CROSSWISE SLOT BIN-PACKING ===
+  // Try to pair crosswise slots into columns (one at front, one at back) when they fit
+  interface CrosswiseColumn {
+    frontSlot: EdgeLoadedSlot | null;
+    backSlot: EdgeLoadedSlot | null;
+    columnWidth: number;
+  }
+  const crosswiseColumns: CrosswiseColumn[] = [];
 
-	// Sort crosswise by slotDepth (largest first) to improve packing
-	const sortedCrosswiseSlots = [...crosswiseSlots].sort((a, b) => b.slotDepth - a.slotDepth);
+  // Sort crosswise by slotDepth (largest first) to improve packing
+  const sortedCrosswiseSlots = [...crosswiseSlots].sort((a, b) => b.slotDepth - a.slotDepth);
 
-	// Assign each crosswise slot to a column
-	for (const slot of sortedCrosswiseSlots) {
-		let placed = false;
+  // Assign each crosswise slot to a column
+  for (const slot of sortedCrosswiseSlots) {
+    let placed = false;
 
-		// Try to fit in an existing column's back position
-		for (const col of crosswiseColumns) {
-			if (col.backSlot === null && col.frontSlot) {
-				// Check if combined depth fits
-				const combinedDepth = col.frontSlot.slotDepth + wallThickness + slot.slotDepth;
-				const availableDepth = effectiveFrontRowDepth + wallThickness + effectiveBackRowDepth;
+    // Try to fit in an existing column's back position
+    for (const col of crosswiseColumns) {
+      if (col.backSlot === null && col.frontSlot) {
+        // Check if combined depth fits
+        const combinedDepth = col.frontSlot.slotDepth + wallThickness + slot.slotDepth;
+        const availableDepth = effectiveFrontRowDepth + wallThickness + effectiveBackRowDepth;
 
-				if (combinedDepth <= availableDepth || availableDepth === 0) {
-					col.backSlot = slot;
-					col.columnWidth = Math.max(col.columnWidth, slot.slotWidth);
-					slot.rowAssignment = 'back';
-					placed = true;
-					break;
-				}
-			}
-		}
+        if (combinedDepth <= availableDepth || availableDepth === 0) {
+          col.backSlot = slot;
+          col.columnWidth = Math.max(col.columnWidth, slot.slotWidth);
+          slot.rowAssignment = 'back';
+          placed = true;
+          break;
+        }
+      }
+    }
 
-		if (!placed) {
-			crosswiseColumns.push({
-				frontSlot: slot,
-				backSlot: null,
-				columnWidth: slot.slotWidth
-			});
-			slot.rowAssignment = 'front';
-		}
-	}
+    if (!placed) {
+      crosswiseColumns.push({
+        frontSlot: slot,
+        backSlot: null,
+        columnWidth: slot.slotWidth
+      });
+      slot.rowAssignment = 'front';
+    }
+  }
 
-	// Calculate crosswise total width from columns
-	let crosswiseX = Math.max(frontRowX, backRowX);
-	for (const col of crosswiseColumns) {
-		crosswiseX += col.columnWidth + wallThickness;
-	}
+  // Calculate crosswise total width from columns
+  let crosswiseX = Math.max(frontRowX, backRowX);
+  for (const col of crosswiseColumns) {
+    crosswiseX += col.columnWidth + wallThickness;
+  }
 
-	// Use the maximum of top-loaded and edge-loaded heights
-	const finalMaxStackHeight = Math.max(maxStackHeight, maxEdgeLoadedHeight);
+  // Use the maximum of top-loaded and edge-loaded heights
+  const finalMaxStackHeight = Math.max(maxStackHeight, maxEdgeLoadedHeight);
 
-	// X offset where top-loaded stacks begin (after all edge-loaded)
-	const edgeLoadedEndX = crosswiseSlots.length > 0 ? crosswiseX : Math.max(frontRowX, backRowX);
-	const hasEdgeLoaded = edgeLoadedStacks && edgeLoadedStacks.length > 0;
-	let topLoadedFrontX = hasEdgeLoaded ? edgeLoadedEndX : wallThickness;
-	let topLoadedBackX = hasEdgeLoaded ? edgeLoadedEndX : wallThickness;
+  // X offset where top-loaded stacks begin (after all edge-loaded)
+  const edgeLoadedEndX = crosswiseSlots.length > 0 ? crosswiseX : Math.max(frontRowX, backRowX);
+  const hasEdgeLoaded = edgeLoadedStacks && edgeLoadedStacks.length > 0;
+  let topLoadedFrontX = hasEdgeLoaded ? edgeLoadedEndX : wallThickness;
+  let topLoadedBackX = hasEdgeLoaded ? edgeLoadedEndX : wallThickness;
 
-	// Greedy bin-packing for top-loaded stacks
-	for (const { stack } of sortedStacks) {
-		const [shapeRef, count] = stack;
-		const pw = getPocketWidth(shapeRef);
-		const pl = getPocketLength(shapeRef);
+  // Greedy bin-packing for top-loaded stacks
+  for (const { stack } of sortedStacks) {
+    const [shapeRef, count] = stack;
+    const pw = getPocketWidth(shapeRef);
+    const pl = getPocketLength(shapeRef);
 
-		// Assign to row with less current X (greedy approach)
-		if (topLoadedFrontX <= topLoadedBackX) {
-			topLoadedPlacements.push({
-				shapeRef,
-				count,
-				pocketWidth: pw,
-				pocketLength: pl,
-				rowAssignment: 'front',
-				xPosition: topLoadedFrontX
-			});
-			topLoadedFrontX += pw + wallThickness;
-		} else {
-			topLoadedPlacements.push({
-				shapeRef,
-				count,
-				pocketWidth: pw,
-				pocketLength: pl,
-				rowAssignment: 'back',
-				xPosition: topLoadedBackX
-			});
-			topLoadedBackX += pw + wallThickness;
-		}
-	}
+    // Assign to row with less current X (greedy approach)
+    if (topLoadedFrontX <= topLoadedBackX) {
+      topLoadedPlacements.push({
+        shapeRef,
+        count,
+        pocketWidth: pw,
+        pocketLength: pl,
+        rowAssignment: 'front',
+        xPosition: topLoadedFrontX
+      });
+      topLoadedFrontX += pw + wallThickness;
+    } else {
+      topLoadedPlacements.push({
+        shapeRef,
+        count,
+        pocketWidth: pw,
+        pocketLength: pl,
+        rowAssignment: 'back',
+        xPosition: topLoadedBackX
+      });
+      topLoadedBackX += pw + wallThickness;
+    }
+  }
 
-	// Update effective row depths to include top-loaded stacks
-	for (const placement of topLoadedPlacements) {
-		if (placement.rowAssignment === 'front') {
-			effectiveFrontRowDepth = Math.max(effectiveFrontRowDepth, placement.pocketLength);
-		} else {
-			effectiveBackRowDepth = Math.max(effectiveBackRowDepth, placement.pocketLength);
-		}
-	}
+  // Update effective row depths to include top-loaded stacks
+  for (const placement of topLoadedPlacements) {
+    if (placement.rowAssignment === 'front') {
+      effectiveFrontRowDepth = Math.max(effectiveFrontRowDepth, placement.pocketLength);
+    } else {
+      effectiveBackRowDepth = Math.max(effectiveBackRowDepth, placement.pocketLength);
+    }
+  }
 
-	// Tray length (X dimension)
-	const topLoadedEndX = Math.max(topLoadedFrontX, topLoadedBackX);
-	const trayWidthAuto = topLoadedPlacements.length > 0 ? topLoadedEndX : edgeLoadedEndX;
-	const trayWidth = trayWidthOverride > 0 ? trayWidthOverride : trayWidthAuto;
+  // Tray length (X dimension)
+  const topLoadedEndX = Math.max(topLoadedFrontX, topLoadedBackX);
+  const trayWidthAuto = topLoadedPlacements.length > 0 ? topLoadedEndX : edgeLoadedEndX;
+  const trayWidth = trayWidthOverride > 0 ? trayWidthOverride : trayWidthAuto;
 
-	// Tray width (Y dimension) - always 2 rows
-	const topLoadedTotalDepth =
-		effectiveFrontRowDepth +
-		(effectiveBackRowDepth > 0 ? wallThickness + effectiveBackRowDepth : 0);
-	const trayDepthAuto = topLoadedTotalDepth > 0 ? topLoadedTotalDepth : crosswiseMaxDepth;
-	const trayDepth = wallThickness + trayDepthAuto + wallThickness;
+  // Tray width (Y dimension) - always 2 rows
+  const topLoadedTotalDepth =
+    effectiveFrontRowDepth + (effectiveBackRowDepth > 0 ? wallThickness + effectiveBackRowDepth : 0);
+  const trayDepthAuto = topLoadedTotalDepth > 0 ? topLoadedTotalDepth : crosswiseMaxDepth;
+  const trayDepth = wallThickness + trayDepthAuto + wallThickness;
 
-	const trayHeight = floorThickness + finalMaxStackHeight + rimHeight;
+  const trayHeight = floorThickness + finalMaxStackHeight + rimHeight;
 
-	return {
-		width: trayWidth, // X
-		depth: trayDepth, // Y
-		height: trayHeight // Z
-	};
+  return {
+    width: trayWidth, // X
+    depth: trayDepth, // Y
+    height: trayHeight // Z
+  };
 }
 
 // Backwards compatibility alias for counter tray dimensions
@@ -468,313 +460,293 @@ import type { ManualTrayPlacement } from '$lib/types/project';
 // Supports tray rotation: trays can be rotated 90° for more efficient packing
 // If manualLayout is provided, uses those positions instead of auto-arrangement
 export function arrangeTrays(
-	trays: Tray[],
-	options?: {
-		customBoxWidth?: number;
-		customBoxDepth?: number;
-		wallThickness?: number;
-		tolerance?: number;
-		cardSizes?: CardSize[];
-		counterShapes?: CounterShape[];
-		manualLayout?: ManualTrayPlacement[];
-		printBedSize?: number;
-	}
+  trays: Tray[],
+  options?: {
+    customBoxWidth?: number;
+    customBoxDepth?: number;
+    wallThickness?: number;
+    tolerance?: number;
+    cardSizes?: CardSize[];
+    counterShapes?: CounterShape[];
+    manualLayout?: ManualTrayPlacement[];
+    printBedSize?: number;
+  }
 ): TrayPlacement[] {
-	if (trays.length === 0) return [];
+  if (trays.length === 0) return [];
 
-	// If manual layout is provided, use it instead of auto-arrangement
-	if (options?.manualLayout && options.manualLayout.length > 0) {
-		const placements: TrayPlacement[] = [];
-		for (const manual of options.manualLayout) {
-			const tray = trays.find((t) => t.id === manual.trayId);
-			if (!tray) continue;
+  // If manual layout is provided, use it instead of auto-arrangement
+  if (options?.manualLayout && options.manualLayout.length > 0) {
+    const placements: TrayPlacement[] = [];
+    for (const manual of options.manualLayout) {
+      const tray = trays.find((t) => t.id === manual.trayId);
+      if (!tray) continue;
 
-			const dims = getTrayDimensionsForTray(
-				tray,
-				options?.cardSizes ?? [],
-				options?.counterShapes ?? []
-			);
-			// Apply rotation: 90° and 270° swap width/depth
-			const swapDims = manual.rotation === 90 || manual.rotation === 270;
-			const effectiveDims: TrayDimensions = swapDims
-				? { width: dims.depth, depth: dims.width, height: dims.height }
-				: dims;
+      const dims = getTrayDimensionsForTray(tray, options?.cardSizes ?? [], options?.counterShapes ?? []);
+      // Apply rotation: 90° and 270° swap width/depth
+      const swapDims = manual.rotation === 90 || manual.rotation === 270;
+      const effectiveDims: TrayDimensions = swapDims
+        ? { width: dims.depth, depth: dims.width, height: dims.height }
+        : dims;
 
-			placements.push({
-				tray,
-				dimensions: effectiveDims,
-				x: manual.x,
-				y: manual.y,
-				rotated: swapDims // TrayPlacement still uses boolean for compatibility
-			});
-		}
-		// Add any trays not in manual layout at auto positions (new trays)
-		const manualIds = new Set(options.manualLayout.map((m) => m.trayId));
-		const unplacedTrays = trays.filter((t) => !manualIds.has(t.id));
-		if (unplacedTrays.length > 0) {
-			// Auto-arrange remaining trays starting after the manual ones
-			const autoPlacements = arrangeTraysAuto(unplacedTrays, options);
-			// Offset them past the manual layout
-			let maxY = 0;
-			for (const p of placements) {
-				maxY = Math.max(maxY, p.y + p.dimensions.depth);
-			}
-			for (const p of autoPlacements) {
-				placements.push({ ...p, y: p.y + maxY });
-			}
-		}
-		return placements;
-	}
+      placements.push({
+        tray,
+        dimensions: effectiveDims,
+        x: manual.x,
+        y: manual.y,
+        rotated: swapDims // TrayPlacement still uses boolean for compatibility
+      });
+    }
+    // Add any trays not in manual layout at auto positions (new trays)
+    const manualIds = new Set(options.manualLayout.map((m) => m.trayId));
+    const unplacedTrays = trays.filter((t) => !manualIds.has(t.id));
+    if (unplacedTrays.length > 0) {
+      // Auto-arrange remaining trays starting after the manual ones
+      const autoPlacements = arrangeTraysAuto(unplacedTrays, options);
+      // Offset them past the manual layout
+      let maxY = 0;
+      for (const p of placements) {
+        maxY = Math.max(maxY, p.y + p.dimensions.depth);
+      }
+      for (const p of autoPlacements) {
+        placements.push({ ...p, y: p.y + maxY });
+      }
+    }
+    return placements;
+  }
 
-	return arrangeTraysAuto(trays, options);
+  return arrangeTraysAuto(trays, options);
 }
 
 // Tray rectangle for packing
 interface TrayRect {
-	tray: Tray;
-	width: number;
-	depth: number;
-	height: number;
+  tray: Tray;
+  width: number;
+  depth: number;
+  height: number;
 }
 
 function arrangeTraysAuto(
-	trays: Tray[],
-	options?: {
-		customBoxWidth?: number;
-		customBoxDepth?: number;
-		wallThickness?: number;
-		tolerance?: number;
-		cardSizes?: CardSize[];
-		counterShapes?: CounterShape[];
-		printBedSize?: number;
-	}
+  trays: Tray[],
+  options?: {
+    customBoxWidth?: number;
+    customBoxDepth?: number;
+    wallThickness?: number;
+    tolerance?: number;
+    cardSizes?: CardSize[];
+    counterShapes?: CounterShape[];
+    printBedSize?: number;
+  }
 ): TrayPlacement[] {
-	if (trays.length === 0) return [];
+  if (trays.length === 0) return [];
 
-	// Get dimensions for each tray
-	const trayRects: TrayRect[] = trays.map((tray) => {
-		const dims = getTrayDimensionsForTray(
-			tray,
-			options?.cardSizes ?? [],
-			options?.counterShapes ?? []
-		);
-		return {
-			tray,
-			width: dims.width,
-			depth: dims.depth,
-			height: dims.height
-		};
-	});
+  // Get dimensions for each tray
+  const trayRects: TrayRect[] = trays.map((tray) => {
+    const dims = getTrayDimensionsForTray(tray, options?.cardSizes ?? [], options?.counterShapes ?? []);
+    return {
+      tray,
+      width: dims.width,
+      depth: dims.depth,
+      height: dims.height
+    };
+  });
 
-	// Calculate target bin size
-	const wallThickness = options?.wallThickness ?? 3;
-	const tolerance = options?.tolerance ?? 0.5;
+  // Calculate target bin size
+  const wallThickness = options?.wallThickness ?? 3;
+  const tolerance = options?.tolerance ?? 0.5;
 
-	// Get print bed size from options or extract from first counter tray
-	let printBedSize = options?.printBedSize;
-	if (!printBedSize) {
-		for (const tray of trays) {
-			if (tray.type === 'counter' && tray.params.printBedSize) {
-				printBedSize = tray.params.printBedSize;
-				break;
-			}
-		}
-	}
-	printBedSize = printBedSize ?? 256;
+  // Get print bed size from options or extract from first counter tray
+  let printBedSize = options?.printBedSize;
+  if (!printBedSize) {
+    for (const tray of trays) {
+      if (tray.type === 'counter' && tray.params.printBedSize) {
+        printBedSize = tray.params.printBedSize;
+        break;
+      }
+    }
+  }
+  printBedSize = printBedSize ?? 256;
 
-	// Calculate interior cavity max from print bed
-	const interiorMax = printBedSize - (wallThickness + tolerance) * 2;
+  // Calculate interior cavity max from print bed
+  const interiorMax = printBedSize - (wallThickness + tolerance) * 2;
 
-	let targetWidth: number;
-	let targetDepth: number;
+  let targetWidth: number;
+  let targetDepth: number;
 
-	if (options?.customBoxWidth && options?.customBoxDepth) {
-		targetWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
-		targetDepth = options.customBoxDepth - wallThickness * 2 - tolerance * 2;
-	} else if (options?.customBoxWidth) {
-		// Only width constrained - use it for width, print bed max for depth
-		targetWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
-		targetDepth = interiorMax;
-	} else if (options?.customBoxDepth) {
-		// Only depth constrained - use print bed max for width
-		targetWidth = interiorMax;
-		targetDepth = options.customBoxDepth - wallThickness * 2 - tolerance * 2;
-	} else {
-		targetWidth = interiorMax;
-		targetDepth = interiorMax;
-	}
+  if (options?.customBoxWidth && options?.customBoxDepth) {
+    targetWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
+    targetDepth = options.customBoxDepth - wallThickness * 2 - tolerance * 2;
+  } else if (options?.customBoxWidth) {
+    // Only width constrained - use it for width, print bed max for depth
+    targetWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
+    targetDepth = interiorMax;
+  } else if (options?.customBoxDepth) {
+    // Only depth constrained - use print bed max for width
+    targetWidth = interiorMax;
+    targetDepth = options.customBoxDepth - wallThickness * 2 - tolerance * 2;
+  } else {
+    targetWidth = interiorMax;
+    targetDepth = interiorMax;
+  }
 
-	// Extended Rect class to store tray data
-	class TrayPackRect extends Rect {
-		trayRect: TrayRect;
-		originalWidth: number;
-		originalHeight: number;
+  // Extended Rect class to store tray data
+  class TrayPackRect extends Rect {
+    trayRect: TrayRect;
+    originalWidth: number;
+    originalHeight: number;
 
-		constructor(trayRect: TrayRect) {
-			super(0, 0, trayRect.width, trayRect.depth);
-			this.trayRect = trayRect;
-			this.originalWidth = trayRect.width;
-			this.originalHeight = trayRect.depth;
-		}
-	}
+    constructor(trayRect: TrayRect) {
+      super(0, 0, trayRect.width, trayRect.depth);
+      this.trayRect = trayRect;
+      this.originalWidth = trayRect.width;
+      this.originalHeight = trayRect.depth;
+    }
+  }
 
-	// Try GuillotineBinPack with different heuristics
-	const tryGuillotine = (
-		width: number,
-		height: number,
-		allowFlip: boolean,
-		rectChoice: number,
-		splitMethod: number
-	): TrayPlacement[] | null => {
-		const packer = new GuillotineBinPack<TrayPackRect>(width, height, allowFlip);
+  // Try GuillotineBinPack with different heuristics
+  const tryGuillotine = (
+    width: number,
+    height: number,
+    allowFlip: boolean,
+    rectChoice: number,
+    splitMethod: number
+  ): TrayPlacement[] | null => {
+    const packer = new GuillotineBinPack<TrayPackRect>(width, height, allowFlip);
 
-		// Sort trays by area (largest first) for better packing
-		const sortedTrayRects = [...trayRects].sort((a, b) => b.width * b.depth - a.width * a.depth);
+    // Sort trays by area (largest first) for better packing
+    const sortedTrayRects = [...trayRects].sort((a, b) => b.width * b.depth - a.width * a.depth);
 
-		// Create rect objects for packing (sorted by area)
-		const rects = sortedTrayRects.map((r) => new TrayPackRect(r));
+    // Create rect objects for packing (sorted by area)
+    const rects = sortedTrayRects.map((r) => new TrayPackRect(r));
 
-		// Insert all rectangles
-		packer.InsertSizes(rects, true, rectChoice, splitMethod);
+    // Insert all rectangles
+    packer.InsertSizes(rects, true, rectChoice, splitMethod);
 
-		// Check if all were placed
-		if (packer.usedRectangles.length !== trayRects.length) return null;
+    // Check if all were placed
+    if (packer.usedRectangles.length !== trayRects.length) return null;
 
-		// Verify no overlaps in the packing result
-		const OVERLAP_EPSILON = 0.01;
-		for (let i = 0; i < packer.usedRectangles.length; i++) {
-			for (let j = i + 1; j < packer.usedRectangles.length; j++) {
-				const r1 = packer.usedRectangles[i];
-				const r2 = packer.usedRectangles[j];
-				const noOverlapX =
-					r1.x + r1.width <= r2.x + OVERLAP_EPSILON || r2.x + r2.width <= r1.x + OVERLAP_EPSILON;
-				const noOverlapY =
-					r1.y + r1.height <= r2.y + OVERLAP_EPSILON || r2.y + r2.height <= r1.y + OVERLAP_EPSILON;
-				if (!noOverlapX && !noOverlapY) {
-					// Overlap detected - reject this packing
-					return null;
-				}
-			}
-		}
+    // Verify no overlaps in the packing result
+    const OVERLAP_EPSILON = 0.01;
+    for (let i = 0; i < packer.usedRectangles.length; i++) {
+      for (let j = i + 1; j < packer.usedRectangles.length; j++) {
+        const r1 = packer.usedRectangles[i];
+        const r2 = packer.usedRectangles[j];
+        const noOverlapX = r1.x + r1.width <= r2.x + OVERLAP_EPSILON || r2.x + r2.width <= r1.x + OVERLAP_EPSILON;
+        const noOverlapY = r1.y + r1.height <= r2.y + OVERLAP_EPSILON || r2.y + r2.height <= r1.y + OVERLAP_EPSILON;
+        if (!noOverlapX && !noOverlapY) {
+          // Overlap detected - reject this packing
+          return null;
+        }
+      }
+    }
 
-		// Calculate bounding box and verify fit
-		let maxX = 0;
-		let maxY = 0;
-		for (const rect of packer.usedRectangles) {
-			maxX = Math.max(maxX, rect.x + rect.width);
-			maxY = Math.max(maxY, rect.y + rect.height);
-		}
+    // Calculate bounding box and verify fit
+    let maxX = 0;
+    let maxY = 0;
+    for (const rect of packer.usedRectangles) {
+      maxX = Math.max(maxX, rect.x + rect.width);
+      maxY = Math.max(maxY, rect.y + rect.height);
+    }
 
-		if (maxX > targetWidth || maxY > targetDepth) return null;
+    if (maxX > targetWidth || maxY > targetDepth) return null;
 
-		// Convert to placements
-		const placements: TrayPlacement[] = [];
-		for (const rect of packer.usedRectangles) {
-			const trayRect = rect.trayRect;
-			// Check if rotated by comparing dimensions
-			const wasRotated =
-				Math.abs(rect.width - rect.originalHeight) < 0.01 &&
-				Math.abs(rect.height - rect.originalWidth) < 0.01;
+    // Convert to placements
+    const placements: TrayPlacement[] = [];
+    for (const rect of packer.usedRectangles) {
+      const trayRect = rect.trayRect;
+      // Check if rotated by comparing dimensions
+      const wasRotated =
+        Math.abs(rect.width - rect.originalHeight) < 0.01 && Math.abs(rect.height - rect.originalWidth) < 0.01;
 
-			placements.push({
-				tray: trayRect.tray,
-				dimensions: {
-					width: rect.width,
-					depth: rect.height,
-					height: trayRect.height
-				},
-				x: rect.x,
-				y: rect.y,
-				rotated: wasRotated
-			});
-		}
+      placements.push({
+        tray: trayRect.tray,
+        dimensions: {
+          width: rect.width,
+          depth: rect.height,
+          height: trayRect.height
+        },
+        x: rect.x,
+        y: rect.y,
+        rotated: wasRotated
+      });
+    }
 
-		return placements;
-	};
+    return placements;
+  };
 
-	// Try combinations of heuristics
-	// RectChoice: 0=BestAreaFit, 1=BestShortSideFit, 2=BestLongSideFit (skip "Worst" variants 3-5)
-	// SplitMethod: all 6 are useful (no "worst" variants)
-	const rectChoices = [0, 1, 2];
-	const splitMethods = [0, 1, 2, 3, 4, 5];
+  // Try combinations of heuristics
+  // RectChoice: 0=BestAreaFit, 1=BestShortSideFit, 2=BestLongSideFit (skip "Worst" variants 3-5)
+  // SplitMethod: all 6 are useful (no "worst" variants)
+  const rectChoices = [0, 1, 2];
+  const splitMethods = [0, 1, 2, 3, 4, 5];
 
-	interface PackResult {
-		placements: TrayPlacement[];
-		area: number;
-	}
+  interface PackResult {
+    placements: TrayPlacement[];
+    area: number;
+  }
 
-	const results: PackResult[] = [];
+  const results: PackResult[] = [];
 
-	// Try all combinations with and without rotation
-	for (const allowFlip of [true, false]) {
-		for (const rectChoice of rectChoices) {
-			for (const splitMethod of splitMethods) {
-				const placements = tryGuillotine(
-					targetWidth,
-					targetDepth,
-					allowFlip,
-					rectChoice,
-					splitMethod
-				);
-				if (placements) {
-					let maxX = 0;
-					let maxY = 0;
-					for (const p of placements) {
-						maxX = Math.max(maxX, p.x + p.dimensions.width);
-						maxY = Math.max(maxY, p.y + p.dimensions.depth);
-					}
-					results.push({ placements, area: maxX * maxY });
-				}
-			}
-		}
-	}
+  // Try all combinations with and without rotation
+  for (const allowFlip of [true, false]) {
+    for (const rectChoice of rectChoices) {
+      for (const splitMethod of splitMethods) {
+        const placements = tryGuillotine(targetWidth, targetDepth, allowFlip, rectChoice, splitMethod);
+        if (placements) {
+          let maxX = 0;
+          let maxY = 0;
+          for (const p of placements) {
+            maxX = Math.max(maxX, p.x + p.dimensions.width);
+            maxY = Math.max(maxY, p.y + p.dimensions.depth);
+          }
+          results.push({ placements, area: maxX * maxY });
+        }
+      }
+    }
+  }
 
-	// If we found valid results, return the most compact one
-	if (results.length > 0) {
-		results.sort((a, b) => a.area - b.area);
-		return results[0].placements;
-	}
+  // If we found valid results, return the most compact one
+  if (results.length > 0) {
+    results.sort((a, b) => a.area - b.area);
+    return results[0].placements;
+  }
 
-	// Fallback: stack vertically (trays don't fit within constraints)
-	let y = 0;
-	return trayRects.map((rect) => {
-		const placement: TrayPlacement = {
-			tray: rect.tray,
-			dimensions: { width: rect.width, depth: rect.depth, height: rect.height },
-			x: 0,
-			y,
-			rotated: false
-		};
-		y += rect.depth;
-		return placement;
-	});
+  // Fallback: stack vertically (trays don't fit within constraints)
+  let y = 0;
+  return trayRects.map((rect) => {
+    const placement: TrayPlacement = {
+      tray: rect.tray,
+      dimensions: { width: rect.width, depth: rect.depth, height: rect.height },
+      x: 0,
+      y,
+      rotated: false
+    };
+    y += rect.depth;
+    return placement;
+  });
 }
 
 // Calculate box interior dimensions from tray placements
-export function getBoxInteriorDimensions(
-	placements: TrayPlacement[],
-	tolerance: number
-): TrayDimensions {
-	if (placements.length === 0) {
-		return { width: 0, depth: 0, height: 0 };
-	}
+export function getBoxInteriorDimensions(placements: TrayPlacement[], tolerance: number): TrayDimensions {
+  if (placements.length === 0) {
+    return { width: 0, depth: 0, height: 0 };
+  }
 
-	let maxX = 0;
-	let maxY = 0;
-	let maxHeight = 0;
+  let maxX = 0;
+  let maxY = 0;
+  let maxHeight = 0;
 
-	for (const p of placements) {
-		maxX = Math.max(maxX, p.x + p.dimensions.width);
-		maxY = Math.max(maxY, p.y + p.dimensions.depth);
-		maxHeight = Math.max(maxHeight, p.dimensions.height);
-	}
+  for (const p of placements) {
+    maxX = Math.max(maxX, p.x + p.dimensions.width);
+    maxY = Math.max(maxY, p.y + p.dimensions.depth);
+    maxHeight = Math.max(maxHeight, p.dimensions.height);
+  }
 
-	// Add tolerance around all sides
-	return {
-		width: maxX + tolerance * 2,
-		depth: maxY + tolerance * 2,
-		height: maxHeight + tolerance
-	};
+  // Add tolerance around all sides
+  return {
+    width: maxX + tolerance * 2,
+    depth: maxY + tolerance * 2,
+    height: maxHeight + tolerance
+  };
 }
 
 // Corner radius for rounded boxes (proportional to wall thickness)
@@ -785,302 +757,282 @@ const CORNER_SEGMENTS = 64;
 
 // Create a rounded rectangle outline using hull of cylinders at corners
 function createRoundedBox(
-	width: number,
-	depth: number,
-	height: number,
-	cornerRadius: number,
-	center: [number, number, number]
+  width: number,
+  depth: number,
+  height: number,
+  cornerRadius: number,
+  center: [number, number, number]
 ): Geom3 {
-	const r = Math.min(cornerRadius, width / 2, depth / 2);
-	const [cx, cy, cz] = center;
+  const r = Math.min(cornerRadius, width / 2, depth / 2);
+  const [cx, cy, cz] = center;
 
-	// Create cylinders at 4 corners and hull them
-	const corners = [
-		translate(
-			[cx - width / 2 + r, cy - depth / 2 + r, cz],
-			cylinder({ radius: r, height, segments: CORNER_SEGMENTS })
-		),
-		translate(
-			[cx + width / 2 - r, cy - depth / 2 + r, cz],
-			cylinder({ radius: r, height, segments: CORNER_SEGMENTS })
-		),
-		translate(
-			[cx - width / 2 + r, cy + depth / 2 - r, cz],
-			cylinder({ radius: r, height, segments: CORNER_SEGMENTS })
-		),
-		translate(
-			[cx + width / 2 - r, cy + depth / 2 - r, cz],
-			cylinder({ radius: r, height, segments: CORNER_SEGMENTS })
-		)
-	];
+  // Create cylinders at 4 corners and hull them
+  const corners = [
+    translate([cx - width / 2 + r, cy - depth / 2 + r, cz], cylinder({ radius: r, height, segments: CORNER_SEGMENTS })),
+    translate([cx + width / 2 - r, cy - depth / 2 + r, cz], cylinder({ radius: r, height, segments: CORNER_SEGMENTS })),
+    translate([cx - width / 2 + r, cy + depth / 2 - r, cz], cylinder({ radius: r, height, segments: CORNER_SEGMENTS })),
+    translate([cx + width / 2 - r, cy + depth / 2 - r, cz], cylinder({ radius: r, height, segments: CORNER_SEGMENTS }))
+  ];
 
-	return hull(...corners);
+  return hull(...corners);
 }
 
 // Diameter of poke holes for pushing trays out from below
 const POKE_HOLE_DIAMETER = 15;
 
 // Create box geometry with rounded corners
-export function createBox(
-	box: Box,
-	cardSizes: CardSize[] = [],
-	counterShapes: CounterShape[] = []
-): Geom3 | null {
-	if (box.trays.length === 0) return null;
+export function createBox(box: Box, cardSizes: CardSize[] = [], counterShapes: CounterShape[] = []): Geom3 | null {
+  if (box.trays.length === 0) return null;
 
-	const placements = arrangeTrays(box.trays, {
-		customBoxWidth: box.customWidth,
-		wallThickness: box.wallThickness,
-		tolerance: box.tolerance,
-		cardSizes,
-		counterShapes,
-		manualLayout: box.manualLayout
-	});
-	const interior = getBoxInteriorDimensions(placements, box.tolerance);
+  const placements = arrangeTrays(box.trays, {
+    customBoxWidth: box.customWidth,
+    wallThickness: box.wallThickness,
+    tolerance: box.tolerance,
+    cardSizes,
+    counterShapes,
+    manualLayout: box.manualLayout
+  });
+  const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
-	// Box exterior dimensions
-	const exteriorWidth = interior.width + box.wallThickness * 2;
-	const exteriorDepth = interior.depth + box.wallThickness * 2;
-	const exteriorHeight = interior.height + box.floorThickness;
+  // Box exterior dimensions
+  const exteriorWidth = interior.width + box.wallThickness * 2;
+  const exteriorDepth = interior.depth + box.wallThickness * 2;
+  const exteriorHeight = interior.height + box.floorThickness;
 
-	const cornerRadius = getCornerRadius(box.wallThickness);
-	const innerCornerRadius = Math.max(cornerRadius - box.wallThickness, 1);
+  const cornerRadius = getCornerRadius(box.wallThickness);
+  const innerCornerRadius = Math.max(cornerRadius - box.wallThickness, 1);
 
-	// Create outer shell with rounded corners
-	const outer = createRoundedBox(exteriorWidth, exteriorDepth, exteriorHeight, cornerRadius, [
-		exteriorWidth / 2,
-		exteriorDepth / 2,
-		exteriorHeight / 2
-	]);
+  // Create outer shell with rounded corners
+  const outer = createRoundedBox(exteriorWidth, exteriorDepth, exteriorHeight, cornerRadius, [
+    exteriorWidth / 2,
+    exteriorDepth / 2,
+    exteriorHeight / 2
+  ]);
 
-	// Create interior cavity with rounded corners
-	const inner = translate(
-		[box.wallThickness, box.wallThickness, box.floorThickness],
-		createRoundedBox(interior.width, interior.depth, interior.height + 1, innerCornerRadius, [
-			interior.width / 2,
-			interior.depth / 2,
-			(interior.height + 1) / 2
-		])
-	);
+  // Create interior cavity with rounded corners
+  const inner = translate(
+    [box.wallThickness, box.wallThickness, box.floorThickness],
+    createRoundedBox(interior.width, interior.depth, interior.height + 1, innerCornerRadius, [
+      interior.width / 2,
+      interior.depth / 2,
+      (interior.height + 1) / 2
+    ])
+  );
 
-	let result = subtract(outer, inner);
+  let result = subtract(outer, inner);
 
-	// Create poke holes at the center of each tray position
-	for (const p of placements) {
-		// Calculate center of tray in box coordinates
-		// Tray positions are relative to interior, add wall thickness and tolerance offset
-		const centerX = box.wallThickness + box.tolerance + p.x + p.dimensions.width / 2;
-		const centerY = box.wallThickness + box.tolerance + p.y + p.dimensions.depth / 2;
+  // Create poke holes at the center of each tray position
+  for (const p of placements) {
+    // Calculate center of tray in box coordinates
+    // Tray positions are relative to interior, add wall thickness and tolerance offset
+    const centerX = box.wallThickness + box.tolerance + p.x + p.dimensions.width / 2;
+    const centerY = box.wallThickness + box.tolerance + p.y + p.dimensions.depth / 2;
 
-		const hole = translate(
-			[centerX, centerY, box.floorThickness / 2],
-			cylinder({
-				radius: POKE_HOLE_DIAMETER / 2,
-				height: box.floorThickness + 1,
-				segments: 32
-			})
-		);
-		result = subtract(result, hole);
-	}
+    const hole = translate(
+      [centerX, centerY, box.floorThickness / 2],
+      cylinder({
+        radius: POKE_HOLE_DIAMETER / 2,
+        height: box.floorThickness + 1,
+        segments: 32
+      })
+    );
+    result = subtract(result, hole);
+  }
 
-	return result;
+  return result;
 }
 
 // Calculate minimum required exterior dimensions for a box
 export function calculateMinimumBoxDimensions(
-	box: Box,
-	cardSizes: CardSize[] = [],
-	counterShapes: CounterShape[] = []
+  box: Box,
+  cardSizes: CardSize[] = [],
+  counterShapes: CounterShape[] = []
 ): BoxMinimumDimensions {
-	if (box.trays.length === 0) {
-		return { minWidth: 0, minDepth: 0, minHeight: 0 };
-	}
+  if (box.trays.length === 0) {
+    return { minWidth: 0, minDepth: 0, minHeight: 0 };
+  }
 
-	const placements = arrangeTrays(box.trays, {
-		customBoxWidth: box.customWidth,
-		wallThickness: box.wallThickness,
-		tolerance: box.tolerance,
-		cardSizes,
-		counterShapes,
-		manualLayout: box.manualLayout
-	});
-	const interior = getBoxInteriorDimensions(placements, box.tolerance);
+  const placements = arrangeTrays(box.trays, {
+    customBoxWidth: box.customWidth,
+    wallThickness: box.wallThickness,
+    tolerance: box.tolerance,
+    cardSizes,
+    counterShapes,
+    manualLayout: box.manualLayout
+  });
+  const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
-	return {
-		minWidth: interior.width + box.wallThickness * 2,
-		minDepth: interior.depth + box.wallThickness * 2,
-		minHeight: interior.height + box.floorThickness
-	};
+  return {
+    minWidth: interior.width + box.wallThickness * 2,
+    minDepth: interior.depth + box.wallThickness * 2,
+    minHeight: interior.height + box.floorThickness
+  };
 }
 
 // Validate custom dimensions against minimum requirements
 export function validateCustomDimensions(
-	box: Box,
-	cardSizes: CardSize[] = [],
-	counterShapes: CounterShape[] = []
+  box: Box,
+  cardSizes: CardSize[] = [],
+  counterShapes: CounterShape[] = []
 ): ValidationResult {
-	const errors: string[] = [];
+  const errors: string[] = [];
 
-	// If customWidth is set, first check if any single tray is too wide
-	// (this is a hard constraint - a tray physically wider than the box can't fit)
-	if (box.customWidth !== undefined) {
-		const interiorWidth = box.customWidth - box.wallThickness * 2 - box.tolerance * 2;
+  // If customWidth is set, first check if any single tray is too wide
+  // (this is a hard constraint - a tray physically wider than the box can't fit)
+  if (box.customWidth !== undefined) {
+    const interiorWidth = box.customWidth - box.wallThickness * 2 - box.tolerance * 2;
 
-		for (const tray of box.trays) {
-			const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
-			// Check both orientations - tray can be rotated to fit
-			const minWidth = Math.min(dims.width, dims.depth);
+    for (const tray of box.trays) {
+      const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
+      // Check both orientations - tray can be rotated to fit
+      const minWidth = Math.min(dims.width, dims.depth);
 
-			if (minWidth > interiorWidth) {
-				errors.push(
-					`Tray "${tray.name}" is too wide to fit in box. Tray minimum dimension: ${minWidth.toFixed(1)}mm, Box interior: ${interiorWidth.toFixed(1)}mm`
-				);
-			}
-		}
-	}
+      if (minWidth > interiorWidth) {
+        errors.push(
+          `Tray "${tray.name}" is too wide to fit in box. Tray minimum dimension: ${minWidth.toFixed(1)}mm, Box interior: ${interiorWidth.toFixed(1)}mm`
+        );
+      }
+    }
+  }
 
-	// If customDepth is set, check if any single tray is too deep (in its narrowest orientation)
-	if (box.customDepth !== undefined) {
-		const interiorDepth = box.customDepth - box.wallThickness * 2 - box.tolerance * 2;
+  // If customDepth is set, check if any single tray is too deep (in its narrowest orientation)
+  if (box.customDepth !== undefined) {
+    const interiorDepth = box.customDepth - box.wallThickness * 2 - box.tolerance * 2;
 
-		for (const tray of box.trays) {
-			const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
-			// Check both orientations
-			const minDepth = Math.min(dims.width, dims.depth);
+    for (const tray of box.trays) {
+      const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
+      // Check both orientations
+      const minDepth = Math.min(dims.width, dims.depth);
 
-			if (minDepth > interiorDepth) {
-				errors.push(
-					`Tray "${tray.name}" is too deep to fit in box. Tray minimum dimension: ${minDepth.toFixed(1)}mm, Box interior: ${interiorDepth.toFixed(1)}mm`
-				);
-			}
-		}
-	}
+      if (minDepth > interiorDepth) {
+        errors.push(
+          `Tray "${tray.name}" is too deep to fit in box. Tray minimum dimension: ${minDepth.toFixed(1)}mm, Box interior: ${interiorDepth.toFixed(1)}mm`
+        );
+      }
+    }
+  }
 
-	// Calculate minimums based on actual arrangement (which now respects customWidth)
-	const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
+  // Calculate minimums based on actual arrangement (which now respects customWidth)
+  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
 
-	// Only validate customDepth if it's explicitly set (width can grow to accommodate)
-	// The arrangement algorithm handles width constraints by using more rows
-	if (box.customDepth !== undefined && box.customDepth < minimums.minDepth) {
-		errors.push(
-			`Custom depth (${box.customDepth.toFixed(1)}mm) is smaller than minimum required (${minimums.minDepth.toFixed(1)}mm)`
-		);
-	}
+  // Only validate customDepth if it's explicitly set (width can grow to accommodate)
+  // The arrangement algorithm handles width constraints by using more rows
+  if (box.customDepth !== undefined && box.customDepth < minimums.minDepth) {
+    errors.push(
+      `Custom depth (${box.customDepth.toFixed(1)}mm) is smaller than minimum required (${minimums.minDepth.toFixed(1)}mm)`
+    );
+  }
 
-	// Validate height (this is always a hard constraint)
-	if (box.customBoxHeight !== undefined && box.customBoxHeight < minimums.minHeight) {
-		errors.push(
-			`Custom height (${box.customBoxHeight.toFixed(1)}mm) is smaller than minimum required (${minimums.minHeight.toFixed(1)}mm)`
-		);
-	}
+  // Validate height (this is always a hard constraint)
+  if (box.customBoxHeight !== undefined && box.customBoxHeight < minimums.minHeight) {
+    errors.push(
+      `Custom height (${box.customBoxHeight.toFixed(1)}mm) is smaller than minimum required (${minimums.minHeight.toFixed(1)}mm)`
+    );
+  }
 
-	return {
-		valid: errors.length === 0,
-		errors,
-		minimums
-	};
+  return {
+    valid: errors.length === 0,
+    errors,
+    minimums
+  };
 }
 
 // Calculate floor spacer heights for each tray to fill height gaps
 export function calculateTraySpacers(
-	box: Box,
-	cardSizes: CardSize[] = [],
-	counterShapes: CounterShape[] = []
+  box: Box,
+  cardSizes: CardSize[] = [],
+  counterShapes: CounterShape[] = []
 ): TraySpacerInfo[] {
-	if (box.trays.length === 0) return [];
+  if (box.trays.length === 0) return [];
 
-	const placements = arrangeTrays(box.trays, {
-		customBoxWidth: box.customWidth,
-		wallThickness: box.wallThickness,
-		tolerance: box.tolerance,
-		cardSizes,
-		counterShapes,
-		manualLayout: box.manualLayout
-	});
-	const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
+  const placements = arrangeTrays(box.trays, {
+    customBoxWidth: box.customWidth,
+    wallThickness: box.wallThickness,
+    tolerance: box.tolerance,
+    cardSizes,
+    counterShapes,
+    manualLayout: box.manualLayout
+  });
+  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
 
-	// Target exterior height (custom or auto)
-	const targetExteriorHeight = box.customBoxHeight ?? minimums.minHeight;
-	const extraHeight = Math.max(0, targetExteriorHeight - minimums.minHeight);
+  // Target exterior height (custom or auto)
+  const targetExteriorHeight = box.customBoxHeight ?? minimums.minHeight;
+  const extraHeight = Math.max(0, targetExteriorHeight - minimums.minHeight);
 
-	// Each tray gets the same floor spacer (keeps all trays flush at top)
-	return placements.map((placement) => ({
-		trayId: placement.tray.id,
-		placement,
-		floorSpacerHeight: extraHeight
-	}));
+  // Each tray gets the same floor spacer (keeps all trays flush at top)
+  return placements.map((placement) => ({
+    trayId: placement.tray.id,
+    placement,
+    floorSpacerHeight: extraHeight
+  }));
 }
 
 // Get box exterior dimensions (uses custom dimensions when set)
 export function getBoxDimensions(box: Box): TrayDimensions | null {
-	if (box.trays.length === 0) return null;
+  if (box.trays.length === 0) return null;
 
-	const minimums = calculateMinimumBoxDimensions(box);
+  const minimums = calculateMinimumBoxDimensions(box);
 
-	return {
-		width: box.customWidth ?? minimums.minWidth,
-		depth: box.customDepth ?? minimums.minDepth,
-		height: box.customBoxHeight ?? minimums.minHeight
-	};
+  return {
+    width: box.customWidth ?? minimums.minWidth,
+    depth: box.customDepth ?? minimums.minDepth,
+    height: box.customBoxHeight ?? minimums.minHeight
+  };
 }
 
 // Get lid height for a box (lid thickness is 2x wall thickness)
 export function getLidHeight(box: Box): number {
-	return box.wallThickness * 2;
+  return box.wallThickness * 2;
 }
 
 // Get total assembled height (box + lid)
 export function getTotalAssembledHeight(box: Box): number | null {
-	const dims = getBoxDimensions(box);
-	if (!dims) return null;
-	return dims.height + getLidHeight(box);
+  const dims = getBoxDimensions(box);
+  if (!dims) return null;
+  return dims.height + getLidHeight(box);
 }
 
 // Calculate minimum total height (minimum box height + lid height)
 export function calculateMinimumTotalHeight(box: Box): number {
-	const minimums = calculateMinimumBoxDimensions(box);
-	return minimums.minHeight + getLidHeight(box);
+  const minimums = calculateMinimumBoxDimensions(box);
+  return minimums.minHeight + getLidHeight(box);
 }
 
 // Arrange multiple boxes in a row for the "all boxes" view
 // Returns X positions centered around origin
 export function arrangeBoxes(
-	boxes: { width: number; depth: number }[],
-	gap: number = 20
+  boxes: { width: number; depth: number }[],
+  gap: number = 20
 ): { x: number; totalWidth: number }[] {
-	if (boxes.length === 0) return [];
+  if (boxes.length === 0) return [];
 
-	let currentX = 0;
-	const positions: { x: number; totalWidth: number }[] = [];
+  let currentX = 0;
+  const positions: { x: number; totalWidth: number }[] = [];
 
-	for (const box of boxes) {
-		positions.push({ x: currentX + box.width / 2, totalWidth: currentX + box.width });
-		currentX += box.width + gap;
-	}
+  for (const box of boxes) {
+    positions.push({ x: currentX + box.width / 2, totalWidth: currentX + box.width });
+    currentX += box.width + gap;
+  }
 
-	// Center all boxes around origin
-	const totalWidth = currentX - gap;
-	const offset = totalWidth / 2;
+  // Center all boxes around origin
+  const totalWidth = currentX - gap;
+  const offset = totalWidth / 2;
 
-	return positions.map((p) => ({ ...p, x: p.x - offset }));
+  return positions.map((p) => ({ ...p, x: p.x - offset }));
 }
 
 // DEPRECATED: Card sizes are now at project level (project.cardSizes)
 // This function is kept for backwards compatibility but returns an empty array
 // Use getCardSizes() from project.svelte.ts instead
 export function getCustomCardSizesFromBoxes(_boxes: Box[]): CardSize[] {
-	console.warn(
-		'getCustomCardSizesFromBoxes is deprecated - use getCardSizes() from project.svelte.ts'
-	);
-	return [];
+  console.warn('getCustomCardSizesFromBoxes is deprecated - use getCardSizes() from project.svelte.ts');
+  return [];
 }
 
 // DEPRECATED: Card sizes are now at project level (project.cardSizes)
 // This function is kept for backwards compatibility but returns an empty array
 // Use getCardSizes() from project.svelte.ts instead
 export function getCustomCardSizesFromBox(_box: Box): CardSize[] {
-	console.warn(
-		'getCustomCardSizesFromBox is deprecated - use getCardSizes() from project.svelte.ts'
-	);
-	return [];
+  console.warn('getCustomCardSizesFromBox is deprecated - use getCardSizes() from project.svelte.ts');
+  return [];
 }
