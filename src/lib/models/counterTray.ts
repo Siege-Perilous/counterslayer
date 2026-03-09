@@ -38,7 +38,8 @@ export interface CounterTrayParams {
   trayWidthOverride: number;
   topLoadedStacks: TopLoadedStackDef[];
   edgeLoadedStacks: EdgeLoadedStackDef[];
-  printBedSize: number;
+  gameContainerWidth: number;
+  gameContainerDepth: number;
 }
 
 // Default shape and card size IDs (must match DEFAULT_COUNTER_SHAPES and DEFAULT_CARD_SIZES in project store)
@@ -84,7 +85,8 @@ export const defaultParams: CounterTrayParams = {
     [DEFAULT_SHAPE_IDS.square, 4, 'lengthwise'],
     [DEFAULT_SHAPE_IDS.square, 4, 'crosswise']
   ],
-  printBedSize: 256
+  gameContainerWidth: 256,
+  gameContainerDepth: 256
 };
 
 // Counter preview data for visualization

@@ -32,6 +32,7 @@
     getSelectedTray,
     getSelectedBox,
     getProject,
+    getGlobalSettings,
     importProject,
     resetProject,
     getCumulativeTrayLetter,
@@ -151,7 +152,11 @@
 
   let selectedTray = $derived(getSelectedTray());
   let selectedBox = $derived(getSelectedBox());
-  let printBedSize = $derived(selectedTray && isCounterTray(selectedTray) ? selectedTray.params.printBedSize : 256);
+  let globalSettings = $derived(getGlobalSettings());
+  let gameContainerWidth = $derived(globalSettings.gameContainerWidth);
+  let gameContainerDepth = $derived(globalSettings.gameContainerDepth);
+  // For backwards compatibility
+  let printBedSize = $derived(Math.max(gameContainerWidth, gameContainerDepth));
   let selectedTrayLetter = $derived.by(() => {
     // Use override during PDF capture
     if (captureTrayLetter) return captureTrayLetter;
@@ -1020,8 +1025,8 @@
     // The layout editor bounds should be the maximum usable interior (print bed minus walls)
     // Always use print bed size, not current box size, so user can expand layout
     const wallOffset = (box.wallThickness + box.tolerance) * 2;
-    const interiorWidth = printBedSize - wallOffset;
-    const interiorDepth = printBedSize - wallOffset;
+    const interiorWidth = gameContainerWidth - wallOffset;
+    const interiorDepth = gameContainerDepth - wallOffset;
 
     // Enter edit mode with current placements and interior bounds
     enterEditMode(placements, interiorWidth, interiorDepth);
@@ -1154,7 +1159,8 @@
               allBoxes={visibleGeometries.allBoxes}
               boxGeometry={visibleGeometries.box}
               lidGeometry={visibleGeometries.lid}
-              {printBedSize}
+              {gameContainerWidth}
+              {gameContainerDepth}
               exploded={visibleGeometries.exploded}
               showAllTrays={visibleGeometries.showAllTrays}
               showAllBoxes={visibleGeometries.showAllBoxes}
@@ -1325,7 +1331,7 @@
     <!-- Mobile Editor Pane (bottom) -->
     <Pane defaultSize={0} minSize={0} maxSize={60} bind:this={mobileEditorPane}>
       <div class="mobilePanelContent">
-        <EditorPanel {selectionType} {isLayoutEditMode} {printBedSize} />
+        <EditorPanel {selectionType} {isLayoutEditMode} {gameContainerWidth} {gameContainerDepth} />
       </div>
     </Pane>
   </PaneGroup>
@@ -1349,7 +1355,8 @@
               allBoxes={visibleGeometries.allBoxes}
               boxGeometry={visibleGeometries.box}
               lidGeometry={visibleGeometries.lid}
-              {printBedSize}
+              {gameContainerWidth}
+              {gameContainerDepth}
               exploded={visibleGeometries.exploded}
               showAllTrays={visibleGeometries.showAllTrays}
               showAllBoxes={visibleGeometries.showAllBoxes}
@@ -1546,7 +1553,7 @@
       onCollapse={() => (isEditorCollapsed = true)}
       onExpand={() => (isEditorCollapsed = false)}
     >
-      <EditorPanel {selectionType} {isLayoutEditMode} {printBedSize} />
+      <EditorPanel {selectionType} {isLayoutEditMode} {gameContainerWidth} {gameContainerDepth} />
     </Pane>
   </PaneGroup>
 {/if}

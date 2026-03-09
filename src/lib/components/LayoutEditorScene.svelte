@@ -13,7 +13,8 @@
     setSnapGuides,
     clearSnapGuides,
     getActiveSnapGuides,
-    getPrintBedSize,
+    getGameContainerWidth,
+    getGameContainerDepth,
     getEffectiveDimensions,
     type EditorTrayPlacement
   } from '$lib/stores/layoutEditor.svelte';
@@ -39,7 +40,10 @@
   let placements = $derived(getWorkingPlacements());
   let selectedTrayId = $derived(getSelectedTrayId());
   let snapGuides = $derived(getActiveSnapGuides());
-  let printBedSize = $derived(getPrintBedSize());
+  let gameContainerWidth = $derived(getGameContainerWidth());
+  let gameContainerDepth = $derived(getGameContainerDepth());
+  // Use max dimension for legacy print bed size calculations
+  let printBedSize = $derived(Math.max(gameContainerWidth, gameContainerDepth));
 
   // Raycaster for picking
   const raycaster = new THREE.Raycaster();
@@ -126,10 +130,10 @@
         const placement = placements.find((p) => p.trayId === selectedTrayId);
         if (placement) {
           // Apply snapping
-          const snapResult = snapPosition(placement, newX, newY, placements, printBedSize);
+          const snapResult = snapPosition(placement, newX, newY, placements, gameContainerWidth, gameContainerDepth);
 
           // Check if position is valid (no overlaps)
-          if (isValidPosition(placement, snapResult.x, snapResult.y, placements, printBedSize)) {
+          if (isValidPosition(placement, snapResult.x, snapResult.y, placements, gameContainerWidth, gameContainerDepth)) {
             updateTrayPosition(selectedTrayId, snapResult.x, snapResult.y);
             setSnapGuides(snapResult.guides);
           }
@@ -198,11 +202,11 @@
 </script>
 
 <!-- Camera and controls -->
-<T.PerspectiveCamera makeDefault position={[printBedSize * 0.5, printBedSize * 0.8, printBedSize * 0.8]} fov={45} />
+<T.PerspectiveCamera makeDefault position={[gameContainerWidth * 0.5, printBedSize * 0.8, gameContainerDepth * 0.8]} fov={45} />
 <OrbitControls
   enableDamping
   dampingFactor={0.1}
-  target={[printBedSize / 2, 0, -printBedSize / 2]}
+  target={[gameContainerWidth / 2, 0, -gameContainerDepth / 2]}
   enabled={!isDragging}
 />
 
@@ -210,15 +214,15 @@
 <SceneLighting preset="editor" />
 
 <!-- Print bed floor -->
-<T.Mesh rotation.x={-Math.PI / 2} position={[printBedSize / 2, -0.5, -printBedSize / 2]}>
-  <T.PlaneGeometry args={[printBedSize, printBedSize]} />
+<T.Mesh rotation.x={-Math.PI / 2} position={[gameContainerWidth / 2, -0.5, -gameContainerDepth / 2]}>
+  <T.PlaneGeometry args={[gameContainerWidth, gameContainerDepth]} />
   <T.MeshStandardMaterial color="#1a1a1a" />
 </T.Mesh>
 
 <!-- Grid helper -->
 <T.GridHelper
   args={[printBedSize, printBedSize / 10, '#333333', '#222222']}
-  position={[printBedSize / 2, 0.01, -printBedSize / 2]}
+  position={[gameContainerWidth / 2, 0.01, -gameContainerDepth / 2]}
 />
 
 <!-- Tray meshes -->

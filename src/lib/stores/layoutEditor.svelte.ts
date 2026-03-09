@@ -37,7 +37,8 @@ let isEditMode = $state(false);
 let selectedTrayId = $state<string | null>(null);
 let workingPlacements = $state<EditorTrayPlacement[]>([]);
 let originalPlacements = $state<EditorTrayPlacement[]>([]); // For cancel/restore
-let printBedSize = $state(256); // Legacy - use boundsWidth/boundsDepth instead
+let gameContainerWidth = $state(256); // Game container width (used for legacy printBedSize compatibility)
+let gameContainerDepth = $state(256); // Game container depth
 let boundsWidth = $state(256); // Interior width (box width minus walls)
 let boundsDepth = $state(256); // Interior depth (box depth minus walls)
 
@@ -86,8 +87,11 @@ export const layoutEditorState = {
   get activeSnapGuides() {
     return activeSnapGuides;
   },
-  get printBedSize() {
-    return printBedSize;
+  get gameContainerWidth() {
+    return gameContainerWidth;
+  },
+  get gameContainerDepth() {
+    return gameContainerDepth;
   },
   get boundsWidth() {
     return boundsWidth;
@@ -117,8 +121,12 @@ export function getActiveSnapGuides(): SnapGuide[] {
   return activeSnapGuides;
 }
 
-export function getPrintBedSize(): number {
-  return printBedSize;
+export function getGameContainerWidth(): number {
+  return gameContainerWidth;
+}
+
+export function getGameContainerDepth(): number {
+  return gameContainerDepth;
 }
 
 export function getBoundsWidth(): number {
@@ -152,7 +160,8 @@ export function enterEditMode(
   // Set bounds for layout constraints (interior of box, not print bed)
   boundsWidth = interiorWidth;
   boundsDepth = interiorDepth;
-  printBedSize = Math.max(interiorWidth, interiorDepth); // Legacy compatibility
+  gameContainerWidth = interiorWidth;
+  gameContainerDepth = interiorDepth;
   selectedTrayId = null;
   activeSnapGuides = [];
   isEditMode = true;

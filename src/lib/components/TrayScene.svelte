@@ -66,7 +66,9 @@
     allBoxes?: BoxGeometryData[];
     boxGeometry?: BufferGeometry | null;
     lidGeometry?: BufferGeometry | null;
-    printBedSize: number;
+    printBedSize?: number; // Legacy (deprecated) - use gameContainerWidth/gameContainerDepth
+    gameContainerWidth?: number;
+    gameContainerDepth?: number;
     exploded?: boolean;
     showAllTrays?: boolean;
     showAllBoxes?: boolean;
@@ -95,7 +97,9 @@
     allBoxes = [],
     boxGeometry = null,
     lidGeometry = null,
-    printBedSize,
+    printBedSize: legacyPrintBedSize,
+    gameContainerWidth: propContainerWidth,
+    gameContainerDepth: propContainerDepth,
     exploded = false,
     showAllTrays = false,
     showAllBoxes = false,
@@ -117,6 +121,12 @@
     onTrayDoubleClick,
     generating = false
   }: Props = $props();
+
+  // Compute actual container dimensions (prefer new props, fallback to legacy printBedSize)
+  let gameContainerWidth = $derived(propContainerWidth ?? legacyPrintBedSize ?? 256);
+  let gameContainerDepth = $derived(propContainerDepth ?? legacyPrintBedSize ?? 256);
+  // For backwards compatibility with places that use printBedSize
+  let printBedSize = $derived(Math.max(gameContainerWidth, gameContainerDepth));
 
   // Get Threlte context for capture
   const { renderer, scene, camera } = useThrelte();
@@ -792,7 +802,7 @@
     {@const boxCenterZ = boxGeomBounds ? (boxGeomBounds.max.y + boxGeomBounds.min.y) / 2 : boxDepth / 2}
 
     <!-- Print bed for this box -->
-    <PrintBed size={printBedSize} title={boxData.boxName} position={[xOffset, 0, zOffset]} />
+    <PrintBed width={gameContainerWidth} depth={gameContainerDepth} title={boxData.boxName} position={[xOffset, 0, zOffset]} />
 
     <!-- Box geometry (without lid) -->
     {#if boxData.boxGeometry}
@@ -1455,10 +1465,11 @@
   <!-- PrintBed position differs in edit mode (corner at origin) vs normal mode (centered) -->
   <!-- In edit mode, show interior bounds (accounting for walls) -->
   <PrintBed
-    size={visualEditMode ? Math.max(editBoundsWidth, editBoundsDepth) : printBedSize}
+    width={visualEditMode ? editBoundsWidth : gameContainerWidth}
+    depth={visualEditMode ? editBoundsDepth : gameContainerDepth}
     title={visualEditMode ? '' : viewTitle}
     position={visualEditMode ? [editModeCenter.x, 0, editModeCenter.z] : [0, 0, printBedSize / 2]}
-    sizeLabel={visualEditMode ? `${Math.max(editBoundsWidth, editBoundsDepth)}mm max box cavity` : undefined}
+    sizeLabel={visualEditMode ? `${editBoundsWidth} × ${editBoundsDepth}mm max box cavity` : undefined}
   />
 {/if}
 

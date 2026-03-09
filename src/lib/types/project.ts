@@ -139,7 +139,8 @@ export interface Box {
 
 // Project-level global settings (used as defaults and shown even without counter trays)
 export interface GlobalSettings {
-  printBedSize: number;
+  gameContainerWidth: number;
+  gameContainerDepth: number;
 }
 
 export interface Project {
