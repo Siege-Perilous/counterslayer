@@ -155,8 +155,6 @@
   let globalSettings = $derived(getGlobalSettings());
   let gameContainerWidth = $derived(globalSettings.gameContainerWidth);
   let gameContainerDepth = $derived(globalSettings.gameContainerDepth);
-  // For backwards compatibility
-  let printBedSize = $derived(Math.max(gameContainerWidth, gameContainerDepth));
   let selectedTrayLetter = $derived.by(() => {
     // Use override during PDF capture
     if (captureTrayLetter) return captureTrayLetter;

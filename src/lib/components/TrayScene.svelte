@@ -802,7 +802,12 @@
     {@const boxCenterZ = boxGeomBounds ? (boxGeomBounds.max.y + boxGeomBounds.min.y) / 2 : boxDepth / 2}
 
     <!-- Print bed for this box -->
-    <PrintBed width={gameContainerWidth} depth={gameContainerDepth} title={boxData.boxName} position={[xOffset, 0, zOffset]} />
+    <PrintBed
+      width={gameContainerWidth}
+      depth={gameContainerDepth}
+      title={boxData.boxName}
+      position={[xOffset, 0, zOffset]}
+    />
 
     <!-- Box geometry (without lid) -->
     {#if boxData.boxGeometry}

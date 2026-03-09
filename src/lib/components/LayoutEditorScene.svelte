@@ -133,7 +133,9 @@
           const snapResult = snapPosition(placement, newX, newY, placements, gameContainerWidth, gameContainerDepth);
 
           // Check if position is valid (no overlaps)
-          if (isValidPosition(placement, snapResult.x, snapResult.y, placements, gameContainerWidth, gameContainerDepth)) {
+          if (
+            isValidPosition(placement, snapResult.x, snapResult.y, placements, gameContainerWidth, gameContainerDepth)
+          ) {
             updateTrayPosition(selectedTrayId, snapResult.x, snapResult.y);
             setSnapGuides(snapResult.guides);
           }
@@ -202,7 +204,11 @@
 </script>
 
 <!-- Camera and controls -->
-<T.PerspectiveCamera makeDefault position={[gameContainerWidth * 0.5, printBedSize * 0.8, gameContainerDepth * 0.8]} fov={45} />
+<T.PerspectiveCamera
+  makeDefault
+  position={[gameContainerWidth * 0.5, printBedSize * 0.8, gameContainerDepth * 0.8]}
+  fov={45}
+/>
 <OrbitControls
   enableDamping
   dampingFactor={0.1}

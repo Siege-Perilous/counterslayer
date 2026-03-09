@@ -39,12 +39,7 @@
     gameContainerDepth?: number;
   }
 
-  let {
-    selectionType,
-    isLayoutEditMode = false,
-    gameContainerWidth = 256,
-    gameContainerDepth = 256
-  }: Props = $props();
+  let { selectionType, isLayoutEditMode = false, gameContainerWidth = 256, gameContainerDepth = 256 }: Props = $props();
 
   // Layout editor dimensions
   let interiorWidth = $derived(layoutEditorState.boundsWidth);
