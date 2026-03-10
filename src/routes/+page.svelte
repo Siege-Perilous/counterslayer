@@ -1691,7 +1691,9 @@
                   <Button
                     variant="ghost"
                     onclick={handleExportAll}
-                    disabled={generating || exportingStl || (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
+                    disabled={generating ||
+                      exportingStl ||
+                      (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
                     isLoading={exportingStl}
                     style="width: 100%; justify-content: flex-start;"
                   >
@@ -1917,7 +1919,9 @@
                 <Button
                   variant="ghost"
                   onclick={handleExportAll}
-                  disabled={generating || exportingStl || (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
+                  disabled={generating ||
+                    exportingStl ||
+                    (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
                   isLoading={exportingStl}
                   style="width: 100%; justify-content: flex-start;"
                 >
@@ -1926,7 +1930,9 @@
                 <Button
                   variant="ghost"
                   onclick={handleExport3mf}
-                  disabled={generating || exporting3mf || (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
+                  disabled={generating ||
+                    exporting3mf ||
+                    (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
                   isLoading={exporting3mf}
                   style="width: 100%; justify-content: flex-start;"
                 >
