@@ -102,7 +102,6 @@
   let layerOffsetX = $derived(-gameContainerWidth / 2);
   let layerOffsetZ = $derived(printBedSize / 2 + gameContainerDepth / 2);
 
-
   // Get live tray color from project store
   function getTrayColor(trayId: string, fallbackColor: string): string {
     const project = getProject();
@@ -246,18 +245,22 @@
   </T.Line>
 
   <!-- Top tick mark -->
-  <T.Line geometry={new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(indicatorX - 3, displayHeight, indicatorZ),
-    new THREE.Vector3(indicatorX + 3, displayHeight, indicatorZ)
-  ])}>
+  <T.Line
+    geometry={new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(indicatorX - 3, displayHeight, indicatorZ),
+      new THREE.Vector3(indicatorX + 3, displayHeight, indicatorZ)
+    ])}
+  >
     <T.LineBasicMaterial color="#888888" />
   </T.Line>
 
   <!-- Bottom tick mark -->
-  <T.Line geometry={new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(indicatorX - 3, 0, indicatorZ),
-    new THREE.Vector3(indicatorX + 3, 0, indicatorZ)
-  ])}>
+  <T.Line
+    geometry={new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(indicatorX - 3, 0, indicatorZ),
+      new THREE.Vector3(indicatorX + 3, 0, indicatorZ)
+    ])}
+  >
     <T.LineBasicMaterial color="#888888" />
   </T.Line>
 

@@ -1302,9 +1302,7 @@ export function moveTrayToLoose(trayId: string, targetLayerId?: string): void {
 
   if (!sourceTray || !sourceBox || !sourceLayer) return;
 
-  const targetLayer = targetLayerId
-    ? project.layers.find((l) => l.id === targetLayerId) ?? sourceLayer
-    : sourceLayer;
+  const targetLayer = targetLayerId ? (project.layers.find((l) => l.id === targetLayerId) ?? sourceLayer) : sourceLayer;
 
   // Remove from source box
   sourceBox.trays.splice(sourceIndex, 1);

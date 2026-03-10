@@ -1,8 +1,8 @@
 import type { Box, CardSize, CounterShape, Tray } from '$lib/types/project';
 import { isCardDividerTray, isCardTray, isCupTray } from '$lib/types/project';
+import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
-import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
 import { getCardDividerTrayDimensions } from './cardDividerTray';
 import { getCardDrawTrayDimensions } from './cardTray';
 import type { CounterTrayParams } from './counterTray';
@@ -602,9 +602,7 @@ function arrangeTraysAuto(
   const packResult = packItems(packingItems, targetWidth, targetDepth);
 
   // Convert packing result to tray placements
-  const convertToPlacement = (
-    result: ReturnType<typeof packItems<TrayPackData>>
-  ): TrayPlacement[] => {
+  const convertToPlacement = (result: ReturnType<typeof packItems<TrayPackData>>): TrayPlacement[] => {
     if (!result) return [];
 
     return result.items.map((packed) => ({

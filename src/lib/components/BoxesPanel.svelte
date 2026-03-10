@@ -2,7 +2,7 @@
   import { Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon, Select } from '@tableslayer/ui';
   import { IconX, IconPlus } from '@tabler/icons-svelte';
   import type { Box } from '$lib/types/project';
-  import { getAllBoxes, getProject, moveBoxToLayer, findTrayLocation } from '$lib/stores/project.svelte';
+  import { getAllBoxes, getProject, moveBoxToLayer } from '$lib/stores/project.svelte';
   import { calculateMinimumBoxDimensions, getLidHeight } from '$lib/models/box';
   import { calculateLayerHeight } from '$lib/models/layer';
   import { getCardSizes, getCounterShapes } from '$lib/stores/project.svelte';
@@ -85,11 +85,7 @@
   });
 
   // Natural box height (without layer adjustment)
-  const naturalBoxHeight = $derived(
-    selectedBox
-      ? (selectedBox.customBoxHeight ?? minimums.minHeight) + lidHeight
-      : 0
-  );
+  const naturalBoxHeight = $derived(selectedBox ? (selectedBox.customBoxHeight ?? minimums.minHeight) + lidHeight : 0);
 
   // Actual box dimensions (custom or auto-calculated)
   // Height is adjusted to match layer height when box is in a layer with taller items

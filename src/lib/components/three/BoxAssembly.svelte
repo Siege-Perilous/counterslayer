@@ -150,15 +150,9 @@
     tolerance +
     placement.x +
     (isRotated ? placement.dimensions.width : 0)}
-  {@const trayZ =
-    boxCenterZ - (boxGeomBounds?.min.y ?? 0) - wallThickness - tolerance - placement.y}
+  {@const trayZ = boxCenterZ - (boxGeomBounds?.min.y ?? 0) - wallThickness - tolerance - placement.y}
   {@const cumulativeTrayIdx = trayIndexOffset + trayIndex}
-  <T.Group
-    position.x={trayX}
-    position.y={floorThickness}
-    position.z={trayZ}
-    rotation.y={isRotated ? Math.PI / 2 : 0}
-  >
+  <T.Group position.x={trayX} position.y={floorThickness} position.z={trayZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
     <TrayInBox
       geometry={trayData.geometry}
       color={getTrayColor(trayData.trayId, trayIndex)}

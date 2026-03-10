@@ -7,7 +7,6 @@
   import SceneLighting from './three/SceneLighting.svelte';
   import BoxAssembly from './three/BoxAssembly.svelte';
   import LayerContent from './three/LayerContent.svelte';
-  import TrayInBox from './three/TrayInBox.svelte';
   import LayerLayoutEditorScene from './three/LayerLayoutEditorScene.svelte';
   import { getAlternateColor, getSleeveColors } from '$lib/three/materials';
 
@@ -35,7 +34,6 @@
     getEffectiveDimensions
   } from '$lib/stores/layoutEditor.svelte';
   import { snapPosition } from '$lib/utils/layoutSnapping';
-  import { layerLayoutEditorState } from '$lib/stores/layerLayoutEditor.svelte';
 
   interface TrayGeometryData {
     trayId: string;
@@ -978,7 +976,7 @@
         showCounters={showCounters && !isLayoutEditMode}
         showLid={false}
         {triangleCornerRadius}
-        onTrayClick={onTrayClick}
+        {onTrayClick}
         onTrayDoubleClick={isLayoutEditMode ? undefined : onTrayDoubleClick}
         trayIndexOffset={cumulativeTrayIdx}
       />
@@ -990,7 +988,7 @@
 {#if !generating && showAllLayers && allLayerArrangements.length > 0}
   <!-- Calculate layer Y offsets (stack from bottom to top) -->
   {@const layerSeparation = 20}
-  {@const layerYOffsets = allLayerArrangements.reduce<number[]>((acc, { arrangement }, i) => {
+  {@const layerYOffsets = allLayerArrangements.reduce<number[]>((acc, _entry, i) => {
     if (i === 0) {
       acc.push(0);
     } else {
@@ -1030,7 +1028,7 @@
         showLabel={true}
         {labelQuaternion}
         {monoFont}
-        onTrayClick={onTrayClick}
+        {onTrayClick}
         onTrayDoubleClick={isLayoutEditMode ? undefined : onTrayDoubleClick}
       />
     </T.Group>
@@ -1067,9 +1065,9 @@
       allLooseTrayGeometries={allLooseTrays}
       {gameContainerWidth}
       {gameContainerDepth}
-      boxWallThickness={boxWallThickness}
-      boxTolerance={boxTolerance}
-      boxFloorThickness={boxFloorThickness}
+      {boxWallThickness}
+      {boxTolerance}
+      {boxFloorThickness}
       {printBedSize}
     />
   {:else}
@@ -1085,14 +1083,14 @@
       wallThickness={boxWallThickness}
       tolerance={boxTolerance}
       floorThickness={boxFloorThickness}
-      showCounters={showCounters}
+      {showCounters}
       showLid={true}
       layerName={viewTitle}
       showLabel={true}
       {labelQuaternion}
       {monoFont}
-      onTrayClick={onTrayClick}
-      onTrayDoubleClick={onTrayDoubleClick}
+      {onTrayClick}
+      {onTrayDoubleClick}
     />
   {/if}
 {/if}

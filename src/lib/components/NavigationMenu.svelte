@@ -21,7 +21,6 @@
     isCardTray,
     isCardDividerTray,
     isCupTray,
-    isLooseTray,
     type Box,
     type Layer,
     type Tray,

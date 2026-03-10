@@ -12,8 +12,8 @@ import type {
   ManualLooseTrayPlacement,
   Tray
 } from '$lib/types/project';
-import { getBoxExteriorDimensions, getTrayDimensionsForTray } from './box';
 import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
+import { getBoxExteriorDimensions, getTrayDimensionsForTray } from './box';
 
 export interface BoxDimensions {
   width: number;
@@ -78,11 +78,7 @@ export function calculateLayerHeight(
  * Get dimensions of a box's exterior (including walls, floor, lid)
  * This is used for layer-level arrangement
  */
-export function getBoxDimensions(
-  box: Box,
-  cardSizes: CardSize[],
-  counterShapes: CounterShape[]
-): BoxDimensions {
+export function getBoxDimensions(box: Box, cardSizes: CardSize[], counterShapes: CounterShape[]): BoxDimensions {
   return getBoxExteriorDimensions(box, cardSizes, counterShapes);
 }
 
@@ -100,7 +96,7 @@ export function arrangeLayerContents(
     gap?: number;
   }
 ): LayerArrangement {
-  const { gameContainerWidth, gameContainerDepth, cardSizes, counterShapes, gap = 2 } = options;
+  const { cardSizes, counterShapes } = options;
 
   // Calculate layer height first
   const layerHeight = calculateLayerHeight(layer, { cardSizes, counterShapes });
@@ -344,13 +340,15 @@ function arrangeLayerAuto(
   // Fallback: stack vertically
   const fallback = stackItemsVertically(packingItems);
   const fallbackPlacement = convertToPlacement(fallback);
-  return fallbackPlacement || {
-    boxes: [],
-    looseTrays: [],
-    layerHeight,
-    totalWidth: 0,
-    totalDepth: 0
-  };
+  return (
+    fallbackPlacement || {
+      boxes: [],
+      looseTrays: [],
+      layerHeight,
+      totalWidth: 0,
+      totalDepth: 0
+    }
+  );
 }
 
 /**

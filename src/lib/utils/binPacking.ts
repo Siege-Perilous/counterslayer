@@ -101,8 +101,7 @@ function tryPacking<T>(
   for (const rect of packer.usedRectangles) {
     const packRect = rect as PackRect<T>;
     const wasRotated =
-      Math.abs(rect.width - packRect.originalHeight) < 0.01 &&
-      Math.abs(rect.height - packRect.originalWidth) < 0.01;
+      Math.abs(rect.width - packRect.originalHeight) < 0.01 && Math.abs(rect.height - packRect.originalWidth) < 0.01;
 
     packedItems.push({
       data: packRect.itemData,
@@ -139,7 +138,7 @@ export function packItems<T>(
   if (items.length === 0) return null;
 
   // Sort by area (largest first) for better packing
-  const sortedItems = [...items].sort((a, b) => (b.width * b.depth) - (a.width * a.depth));
+  const sortedItems = [...items].sort((a, b) => b.width * b.depth - a.width * a.depth);
 
   // Try combinations of heuristics
   // RectChoice: 0=BestAreaFit, 1=BestShortSideFit, 2=BestLongSideFit

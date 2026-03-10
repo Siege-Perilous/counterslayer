@@ -55,11 +55,7 @@
   }: Props = $props();
 
   // Create rounded triangle geometry for counter previews
-  function createRoundedTriangleGeometry(
-    side: number,
-    thickness: number,
-    cornerRadius: number
-  ): THREE.BufferGeometry {
+  function createRoundedTriangleGeometry(side: number, thickness: number, cornerRadius: number): THREE.BufferGeometry {
     const r = cornerRadius;
     const triHeight = side * (Math.sqrt(3) / 2);
 
@@ -131,12 +127,7 @@
 </script>
 
 <!-- Tray mesh with -90° X rotation (JSCAD to Three.js transform) -->
-<T.Mesh
-  {geometry}
-  rotation.x={-Math.PI / 2}
-  onclick={handleClick}
-  ondblclick={handleDoubleClick}
->
+<T.Mesh {geometry} rotation.x={-Math.PI / 2} onclick={handleClick} ondblclick={handleDoubleClick}>
   <T.MeshStandardMaterial {color} roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
 </T.Mesh>
 
@@ -146,8 +137,7 @@
     {#if stack.isEdgeLoaded}
       <!-- Edge-loaded: counters standing on edge like books -->
       {#each Array(stack.count) as _, counterIdx (counterIdx)}
-        {@const effectiveShape =
-          stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
+        {@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
         {@const standingHeight =
           stack.isCardDivider && stack.cardDividerHeight
             ? stack.cardDividerHeight
@@ -212,8 +202,7 @@
         {@const posZ = -stack.y}
         {@const isAlt = counterIdx % 2 === 1}
         {@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
-        {@const effectiveShape =
-          stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
+        {@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
         {@const isSleevedCard = !!(stack.innerWidth && stack.innerLength)}
         {@const sleeveColors = getSleeveColors(isAlt)}
         {@const triGeom =

@@ -139,9 +139,10 @@ export function createBoxWithLidGrooves(
   const lidThickness = box.lidParams?.thickness ?? 2;
   // Use target height if provided and valid, otherwise use natural height
   // The target height is the layer exterior height; subtract only lid visible height (thickness) for box body
-  const extHeight = targetExteriorHeight !== undefined && targetExteriorHeight > 0
-    ? Math.max(targetExteriorHeight - lidThickness, naturalHeight)
-    : naturalHeight;
+  const extHeight =
+    targetExteriorHeight !== undefined && targetExteriorHeight > 0
+      ? Math.max(targetExteriorHeight - lidThickness, naturalHeight)
+      : naturalHeight;
 
   console.log(`[createBoxWithLidGrooves "${box.name}"]`);
   console.log(`  targetExteriorHeight: ${targetExteriorHeight}`);

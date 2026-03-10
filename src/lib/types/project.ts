@@ -203,10 +203,7 @@ export function isLooseTray(project: Project, trayId: string): boolean {
 }
 
 // Find where a tray is located (layer + box or loose)
-export function findTrayLocation(
-  project: Project,
-  trayId: string
-): { layerId: string; boxId: string | null } | null {
+export function findTrayLocation(project: Project, trayId: string): { layerId: string; boxId: string | null } | null {
   for (const layer of project.layers) {
     // Check loose trays first
     if (layer.looseTrays.some((t) => t.id === trayId)) {

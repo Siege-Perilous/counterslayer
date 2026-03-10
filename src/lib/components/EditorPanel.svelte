@@ -266,7 +266,7 @@
       {:else if selectionType === 'tray'}
         {#if selectedTray}
           <TraysPanel
-            selectedBox={selectedBox}
+            {selectedBox}
             {selectedTray}
             onSelectTray={() => {}}
             onAddTray={() => {}}

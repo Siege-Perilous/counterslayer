@@ -6,20 +6,22 @@ async function captureScreenshots() {
 
   // Capture console logs from the start
   const consoleLogs: string[] = [];
-  page.on('console', async msg => {
+  page.on('console', async (msg) => {
     const text = msg.text();
     if (text.includes('arrangeLayerAuto') || text.includes('LayerContent')) {
       // Try to get full object details
       try {
         const args = msg.args();
         if (args.length > 1) {
-          const fullText = await Promise.all(args.map(async (arg) => {
-            try {
-              return JSON.stringify(await arg.jsonValue(), null, 2);
-            } catch {
-              return arg.toString();
-            }
-          }));
+          const fullText = await Promise.all(
+            args.map(async (arg) => {
+              try {
+                return JSON.stringify(await arg.jsonValue(), null, 2);
+              } catch {
+                return arg.toString();
+              }
+            })
+          );
           console.log('Console:', fullText.join(' '));
         } else {
           console.log('Console:', text);

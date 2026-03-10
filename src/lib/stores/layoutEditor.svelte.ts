@@ -4,9 +4,9 @@
  */
 
 import type { TrayPlacement } from '$lib/models/box';
-import type { ManualTrayPlacement } from '$lib/types/project';
 import type { SnapGuide } from '$lib/types/editor';
 import { getEffectiveDimensions as getEffectiveDimsBase } from '$lib/types/editor';
+import type { ManualTrayPlacement } from '$lib/types/project';
 
 // Re-export SnapGuide for backwards compatibility
 export type { SnapGuide };

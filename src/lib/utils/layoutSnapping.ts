@@ -5,14 +5,14 @@
 
 import type { EditorTrayPlacement } from '$lib/stores/layoutEditor.svelte';
 import { getEffectiveDimensions } from '$lib/stores/layoutEditor.svelte';
-import type { SnapGuide, SnapResult, SnappableItem } from '$lib/types/editor';
+import type { SnapResult, SnappableItem } from '$lib/types/editor';
 import {
-  snapItemPosition,
   checkItemOverlap,
-  hasAnyOverlap as hasAnyOverlapBase,
   findAllOverlaps as findAllOverlapsBase,
+  hasAnyOverlap as hasAnyOverlapBase,
+  isValidPosition as isValidPositionBase,
   isWithinBounds as isWithinBoundsBase,
-  isValidPosition as isValidPositionBase
+  snapItemPosition
 } from './editorSnapping';
 
 // Re-export types for backwards compatibility
@@ -43,9 +43,7 @@ export function snapPosition(
   boundsDepth: number = boundsWidth
 ): SnapResult {
   const movingItem = toSnappableItem({ ...movingTray, x: newX, y: newY });
-  const otherItems = allPlacements
-    .filter((p) => p.trayId !== movingTray.trayId)
-    .map(toSnappableItem);
+  const otherItems = allPlacements.filter((p) => p.trayId !== movingTray.trayId).map(toSnappableItem);
 
   return snapItemPosition(movingItem, newX, newY, otherItems, boundsWidth, boundsDepth);
 }

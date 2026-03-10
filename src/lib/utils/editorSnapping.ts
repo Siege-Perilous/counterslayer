@@ -219,17 +219,8 @@ export function findAllOverlaps(items: SnappableItem[]): Array<[string, string]>
 /**
  * Check if an item is within bounds
  */
-export function isWithinBounds(
-  item: SnappableItem,
-  boundsWidth: number,
-  boundsDepth: number
-): boolean {
-  return (
-    item.x >= 0 &&
-    item.y >= 0 &&
-    item.x + item.width <= boundsWidth &&
-    item.y + item.depth <= boundsDepth
-  );
+export function isWithinBounds(item: SnappableItem, boundsWidth: number, boundsDepth: number): boolean {
+  return item.x >= 0 && item.y >= 0 && item.x + item.width <= boundsWidth && item.y + item.depth <= boundsDepth;
 }
 
 /**

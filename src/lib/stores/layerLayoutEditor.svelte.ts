@@ -4,9 +4,9 @@
  */
 
 import type { BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
-import type { ManualBoxPlacement, ManualLooseTrayPlacement } from '$lib/types/project';
 import type { SnapGuide } from '$lib/types/editor';
 import { getEffectiveDimensions as getEffectiveDimsBase } from '$lib/types/editor';
+import type { ManualBoxPlacement, ManualLooseTrayPlacement } from '$lib/types/project';
 
 // Re-export SnapGuide for backwards compatibility
 export type { SnapGuide };
@@ -332,12 +332,7 @@ export function clearSnapGuides(): void {
 /**
  * Start dragging an item
  */
-export function startDrag(
-  itemId: string,
-  itemType: 'box' | 'looseTray',
-  startX: number,
-  startY: number
-): void {
+export function startDrag(itemId: string, itemType: 'box' | 'looseTray', startX: number, startY: number): void {
   let originalX = 0;
   let originalY = 0;
 

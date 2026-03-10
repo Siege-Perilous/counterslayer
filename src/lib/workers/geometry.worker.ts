@@ -6,7 +6,6 @@
 import {
   arrangeTrays,
   calculateTraySpacers,
-  getBoxDimensions,
   getBoxExteriorDimensions,
   getLidHeight,
   getTrayDimensionsForTray,
@@ -109,11 +108,7 @@ function getCumulativeTrayIndexForTray(layers: Layer[], trayId: string): number 
  * For loose trays to match box height, they are generated at the layer height.
  * For boxes to match a taller loose tray, their interior trays need to grow.
  */
-function calculateUnifiedLayerHeight(
-  layer: Layer,
-  cardSizes: CardSize[],
-  counterShapes: CounterShape[]
-): number {
+function calculateUnifiedLayerHeight(layer: Layer, cardSizes: CardSize[], counterShapes: CounterShape[]): number {
   // Get all box exterior heights
   const boxHeights = layer.boxes.map((box) => {
     const dims = getBoxExteriorDimensions(box, cardSizes, counterShapes);
@@ -582,7 +577,7 @@ function handleGenerate(msg: GenerateMessage): void {
 
       // Find the layer containing this box and get the unified layer height
       const selectedBoxLayer = findLayerForBox(box.id);
-      const selectedLayerHeight = selectedBoxLayer ? layerHeights.get(selectedBoxLayer.id) ?? 0 : 0;
+      const selectedLayerHeight = selectedBoxLayer ? (layerHeights.get(selectedBoxLayer.id) ?? 0) : 0;
 
       // Calculate the required tray height to match the layer height
       const requiredTrayHeight = getRequiredTrayHeightForBox(box, selectedLayerHeight);
@@ -656,7 +651,7 @@ function handleGenerate(msg: GenerateMessage): void {
       // Loose tray - no box context
       // Find the layer containing this loose tray and get the unified layer height
       const looseTrayLayer = findLayerForLooseTray(tray.id);
-      const looseTrayLayerHeight = looseTrayLayer ? layerHeights.get(looseTrayLayer.id) ?? 0 : 0;
+      const looseTrayLayerHeight = looseTrayLayer ? (layerHeights.get(looseTrayLayer.id) ?? 0) : 0;
 
       // Calculate tray dimensions for proper sizing
       const trayDims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
@@ -714,7 +709,7 @@ function handleGenerate(msg: GenerateMessage): void {
 
       // Find this box's layer and get the unified layer height
       const boxLayer = findLayerForBox(projectBox.id);
-      const layerHeight = boxLayer ? layerHeights.get(boxLayer.id) ?? 0 : 0;
+      const layerHeight = boxLayer ? (layerHeights.get(boxLayer.id) ?? 0) : 0;
 
       // Calculate the required tray height to match the layer height
       // This ensures all boxes in a layer have the same exterior height
@@ -726,7 +721,9 @@ function handleGenerate(msg: GenerateMessage): void {
       const expectedBoxBody = layerHeight > 0 ? layerHeight - lidHeight : naturalDims.height - lidHeight;
 
       console.log(`[Box "${projectBox.name}"]`);
-      console.log(`  Natural exterior: ${naturalDims.height.toFixed(1)}mm (body=${(naturalDims.height - lidHeight).toFixed(1)}, lid=${lidHeight})`);
+      console.log(
+        `  Natural exterior: ${naturalDims.height.toFixed(1)}mm (body=${(naturalDims.height - lidHeight).toFixed(1)}, lid=${lidHeight})`
+      );
       console.log(`  Layer height: ${layerHeight.toFixed(1)}mm`);
       console.log(`  Target box body: ${expectedBoxBody.toFixed(1)}mm`);
       console.log(`  Required tray height: ${requiredTrayHeight.toFixed(1)}mm`);
@@ -754,7 +751,7 @@ function handleGenerate(msg: GenerateMessage): void {
       const maxNaturalTrayHeight = Math.max(...naturalTrayHeights, 0);
       const boxMaxHeight = Math.max(requiredTrayHeight, maxNaturalTrayHeight);
 
-      console.log(`  Natural tray heights: [${naturalTrayHeights.map(h => h.toFixed(1)).join(', ')}]mm`);
+      console.log(`  Natural tray heights: [${naturalTrayHeights.map((h) => h.toFixed(1)).join(', ')}]mm`);
       console.log(`  => Trays generated at: ${boxMaxHeight.toFixed(1)}mm`);
 
       // Cache JSCAD geometries for this box's trays

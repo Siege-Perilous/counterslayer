@@ -14,16 +14,10 @@
     updateDrag,
     endDrag,
     setSnapGuides,
-    clearSnapGuides,
     getEffectiveBoxDimensions,
-    getEffectiveLooseTrayDimensions,
-    type EditorBoxPlacement,
-    type EditorLooseTrayPlacement
+    getEffectiveLooseTrayDimensions
   } from '$lib/stores/layerLayoutEditor.svelte';
-  import {
-    snapLayerItemPosition,
-    type LayerItemForSnapping
-  } from '$lib/utils/layerLayoutSnapping';
+  import { snapLayerItemPosition, type LayerItemForSnapping } from '$lib/utils/layerLayoutSnapping';
   import type { TrayPlacement } from '$lib/models/box';
   import type { CounterStack } from '$lib/models/counterTray';
   import { getProject } from '$lib/stores/project.svelte';
@@ -191,8 +185,10 @@
 
         // Update position via drag system (which handles position updates)
         // We need to update the start position delta to account for snapping
-        updateDrag(dragState.startX + (snapResult.x - dragState.originalItemX),
-                   dragState.startY + (snapResult.y - dragState.originalItemY));
+        updateDrag(
+          dragState.startX + (snapResult.x - dragState.originalItemX),
+          dragState.startY + (snapResult.y - dragState.originalItemY)
+        );
         setSnapGuides(snapResult.guides);
       }
     }
@@ -234,7 +230,6 @@
   {@const dims = getEffectiveBoxDimensions(boxPlacement)}
   {@const isRotated = boxPlacement.rotation === 90 || boxPlacement.rotation === 270}
   {@const isSelected = selectedItemId === boxPlacement.boxId && selectedItemType === 'box'}
-  {@const isHovered = hoveredItemId === boxPlacement.boxId}
   {@const baseX = layerOffsetX + boxPlacement.x + dims.width / 2}
   {@const baseZ = layerOffsetZ - boxPlacement.y - dims.depth / 2}
 
@@ -263,9 +258,14 @@
     <T.Mesh
       visible={false}
       position.y={boxPlacement.height / 2}
-      onpointerdown={(e: IntersectionEvent<PointerEvent>) => handleItemPointerDown(e, boxPlacement.boxId, 'box', boxPlacement.x, boxPlacement.y)}
-      onpointerenter={() => { hoveredItemId = boxPlacement.boxId; }}
-      onpointerleave={() => { hoveredItemId = null; }}
+      onpointerdown={(e: IntersectionEvent<PointerEvent>) =>
+        handleItemPointerDown(e, boxPlacement.boxId, 'box', boxPlacement.x, boxPlacement.y)}
+      onpointerenter={() => {
+        hoveredItemId = boxPlacement.boxId;
+      }}
+      onpointerleave={() => {
+        hoveredItemId = null;
+      }}
     >
       <T.BoxGeometry args={[dims.width, boxPlacement.height, dims.depth]} />
       <T.MeshBasicMaterial transparent opacity={0} />
@@ -278,7 +278,9 @@
         rotation.x={-Math.PI / 2}
         position.y={boxPlacement.height / 2}
         geometry={edgesGeom}
-        oncreate={(ref) => { ref.computeLineDistances(); }}
+        oncreate={(ref) => {
+          ref.computeLineDistances();
+        }}
       >
         <T.LineDashedMaterial color="#ffffff" dashSize={3} gapSize={2} />
       </T.LineSegments>
@@ -329,9 +331,14 @@
       position.x={dims.width / 2}
       position.y={trayPlacement.height / 2}
       position.z={-dims.depth / 2}
-      onpointerdown={(e: IntersectionEvent<PointerEvent>) => handleItemPointerDown(e, trayPlacement.trayId, 'looseTray', trayPlacement.x, trayPlacement.y)}
-      onpointerenter={() => { hoveredItemId = trayPlacement.trayId; }}
-      onpointerleave={() => { hoveredItemId = null; }}
+      onpointerdown={(e: IntersectionEvent<PointerEvent>) =>
+        handleItemPointerDown(e, trayPlacement.trayId, 'looseTray', trayPlacement.x, trayPlacement.y)}
+      onpointerenter={() => {
+        hoveredItemId = trayPlacement.trayId;
+      }}
+      onpointerleave={() => {
+        hoveredItemId = null;
+      }}
     >
       <T.BoxGeometry args={[dims.width, trayPlacement.height, dims.depth]} />
       <T.MeshBasicMaterial transparent opacity={0} />
@@ -346,7 +353,9 @@
         position.y={trayPlacement.height / 2}
         position.z={-dims.depth / 2}
         geometry={edgesGeom}
-        oncreate={(ref) => { ref.computeLineDistances(); }}
+        oncreate={(ref) => {
+          ref.computeLineDistances();
+        }}
       >
         <T.LineDashedMaterial color="#ffffff" dashSize={3} gapSize={2} />
       </T.LineSegments>

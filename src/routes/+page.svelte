@@ -20,10 +20,15 @@
   import { createCounterTray, getCounterPositions, type CounterStack } from '$lib/models/counterTray';
   import { createCardDrawTray, getCardDrawPositions, type CardStack } from '$lib/models/cardTray';
   import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
-  import { arrangeTrays, calculateTraySpacers, getBoxExteriorDimensions } from '$lib/models/box';
+  import { arrangeTrays, calculateTraySpacers } from '$lib/models/box';
   import { arrangeLayerContents, type BoxPlacement, type LooseTrayPlacement } from '$lib/models/layer';
   import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
-  import { getGeometryWorker, type TrayGeometryData, type BoxGeometryData, type LooseTrayGeometryData } from '$lib/utils/geometryWorker';
+  import {
+    getGeometryWorker,
+    type TrayGeometryData,
+    type BoxGeometryData,
+    type LooseTrayGeometryData
+  } from '$lib/utils/geometryWorker';
   import { BlobWriter, ZipWriter } from '@zip.js/zip.js';
   import { exportPdfReference, exportPdfWithScreenshots, type TrayScreenshot } from '$lib/utils/pdfGenerator';
   import type { CaptureOptions } from '$lib/utils/screenshotCapture';
@@ -37,7 +42,6 @@
     getGlobalSettings,
     importProject,
     resetProject,
-    getCumulativeTrayLetter,
     getTrayLetterById,
     getAllBoxes,
     isCounterTray,
@@ -499,7 +503,6 @@
   }
 
   async function handleExportAll() {
-    const project = getProject();
     const allBoxes = getAllBoxes();
     if (allBoxes.length === 0) return;
 
@@ -1104,12 +1107,12 @@
       const project = untrack(() => getProject());
 
       // Verify the selected tray exists in the selected box (or is a loose tray)
-      let selectedBox = null;
+      let _selectedBox = null;
       let selectedTray = null;
       for (const layer of project.layers) {
         const box = layer.boxes.find((b) => b.id === project.selectedBoxId);
         if (box) {
-          selectedBox = box;
+          _selectedBox = box;
           selectedTray = box.trays.find((t) => t.id === project.selectedTrayId);
           break;
         }
@@ -1263,12 +1266,7 @@
       counterShapes
     });
 
-    enterLayerEditMode(
-      arrangement.boxes,
-      arrangement.looseTrays,
-      gameContainerWidth,
-      gameContainerDepth
-    );
+    enterLayerEditMode(arrangement.boxes, arrangement.looseTrays, gameContainerWidth, gameContainerDepth);
   }
 
   function handleSaveLayerLayout() {

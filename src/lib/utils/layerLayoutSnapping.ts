@@ -3,12 +3,12 @@
  * Wraps the shared editorSnapping utilities for layer items (boxes + loose trays)
  */
 
-import type { SnapGuide, SnapResult, SnappableItem } from '$lib/types/editor';
+import type { SnapResult, SnappableItem } from '$lib/types/editor';
 import {
-  snapItemPosition,
   checkItemOverlap,
   findAllOverlaps as findAllOverlapsBase,
-  isWithinBounds as isWithinBoundsBase
+  isWithinBounds as isWithinBoundsBase,
+  snapItemPosition
 } from './editorSnapping';
 
 // Re-export types and the SnappableItem interface as LayerItemForSnapping for backwards compatibility
@@ -33,10 +33,7 @@ export function snapLayerItemPosition(
 /**
  * Check if two layer items overlap (AABB collision)
  */
-export function checkLayerItemOverlap(
-  item1: LayerItemForSnapping,
-  item2: LayerItemForSnapping
-): boolean {
+export function checkLayerItemOverlap(item1: LayerItemForSnapping, item2: LayerItemForSnapping): boolean {
   return checkItemOverlap(item1, item2);
 }
 
@@ -51,10 +48,6 @@ export function findLayerOverlaps(items: LayerItemForSnapping[]): Array<[string,
 /**
  * Check if a layer item is within bounds
  */
-export function isLayerItemWithinBounds(
-  item: LayerItemForSnapping,
-  boundsWidth: number,
-  boundsDepth: number
-): boolean {
+export function isLayerItemWithinBounds(item: LayerItemForSnapping, boundsWidth: number, boundsDepth: number): boolean {
   return isWithinBoundsBase(item, boundsWidth, boundsDepth);
 }

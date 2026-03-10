@@ -15,16 +15,7 @@ import {
 } from '$lib/stores/project.svelte';
 import type { CupLayout } from '$lib/types/cupLayout';
 import { gridToSplitLayout } from '$lib/types/cupLayout';
-import type {
-  Box,
-  CardSize,
-  CounterShape,
-  Layer,
-  LegacyProject,
-  LidParams,
-  Project,
-  Tray
-} from '$lib/types/project';
+import type { Box, CardSize, CounterShape, Layer, LegacyProject, LidParams, Project, Tray } from '$lib/types/project';
 import { isLegacyProject } from '$lib/types/project';
 const STORAGE_KEY = 'counter-tray-project';
 
@@ -438,7 +429,7 @@ function getBoxesFromProject(project: Project | LegacyProject): Box[] {
 }
 
 // Get all trays from a project (handles both legacy and new formats)
-function getAllTraysFromProject(project: Project | LegacyProject): Tray[] {
+function _getAllTraysFromProject(project: Project | LegacyProject): Tray[] {
   const boxes = getBoxesFromProject(project);
   const trays: Tray[] = [];
   for (const box of boxes) {

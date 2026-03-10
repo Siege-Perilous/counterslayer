@@ -29,14 +29,13 @@
   import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
   import type { CupTrayParams } from '$lib/models/cupTray';
   import { countCups } from '$lib/types/cupLayout';
-  import { getTrayDimensionsForTray, arrangeTrays, getLidHeight } from '$lib/models/box';
+  import { getTrayDimensionsForTray, arrangeTrays } from '$lib/models/box';
   import { calculateLayerHeight } from '$lib/models/layer';
   import {
     getProject,
     getTrayLetterById,
     moveTray,
     moveTrayToLoose,
-    getAllBoxes,
     getCardSizes,
     getCounterShapes
   } from '$lib/stores/project.svelte';
@@ -267,7 +266,7 @@
         </IconButton>
       </div>
       <div class="panelListItems">
-        {#each selectedBox.trays as tray, trayIdx (tray.id)}
+        {#each selectedBox.trays as tray, _trayIdx (tray.id)}
           {@const stats = getTrayStats(tray)}
           {@const letter = getTrayLetterById(getProject().layers, tray.id)}
           <div

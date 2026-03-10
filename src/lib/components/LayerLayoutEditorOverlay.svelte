@@ -34,7 +34,9 @@
     return getEffectiveLooseTrayDimensions(selectedPlacement as Parameters<typeof getEffectiveLooseTrayDimensions>[0]);
   });
 
-  let itemTypeLabel = $derived(selectedItemType === 'box' ? 'Box' : selectedItemType === 'looseTray' ? 'Tray' : undefined);
+  let itemTypeLabel = $derived(
+    selectedItemType === 'box' ? 'Box' : selectedItemType === 'looseTray' ? 'Tray' : undefined
+  );
 </script>
 
 <LayoutEditorToolbar

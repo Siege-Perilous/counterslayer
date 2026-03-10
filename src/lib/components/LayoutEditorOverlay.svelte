@@ -19,7 +19,7 @@
 
   let isEditMode = $derived.by(() => layoutEditorState.isEditMode);
   let selectedPlacement = $derived.by(() => getSelectedPlacement());
-  let selectedDims = $derived.by(() => selectedPlacement ? getEffectiveDimensions(selectedPlacement) : null);
+  let selectedDims = $derived.by(() => (selectedPlacement ? getEffectiveDimensions(selectedPlacement) : null));
 </script>
 
 <LayoutEditorToolbar
