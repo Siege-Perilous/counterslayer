@@ -45,6 +45,12 @@ pip install -r requirements.txt
 
 You then can ask Claude questions, rerunning the debug whenever you make changes.
 
-## Contributing
+## License & open source contributions
+
+Counter Slayer is available under a functional source [license](LICENSE.md) that becomes Apache 2 after two years. You are free to host and modify Counter Slayer on your own as long as you don't try to monetize it. The primary intention of the source being open is so hobbyists can get familiar with a large Svelte codebase. We welcome PRs and bug reports.
+
+Any STL models you generate with Counter Slayer are yours to do with as you wish, and can be hosted or sold without permission.
+
+## Share your projects with others
 
 Feel free to create a PR to contribute code changes or add a new game to the pre-built trays. You can find these in [`static/projects`](https://github.com/Siege-Perilous/counterslayer/tree/main/static/projects).
