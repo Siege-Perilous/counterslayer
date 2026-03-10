@@ -1,0 +1,206 @@
+{
+  "version": 2,
+  "layers": [
+    {
+      "id": "skrgpjx",
+      "name": "Trays layer",
+      "boxes": [],
+      "looseTrays": [
+        {
+          "id": "um0e6nd",
+          "type": "cup",
+          "name": "Factions",
+          "color": "#88a4a6",
+          "rotationOverride": "auto",
+          "params": {
+            "layout": {
+              "root": {
+                "type": "split",
+                "direction": "vertical",
+                "ratio": 0.5,
+                "first": { "type": "cup", "id": "xzx26ii" },
+                "second": { "type": "cup", "id": "gnc7qii" }
+              }
+            },
+            "trayWidth": 190,
+            "trayDepth": 70,
+            "cupCavityHeight": 26,
+            "wallThickness": 2,
+            "floorThickness": 2,
+            "cornerRadius": 6
+          },
+          "showEmboss": false
+        },
+        {
+          "id": "ouvq9zi",
+          "type": "cup",
+          "name": "Factions",
+          "color": "#64a35a",
+          "rotationOverride": "auto",
+          "params": {
+            "layout": {
+              "root": {
+                "type": "split",
+                "direction": "vertical",
+                "ratio": 0.5,
+                "first": { "type": "cup", "id": "qqdkrvg" },
+                "second": { "type": "cup", "id": "g9mekur" }
+              }
+            },
+            "trayWidth": 190,
+            "trayDepth": 70,
+            "cupCavityHeight": 26,
+            "wallThickness": 2,
+            "floorThickness": 2,
+            "cornerRadius": 6
+          },
+          "showEmboss": false
+        },
+        {
+          "id": "k577dhh",
+          "type": "cup",
+          "name": "Factions",
+          "color": "#5b4a7c",
+          "rotationOverride": "auto",
+          "params": {
+            "layout": {
+              "root": {
+                "type": "split",
+                "direction": "vertical",
+                "ratio": 0.5,
+                "first": { "type": "cup", "id": "glfk1gx" },
+                "second": { "type": "cup", "id": "aolupih" }
+              }
+            },
+            "trayWidth": 190,
+            "trayDepth": 70,
+            "cupCavityHeight": 26,
+            "wallThickness": 2,
+            "floorThickness": 2,
+            "cornerRadius": 6
+          },
+          "showEmboss": false
+        },
+        {
+          "id": "uq2k4hr",
+          "type": "cup",
+          "name": "Gold, Razed, Monsters",
+          "color": "#807875",
+          "rotationOverride": "auto",
+          "params": {
+            "layout": {
+              "root": {
+                "type": "split",
+                "direction": "horizontal",
+                "ratio": 0.3333333333333333,
+                "first": { "type": "cup", "id": "on1qgp9" },
+                "second": {
+                  "type": "split",
+                  "direction": "horizontal",
+                  "ratio": 0.4939024390243902,
+                  "first": { "type": "cup", "id": "9tx32t9" },
+                  "second": { "type": "cup", "id": "3vy5wv4" }
+                }
+              }
+            },
+            "trayWidth": 95,
+            "trayDepth": 210,
+            "cupCavityHeight": 26,
+            "wallThickness": 2,
+            "floorThickness": 2,
+            "cornerRadius": 6
+          },
+          "showEmboss": false
+        }
+      ],
+      "manualLayout": {
+        "boxes": [],
+        "looseTrays": [
+          { "trayId": "um0e6nd", "x": 0, "y": 98, "rotation": 90 },
+          { "trayId": "ouvq9zi", "x": 70, "y": 98, "rotation": 90 },
+          { "trayId": "k577dhh", "x": 140, "y": 98, "rotation": 90 },
+          { "trayId": "uq2k4hr", "x": 0, "y": 0, "rotation": 90 }
+        ]
+      }
+    },
+    {
+      "id": "qlaunzl",
+      "name": "Side rail layer",
+      "boxes": [],
+      "looseTrays": [
+        {
+          "id": "txnc6tg",
+          "type": "cardDivider",
+          "name": "Cards",
+          "color": "#a36b5a",
+          "rotationOverride": "auto",
+          "params": {
+            "stacks": [
+              { "cardSizeId": "card-standard", "count": 100 },
+              { "cardSizeId": "card-standard", "count": 100 }
+            ],
+            "orientation": "horizontal",
+            "stackDirection": "sideBySide",
+            "wallThickness": 2,
+            "floorThickness": 2,
+            "clearance": 1.5,
+            "rimHeight": 3
+          },
+          "showEmboss": false,
+          "showStackLabels": false
+        },
+        {
+          "id": "w7ep967",
+          "type": "cup",
+          "name": "Dice",
+          "color": "#5a7c6a",
+          "rotationOverride": "auto",
+          "params": {
+            "layout": {
+              "root": {
+                "type": "split",
+                "direction": "vertical",
+                "ratio": 0.5,
+                "first": { "type": "cup", "id": "a9ww8hf" },
+                "second": { "type": "cup", "id": "44c5ge5" }
+              }
+            },
+            "trayWidth": 90,
+            "trayDepth": 57,
+            "cupCavityHeight": null,
+            "wallThickness": 2,
+            "floorThickness": 2,
+            "cornerRadius": 6
+          },
+          "showEmboss": false
+        }
+      ],
+      "manualLayout": {
+        "boxes": [],
+        "looseTrays": [
+          { "trayId": "txnc6tg", "x": 220, "y": 94, "rotation": 90 },
+          { "trayId": "w7ep967", "x": 220, "y": 0, "rotation": 90 }
+        ]
+      }
+    }
+  ],
+  "counterShapes": [
+    { "id": "shape-square", "name": "Square", "baseShape": "square", "width": 15.9, "length": 15.9, "thickness": 1.3 },
+    { "id": "shape-hex", "name": "Hex", "baseShape": "hex", "width": 15.9, "length": 15.9, "thickness": 1.3, "pointyTop": false },
+    { "id": "shape-circle", "name": "Circle", "baseShape": "circle", "width": 15.9, "length": 15.9, "thickness": 1.3 },
+    { "id": "shape-triangle", "name": "Triangle", "baseShape": "triangle", "width": 15.9, "length": 15.9, "thickness": 1.3, "cornerRadius": 1.5 }
+  ],
+  "cardSizes": [
+    { "id": "card-standard", "name": "Standard", "width": 66, "length": 91, "thickness": 0.5 },
+    { "id": "card-mini-american", "name": "Mini American", "width": 44, "length": 66, "thickness": 0.5 },
+    { "id": "card-mini-european", "name": "Mini European", "width": 47, "length": 71, "thickness": 0.5 },
+    { "id": "card-euro", "name": "Euro", "width": 62, "length": 95, "thickness": 0.5 },
+    { "id": "card-japanese", "name": "Japanese", "width": 62, "length": 89, "thickness": 0.5 },
+    { "id": "card-tarot", "name": "Tarot", "width": 73, "length": 123, "thickness": 0.5 },
+    { "id": "card-square", "name": "Square", "width": 73, "length": 73, "thickness": 0.5 }
+  ],
+  "globalSettings": {
+    "gameContainerWidth": 277,
+    "gameContainerDepth": 288
+  }
+}

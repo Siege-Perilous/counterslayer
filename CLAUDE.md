@@ -278,16 +278,19 @@ npx tsx scripts/capture-screenshot.ts
 ```
 
 This script:
+
 - Opens the app at http://localhost:5175 in a headless browser
 - Captures console logs (filtered for specific debug keywords)
 - Takes screenshots: `mesh-analysis/view-current.png`, `mesh-analysis/view-dimensions.png`
 
 **Use cases:**
+
 - Debugging layout issues that only appear in the live app
 - Capturing console output from geometry calculations
 - Verifying visual state matches expected geometry
 
 To capture different console output, edit the filter in `capture-screenshot.ts`:
+
 ```typescript
 if (text.includes('yourKeyword')) {
   consoleLogs.push(text);

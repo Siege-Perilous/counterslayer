@@ -5,6 +5,12 @@
       "name": "D-Day: Omaha Beach",
       "author": "Dave Snider",
       "file": "omaha.json"
+    },
+    {
+      "id": "burning-banners",
+      "name": "Burning Banners",
+      "author": "Dave Snider",
+      "file": "burning-banners.json"
     }
   ]
 }

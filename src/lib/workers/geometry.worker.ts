@@ -7,7 +7,6 @@ import {
   arrangeTrays,
   calculateTraySpacers,
   getBoxExteriorDimensions,
-  getLidHeight,
   getTrayDimensionsForTray,
   validateCustomDimensions,
   type TrayPlacement
@@ -676,9 +675,6 @@ function handleGenerate(msg: GenerateMessage): void {
       // This ensures all boxes in a layer have the same exterior height
       const requiredTrayHeight = getRequiredTrayHeightForBox(projectBox, layerHeight);
 
-      // Get natural box dimensions for comparison
-      const naturalDims = getBoxExteriorDimensions(projectBox, cardSizes, counterShapes);
-      const lidHeight = getLidHeight(projectBox);
       // Generate box and lid - pass target height for box to match layer height
       const boxJscad = createBoxWithLidGrooves(projectBox, cardSizes, counterShapes, layerHeight);
       const boxBufferGeom = boxJscad ? jscadToArrays(boxJscad) : null;

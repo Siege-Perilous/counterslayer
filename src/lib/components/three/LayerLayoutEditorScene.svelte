@@ -325,12 +325,12 @@
       </T.Mesh>
     {/if}
 
-    <!-- Invisible hit box for interaction (offset to center since group is at corner) -->
+    <!-- Invisible hit box for interaction (use original dims since group handles rotation) -->
     <T.Mesh
       visible={false}
-      position.x={dims.width / 2}
+      position.x={trayPlacement.originalWidth / 2}
       position.y={trayPlacement.height / 2}
-      position.z={-dims.depth / 2}
+      position.z={-trayPlacement.originalDepth / 2}
       onpointerdown={(e: IntersectionEvent<PointerEvent>) =>
         handleItemPointerDown(e, trayPlacement.trayId, 'looseTray', trayPlacement.x, trayPlacement.y)}
       onpointerenter={() => {
@@ -340,18 +340,20 @@
         hoveredItemId = null;
       }}
     >
-      <T.BoxGeometry args={[dims.width, trayPlacement.height, dims.depth]} />
+      <T.BoxGeometry args={[trayPlacement.originalWidth, trayPlacement.height, trayPlacement.originalDepth]} />
       <T.MeshBasicMaterial transparent opacity={0} />
     </T.Mesh>
 
-    <!-- Selection wireframe for loose tray (offset to center since group is at corner) -->
+    <!-- Selection wireframe for loose tray (use original dims since group handles rotation) -->
     {#if isSelected}
-      {@const edgesGeom = new THREE.EdgesGeometry(new THREE.BoxGeometry(dims.width, dims.depth, trayPlacement.height))}
+      {@const edgesGeom = new THREE.EdgesGeometry(
+        new THREE.BoxGeometry(trayPlacement.originalWidth, trayPlacement.originalDepth, trayPlacement.height)
+      )}
       <T.LineSegments
         rotation.x={-Math.PI / 2}
-        position.x={dims.width / 2}
+        position.x={trayPlacement.originalWidth / 2}
         position.y={trayPlacement.height / 2}
-        position.z={-dims.depth / 2}
+        position.z={-trayPlacement.originalDepth / 2}
         geometry={edgesGeom}
         oncreate={(ref) => {
           ref.computeLineDistances();

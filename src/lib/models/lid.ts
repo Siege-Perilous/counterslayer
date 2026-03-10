@@ -1,7 +1,7 @@
 import type { Box, CardSize, CounterShape, LidParams } from '$lib/types/project';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
-import { arrangeTrays, calculateMinimumBoxDimensions, getBoxInteriorDimensions, getLidHeight } from './box';
+import { arrangeTrays, calculateMinimumBoxDimensions, getBoxInteriorDimensions } from './box';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
@@ -127,7 +127,6 @@ export function createBoxWithLidGrooves(
 
   // Calculate minimum (auto) dimensions
   const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
-  const lidHeight = getLidHeight(box);
 
   // Box exterior dimensions (use custom if set, otherwise auto)
   // If targetExteriorHeight is provided (for layer unification), use it minus lid VISIBLE height for box height

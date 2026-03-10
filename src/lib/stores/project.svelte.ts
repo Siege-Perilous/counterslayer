@@ -1202,8 +1202,8 @@ export function moveTray(trayId: string, targetBoxId: string | 'new'): void {
   autosave();
 }
 
-// Move a box to a different layer
-export function moveBoxToLayer(boxId: string, targetLayerId: string): void {
+// Move a box to a different layer (or create a new layer)
+export function moveBoxToLayer(boxId: string, targetLayerId: string | 'new'): void {
   let sourceBox: Box | null = null;
   let sourceLayer: Layer | null = null;
   let sourceIndex = -1;
@@ -1220,8 +1220,18 @@ export function moveBoxToLayer(boxId: string, targetLayerId: string): void {
 
   if (!sourceBox || !sourceLayer) return;
 
-  const targetLayer = project.layers.find((l) => l.id === targetLayerId);
-  if (!targetLayer || targetLayer.id === sourceLayer.id) return;
+  // Determine target layer
+  let targetLayer: Layer;
+  if (targetLayerId === 'new') {
+    // Create a new layer
+    const layerNumber = project.layers.length + 1;
+    targetLayer = createDefaultLayer(`Layer ${layerNumber}`);
+    project.layers.push(targetLayer);
+  } else {
+    const found = project.layers.find((l) => l.id === targetLayerId);
+    if (!found || found.id === sourceLayer.id) return;
+    targetLayer = found;
+  }
 
   // Remove from source layer
   sourceLayer.boxes.splice(sourceIndex, 1);
@@ -1342,18 +1352,18 @@ export function importProject(data: Project): void {
           }
         }
       }
-      // Ensure selectedTrayId is valid
-      if (project.selectedTrayId) {
-        const location = findTrayLocation(project, project.selectedTrayId);
-        if (!location) {
-          // Find first available tray
-          if (layer.boxes.length > 0 && layer.boxes[0].trays.length > 0) {
-            project.selectedTrayId = layer.boxes[0].trays[0].id;
-          } else if (layer.looseTrays.length > 0) {
-            project.selectedTrayId = layer.looseTrays[0].id;
-          } else {
-            project.selectedTrayId = null;
-          }
+      // Ensure selectedTrayId is valid (or set default if not set)
+      const needsTraySelection = !project.selectedTrayId || !findTrayLocation(project, project.selectedTrayId);
+      if (needsTraySelection) {
+        // Find first available tray
+        if (layer.boxes.length > 0 && layer.boxes[0].trays.length > 0) {
+          project.selectedBoxId = layer.boxes[0].id;
+          project.selectedTrayId = layer.boxes[0].trays[0].id;
+        } else if (layer.looseTrays.length > 0) {
+          project.selectedBoxId = null;
+          project.selectedTrayId = layer.looseTrays[0].id;
+        } else {
+          project.selectedTrayId = null;
         }
       }
     }

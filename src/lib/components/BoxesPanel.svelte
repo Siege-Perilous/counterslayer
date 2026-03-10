@@ -21,13 +21,19 @@
   // Get all boxes from all layers
   const allBoxes = $derived(getAllBoxes());
 
-  // Get layer options for move dropdown
+  // Get layer options for move dropdown (includes "New Layer" option)
   const layerOptions = $derived.by(() => {
     const project = getProject();
-    return project.layers.map((layer) => ({
+    const options = project.layers.map((layer) => ({
       value: layer.id,
       label: layer.name
     }));
+    // Always add "New Layer" option
+    options.push({
+      value: 'new',
+      label: '+ New Layer'
+    });
+    return options;
   });
 
   // Get current layer for the selected box
@@ -42,9 +48,11 @@
     return '';
   });
 
-  // Handle layer change
+  // Handle layer change (can be existing layer ID or 'new')
   function handleLayerChange(layerId: string) {
-    if (!selectedBox || layerId === currentLayerId) return;
+    if (!selectedBox) return;
+    // Allow 'new' or a different layer
+    if (layerId !== 'new' && layerId === currentLayerId) return;
     moveBoxToLayer(selectedBox.id, layerId);
   }
 
@@ -157,24 +165,22 @@
         <Spacer size="0.75rem" />
 
         <!-- Move to Layer -->
-        {#if layerOptions.length > 1}
-          <FormControl label="Layer" name="moveToLayer">
-            {#snippet input({ inputProps })}
-              <Select
-                {...inputProps}
-                selected={currentLayerId ? [currentLayerId] : []}
-                options={layerOptions}
-                onSelectedChange={(selected) => {
-                  if (selected[0]) {
-                    handleLayerChange(selected[0]);
-                  }
-                }}
-              />
-            {/snippet}
-          </FormControl>
+        <FormControl label="Layer" name="moveToLayer">
+          {#snippet input({ inputProps })}
+            <Select
+              {...inputProps}
+              selected={currentLayerId ? [currentLayerId] : []}
+              options={layerOptions}
+              onSelectedChange={(selected) => {
+                if (selected[0]) {
+                  handleLayerChange(selected[0]);
+                }
+              }}
+            />
+          {/snippet}
+        </FormControl>
 
-          <Spacer size="0.75rem" />
-        {/if}
+        <Spacer size="0.75rem" />
 
         <div class="formGrid">
           <FormControl label="Tolerance" name="tolerance">
