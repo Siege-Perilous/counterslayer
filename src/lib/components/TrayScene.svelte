@@ -904,6 +904,7 @@
         showCounters={showCounters && !isLayoutEditMode}
         showLid={true}
         layerName={layer.name}
+        layerHeight={arrangement.layerHeight}
         showLabel={true}
         {labelQuaternion}
         {monoFont}

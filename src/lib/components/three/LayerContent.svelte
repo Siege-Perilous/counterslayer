@@ -68,6 +68,7 @@
     showCounters?: boolean;
     showLid?: boolean;
     layerName?: string;
+    layerHeight?: number;
     showLabel?: boolean;
     labelQuaternion?: [number, number, number, number];
     monoFont?: string;
@@ -89,6 +90,7 @@
     showCounters = false,
     showLid = true,
     layerName = '',
+    layerHeight = 0,
     showLabel = false,
     labelQuaternion = [0, 0, 0, 1],
     monoFont = '/fonts/JetBrainsMono-Regular.ttf',
@@ -234,17 +236,58 @@
   {/if}
 {/each}
 
-<!-- Layer name label (floating above the entire layer) -->
+<!-- Layer height indicator and label (offset from bed edge, at front) -->
 {#if showLabel && layerName}
-  {@const labelY = maxBoxHeight + 15}
+  {@const indicatorX = -gameContainerWidth / 2 - 15}
+  {@const indicatorZ = printBedSize / 2 + gameContainerDepth / 2}
+  {@const displayHeight = layerHeight || maxBoxHeight}
+  {@const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(indicatorX, 0, indicatorZ),
+    new THREE.Vector3(indicatorX, displayHeight, indicatorZ)
+  ])}
+
+  <!-- Vertical height indicator line -->
+  <T.Line geometry={lineGeometry}>
+    <T.LineBasicMaterial color="#888888" linewidth={2} />
+  </T.Line>
+
+  <!-- Top tick mark -->
+  <T.Line geometry={new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(indicatorX - 3, displayHeight, indicatorZ),
+    new THREE.Vector3(indicatorX + 3, displayHeight, indicatorZ)
+  ])}>
+    <T.LineBasicMaterial color="#888888" />
+  </T.Line>
+
+  <!-- Bottom tick mark -->
+  <T.Line geometry={new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(indicatorX - 3, 0, indicatorZ),
+    new THREE.Vector3(indicatorX + 3, 0, indicatorZ)
+  ])}>
+    <T.LineBasicMaterial color="#888888" />
+  </T.Line>
+
+  <!-- Layer name label -->
   <Text
     text={layerName}
     font={monoFont}
-    fontSize={8}
-    position={[0, labelY, printBedSize / 2]}
+    fontSize={6}
+    position={[indicatorX - 5, displayHeight / 2 + 4, indicatorZ]}
     quaternion={labelQuaternion}
     color="#ffffff"
-    anchorX="center"
-    anchorY="bottom"
+    anchorX="right"
+    anchorY="middle"
+  />
+
+  <!-- Layer height value -->
+  <Text
+    text={`${displayHeight.toFixed(1)}mm`}
+    font={monoFont}
+    fontSize={4}
+    position={[indicatorX - 5, displayHeight / 2 - 4, indicatorZ]}
+    quaternion={labelQuaternion}
+    color="#aaaaaa"
+    anchorX="right"
+    anchorY="middle"
   />
 {/if}
