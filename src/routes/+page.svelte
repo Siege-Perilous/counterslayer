@@ -194,6 +194,21 @@
     });
   });
 
+  // Compute arrangements for ALL layers (for stacked view in dimensions mode)
+  let allLayerArrangements = $derived.by(() => {
+    if (viewMode !== 'all-no-lid') return [];
+    const project = getProject();
+    return project.layers.map((layer) => ({
+      layer: { id: layer.id, name: layer.name },
+      arrangement: arrangeLayerContents(layer, {
+        gameContainerWidth,
+        gameContainerDepth,
+        cardSizes: project.cardSizes || [],
+        counterShapes: project.counterShapes || []
+      })
+    }));
+  });
+
   // Compute which geometries to show based on view mode
   let visibleGeometries = $derived.by(() => {
     const result: {
@@ -209,6 +224,16 @@
       showLayerView: boolean;
       layerBoxPlacements: BoxPlacement[];
       layerLooseTrayPlacements: LooseTrayPlacement[];
+      // All layers stacked view
+      showAllLayers: boolean;
+      allLayerArrangements: Array<{
+        layer: { id: string; name: string };
+        arrangement: {
+          boxes: BoxPlacement[];
+          looseTrays: LooseTrayPlacement[];
+          layerHeight: number;
+        };
+      }>;
     } = {
       tray: null,
       allTrays: [],
@@ -221,7 +246,9 @@
       showAllBoxes: false,
       showLayerView: false,
       layerBoxPlacements: [],
-      layerLooseTrayPlacements: []
+      layerLooseTrayPlacements: [],
+      showAllLayers: false,
+      allLayerArrangements: []
     };
 
     // In layout edit mode, only show trays (no box/lid since layout isn't finalized)
@@ -238,9 +265,11 @@
         result.showAllTrays = true;
         break;
       case 'all-no-lid':
-        // Show all boxes together without lids (default view / dimensions view)
+        // Show all layers stacked vertically with lids (dimensions view)
+        result.showAllLayers = true;
+        result.allLayerArrangements = allLayerArrangements;
         result.allBoxes = allBoxGeometries;
-        result.showAllBoxes = true;
+        result.allLooseTrays = allLooseTrayGeometries;
         break;
       case 'exploded':
         result.allTrays = allTrayGeometries;
@@ -1292,6 +1321,8 @@
               showLayerView={visibleGeometries.showLayerView}
               layerBoxPlacements={visibleGeometries.layerBoxPlacements}
               layerLooseTrayPlacements={visibleGeometries.layerLooseTrayPlacements}
+              showAllLayers={visibleGeometries.showAllLayers}
+              allLayerArrangements={visibleGeometries.allLayerArrangements}
               {generating}
             />
           {/await}
@@ -1492,6 +1523,8 @@
               showLayerView={visibleGeometries.showLayerView}
               layerBoxPlacements={visibleGeometries.layerBoxPlacements}
               layerLooseTrayPlacements={visibleGeometries.layerLooseTrayPlacements}
+              showAllLayers={visibleGeometries.showAllLayers}
+              allLayerArrangements={visibleGeometries.allLayerArrangements}
               {generating}
             />
           {/await}

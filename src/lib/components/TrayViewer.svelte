@@ -97,6 +97,16 @@
     showLayerView?: boolean;
     layerBoxPlacements?: BoxPlacement[];
     layerLooseTrayPlacements?: LooseTrayPlacement[];
+    // All layers stacked view
+    showAllLayers?: boolean;
+    allLayerArrangements?: Array<{
+      layer: { id: string; name: string };
+      arrangement: {
+        boxes: BoxPlacement[];
+        looseTrays: LooseTrayPlacement[];
+        layerHeight: number;
+      };
+    }>;
   }
 
   let {
@@ -130,7 +140,9 @@
     generating = false,
     showLayerView = false,
     layerBoxPlacements = [],
-    layerLooseTrayPlacements = []
+    layerLooseTrayPlacements = [],
+    showAllLayers = false,
+    allLayerArrangements = []
   }: Props = $props();
 
   // Compute actual container dimensions (prefer new props, fallback to legacy printBedSize)
@@ -192,11 +204,13 @@
       {showLayerView}
       {layerBoxPlacements}
       {layerLooseTrayPlacements}
+      {showAllLayers}
+      {allLayerArrangements}
     />
   </Canvas>
 
   <!-- Tray info overlay when a tray is clicked (non-edit mode only) -->
-  {#if clickedTrayInfo && !isLayoutEditMode && (showAllTrays || showAllBoxes)}
+  {#if clickedTrayInfo && !isLayoutEditMode && (showAllTrays || showAllBoxes || showAllLayers)}
     <div class="trayInfoOverlay" class:belowToolbar={showAllTrays}>
       <span
         class="trayLetter"
