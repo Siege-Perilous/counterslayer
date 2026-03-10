@@ -4,6 +4,7 @@
   import type { Box } from '$lib/types/project';
   import { getAllBoxes, getProject, moveBoxToLayer, findTrayLocation } from '$lib/stores/project.svelte';
   import { calculateMinimumBoxDimensions, getLidHeight } from '$lib/models/box';
+  import { calculateLayerHeight } from '$lib/models/layer';
   import { getCardSizes, getCounterShapes } from '$lib/stores/project.svelte';
 
   interface Props {
@@ -68,13 +69,36 @@
     selectedBox?.customBoxHeight !== undefined ? selectedBox.customBoxHeight + lidHeight : undefined
   );
 
+  // Get the layer height for the selected box's layer
+  const layerHeight = $derived.by(() => {
+    if (!selectedBox) return 0;
+    const project = getProject();
+    for (const layer of project.layers) {
+      if (layer.boxes.some((b) => b.id === selectedBox.id)) {
+        return calculateLayerHeight(layer, {
+          cardSizes: customCardSizes,
+          counterShapes: customCounterShapes
+        });
+      }
+    }
+    return 0;
+  });
+
+  // Natural box height (without layer adjustment)
+  const naturalBoxHeight = $derived(
+    selectedBox
+      ? (selectedBox.customBoxHeight ?? minimums.minHeight) + lidHeight
+      : 0
+  );
+
   // Actual box dimensions (custom or auto-calculated)
+  // Height is adjusted to match layer height when box is in a layer with taller items
   const boxDimensions = $derived(
     selectedBox
       ? {
           width: selectedBox.customWidth ?? minimums.minWidth,
           depth: selectedBox.customDepth ?? minimums.minDepth,
-          height: (selectedBox.customBoxHeight ?? minimums.minHeight) + lidHeight
+          height: layerHeight > 0 ? Math.max(naturalBoxHeight, layerHeight) : naturalBoxHeight
         }
       : null
   );

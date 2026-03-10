@@ -139,10 +139,11 @@ function arrangeLayerManual(
 
       const dims = getBoxDimensions(box, cardSizes, counterShapes);
       // Apply rotation: 90° and 270° swap width/depth
+      // Use layerHeight for consistent layer stacking
       const swapDims = manual.rotation === 90 || manual.rotation === 270;
       const effectiveDims: BoxDimensions = swapDims
-        ? { width: dims.depth, depth: dims.width, height: dims.height }
-        : dims;
+        ? { width: dims.depth, depth: dims.width, height: layerHeight }
+        : { width: dims.width, depth: dims.depth, height: layerHeight };
 
       boxPlacements.push({
         box,
@@ -345,8 +346,8 @@ function arrangeLayerAuto(
       boxPlacements.push({
         box,
         dimensions: wasRotated
-          ? { width: data.depth, depth: data.width, height: data.height }
-          : { width: data.width, depth: data.depth, height: data.height },
+          ? { width: data.depth, depth: data.width, height: layerHeight }
+          : { width: data.width, depth: data.depth, height: layerHeight },
         x: rect.x,
         y: rect.y,
         rotation: wasRotated ? 90 : 0
@@ -381,7 +382,7 @@ function arrangeLayerAuto(
       const dims = getBoxDimensions(box, cardSizes, counterShapes);
       boxPlacements.push({
         box,
-        dimensions: dims,
+        dimensions: { width: dims.width, depth: dims.depth, height: layerHeight },
         x: 0,
         y: fallbackY,
         rotation: 0

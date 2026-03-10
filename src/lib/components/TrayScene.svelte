@@ -1034,6 +1034,8 @@
     {@const boxData = allBoxes.find((b) => b.boxId === boxPlacement.box.id)}
     {@const boxGeomBounds = boxData?.boxGeometry ? getGeomBounds(boxData.boxGeometry) : null}
     {@const lidGeomBounds = boxData?.lidGeometry ? getGeomBounds(boxData.lidGeometry) : null}
+    <!-- Use actual geometry height for lid positioning, fallback to placement height -->
+    {@const boxGeomHeight = boxGeomBounds ? (boxGeomBounds.max.z - boxGeomBounds.min.z) : boxPlacement.dimensions.height}
     {@const boxHeight = boxPlacement.dimensions.height}
     <!-- Position for the box group: center of placement area -->
     {@const isRotated = boxPlacement.rotation === 90 || boxPlacement.rotation === 270}
@@ -1077,7 +1079,7 @@
             rotation.x={Math.PI / 2}
             rotation.z={lidRotZ}
             position.x={lidCenterX}
-            position.y={boxHeight - lidOverlap}
+            position.y={boxGeomHeight + lidOverlap}
             position.z={lidCenterZ}
           >
             <T.MeshStandardMaterial color="#444444" roughness={0.5} metalness={0.1} side={THREE.DoubleSide} />

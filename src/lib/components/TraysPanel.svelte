@@ -29,7 +29,8 @@
   import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
   import type { CupTrayParams } from '$lib/models/cupTray';
   import { countCups } from '$lib/types/cupLayout';
-  import { getTrayDimensionsForTray, arrangeTrays } from '$lib/models/box';
+  import { getTrayDimensionsForTray, arrangeTrays, getLidHeight } from '$lib/models/box';
+  import { calculateLayerHeight } from '$lib/models/layer';
   import {
     getProject,
     getTrayLetterById,
@@ -134,15 +135,37 @@
     }
   }
 
-  // Compute max tray height across all trays in the box (used for cup tray expansion)
+  // Find the layer containing the selected box
+  const selectedBoxLayer = $derived.by(() => {
+    if (!selectedBox) return null;
+    const project = getProject();
+    return project.layers.find((layer) => layer.boxes.some((b) => b.id === selectedBox.id)) ?? null;
+  });
+
+  // Calculate layer-adjusted tray height
+  // Trays expand to fill the box interior, which may be taller than natural to match layer height
   let maxTrayHeight = $derived.by(() => {
     if (!selectedBox) return 0;
     const cardSizes = getCardSizes();
     const counterShapes = getCounterShapes();
-    return Math.max(
+
+    // Get natural max tray height
+    const naturalMaxHeight = Math.max(
       ...selectedBox.trays.map((tray) => getTrayDimensionsForTray(tray, cardSizes, counterShapes).height),
       0
     );
+
+    // If box is in a layer, calculate layer-adjusted height
+    if (selectedBoxLayer) {
+      const layerHeight = calculateLayerHeight(selectedBoxLayer, { cardSizes, counterShapes });
+      const lidHeight = getLidHeight(selectedBox);
+      const floorThickness = selectedBox.floorThickness;
+      // Required tray height to fill box interior when box is adjusted to layer height
+      const requiredTrayHeight = layerHeight - floorThickness - lidHeight;
+      return Math.max(naturalMaxHeight, requiredTrayHeight);
+    }
+
+    return naturalMaxHeight;
   });
 
   // Compute rotated dimensions for the selected tray (accounting for layout rotation)

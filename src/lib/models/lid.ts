@@ -1,7 +1,7 @@
 import type { Box, CardSize, CounterShape, LidParams } from '$lib/types/project';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
-import { arrangeTrays, calculateMinimumBoxDimensions, getBoxInteriorDimensions } from './box';
+import { arrangeTrays, calculateMinimumBoxDimensions, getBoxInteriorDimensions, getLidHeight } from './box';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
@@ -101,7 +101,8 @@ export const defaultLidParams: LidParams = {
 export function createBoxWithLidGrooves(
   box: Box,
   cardSizes: CardSize[] = [],
-  counterShapes: CounterShape[] = []
+  counterShapes: CounterShape[] = [],
+  targetExteriorHeight?: number
 ): Geom3 | null {
   if (box.trays.length === 0) return null;
 
@@ -126,11 +127,25 @@ export function createBoxWithLidGrooves(
 
   // Calculate minimum (auto) dimensions
   const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
+  const lidHeight = getLidHeight(box);
 
   // Box exterior dimensions (use custom if set, otherwise auto)
+  // If targetExteriorHeight is provided (for layer unification), use it minus lid height for box height
   const extWidth = box.customWidth ?? minimums.minWidth;
   const extDepth = box.customDepth ?? minimums.minDepth;
-  const extHeight = box.customBoxHeight ?? minimums.minHeight;
+  const naturalHeight = box.customBoxHeight ?? minimums.minHeight;
+  // Use target height if provided and valid, otherwise use natural height
+  // The target height is the layer exterior height; subtract lid height to get box body height
+  const extHeight = targetExteriorHeight !== undefined && targetExteriorHeight > 0
+    ? Math.max(targetExteriorHeight - lidHeight, naturalHeight)
+    : naturalHeight;
+
+  console.log(`[createBoxWithLidGrooves "${box.name}"]`);
+  console.log(`  targetExteriorHeight: ${targetExteriorHeight}`);
+  console.log(`  lidHeight: ${lidHeight}`);
+  console.log(`  naturalHeight: ${naturalHeight}`);
+  console.log(`  => extHeight (box body): ${extHeight}`);
+  console.log(`  => interior height: ${extHeight - floor}`);
 
   // Calculate gaps for fill logic
   const widthGap = extWidth - minimums.minWidth; // Extra space at east (high X)

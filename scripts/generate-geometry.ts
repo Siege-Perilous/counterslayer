@@ -50,15 +50,26 @@ async function main() {
   }
 
   const project = JSON.parse(readFileSync(projectPath, 'utf-8'));
-  console.log(`Loaded project with ${project.boxes?.length || 0} boxes`);
+
+  // Support both old (project.boxes) and new (project.layers[].boxes) structure
+  let allBoxes: Box[] = [];
+  if (project.layers) {
+    for (const layer of project.layers) {
+      allBoxes.push(...(layer.boxes || []));
+    }
+  } else if (project.boxes) {
+    allBoxes = project.boxes;
+  }
+
+  console.log(`Loaded project with ${allBoxes.length} boxes`);
 
   // Get box ID from command line or use first box
-  const boxId = process.argv[2] || project.boxes?.[0]?.id;
-  const box: Box | undefined = project.boxes?.find((b: Box) => b.id === boxId);
+  const boxId = process.argv[2] || allBoxes[0]?.id;
+  const box: Box | undefined = allBoxes.find((b: Box) => b.id === boxId);
 
   if (!box) {
     console.error(`Error: Box with ID "${boxId}" not found`);
-    console.error('Available boxes:', project.boxes?.map((b: Box) => `${b.id} (${b.name})`).join(', '));
+    console.error('Available boxes:', allBoxes.map((b: Box) => `${b.id} (${b.name})`).join(', '));
     process.exit(1);
   }
 
