@@ -5,6 +5,11 @@
 
 import type { BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
 import type { ManualBoxPlacement, ManualLooseTrayPlacement } from '$lib/types/project';
+import type { SnapGuide } from '$lib/types/editor';
+import { getEffectiveDimensions as getEffectiveDimsBase } from '$lib/types/editor';
+
+// Re-export SnapGuide for backwards compatibility
+export type { SnapGuide };
 
 // Working placement for boxes during editing
 export interface EditorBoxPlacement {
@@ -33,27 +38,19 @@ export interface EditorLooseTrayPlacement {
   height: number;
 }
 
-// Computed dimensions based on rotation
+// Computed dimensions based on rotation (uses shared implementation)
 export function getEffectiveBoxDimensions(placement: EditorBoxPlacement): {
   width: number;
   depth: number;
 } {
-  const swapped = placement.rotation === 90 || placement.rotation === 270;
-  return {
-    width: swapped ? placement.originalDepth : placement.originalWidth,
-    depth: swapped ? placement.originalWidth : placement.originalDepth
-  };
+  return getEffectiveDimsBase(placement);
 }
 
 export function getEffectiveLooseTrayDimensions(placement: EditorLooseTrayPlacement): {
   width: number;
   depth: number;
 } {
-  const swapped = placement.rotation === 90 || placement.rotation === 270;
-  return {
-    width: swapped ? placement.originalDepth : placement.originalWidth,
-    depth: swapped ? placement.originalWidth : placement.originalDepth
-  };
+  return getEffectiveDimsBase(placement);
 }
 
 // Reactive state
@@ -68,12 +65,6 @@ let gameContainerWidth = $state(256);
 let gameContainerDepth = $state(256);
 
 // Snap guides for visual feedback
-export interface SnapGuide {
-  type: 'vertical' | 'horizontal';
-  position: number;
-  start: number;
-  end: number;
-}
 let activeSnapGuides = $state<SnapGuide[]>([]);
 
 // Drag state

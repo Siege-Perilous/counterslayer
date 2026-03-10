@@ -5,6 +5,11 @@
 
 import type { TrayPlacement } from '$lib/models/box';
 import type { ManualTrayPlacement } from '$lib/types/project';
+import type { SnapGuide } from '$lib/types/editor';
+import { getEffectiveDimensions as getEffectiveDimsBase } from '$lib/types/editor';
+
+// Re-export SnapGuide for backwards compatibility
+export type { SnapGuide };
 
 // Working placement during editing (includes more info than saved placement)
 export interface EditorTrayPlacement {
@@ -20,16 +25,12 @@ export interface EditorTrayPlacement {
   height: number;
 }
 
-// Computed dimensions based on rotation
+// Computed dimensions based on rotation (uses shared implementation)
 export function getEffectiveDimensions(placement: EditorTrayPlacement): {
   width: number;
   depth: number;
 } {
-  const swapped = placement.rotation === 90 || placement.rotation === 270;
-  return {
-    width: swapped ? placement.originalDepth : placement.originalWidth,
-    depth: swapped ? placement.originalWidth : placement.originalDepth
-  };
+  return getEffectiveDimsBase(placement);
 }
 
 // Reactive state
@@ -43,12 +44,6 @@ let boundsWidth = $state(256); // Interior width (box width minus walls)
 let boundsDepth = $state(256); // Interior depth (box depth minus walls)
 
 // Snap guides for visual feedback
-export interface SnapGuide {
-  type: 'vertical' | 'horizontal';
-  position: number; // x for vertical, y for horizontal
-  start: number;
-  end: number;
-}
 let activeSnapGuides = $state<SnapGuide[]>([]);
 
 // Drag state - stored here so it can be shared between different event systems
