@@ -1,3 +1,4 @@
+import defaultProjectJson from '$lib/data/defaultProject.json';
 import { defaultCardDividerTrayParams, type CardDividerTrayParams } from '$lib/models/cardDividerTray';
 import { defaultCardDrawTrayParams, type CardDrawTrayParams } from '$lib/models/cardTray';
 import {
@@ -304,12 +305,6 @@ function createDefaultCupTray(name: string, color: string): CupTray {
 function _createDefaultCardTray(name: string, color: string): CardDrawTray {
   return createDefaultCardDrawTray(name, color);
 }
-
-// Backwards compatibility alias
-function createDefaultTray(name: string, color: string, counterShapes?: CounterShape[]): CounterTray {
-  return createDefaultCounterTray(name, color, counterShapes);
-}
-
 function createDefaultBox(name: string): Box {
   return {
     id: generateId(),
@@ -333,32 +328,8 @@ function createDefaultLayer(name: string): Layer {
 }
 
 function createDefaultProject(): Project {
-  // Create the layer
-  const layer = createDefaultLayer('Layer 1');
-
-  // Create a box with 2 trays
-  const box = createDefaultBox('Game box');
-  const counterTray = createDefaultTray('Counter tray', TRAY_COLORS[0]);
-  const cardDrawTray = createDefaultCardDrawTray('Card draw', TRAY_COLORS[1]);
-  // Set card draw tray to hold 25 cards
-  cardDrawTray.params = { ...cardDrawTray.params, cardCount: 25 };
-  box.trays.push(counterTray);
-  box.trays.push(cardDrawTray);
-  layer.boxes.push(box);
-
-  // Create a loose cup tray
-  const cupTray = createDefaultCupTray('Segmented cups', TRAY_COLORS[2]);
-  layer.looseTrays.push(cupTray);
-
-  return {
-    version: 2,
-    layers: [layer],
-    counterShapes: DEFAULT_COUNTER_SHAPES.map((s) => ({ ...s })),
-    cardSizes: DEFAULT_CARD_SIZES.map((s) => ({ ...s })),
-    selectedLayerId: layer.id,
-    selectedBoxId: box.id,
-    selectedTrayId: counterTray.id
-  };
+  // Deep clone the JSON to avoid mutations affecting the original
+  return JSON.parse(JSON.stringify(defaultProjectJson)) as Project;
 }
 
 // Reactive state
