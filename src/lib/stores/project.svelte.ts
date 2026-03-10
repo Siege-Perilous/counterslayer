@@ -1,3 +1,4 @@
+import defaultProjectJson from '$lib/data/defaultProject.json';
 import { defaultCardDividerTrayParams, type CardDividerTrayParams } from '$lib/models/cardDividerTray';
 import { defaultCardDrawTrayParams, type CardDrawTrayParams } from '$lib/models/cardTray';
 import {
@@ -9,7 +10,6 @@ import {
 import { defaultCupTrayParams, type CupTrayParams } from '$lib/models/cupTray';
 import { defaultLidParams } from '$lib/models/lid';
 import { saveNow, scheduleSave } from '$lib/stores/saveManager';
-import defaultProjectJson from '$lib/data/defaultProject.json';
 import type {
   Box,
   CardDividerTray,
@@ -305,12 +305,6 @@ function createDefaultCupTray(name: string, color: string): CupTray {
 function _createDefaultCardTray(name: string, color: string): CardDrawTray {
   return createDefaultCardDrawTray(name, color);
 }
-
-// Backwards compatibility alias
-function createDefaultTray(name: string, color: string, counterShapes?: CounterShape[]): CounterTray {
-  return createDefaultCounterTray(name, color, counterShapes);
-}
-
 function createDefaultBox(name: string): Box {
   return {
     id: generateId(),

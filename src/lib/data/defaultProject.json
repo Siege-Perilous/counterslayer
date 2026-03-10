@@ -25,76 +25,20 @@
                 "cutoutMax": 12,
                 "trayWidthOverride": 143,
                 "topLoadedStacks": [
-                  [
-                    "shape-square",
-                    12,
-                    null
-                  ],
-                  [
-                    "shape-hex",
-                    10,
-                    null
-                  ],
-                  [
-                    "shape-circle",
-                    8,
-                    null
-                  ],
-                  [
-                    "shape-triangle",
-                    6,
-                    null
-                  ]
+                  ["shape-square", 12, null],
+                  ["shape-hex", 10, null],
+                  ["shape-circle", 8, null],
+                  ["shape-triangle", 6, null]
                 ],
                 "edgeLoadedStacks": [
-                  [
-                    "shape-triangle",
-                    10,
-                    "lengthwise",
-                    null
-                  ],
-                  [
-                    "shape-triangle",
-                    10,
-                    "crosswise",
-                    null
-                  ],
-                  [
-                    "shape-circle",
-                    8,
-                    "lengthwise",
-                    null
-                  ],
-                  [
-                    "shape-circle",
-                    8,
-                    "crosswise",
-                    null
-                  ],
-                  [
-                    "shape-hex",
-                    6,
-                    "lengthwise",
-                    null
-                  ],
-                  [
-                    "shape-hex",
-                    6,
-                    "crosswise",
-                    null
-                  ],
-                  [
-                    "shape-square",
-                    4,
-                    "lengthwise",
-                    null
-                  ],
-                  [
-                    "shape-square",
-                    4,
-                    "crosswise",
-                    null
-                  ]
+                  ["shape-triangle", 10, "lengthwise", null],
+                  ["shape-triangle", 10, "crosswise", null],
+                  ["shape-circle", 8, "lengthwise", null],
+                  ["shape-circle", 8, "crosswise", null],
+                  ["shape-hex", 6, "lengthwise", null],
+                  ["shape-hex", 6, "crosswise", null],
+                  ["shape-square", 4, "lengthwise", null],
+                  ["shape-square", 4, "crosswise", null]
                 ],
                 "gameContainerWidth": 150,
                 "gameContainerDepth": 200
@@ -116,76 +60,20 @@
                 "cutoutMax": 12,
                 "trayWidthOverride": 0,
                 "topLoadedStacks": [
-                  [
-                    "shape-square",
-                    12,
-                    null
-                  ],
-                  [
-                    "shape-hex",
-                    10,
-                    null
-                  ],
-                  [
-                    "shape-circle",
-                    8,
-                    null
-                  ],
-                  [
-                    "shape-triangle",
-                    6,
-                    null
-                  ]
+                  ["shape-square", 12, null],
+                  ["shape-hex", 10, null],
+                  ["shape-circle", 8, null],
+                  ["shape-triangle", 6, null]
                 ],
                 "edgeLoadedStacks": [
-                  [
-                    "shape-triangle",
-                    10,
-                    "lengthwise",
-                    null
-                  ],
-                  [
-                    "shape-triangle",
-                    10,
-                    "crosswise",
-                    null
-                  ],
-                  [
-                    "shape-circle",
-                    8,
-                    "lengthwise",
-                    null
-                  ],
-                  [
-                    "shape-circle",
-                    8,
-                    "crosswise",
-                    null
-                  ],
-                  [
-                    "shape-hex",
-                    6,
-                    "lengthwise",
-                    null
-                  ],
-                  [
-                    "shape-hex",
-                    6,
-                    "crosswise",
-                    null
-                  ],
-                  [
-                    "shape-square",
-                    4,
-                    "lengthwise",
-                    null
-                  ],
-                  [
-                    "shape-square",
-                    4,
-                    "crosswise",
-                    null
-                  ]
+                  ["shape-triangle", 10, "lengthwise", null],
+                  ["shape-triangle", 10, "crosswise", null],
+                  ["shape-circle", 8, "lengthwise", null],
+                  ["shape-circle", 8, "crosswise", null],
+                  ["shape-hex", 6, "lengthwise", null],
+                  ["shape-hex", 6, "crosswise", null],
+                  ["shape-square", 4, "lengthwise", null],
+                  ["shape-square", 4, "crosswise", null]
                 ],
                 "gameContainerWidth": 150,
                 "gameContainerDepth": 200
