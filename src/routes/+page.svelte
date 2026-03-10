@@ -453,32 +453,102 @@
     // Check if cache is still valid (hash matches what was used to generate it)
     const cacheValid = lastGeneratedHash && hashAtGenerationStart === lastGeneratedHash;
 
-    // If cache valid and not forced, try to use cached geometry (only for boxed trays)
-    if (!isLoose && cacheValid && !force && allBoxGeometries.length > 0 && box) {
-      // Find the selected box in the all-boxes cache
-      const cachedBox = allBoxGeometries.find((b) => b.boxId === box.id);
-      if (cachedBox) {
-        // Verify the cached tray count matches current state (detects tray moves)
-        const currentTrayCount = box.trays.length;
-        const cachedTrayCount = cachedBox.trayGeometries.length;
-        if (currentTrayCount !== cachedTrayCount) {
-          // Tray count mismatch - cache is stale, force regeneration
-          // This can happen when a tray is moved between boxes
+    // If cache valid and not forced, try to use cached geometry
+    if (cacheValid && !force) {
+      // Handle loose trays
+      if (isLoose && allLooseTrayGeometries.length > 0) {
+        const cachedLooseTray = allLooseTrayGeometries.find((t) => t.trayId === tray.id);
+        if (cachedLooseTray) {
+          selectedTrayGeometry = cachedLooseTray.geometry;
+          selectedTrayCounters = cachedLooseTray.counterStacks;
+          // For loose trays, allTrayGeometries is just this tray
+          allTrayGeometries = [
+            {
+              trayId: cachedLooseTray.trayId,
+              name: cachedLooseTray.name,
+              color: cachedLooseTray.color,
+              geometry: cachedLooseTray.geometry,
+              placement: {
+                tray,
+                x: 0,
+                y: 0,
+                rotated: false,
+                dimensions: cachedLooseTray.dimensions
+              },
+              counterStacks: cachedLooseTray.counterStacks,
+              trayLetter: cachedLooseTray.trayLetter
+            }
+          ];
+          boxGeometry = null;
+          lidGeometry = null;
+          console.debug('[Geometry Cache] Hit for loose tray:', tray.id);
+          return;
         } else {
-          // Find the selected tray within this box
-          const cachedTray = cachedBox.trayGeometries.find((t) => t.trayId === tray.id);
-          if (cachedTray) {
-            // Use cached data for this box
-            selectedTrayGeometry = cachedTray.geometry;
-            selectedTrayCounters = cachedTray.counterStacks;
-            allTrayGeometries = cachedBox.trayGeometries;
-            boxGeometry = cachedBox.boxGeometry;
-            lidGeometry = cachedBox.lidGeometry;
-            return;
-          }
+          console.debug('[Geometry Cache] Loose tray not found in cache:', {
+            lookingFor: tray.id,
+            availableLooseTrays: allLooseTrayGeometries.map((t) => t.trayId)
+          });
         }
       }
+
+      // Handle boxed trays
+      if (!isLoose && allBoxGeometries.length > 0 && box) {
+        // Find the selected box in the all-boxes cache
+        const cachedBox = allBoxGeometries.find((b) => b.boxId === box.id);
+        if (cachedBox) {
+          // Verify the cached tray count matches current state (detects tray moves)
+          const currentTrayCount = box.trays.length;
+          const cachedTrayCount = cachedBox.trayGeometries.length;
+          if (currentTrayCount !== cachedTrayCount) {
+            // Tray count mismatch - cache is stale, force regeneration
+            // This can happen when a tray is moved between boxes
+            console.debug('[Geometry Cache] Tray count mismatch:', { currentTrayCount, cachedTrayCount });
+          } else {
+            // Find the selected tray within this box
+            const cachedTray = cachedBox.trayGeometries.find((t) => t.trayId === tray.id);
+            if (cachedTray) {
+              // Use cached data for this box
+              selectedTrayGeometry = cachedTray.geometry;
+              selectedTrayCounters = cachedTray.counterStacks;
+              allTrayGeometries = cachedBox.trayGeometries;
+              boxGeometry = cachedBox.boxGeometry;
+              lidGeometry = cachedBox.lidGeometry;
+              console.debug('[Geometry Cache] Hit for boxed tray:', tray.id);
+              return;
+            } else {
+              // Tray not found in cache - this shouldn't happen normally
+              console.debug('[Geometry Cache] Tray not found in cache:', {
+                lookingFor: tray.id,
+                availableTrays: cachedBox.trayGeometries.map((t) => t.trayId)
+              });
+            }
+          }
+        } else {
+          console.debug('[Geometry Cache] Box not found in cache:', {
+            lookingFor: box.id,
+            availableBoxes: allBoxGeometries.map((b) => b.boxId)
+          });
+        }
+      }
+    } else if (!force) {
+      // Log why cache was skipped
+      console.debug('[Geometry Cache] Skipped:', {
+        cacheValid,
+        isLoose,
+        hasBoxGeometries: allBoxGeometries.length > 0,
+        hasLooseTrayGeometries: allLooseTrayGeometries.length > 0,
+        hasBox: !!box,
+        hashMatch: lastGeneratedHash === hashAtGenerationStart
+      });
     }
+
+    console.debug('[Geometry Worker] Calling worker:', {
+      force,
+      trayId: tray.id,
+      boxId: box?.id ?? '(loose)',
+      cacheValid,
+      hashMatch: lastGeneratedHash === hashAtGenerationStart
+    });
 
     generating = true;
     error = '';
@@ -1268,12 +1338,15 @@
 
         if (!hasInitialized) {
           hasInitialized = true;
+          console.debug('[Geometry Trigger] Initial load - forcing regeneration');
           regenerate(true); // Force on initial load
         } else if (structureChanged) {
           // Force regeneration only for true structural changes (add/delete/move)
+          console.debug('[Geometry Trigger] Structure changed - forcing regeneration');
           regenerate(true);
         } else if (selectionChanged) {
           // Selection-only changes should use the cache
+          console.debug('[Geometry Trigger] Selection changed - using cache');
           regenerate(false);
         }
       }
