@@ -5,7 +5,7 @@
    * Internal positioning is relative to the layer's local origin.
    */
   import { T } from '@threlte/core';
-  import { Text } from '@threlte/extras';
+  import { Text, type IntersectionEvent } from '@threlte/extras';
   import * as THREE from 'three';
   import BoxAssembly from './BoxAssembly.svelte';
   import TrayInBox from './TrayInBox.svelte';
@@ -190,13 +190,14 @@
         {onTrayClick}
         {onTrayDoubleClick}
         onBoxClick={onBoxDoubleClick}
+        allowInnerTrayClicks={false}
       />
     {:else}
       <!-- Fallback: simple box geometry if actual geometry not available -->
       <T.Mesh
         position.y={boxHeight / 2}
-        onclick={(e: { stopPropagation?: () => void }) => {
-          e.stopPropagation?.();
+        onclick={(e: IntersectionEvent<MouseEvent>) => {
+          e.stopPropagation();
           onTrayClick?.({
             trayId: boxPlacement.box.id,
             name: boxPlacement.box.name,
@@ -208,7 +209,10 @@
             type: 'box'
           });
         }}
-        ondblclick={() => onBoxDoubleClick?.(boxPlacement.box.id)}
+        ondblclick={(e: IntersectionEvent<MouseEvent>) => {
+          e.stopPropagation();
+          onBoxDoubleClick?.(boxPlacement.box.id);
+        }}
       >
         <T.BoxGeometry args={[boxPlacement.dimensions.width, boxHeight, boxPlacement.dimensions.depth]} />
         <T.MeshStandardMaterial color="#444444" roughness={0.7} metalness={0.1} />

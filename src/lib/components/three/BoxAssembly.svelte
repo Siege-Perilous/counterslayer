@@ -5,6 +5,7 @@
    * All internal positioning is relative to (0,0,0) at the box center.
    */
   import { T } from '@threlte/core';
+  import type { IntersectionEvent } from '@threlte/extras';
   import * as THREE from 'three';
   import TrayInBox from './TrayInBox.svelte';
   import type { TrayPlacement } from '$lib/models/box';
@@ -50,6 +51,8 @@
     onBoxClick?: (boxId: string) => void;
     // Index offset for tray letter calculation
     trayIndexOffset?: number;
+    // When false, inner tray clicks are disabled (for layer views where only box-level clicks are allowed)
+    allowInnerTrayClicks?: boolean;
   }
 
   let {
@@ -68,7 +71,8 @@
     onTrayClick,
     onTrayDoubleClick,
     onBoxClick,
-    trayIndexOffset = 0
+    trayIndexOffset = 0,
+    allowInnerTrayClicks = true
   }: Props = $props();
 
   // Helper to get geometry bounds
@@ -121,8 +125,8 @@
     position.x={boxCenterX}
     position.y={0}
     position.z={boxCenterZ}
-    onclick={(e: { stopPropagation?: () => void }) => {
-      e.stopPropagation?.();
+    onclick={(e: IntersectionEvent<MouseEvent>) => {
+      e.stopPropagation();
       if (boxId && boxName) {
         onTrayClick?.({
           trayId: boxId,
@@ -135,9 +139,9 @@
           type: 'box'
         });
       }
-      onBoxClick?.(boxId);
     }}
-    ondblclick={() => {
+    ondblclick={(e: IntersectionEvent<MouseEvent>) => {
+      e.stopPropagation();
       if (boxId && onBoxClick) {
         onBoxClick(boxId);
       }
@@ -156,6 +160,27 @@
     position.x={lidCenterX}
     position.y={boxHeight}
     position.z={lidCenterZ}
+    onclick={(e: IntersectionEvent<MouseEvent>) => {
+      e.stopPropagation();
+      if (boxId && boxName) {
+        onTrayClick?.({
+          trayId: boxId,
+          name: boxName,
+          letter: '',
+          width: boxDimensions.width,
+          depth: boxDimensions.depth,
+          height: boxDimensions.height,
+          color: '#444444',
+          type: 'box'
+        });
+      }
+    }}
+    ondblclick={(e: IntersectionEvent<MouseEvent>) => {
+      e.stopPropagation();
+      if (boxId && onBoxClick) {
+        onBoxClick(boxId);
+      }
+    }}
   >
     <T.MeshStandardMaterial color="#444444" roughness={0.5} metalness={0.1} side={THREE.DoubleSide} />
   </T.Mesh>
@@ -184,8 +209,8 @@
       trayName={trayData.name}
       trayLetter={trayData.trayLetter ?? getTrayLetter(cumulativeTrayIdx)}
       {triangleCornerRadius}
-      onClick={onTrayClick}
-      onDoubleClick={onTrayDoubleClick}
+      onClick={allowInnerTrayClicks ? onTrayClick : undefined}
+      onDoubleClick={allowInnerTrayClicks ? onTrayDoubleClick : undefined}
       width={placement.dimensions.width}
       depth={placement.dimensions.depth}
       height={placement.dimensions.height}
