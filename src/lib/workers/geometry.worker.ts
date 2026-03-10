@@ -132,15 +132,19 @@ function calculateUnifiedLayerHeight(
 
 /**
  * Calculate the required interior tray height for a box to match a target layer height.
- * Box exterior = interior tray height + floor thickness + lid groove
- * So: required tray height = layer height - floor thickness - lid groove
+ * The lid slides into the box - only the flat top (lid thickness) sticks above.
+ * Box body = layer height - lid thickness (visible part)
+ * Box interior = box body - floor thickness
+ * Required tray height = box interior
  */
 function getRequiredTrayHeightForBox(box: Box, targetLayerHeight: number): number {
-  const lidHeight = getLidHeight(box);
+  // Only the lid thickness (flat top) sticks above the box, not the full lid height
+  const lidThickness = box.lidParams?.thickness ?? 2;
   const floorThickness = box.floorThickness;
 
-  // Target tray height = layer height - box overhead (floor + lid groove)
-  const requiredTrayHeight = targetLayerHeight - floorThickness - lidHeight;
+  // Box body = layer height - lid visible height
+  // Tray height = box interior = box body - floor
+  const requiredTrayHeight = targetLayerHeight - lidThickness - floorThickness;
 
   // Return at least 0 (shouldn't happen in practice)
   return Math.max(requiredTrayHeight, 0);

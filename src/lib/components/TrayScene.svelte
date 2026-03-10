@@ -1036,7 +1036,14 @@
     {@const lidGeomBounds = boxData?.lidGeometry ? getGeomBounds(boxData.lidGeometry) : null}
     <!-- Use actual geometry height for lid positioning, fallback to placement height -->
     {@const boxGeomHeight = boxGeomBounds ? (boxGeomBounds.max.z - boxGeomBounds.min.z) : boxPlacement.dimensions.height}
+    {@const lidGeomHeight = lidGeomBounds ? (lidGeomBounds.max.z - lidGeomBounds.min.z) : 0}
     {@const boxHeight = boxPlacement.dimensions.height}
+    {@const _ = console.log(`[Layer View Box "${boxPlacement.box.name}"]`, {
+      boxGeomHeight: boxGeomHeight.toFixed(2),
+      lidGeomHeight: lidGeomHeight.toFixed(2),
+      lidPositionY: boxHeight.toFixed(2),
+      layerHeight: boxHeight.toFixed(2)
+    })}
     <!-- Position for the box group: center of placement area -->
     {@const isRotated = boxPlacement.rotation === 90 || boxPlacement.rotation === 270}
     {@const baseX = layerOffsetX + boxPlacement.x + boxPlacement.dimensions.width / 2}
@@ -1079,7 +1086,7 @@
             rotation.x={Math.PI / 2}
             rotation.z={lidRotZ}
             position.x={lidCenterX}
-            position.y={boxGeomHeight + lidOverlap}
+            position.y={boxHeight}
             position.z={lidCenterZ}
           >
             <T.MeshStandardMaterial color="#444444" roughness={0.5} metalness={0.1} side={THREE.DoubleSide} />
@@ -1131,12 +1138,18 @@
   <!-- Render loose trays with actual geometry -->
   {#each layerLooseTrayPlacements as trayPlacement (trayPlacement.tray.id)}
     {@const looseTrayGeom = allLooseTrays.find((lt) => lt.trayId === trayPlacement.tray.id)}
+    {@const looseTrayBounds = looseTrayGeom?.geometry ? getGeomBounds(looseTrayGeom.geometry) : null}
+    {@const looseTrayGeomHeight = looseTrayBounds ? (looseTrayBounds.max.z - looseTrayBounds.min.z) : 0}
     {@const trayHeight = trayPlacement.dimensions.height}
     {@const trayColor = trayPlacement.tray.color || TRAY_COLORS[0]}
     {@const isRotated = trayPlacement.rotation === 90 || trayPlacement.rotation === 270}
     <!-- Position: placed on floor at placement coords -->
     {@const baseX = layerOffsetX + trayPlacement.x + (isRotated ? trayPlacement.dimensions.width : 0)}
     {@const baseZ = layerOffsetZ - trayPlacement.y}
+    {@const _ = console.log(`[Layer View Loose Tray "${trayPlacement.tray.name}"]`, {
+      looseTrayGeomHeight: looseTrayGeomHeight.toFixed(2),
+      placementHeight: trayHeight.toFixed(2)
+    })}
 
     {#if looseTrayGeom}
       <!-- Render actual tray geometry -->

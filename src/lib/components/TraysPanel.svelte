@@ -158,10 +158,11 @@
     // If box is in a layer, calculate layer-adjusted height
     if (selectedBoxLayer) {
       const layerHeight = calculateLayerHeight(selectedBoxLayer, { cardSizes, counterShapes });
-      const lidHeight = getLidHeight(selectedBox);
+      // Only lid thickness (flat top) sticks above box, not full lid height
+      const lidThickness = selectedBox.lidParams?.thickness ?? 2;
       const floorThickness = selectedBox.floorThickness;
       // Required tray height to fill box interior when box is adjusted to layer height
-      const requiredTrayHeight = layerHeight - floorThickness - lidHeight;
+      const requiredTrayHeight = layerHeight - lidThickness - floorThickness;
       return Math.max(naturalMaxHeight, requiredTrayHeight);
     }
 

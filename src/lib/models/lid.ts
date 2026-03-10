@@ -130,14 +130,17 @@ export function createBoxWithLidGrooves(
   const lidHeight = getLidHeight(box);
 
   // Box exterior dimensions (use custom if set, otherwise auto)
-  // If targetExteriorHeight is provided (for layer unification), use it minus lid height for box height
+  // If targetExteriorHeight is provided (for layer unification), use it minus lid VISIBLE height for box height
   const extWidth = box.customWidth ?? minimums.minWidth;
   const extDepth = box.customDepth ?? minimums.minDepth;
   const naturalHeight = box.customBoxHeight ?? minimums.minHeight;
+  // The lid slides into the box - only the flat top (thickness) sticks above
+  // The rails extend down INTO the box walls, so don't subtract the full lid height
+  const lidThickness = box.lidParams?.thickness ?? 2;
   // Use target height if provided and valid, otherwise use natural height
-  // The target height is the layer exterior height; subtract lid height to get box body height
+  // The target height is the layer exterior height; subtract only lid visible height (thickness) for box body
   const extHeight = targetExteriorHeight !== undefined && targetExteriorHeight > 0
-    ? Math.max(targetExteriorHeight - lidHeight, naturalHeight)
+    ? Math.max(targetExteriorHeight - lidThickness, naturalHeight)
     : naturalHeight;
 
   console.log(`[createBoxWithLidGrooves "${box.name}"]`);
