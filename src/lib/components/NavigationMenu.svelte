@@ -179,7 +179,7 @@
     <span class="navItemIcon">
       <Icon Icon={IconRuler} size="1rem" />
     </span>
-    Dimensions
+    Project & dimensions
   </button>
   <Hr />
 
@@ -293,30 +293,28 @@
                       <span class="trayLetter">{letter}</span>
                       {tray.name}
                     </span>
-                    {#if box.trays.length > 1}
-                      <span
-                        class="navItemDelete"
-                        role="none"
-                        onclick={(e) => e.stopPropagation()}
-                        onkeydown={(e) => e.stopPropagation()}
+                    <span
+                      class="navItemDelete"
+                      role="none"
+                      onclick={(e) => e.stopPropagation()}
+                      onkeydown={(e) => e.stopPropagation()}
+                    >
+                      <ConfirmActionButton
+                        action={() => handleDeleteTray(box.id, tray.id)}
+                        actionButtonText="Delete tray"
+                        positioning={{ placement: 'right' }}
+                        portal=".appContainer"
                       >
-                        <ConfirmActionButton
-                          action={() => handleDeleteTray(box.id, tray.id)}
-                          actionButtonText="Delete tray"
-                          positioning={{ placement: 'right' }}
-                          portal=".appContainer"
-                        >
-                          {#snippet trigger({ triggerProps })}
-                            <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete tray">
-                              <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
-                            </IconButton>
-                          {/snippet}
-                          {#snippet actionMessage()}
-                            <p>Delete this tray?</p>
-                          {/snippet}
-                        </ConfirmActionButton>
-                      </span>
-                    {/if}
+                        {#snippet trigger({ triggerProps })}
+                          <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete tray">
+                            <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
+                          </IconButton>
+                        {/snippet}
+                        {#snippet actionMessage()}
+                          <p>Delete this tray?</p>
+                        {/snippet}
+                      </ConfirmActionButton>
+                    </span>
                   </button>
                 {/each}
 

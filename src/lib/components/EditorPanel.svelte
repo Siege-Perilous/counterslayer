@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Panel, Title, Input, FormControl, Spacer } from '@tableslayer/ui';
+  import { Panel, Title, Input, FormControl, Spacer, Text } from '@tableslayer/ui';
   import GlobalsPanel from './GlobalsPanel.svelte';
   import BoxesPanel from './BoxesPanel.svelte';
   import TraysPanel from './TraysPanel.svelte';
@@ -32,6 +32,8 @@
   import type { CupTrayParams } from '$lib/models/cupTray';
   import { countCups } from '$lib/types/cupLayout';
   import { layoutEditorState } from '$lib/stores/layoutEditor.svelte';
+  import { getTrayDimensionsForTray } from '$lib/models/box';
+  import { getBoxDimensions, calculateLayerHeight } from '$lib/models/layer';
 
   type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
 
@@ -218,9 +220,12 @@
         <GlobalsPanel {globalSettings} onGlobalSettingsChange={handleGlobalSettingsChange} />
       {:else if selectionType === 'layer'}
         {#if selectedLayer}
+          {@const cardSizes = project.cardSizes ?? []}
+          {@const counterShapes = project.counterShapes ?? []}
+          {@const layerHeight = calculateLayerHeight(selectedLayer, { cardSizes, counterShapes })}
           <div class="layerSettings">
             <div class="panelFormSection">
-              <FormControl label="Layer Name" name="layerName">
+              <FormControl label="Layer name" name="layerName">
                 {#snippet input({ inputProps })}
                   <Input
                     {...inputProps}
@@ -231,14 +236,53 @@
                 {/snippet}
               </FormControl>
               <Spacer size="1rem" />
-              <div class="layerSummary">
-                <div class="summaryItem">
-                  <span class="summaryLabel">Boxes</span>
-                  <span class="summaryValue">{selectedLayer.boxes.length}</span>
-                </div>
-                <div class="summaryItem">
-                  <span class="summaryLabel">Loose trays</span>
-                  <span class="summaryValue">{selectedLayer.looseTrays.length}</span>
+              <Text size="0.875rem" color="fgMuted">
+                A <Text as="span" size="0.875rem" weight={600}>layer</Text>
+                represents a horizontal slice of your game container. When editing in the layout editor, you can drag and
+                drop boxes and trays to visualize them within a layer, but this has no impact on the print.
+              </Text>
+              <Spacer size="1rem" />
+              <Text size="0.875rem" color="fgMuted">
+                All boxes and loose trays in a layer are normalized to be the same height as the tallest tray. Trays
+                within a box will simlarly normalize to make sure the contents don't spill. If you are targeting
+                specific heights for a layer or box, please edit the stacks and heights individually in their child
+                trays.
+              </Text>
+              <Spacer size="1rem" />
+              <div class="layerContents">
+                <span class="contentsLabel">Layer content dimensions</span>
+                <div class="contentsTree">
+                  {#each selectedLayer.boxes as box (box.id)}
+                    {@const boxDims = getBoxDimensions(box, cardSizes, counterShapes)}
+                    {@const boxInteriorHeight = layerHeight - box.floorThickness}
+                    <div class="treeItem treeItem--box">
+                      <span class="treeItemName">{box.name}</span>
+                      <span class="treeItemDims">
+                        {boxDims.width.toFixed(0)} × {boxDims.depth.toFixed(0)} × {layerHeight.toFixed(0)}
+                      </span>
+                    </div>
+                    {#each box.trays as tray (tray.id)}
+                      {@const trayDims = getTrayDimensionsForTray(tray, cardSizes, counterShapes)}
+                      <div class="treeItem treeItem--tray treeItem--nested">
+                        <span class="treeItemName">{tray.name}</span>
+                        <span class="treeItemDims">
+                          {trayDims.width.toFixed(0)} × {trayDims.depth.toFixed(0)} × {boxInteriorHeight.toFixed(0)}
+                        </span>
+                      </div>
+                    {/each}
+                  {/each}
+                  {#each selectedLayer.looseTrays as tray (tray.id)}
+                    {@const trayDims = getTrayDimensionsForTray(tray, cardSizes, counterShapes)}
+                    <div class="treeItem treeItem--looseTray">
+                      <span class="treeItemName">{tray.name}</span>
+                      <span class="treeItemDims">
+                        {trayDims.width.toFixed(0)} × {trayDims.depth.toFixed(0)} × {layerHeight.toFixed(0)}
+                      </span>
+                    </div>
+                  {/each}
+                  {#if selectedLayer.boxes.length === 0 && selectedLayer.looseTrays.length === 0}
+                    <div class="treeEmpty">No items in layer</div>
+                  {/if}
                 </div>
               </div>
             </div>
@@ -391,27 +435,71 @@
     padding: 0 0.75rem;
   }
 
-  .layerSummary {
+  .layerContents {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    padding: 0.75rem;
+  }
+
+  .contentsLabel {
+    font-size: 0.75rem;
+    color: var(--fgMuted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .contentsTree {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
     background: var(--contrastLowest);
     border-radius: var(--radius-2);
   }
 
-  .summaryItem {
+  .treeItem {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     font-size: 0.75rem;
+    padding: 0.25rem 0;
+    border-radius: var(--radius-1);
   }
 
-  .summaryLabel {
-    color: var(--fgMuted);
+  .treeItem--box {
+    font-weight: 600;
   }
 
-  .summaryValue {
-    font-family: var(--font-mono);
+  .treeItem--nested {
+    margin-left: 1rem;
+    background: transparent;
+    border-left: 2px solid var(--borderColor);
+  }
+
+  .treeItem--looseTray {
+    background: transparent;
+  }
+
+  .treeItemName {
     color: var(--fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .treeItemDims {
+    font-family: var(--font-mono);
+    color: var(--fgMuted);
+    font-size: 0.6875rem;
+    flex-shrink: 0;
+    margin-left: 0.5rem;
+  }
+
+  .treeEmpty {
+    font-size: 0.75rem;
+    color: var(--fgMuted);
+    font-style: italic;
+    padding: 0.5rem;
   }
 </style>

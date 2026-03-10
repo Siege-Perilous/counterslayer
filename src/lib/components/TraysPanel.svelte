@@ -294,19 +294,17 @@
                       ? stats.stacks + ' cups'
                       : stats.counters + 'c in ' + stats.stacks + 's'}
               </span>
-              {#if selectedBox.trays.length > 1}
-                <IconButton
-                  onclick={(e: MouseEvent) => {
-                    e.stopPropagation();
-                    onDeleteTray(selectedBox.id, tray.id);
-                  }}
-                  title="Delete tray"
-                  size="sm"
-                  variant="ghost"
-                >
-                  <Icon color="var(--fgMuted)" Icon={IconX} />
-                </IconButton>
-              {/if}
+              <IconButton
+                onclick={(e: MouseEvent) => {
+                  e.stopPropagation();
+                  onDeleteTray(selectedBox.id, tray.id);
+                }}
+                title="Delete tray"
+                size="sm"
+                variant="ghost"
+              >
+                <Icon color="var(--fgMuted)" Icon={IconX} />
+              </IconButton>
             </span>
           </div>
         {/each}
