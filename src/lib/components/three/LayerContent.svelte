@@ -102,12 +102,6 @@
   let layerOffsetX = $derived(-gameContainerWidth / 2);
   let layerOffsetZ = $derived(printBedSize / 2 + gameContainerDepth / 2);
 
-  // Helper to get geometry bounds
-  function getGeomBounds(geom: THREE.BufferGeometry | null): THREE.Box3 | null {
-    if (!geom) return null;
-    geom.computeBoundingBox();
-    return geom.boundingBox;
-  }
 
   // Get live tray color from project store
   function getTrayColor(trayId: string, fallbackColor: string): string {
