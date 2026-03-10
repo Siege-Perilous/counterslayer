@@ -275,6 +275,11 @@
         {#snippet end()}mm{/snippet}
       </FormControl>
     </div>
+    <Spacer size="0.5rem" />
+    <Text size="0.875rem" color="var(--fgMuted)">
+      Set to the inner dimensions of the actual cardboard box your game uses. It provides the bounding area for layout
+      calculations.
+    </Text>
   </section>
 
   <Hr />

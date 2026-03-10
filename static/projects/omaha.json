@@ -1,189 +1,230 @@
 {
-  "boxes": [
+  "version": 2,
+  "layers": [
     {
-      "id": "x20qob1",
-      "name": "D-Day: Omaha Beach",
-      "trays": [
+      "id": "kh0090t",
+      "name": "Layer 1",
+      "boxes": [
         {
-          "id": "20zi1a1",
-          "name": "Germans",
-          "type": "counter",
-          "color": "#6b8e23",
-          "params": {
-            "counterThickness": 1.8,
-            "clearance": 0.3,
-            "wallThickness": 2,
-            "floorThickness": 2,
-            "rimHeight": 2,
-            "cutoutRatio": 0.3,
-            "cutoutMax": 12,
-            "trayWidthOverride": 0,
-            "extraTrayCols": 1,
-            "extraTrayRows": 1,
-            "topLoadedStacks": [
-              ["shape-square", 10, "Infantry"],
-              ["shape-square", 10, "Infantry"],
-              ["shape-square", 8, "Infantry"],
-              ["shape-square", 12, "Mobile Depth"],
-              ["shape-square", 12, "Mobile Depth"],
-              ["shape-square", 9, "WN Depth"],
-              ["shape-square", 9, "WN Depth"],
-              ["shape-square", 8, "Building Depth"],
-              ["shape-square", 4, "Armor Depth"],
-              ["shape-square", 9, "WN Crew"],
-              ["shape-square", 1, "WN Crew with Rocket Artillery"],
-              ["shape-square", 8, "WN Crew with Artillery"],
-              ["shape-square", 4, "Off Map Artillery"],
-              ["shape-square", 4, "Armor"],
-              ["shape-square", 8, "Disrupted"]
-            ],
-            "edgeLoadedStacks": [],
-            "printBedSize": 256
-          }
-        },
-        {
-          "id": "l1nek3z",
-          "name": "Markers",
-          "type": "counter",
-          "color": "#4682b4",
-          "params": {
-            "counterThickness": 1.8,
-            "clearance": 0.3,
-            "wallThickness": 2,
-            "floorThickness": 2,
-            "rimHeight": 2,
-            "cutoutRatio": 0.3,
-            "cutoutMax": 12,
-            "trayWidthOverride": 0,
-            "extraTrayCols": 1,
-            "extraTrayRows": 1,
-            "topLoadedStacks": [
-              ["shape-square", 2, "Phase / Turn"],
-              ["shape-square", 2, "Naval Gunfire"],
-              ["shape-square", 5, "Climb"],
-              ["shape-square", 7, "Clear"],
-              ["shape-square", 7, "Clear"],
-              ["shape-square", 2, "Smoke"],
-              ["shape-square", 3, "Command Transfer"],
-              ["shape-square", 10, "Garrison"],
-              ["shape-square", 10, "Garrison"],
-              ["shape-square", 8, "Garrison"],
-              ["shape-square", 8, "Allies Disrupted"]
-            ],
-            "edgeLoadedStacks": [],
-            "printBedSize": 256
-          }
-        },
-        {
-          "id": "914nvd6",
-          "name": "29th Division",
-          "type": "counter",
-          "color": "#8b4513",
-          "params": {
-            "counterThickness": 1.8,
-            "clearance": 0.3,
-            "wallThickness": 2,
-            "floorThickness": 2,
-            "rimHeight": 2,
-            "cutoutRatio": 0.3,
-            "cutoutMax": 12,
-            "trayWidthOverride": 0,
-            "extraTrayCols": 1,
-            "extraTrayRows": 1,
-            "topLoadedStacks": [
-              ["shape-square", 1, "General"],
-              ["shape-square", 5, "Hero"],
-              ["shape-square", 2, "HQ"],
-              ["shape-square", 2, "HQ Range"],
-              ["shape-square", 2, "Range"],
-              ["shape-square", 2, "Engineer Battalion"],
-              ["shape-square", 12, "Infantry"],
-              ["shape-square", 12, "Infantry"],
-              ["shape-square", 12, "Replacement Infantry"],
-              ["shape-square", 12, "Replacement Infantry"],
-              ["shape-square", 5, "Ranger Infantry"],
-              ["shape-square", 1, "Artillery"],
-              ["shape-square", 1, "Self Propelled Artillery"],
-              ["shape-square", 1, "Replacement Self Propelled Artillery"],
-              ["shape-square", 2, "Anti-Aircraft Battery"],
-              ["shape-square", 2, "Self Propelled Anti-Aircraft Battery"],
-              ["shape-square", 2, "Antitank Company"],
-              ["shape-square", 2, "Amphibious Artillery Battery"],
-              ["shape-square", 1, "Replacement Amphibious Artillery Battery"],
-              ["shape-square", 6, "Armor"],
-              ["shape-square", 4, "Action taken"]
-            ],
-            "edgeLoadedStacks": [],
-            "printBedSize": 256
-          }
-        },
-        {
-          "id": "5cdejlg",
-          "name": "1st Division",
-          "type": "counter",
-          "color": "#8b0000",
-          "params": {
-            "counterThickness": 1.8,
-            "clearance": 0.3,
-            "wallThickness": 2,
-            "floorThickness": 2,
-            "rimHeight": 2,
-            "cutoutRatio": 0.3,
-            "cutoutMax": 12,
-            "trayWidthOverride": 0,
-            "extraTrayCols": 1,
-            "extraTrayRows": 1,
-            "topLoadedStacks": [
-              ["shape-square", 1, "General"],
-              ["shape-square", 5, "Hero"],
-              ["shape-square", 2, "HQ"],
-              ["shape-square", 2, "HQ Range"],
-              ["shape-square", 2, "Range"],
-              ["shape-square", 2, "Engineer Battalion"],
-              ["shape-square", 12, "Infantry"],
-              ["shape-square", 12, "Infantry"],
-              ["shape-square", 12, "Replacement Infantry"],
-              ["shape-square", 12, "Replacement Infantry"],
-              ["shape-square", 1, "Artillery"],
-              ["shape-square", 1, "Self Propelled Artillery"],
-              ["shape-square", 1, "Replacement Self Propelled Artillery"],
-              ["shape-square", 1, "AA Battery"],
-              ["shape-square", 2, "Self Propelled Anti-Aircraft Battery"],
-              ["shape-square", 2, "Anti-tank Company"],
-              ["shape-square", 2, "Amphibious Artillery"],
-              ["shape-square", 1, "Replacement Amphibious Artillery Battery"],
-              ["shape-square", 6, "Armor"],
-              ["shape-square", 4, "Action taken"]
-            ],
-            "edgeLoadedStacks": [],
-            "printBedSize": 256
-          }
+          "id": "x20qob1",
+          "name": "D-Day: Omaha Beach",
+          "trays": [
+            {
+              "id": "20zi1a1",
+              "name": "Germans",
+              "type": "counter",
+              "color": "#6b8e23",
+              "params": {
+                "counterThickness": 1.8,
+                "clearance": 0.3,
+                "wallThickness": 2,
+                "floorThickness": 2,
+                "rimHeight": 2,
+                "cutoutRatio": 0.3,
+                "cutoutMax": 12,
+                "trayWidthOverride": 0,
+                "topLoadedStacks": [
+                  ["shape-square", 10, "Infantry"],
+                  ["shape-square", 10, "Infantry"],
+                  ["shape-square", 8, "Infantry"],
+                  ["shape-square", 12, "Mobile Depth"],
+                  ["shape-square", 12, "Mobile Depth"],
+                  ["shape-square", 9, "WN Depth"],
+                  ["shape-square", 9, "WN Depth"],
+                  ["shape-square", 8, "Building Depth"],
+                  ["shape-square", 4, "Armor Depth"],
+                  ["shape-square", 9, "WN Crew"],
+                  ["shape-square", 1, "WN Crew with Rocket Artillery"],
+                  ["shape-square", 8, "WN Crew with Artillery"],
+                  ["shape-square", 4, "Off Map Artillery"],
+                  ["shape-square", 4, "Armor"],
+                  ["shape-square", 8, "Disrupted"]
+                ],
+                "edgeLoadedStacks": [],
+                "gameContainerWidth": 220,
+                "gameContainerDepth": 292
+              }
+            },
+            {
+              "id": "l1nek3z",
+              "name": "Markers",
+              "type": "counter",
+              "color": "#4682b4",
+              "params": {
+                "counterThickness": 1.8,
+                "clearance": 0.3,
+                "wallThickness": 2,
+                "floorThickness": 2,
+                "rimHeight": 2,
+                "cutoutRatio": 0.3,
+                "cutoutMax": 12,
+                "trayWidthOverride": 0,
+                "topLoadedStacks": [
+                  ["shape-square", 2, "Phase / Turn"],
+                  ["shape-square", 2, "Naval Gunfire"],
+                  ["shape-square", 5, "Climb"],
+                  ["shape-square", 7, "Clear"],
+                  ["shape-square", 7, "Clear"],
+                  ["shape-square", 2, "Smoke"],
+                  ["shape-square", 3, "Command Transfer"],
+                  ["shape-square", 10, "Garrison"],
+                  ["shape-square", 10, "Garrison"],
+                  ["shape-square", 8, "Garrison"],
+                  ["shape-square", 8, "Allies Disrupted"]
+                ],
+                "edgeLoadedStacks": [],
+                "gameContainerWidth": 220,
+                "gameContainerDepth": 292
+              }
+            },
+            {
+              "id": "914nvd6",
+              "name": "29th Division",
+              "type": "counter",
+              "color": "#8b4513",
+              "params": {
+                "counterThickness": 1.8,
+                "clearance": 0.3,
+                "wallThickness": 2,
+                "floorThickness": 2,
+                "rimHeight": 2,
+                "cutoutRatio": 0.3,
+                "cutoutMax": 12,
+                "trayWidthOverride": 0,
+                "topLoadedStacks": [
+                  ["shape-square", 1, "General"],
+                  ["shape-square", 5, "Hero"],
+                  ["shape-square", 2, "HQ"],
+                  ["shape-square", 2, "HQ Range"],
+                  ["shape-square", 2, "Range"],
+                  ["shape-square", 2, "Engineer Battalion"],
+                  ["shape-square", 12, "Infantry"],
+                  ["shape-square", 12, "Infantry"],
+                  ["shape-square", 12, "Replacement Infantry"],
+                  ["shape-square", 12, "Replacement Infantry"],
+                  ["shape-square", 5, "Ranger Infantry"],
+                  ["shape-square", 1, "Artillery"],
+                  ["shape-square", 1, "Self Propelled Artillery"],
+                  ["shape-square", 1, "Replacement Self Propelled Artillery"],
+                  ["shape-square", 2, "Anti-Aircraft Battery"],
+                  ["shape-square", 2, "Self Propelled Anti-Aircraft Battery"],
+                  ["shape-square", 2, "Antitank Company"],
+                  ["shape-square", 2, "Amphibious Artillery Battery"],
+                  ["shape-square", 1, "Replacement Amphibious Artillery Battery"],
+                  ["shape-square", 6, "Armor"],
+                  ["shape-square", 4, "Action taken"]
+                ],
+                "edgeLoadedStacks": [],
+                "gameContainerWidth": 220,
+                "gameContainerDepth": 292
+              }
+            },
+            {
+              "id": "5cdejlg",
+              "name": "1st Division",
+              "type": "counter",
+              "color": "#8b0000",
+              "params": {
+                "counterThickness": 1.8,
+                "clearance": 0.3,
+                "wallThickness": 2,
+                "floorThickness": 2,
+                "rimHeight": 2,
+                "cutoutRatio": 0.3,
+                "cutoutMax": 12,
+                "trayWidthOverride": 0,
+                "topLoadedStacks": [
+                  ["shape-square", 1, "General"],
+                  ["shape-square", 5, "Hero"],
+                  ["shape-square", 2, "HQ"],
+                  ["shape-square", 2, "HQ Range"],
+                  ["shape-square", 2, "Range"],
+                  ["shape-square", 2, "Engineer Battalion"],
+                  ["shape-square", 12, "Infantry"],
+                  ["shape-square", 12, "Infantry"],
+                  ["shape-square", 12, "Replacement Infantry"],
+                  ["shape-square", 12, "Replacement Infantry"],
+                  ["shape-square", 1, "Artillery"],
+                  ["shape-square", 1, "Self Propelled Artillery"],
+                  ["shape-square", 1, "Replacement Self Propelled Artillery"],
+                  ["shape-square", 1, "AA Battery"],
+                  ["shape-square", 2, "Self Propelled Anti-Aircraft Battery"],
+                  ["shape-square", 2, "Anti-tank Company"],
+                  ["shape-square", 2, "Amphibious Artillery"],
+                  ["shape-square", 1, "Replacement Amphibious Artillery Battery"],
+                  ["shape-square", 6, "Armor"],
+                  ["shape-square", 4, "Action taken"]
+                ],
+                "edgeLoadedStacks": [],
+                "gameContainerWidth": 220,
+                "gameContainerDepth": 292
+              }
+            }
+          ],
+          "tolerance": 0.5,
+          "wallThickness": 3,
+          "floorThickness": 2,
+          "lidParams": {
+            "thickness": 2,
+            "railHeight": 6,
+            "railWidth": 0,
+            "railInset": 0,
+            "ledgeHeight": 0,
+            "fingerNotchRadius": 0,
+            "fingerNotchDepth": 0,
+            "snapEnabled": true,
+            "snapBumpHeight": 0.4,
+            "snapBumpWidth": 4,
+            "railEngagement": 0.5,
+            "showName": true,
+            "rampLockEnabled": false,
+            "rampHeight": 0.5,
+            "rampLengthIn": 4,
+            "rampLengthOut": 1.5
+          },
+          "customWidth": 219,
+          "fillSolidEmpty": true,
+          "customBoxHeight": 28.2
         }
       ],
-      "tolerance": 0.5,
-      "wallThickness": 3,
-      "floorThickness": 2,
-      "lidParams": {
-        "thickness": 2,
-        "railHeight": 6,
-        "railWidth": 0,
-        "railInset": 0,
-        "ledgeHeight": 0,
-        "fingerNotchRadius": 0,
-        "fingerNotchDepth": 0,
-        "snapEnabled": true,
-        "snapBumpHeight": 0.4,
-        "snapBumpWidth": 4,
-        "railEngagement": 0.5,
-        "rampLockEnabled": false,
-        "rampHeight": 0.5,
-        "rampLengthIn": 4,
-        "rampLengthOut": 1.5,
-        "showName": true
-      },
-      "customWidth": 219,
-      "fillSolidEmpty": true,
-      "customBoxHeight": 28.2
+      "looseTrays": [
+        {
+          "id": "4hukgo2",
+          "type": "cardDraw",
+          "name": "Card Draw",
+          "color": "#a36b5a",
+          "rotationOverride": "auto",
+          "params": {
+            "cardSizeId": "card-standard",
+            "cardCount": 26,
+            "wallThickness": 4,
+            "floorThickness": 4,
+            "clearance": 1.5,
+            "floorSlopeAngle": 5,
+            "magnetHoleDiameter": 6,
+            "magnetHoleDepth": 3
+          },
+          "showEmboss": false
+        },
+        {
+          "id": "ljoulib",
+          "type": "cardDraw",
+          "name": "Card Discard",
+          "color": "#5a7c6a",
+          "rotationOverride": "auto",
+          "params": {
+            "cardSizeId": "card-standard",
+            "cardCount": 26,
+            "wallThickness": 4,
+            "floorThickness": 4,
+            "clearance": 1.5,
+            "floorSlopeAngle": 5,
+            "magnetHoleDiameter": 6,
+            "magnetHoleDepth": 3
+          },
+          "showEmboss": false
+        }
+      ]
     }
   ],
   "counterShapes": [
@@ -192,7 +233,17 @@
     { "id": "shape-circle", "name": "Circle", "baseShape": "circle", "width": 15.9, "length": 15.9, "thickness": 1.8 },
     { "id": "shape-triangle", "name": "Triangle", "baseShape": "triangle", "width": 15.9, "length": 15.9, "thickness": 1.8, "cornerRadius": 1.5 }
   ],
-  "cardSizes": [],
-  "selectedBoxId": "x20qob1",
-  "selectedTrayId": "914nvd6"
+  "cardSizes": [
+    { "id": "card-standard", "name": "Standard", "width": 66, "length": 91, "thickness": 0.5 },
+    { "id": "card-mini-american", "name": "Mini American", "width": 44, "length": 66, "thickness": 0.5 },
+    { "id": "card-mini-european", "name": "Mini European", "width": 47, "length": 71, "thickness": 0.5 },
+    { "id": "card-euro", "name": "Euro", "width": 62, "length": 95, "thickness": 0.5 },
+    { "id": "card-japanese", "name": "Japanese", "width": 62, "length": 89, "thickness": 0.5 },
+    { "id": "card-tarot", "name": "Tarot", "width": 73, "length": 123, "thickness": 0.5 },
+    { "id": "card-square", "name": "Square", "width": 73, "length": 73, "thickness": 0.5 }
+  ],
+  "globalSettings": {
+    "gameContainerWidth": 220,
+    "gameContainerDepth": 292
+  }
 }

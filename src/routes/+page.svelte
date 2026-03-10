@@ -165,6 +165,7 @@
       const res = await fetch(`/projects/${project.file}`);
       const data = (await res.json()) as Project;
       importProject(data);
+      regenerate(true);
       error = '';
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load project';
@@ -1034,6 +1035,7 @@
       const text = await file.text();
       const data = importProjectFromJson(text);
       importProject(data);
+      regenerate(true);
       error = '';
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to import JSON';
