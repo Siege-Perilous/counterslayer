@@ -1,0 +1,466 @@
+{
+  "version": 2,
+  "layers": [
+    {
+      "id": "x58fp4d",
+      "name": "Bottom layer",
+      "boxes": [
+        {
+          "id": "fcq18w1",
+          "name": "Counter box",
+          "trays": [
+            {
+              "id": "bcsp084",
+              "type": "counter",
+              "name": "Counter tray",
+              "color": "#c27c68",
+              "rotationOverride": "auto",
+              "params": {
+                "counterThickness": 1.3,
+                "clearance": 0.3,
+                "wallThickness": 2,
+                "floorThickness": 2,
+                "rimHeight": 2,
+                "cutoutRatio": 0.35,
+                "cutoutMax": 12,
+                "trayWidthOverride": 143,
+                "topLoadedStacks": [
+                  [
+                    "shape-square",
+                    12,
+                    null
+                  ],
+                  [
+                    "shape-hex",
+                    10,
+                    null
+                  ],
+                  [
+                    "shape-circle",
+                    8,
+                    null
+                  ],
+                  [
+                    "shape-triangle",
+                    6,
+                    null
+                  ]
+                ],
+                "edgeLoadedStacks": [
+                  [
+                    "shape-triangle",
+                    10,
+                    "lengthwise",
+                    null
+                  ],
+                  [
+                    "shape-triangle",
+                    10,
+                    "crosswise",
+                    null
+                  ],
+                  [
+                    "shape-circle",
+                    8,
+                    "lengthwise",
+                    null
+                  ],
+                  [
+                    "shape-circle",
+                    8,
+                    "crosswise",
+                    null
+                  ],
+                  [
+                    "shape-hex",
+                    6,
+                    "lengthwise",
+                    null
+                  ],
+                  [
+                    "shape-hex",
+                    6,
+                    "crosswise",
+                    null
+                  ],
+                  [
+                    "shape-square",
+                    4,
+                    "lengthwise",
+                    null
+                  ],
+                  [
+                    "shape-square",
+                    4,
+                    "crosswise",
+                    null
+                  ]
+                ],
+                "gameContainerWidth": 150,
+                "gameContainerDepth": 200
+              }
+            },
+            {
+              "id": "c9jlm69",
+              "type": "counter",
+              "name": "More counters",
+              "color": "#d4a87c",
+              "rotationOverride": "auto",
+              "params": {
+                "counterThickness": 1.3,
+                "clearance": 0.3,
+                "wallThickness": 2,
+                "floorThickness": 2,
+                "rimHeight": 2,
+                "cutoutRatio": 0.35,
+                "cutoutMax": 12,
+                "trayWidthOverride": 0,
+                "topLoadedStacks": [
+                  [
+                    "shape-square",
+                    12,
+                    null
+                  ],
+                  [
+                    "shape-hex",
+                    10,
+                    null
+                  ],
+                  [
+                    "shape-circle",
+                    8,
+                    null
+                  ],
+                  [
+                    "shape-triangle",
+                    6,
+                    null
+                  ]
+                ],
+                "edgeLoadedStacks": [
+                  [
+                    "shape-triangle",
+                    10,
+                    "lengthwise",
+                    null
+                  ],
+                  [
+                    "shape-triangle",
+                    10,
+                    "crosswise",
+                    null
+                  ],
+                  [
+                    "shape-circle",
+                    8,
+                    "lengthwise",
+                    null
+                  ],
+                  [
+                    "shape-circle",
+                    8,
+                    "crosswise",
+                    null
+                  ],
+                  [
+                    "shape-hex",
+                    6,
+                    "lengthwise",
+                    null
+                  ],
+                  [
+                    "shape-hex",
+                    6,
+                    "crosswise",
+                    null
+                  ],
+                  [
+                    "shape-square",
+                    4,
+                    "lengthwise",
+                    null
+                  ],
+                  [
+                    "shape-square",
+                    4,
+                    "crosswise",
+                    null
+                  ]
+                ],
+                "gameContainerWidth": 150,
+                "gameContainerDepth": 200
+              }
+            }
+          ],
+          "tolerance": 0.5,
+          "wallThickness": 3,
+          "floorThickness": 2,
+          "fillSolidEmpty": true,
+          "lidParams": {
+            "thickness": 2,
+            "railHeight": 6,
+            "railWidth": 0,
+            "railInset": 0,
+            "ledgeHeight": 0,
+            "fingerNotchRadius": 0,
+            "fingerNotchDepth": 0,
+            "snapEnabled": true,
+            "snapBumpHeight": 0.4,
+            "snapBumpWidth": 4,
+            "railEngagement": 0.5,
+            "showName": true,
+            "rampLockEnabled": true,
+            "rampHeight": 0.5,
+            "rampLengthIn": 4,
+            "rampLengthOut": 1.5
+          }
+        }
+      ],
+      "looseTrays": [
+        {
+          "id": "zjozrwd",
+          "type": "cup",
+          "name": "Cup tray",
+          "color": "#8c7a9c",
+          "rotationOverride": "auto",
+          "params": {
+            "layout": {
+              "root": {
+                "type": "split",
+                "direction": "vertical",
+                "ratio": 0.5,
+                "first": {
+                  "type": "cup",
+                  "id": "lpsehg2"
+                },
+                "second": {
+                  "type": "split",
+                  "direction": "horizontal",
+                  "ratio": 0.5,
+                  "first": {
+                    "type": "cup",
+                    "id": "3r12lws"
+                  },
+                  "second": {
+                    "type": "cup",
+                    "id": "3uquvxz"
+                  }
+                }
+              }
+            },
+            "trayWidth": 150,
+            "trayDepth": 100,
+            "cupCavityHeight": null,
+            "wallThickness": 2,
+            "floorThickness": 2,
+            "cornerRadius": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "fnucg1h",
+      "name": "Top layer",
+      "boxes": [],
+      "looseTrays": [
+        {
+          "id": "p8turve",
+          "type": "cardDraw",
+          "name": "Card draw",
+          "color": "#5a8a8f",
+          "rotationOverride": "auto",
+          "params": {
+            "cardSizeId": "card-standard",
+            "cardCount": 50,
+            "wallThickness": 4,
+            "floorThickness": 4,
+            "clearance": 1.5,
+            "floorSlopeAngle": 5,
+            "magnetHoleDiameter": 6,
+            "magnetHoleDepth": 3
+          }
+        },
+        {
+          "id": "5eg8pzv",
+          "type": "cup",
+          "name": "Split cup tray",
+          "color": "#7a9a85",
+          "rotationOverride": "auto",
+          "params": {
+            "layout": {
+              "root": {
+                "type": "split",
+                "direction": "horizontal",
+                "ratio": 0.5,
+                "first": {
+                  "type": "cup",
+                  "id": "3r12lws"
+                },
+                "second": {
+                  "type": "cup",
+                  "id": "3uquvxz"
+                }
+              }
+            },
+            "trayWidth": 73,
+            "trayDepth": 102,
+            "cupCavityHeight": null,
+            "wallThickness": 2,
+            "floorThickness": 2,
+            "cornerRadius": 6
+          }
+        },
+        {
+          "id": "rox7emm",
+          "type": "cardDivider",
+          "name": "Card Divider",
+          "color": "#b08a9c",
+          "rotationOverride": "auto",
+          "params": {
+            "stacks": [
+              {
+                "cardSizeId": "card-mini-european",
+                "count": 30
+              },
+              {
+                "cardSizeId": "card-mini-european",
+                "count": 30
+              },
+              {
+                "cardSizeId": "card-mini-european",
+                "count": 60
+              },
+              {
+                "cardSizeId": "card-mini-european",
+                "count": 60
+              }
+            ],
+            "orientation": "horizontal",
+            "stackDirection": "frontToBack",
+            "wallThickness": 2,
+            "floorThickness": 2,
+            "clearance": 1.5,
+            "rimHeight": 3
+          }
+        }
+      ],
+      "manualLayout": {
+        "boxes": [],
+        "looseTrays": [
+          {
+            "trayId": "p8turve",
+            "x": 0,
+            "y": 0,
+            "rotation": 0
+          },
+          {
+            "trayId": "5eg8pzv",
+            "x": 77,
+            "y": 0,
+            "rotation": 180
+          },
+          {
+            "trayId": "rox7emm",
+            "x": 0,
+            "y": 102,
+            "rotation": 90
+          }
+        ]
+      }
+    }
+  ],
+  "counterShapes": [
+    {
+      "id": "shape-square",
+      "name": "Square",
+      "baseShape": "square",
+      "width": 15.9,
+      "length": 15.9,
+      "thickness": 1.3
+    },
+    {
+      "id": "shape-hex",
+      "name": "Hex",
+      "baseShape": "hex",
+      "width": 15.9,
+      "length": 15.9,
+      "thickness": 1.3,
+      "pointyTop": false
+    },
+    {
+      "id": "shape-circle",
+      "name": "Circle",
+      "baseShape": "circle",
+      "width": 15.9,
+      "length": 15.9,
+      "thickness": 1.3
+    },
+    {
+      "id": "shape-triangle",
+      "name": "Triangle",
+      "baseShape": "triangle",
+      "width": 15.9,
+      "length": 15.9,
+      "thickness": 1.3,
+      "cornerRadius": 1.5
+    }
+  ],
+  "cardSizes": [
+    {
+      "id": "card-standard",
+      "name": "Standard",
+      "width": 66,
+      "length": 91,
+      "thickness": 0.5
+    },
+    {
+      "id": "card-mini-american",
+      "name": "Mini American",
+      "width": 44,
+      "length": 66,
+      "thickness": 0.5
+    },
+    {
+      "id": "card-mini-european",
+      "name": "Mini European",
+      "width": 47,
+      "length": 71,
+      "thickness": 0.5
+    },
+    {
+      "id": "card-euro",
+      "name": "Euro",
+      "width": 62,
+      "length": 95,
+      "thickness": 0.5
+    },
+    {
+      "id": "card-japanese",
+      "name": "Japanese",
+      "width": 62,
+      "length": 89,
+      "thickness": 0.5
+    },
+    {
+      "id": "card-tarot",
+      "name": "Tarot",
+      "width": 73,
+      "length": 123,
+      "thickness": 0.5
+    },
+    {
+      "id": "card-square",
+      "name": "Square",
+      "width": 73,
+      "length": 73,
+      "thickness": 0.5
+    }
+  ],
+  "selectedLayerId": "fnucg1h",
+  "selectedBoxId": null,
+  "selectedTrayId": "p8turve",
+  "globalSettings": {
+    "gameContainerWidth": 150,
+    "gameContainerDepth": 200
+  }
+}
