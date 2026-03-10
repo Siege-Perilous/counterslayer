@@ -379,7 +379,7 @@ export function startDrag(
 }
 
 /**
- * Update drag position
+ * Update drag position with bounds checking considering item dimensions
  */
 export function updateDrag(currentX: number, currentY: number): void {
   if (!dragState.isDragging || !dragState.itemId) return;
@@ -394,9 +394,29 @@ export function updateDrag(currentX: number, currentY: number): void {
   const newX = dragState.originalItemX + deltaX;
   const newY = dragState.originalItemY + deltaY;
 
-  // Clamp to bounds
-  const clampedX = Math.max(0, newX);
-  const clampedY = Math.max(0, newY);
+  // Get item dimensions for proper bounds clamping
+  let itemWidth = 0;
+  let itemDepth = 0;
+
+  if (dragState.itemType === 'box') {
+    const placement = workingBoxPlacements.find((p) => p.boxId === dragState.itemId);
+    if (placement) {
+      const dims = getEffectiveBoxDimensions(placement);
+      itemWidth = dims.width;
+      itemDepth = dims.depth;
+    }
+  } else {
+    const placement = workingLooseTrayPlacements.find((p) => p.trayId === dragState.itemId);
+    if (placement) {
+      const dims = getEffectiveLooseTrayDimensions(placement);
+      itemWidth = dims.width;
+      itemDepth = dims.depth;
+    }
+  }
+
+  // Clamp to bounds - ensure item stays fully within container
+  const clampedX = Math.max(0, Math.min(newX, gameContainerWidth - itemWidth));
+  const clampedY = Math.max(0, Math.min(newY, gameContainerDepth - itemDepth));
 
   if (dragState.itemType === 'box') {
     updateBoxPosition(dragState.itemId, clampedX, clampedY);
@@ -420,4 +440,15 @@ export function endDrag(): void {
     originalItemY: 0
   };
   clearSnapGuides();
+}
+
+/**
+ * Get the currently selected placement (for UI display)
+ */
+export function getSelectedPlacement(): EditorBoxPlacement | EditorLooseTrayPlacement | null {
+  if (!selectedItemId || !selectedItemType) return null;
+  if (selectedItemType === 'box') {
+    return workingBoxPlacements.find((p) => p.boxId === selectedItemId) ?? null;
+  }
+  return workingLooseTrayPlacements.find((p) => p.trayId === selectedItemId) ?? null;
 }

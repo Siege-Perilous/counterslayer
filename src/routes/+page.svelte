@@ -51,6 +51,7 @@
   import type { BufferGeometry } from 'three';
   import { onDestroy, untrack } from 'svelte';
   import LayoutEditorOverlay from '$lib/components/LayoutEditorOverlay.svelte';
+  import LayerLayoutEditorOverlay from '$lib/components/LayerLayoutEditorOverlay.svelte';
   import {
     enterEditMode,
     exitEditMode,
@@ -62,6 +63,16 @@
     getSelectedTrayId
   } from '$lib/stores/layoutEditor.svelte';
   import { findAllOverlaps } from '$lib/utils/layoutSnapping';
+  import {
+    enterLayerEditMode,
+    exitLayerEditMode,
+    cancelLayerChanges,
+    layerLayoutEditorState,
+    getManualLayerPlacements,
+    rotateSelectedItem
+  } from '$lib/stores/layerLayoutEditor.svelte';
+  import { saveLayerLayout, clearLayerLayout } from '$lib/stores/project.svelte';
+  import { findLayerOverlaps, type LayerItemForSnapping } from '$lib/utils/layerLayoutSnapping';
 
   type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid' | 'layer';
   type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
@@ -1233,6 +1244,125 @@
     }
   }
 
+  // Layer Layout Editor handlers
+  let isLayerLayoutEditMode = $derived.by(() => layerLayoutEditorState.isEditMode);
+
+  function handleEnterLayerLayoutEdit() {
+    const layer = getSelectedLayer();
+    if (!layer) return;
+
+    const project = getProject();
+    const cardSizes = project.cardSizes ?? [];
+    const counterShapes = project.counterShapes ?? [];
+
+    // Get current layer arrangement
+    const arrangement = arrangeLayerContents(layer, {
+      gameContainerWidth,
+      gameContainerDepth,
+      cardSizes,
+      counterShapes
+    });
+
+    enterLayerEditMode(
+      arrangement.boxes,
+      arrangement.looseTrays,
+      gameContainerWidth,
+      gameContainerDepth
+    );
+  }
+
+  function handleSaveLayerLayout() {
+    const layer = getSelectedLayer();
+    if (!layer) return;
+
+    // Build items for overlap check
+    const items: LayerItemForSnapping[] = [];
+    for (const bp of layerLayoutEditorState.workingBoxPlacements) {
+      const isRotated = bp.rotation === 90 || bp.rotation === 270;
+      items.push({
+        id: bp.boxId,
+        x: bp.x,
+        y: bp.y,
+        width: isRotated ? bp.originalDepth : bp.originalWidth,
+        depth: isRotated ? bp.originalWidth : bp.originalDepth
+      });
+    }
+    for (const ltp of layerLayoutEditorState.workingLooseTrayPlacements) {
+      const isRotated = ltp.rotation === 90 || ltp.rotation === 270;
+      items.push({
+        id: ltp.trayId,
+        x: ltp.x,
+        y: ltp.y,
+        width: isRotated ? ltp.originalDepth : ltp.originalWidth,
+        depth: isRotated ? ltp.originalWidth : ltp.originalDepth
+      });
+    }
+
+    const overlaps = findLayerOverlaps(items);
+
+    if (overlaps.length > 0) {
+      const allPlacements = [
+        ...layerLayoutEditorState.workingBoxPlacements.map((p) => ({ id: p.boxId, name: p.name })),
+        ...layerLayoutEditorState.workingLooseTrayPlacements.map((p) => ({ id: p.trayId, name: p.name }))
+      ];
+      const overlapNames = overlaps.map(([id1, id2]) => {
+        const item1 = allPlacements.find((p) => p.id === id1);
+        const item2 = allPlacements.find((p) => p.id === id2);
+        return `${item1?.name ?? 'Unknown'} and ${item2?.name ?? 'Unknown'}`;
+      });
+      addToast({
+        data: {
+          title: 'Cannot save layout',
+          body: `Items are overlapping: ${overlapNames.join(', ')}`,
+          type: 'danger'
+        }
+      });
+      return;
+    }
+
+    const placements = getManualLayerPlacements();
+    saveLayerLayout(layer.id, placements.boxes, placements.looseTrays);
+    exitLayerEditMode();
+    regenerate(true);
+  }
+
+  function handleCancelLayerLayout() {
+    cancelLayerChanges();
+    exitLayerEditMode();
+  }
+
+  function handleResetAutoLayerLayout() {
+    const layer = getSelectedLayer();
+    if (!layer) return;
+
+    clearLayerLayout(layer.id);
+    exitLayerEditMode();
+    regenerate(true);
+  }
+
+  function handleRotateLayerItem() {
+    rotateSelectedItem();
+  }
+
+  // Auto-cancel layer edit mode when navigating away
+  let lastSelectedLayerId = $state<string | null>(null);
+  $effect(() => {
+    const currentLayerId = selectedLayer?.id ?? null;
+    const currentViewMode = viewMode;
+
+    if (layerLayoutEditorState.isEditMode) {
+      const layerChanged = lastSelectedLayerId !== null && currentLayerId !== lastSelectedLayerId;
+      const leftLayerView = currentViewMode !== 'layer';
+
+      if (layerChanged || leftLayerView) {
+        cancelLayerChanges();
+        exitLayerEditMode();
+      }
+    }
+
+    lastSelectedLayerId = currentLayerId;
+  });
+
   // Cancel edit mode when selection changes (user navigates away)
   let lastSelectedBoxId = $state<string | null>(null);
   let lastSelectionType = $state<SelectionType>('dimensions');
@@ -1317,6 +1447,7 @@
               {viewTitle}
               onCaptureReady={(fn) => (captureFunction = fn)}
               {isLayoutEditMode}
+              {isLayerLayoutEditMode}
               onTrayDoubleClick={handleTrayDoubleClick}
               showLayerView={visibleGeometries.showLayerView}
               layerBoxPlacements={visibleGeometries.layerBoxPlacements}
@@ -1332,6 +1463,19 @@
           <div class="generatingOverlay">
             <Loader />
             <div class="generatingText">Generating geometry...</div>
+          </div>
+        {/if}
+
+        {#if viewMode === 'layer' && !generating}
+          <div class="viewToolbar">
+            <LayerLayoutEditorOverlay
+              onEnterEdit={handleEnterLayerLayoutEdit}
+              onSave={handleSaveLayerLayout}
+              onCancel={handleCancelLayerLayout}
+              onResetAuto={handleResetAutoLayerLayout}
+              onRotate={handleRotateLayerItem}
+              canEdit={(layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 1}
+            />
           </div>
         {/if}
 
@@ -1354,7 +1498,7 @@
           </div>
         {/if}
 
-        {#if !isLayoutEditMode}
+        {#if !isLayoutEditMode && !isLayerLayoutEditMode}
           <div class="bottomToolbar">
             <input
               bind:this={jsonFileInput}
@@ -1519,6 +1663,7 @@
               {viewTitle}
               onCaptureReady={(fn) => (captureFunction = fn)}
               {isLayoutEditMode}
+              {isLayerLayoutEditMode}
               onTrayDoubleClick={handleTrayDoubleClick}
               showLayerView={visibleGeometries.showLayerView}
               layerBoxPlacements={visibleGeometries.layerBoxPlacements}
@@ -1534,6 +1679,19 @@
           <div class="generatingOverlay">
             <Loader />
             <div class="generatingText">Generating geometry...</div>
+          </div>
+        {/if}
+
+        {#if viewMode === 'layer' && !generating}
+          <div class="viewToolbar">
+            <LayerLayoutEditorOverlay
+              onEnterEdit={handleEnterLayerLayoutEdit}
+              onSave={handleSaveLayerLayout}
+              onCancel={handleCancelLayerLayout}
+              onResetAuto={handleResetAutoLayerLayout}
+              onRotate={handleRotateLayerItem}
+              canEdit={(layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 1}
+            />
           </div>
         {/if}
 
@@ -1648,7 +1806,7 @@
               </div>
             {/snippet}
           </Popover>
-          {#if !isLayoutEditMode}
+          {#if !isLayoutEditMode && !isLayerLayoutEditMode}
             <div class="toolbarRight">
               <InputCheckbox
                 checked={showCounters}

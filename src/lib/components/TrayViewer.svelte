@@ -92,6 +92,7 @@
     viewTitle?: string;
     onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
     isLayoutEditMode?: boolean;
+    isLayerLayoutEditMode?: boolean;
     onTrayDoubleClick?: (trayId: string) => void;
     generating?: boolean;
     showLayerView?: boolean;
@@ -136,6 +137,7 @@
     viewTitle = '',
     onCaptureReady,
     isLayoutEditMode = false,
+    isLayerLayoutEditMode = false,
     onTrayDoubleClick,
     generating = false,
     showLayerView = false,
@@ -198,6 +200,7 @@
       {viewTitle}
       {onCaptureReady}
       {isLayoutEditMode}
+      {isLayerLayoutEditMode}
       onTrayClick={handleTrayClick}
       {onTrayDoubleClick}
       {generating}
@@ -210,7 +213,7 @@
   </Canvas>
 
   <!-- Tray info overlay when a tray is clicked (non-edit mode only) -->
-  {#if clickedTrayInfo && !isLayoutEditMode && (showAllTrays || showAllBoxes || showAllLayers)}
+  {#if clickedTrayInfo && !isLayoutEditMode && !isLayerLayoutEditMode && (showAllTrays || showAllBoxes || showAllLayers)}
     <div class="trayInfoOverlay" class:belowToolbar={showAllTrays}>
       <span
         class="trayLetter"

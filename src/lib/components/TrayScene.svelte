@@ -8,6 +8,7 @@
   import BoxAssembly from './three/BoxAssembly.svelte';
   import LayerContent from './three/LayerContent.svelte';
   import TrayInBox from './three/TrayInBox.svelte';
+  import LayerLayoutEditorScene from './three/LayerLayoutEditorScene.svelte';
   import { getAlternateColor, getSleeveColors } from '$lib/three/materials';
 
   // Enable interactivity for pointer events on 3D objects
@@ -34,6 +35,7 @@
     getEffectiveDimensions
   } from '$lib/stores/layoutEditor.svelte';
   import { snapPosition } from '$lib/utils/layoutSnapping';
+  import { layerLayoutEditorState } from '$lib/stores/layerLayoutEditor.svelte';
 
   interface TrayGeometryData {
     trayId: string;
@@ -102,6 +104,7 @@
     viewTitle?: string;
     onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
     isLayoutEditMode?: boolean;
+    isLayerLayoutEditMode?: boolean;
     onTrayClick?: (info: TrayClickInfo | null) => void;
     onTrayDoubleClick?: (trayId: string) => void;
     generating?: boolean;
@@ -147,6 +150,7 @@
     viewTitle = '',
     onCaptureReady,
     isLayoutEditMode = false,
+    isLayerLayoutEditMode = false,
     onTrayClick,
     onTrayDoubleClick,
     generating = false,
@@ -215,6 +219,16 @@
   // This prevents visual jumps during the fade transition
   let visualEditMode = $derived(transitionPhase === 'edit' || transitionPhase === 'fading-to-normal');
 
+  // Layer edit mode transition state (parallel system for layer-level editing)
+  type LayerTransitionPhase = 'normal' | 'fading-to-edit' | 'edit' | 'fading-to-normal';
+  let layerTransitionPhase = $state<LayerTransitionPhase>('normal');
+  let layerNormalSceneOpacity = $state(1);
+  let layerEditSceneOpacity = $state(0);
+  let layerFadeProgress = $state(0);
+  let savedLayerCameraPosition = $state<THREE.Vector3 | null>(null);
+  let savedLayerCameraTarget = $state<THREE.Vector3 | null>(null);
+  let visualLayerEditMode = $derived(layerTransitionPhase === 'edit' || layerTransitionPhase === 'fading-to-normal');
+
   // Fade overlay opacity for transition effect
   // Key insight: overlay must appear IMMEDIATELY when isLayoutEditMode changes,
   // before the effect runs, to hide any scene jumps
@@ -222,10 +236,13 @@
     // If mode is changing but visual hasn't caught up, show overlay immediately
     // This runs synchronously with the prop change, before effects
     if (isLayoutEditMode !== visualEditMode) return 1;
+    if (isLayerLayoutEditMode !== visualLayerEditMode) return 1;
 
     // During fade-in phases (after camera jump), fade out the overlay
     if (transitionPhase === 'edit' && editSceneOpacity < 1) return 1 - editSceneOpacity;
     if (transitionPhase === 'normal' && normalSceneOpacity < 1) return 1 - normalSceneOpacity;
+    if (layerTransitionPhase === 'edit' && layerEditSceneOpacity < 1) return 1 - layerEditSceneOpacity;
+    if (layerTransitionPhase === 'normal' && layerNormalSceneOpacity < 1) return 1 - layerNormalSceneOpacity;
     return 0;
   });
 
@@ -379,6 +396,101 @@
       const t = Math.min(fadeProgress, 1);
       const easeT = 1 - Math.pow(1 - t, 2);
       normalSceneOpacity = easeT;
+    }
+  });
+
+  // Track previous layer edit mode state to detect transitions
+  let wasInLayerEditMode = $state(false);
+
+  // Layer edit mode center (center of print bed / game container)
+  let layerEditModeCenter = $derived.by(() => ({
+    x: 0,
+    z: printBedSize / 2
+  }));
+
+  // Start layer edit mode fade transition
+  $effect(() => {
+    const currentLayerEditMode = isLayerLayoutEditMode;
+
+    untrack(() => {
+      if (!camera.current) return;
+      const cam = camera.current as THREE.PerspectiveCamera;
+
+      if (currentLayerEditMode && !wasInLayerEditMode) {
+        // Entering layer edit mode - start fading out normal scene
+        savedLayerCameraPosition = cam.position.clone();
+        savedLayerCameraTarget = new THREE.Vector3(0, 0, printBedSize / 2);
+        layerTransitionPhase = 'fading-to-edit';
+        layerFadeProgress = 0;
+      } else if (!currentLayerEditMode && wasInLayerEditMode) {
+        // Exiting layer edit mode - start fading out edit scene
+        layerTransitionPhase = 'fading-to-normal';
+        layerFadeProgress = 0;
+      }
+
+      wasInLayerEditMode = currentLayerEditMode;
+    });
+  });
+
+  // Layer edit mode fade transition animation task
+  useTask((delta) => {
+    if (layerTransitionPhase === 'normal' || layerTransitionPhase === 'edit') return;
+    if (!camera.current) return;
+
+    const cam = camera.current as THREE.PerspectiveCamera;
+    layerFadeProgress += delta / FADE_DURATION;
+    const t = Math.min(layerFadeProgress, 1);
+    const easeT = 1 - Math.pow(1 - t, 2);
+
+    if (layerTransitionPhase === 'fading-to-edit') {
+      if (layerFadeProgress < 1) {
+        layerNormalSceneOpacity = 1 - easeT;
+        layerEditSceneOpacity = 0;
+      } else {
+        layerNormalSceneOpacity = 0;
+
+        // Position camera above game container center
+        const editModeHeight = Math.max(printBedSize * 1.5, 400);
+        cam.position.set(layerEditModeCenter.x, editModeHeight, layerEditModeCenter.z + 0.01);
+        cam.lookAt(layerEditModeCenter.x, 0, layerEditModeCenter.z);
+
+        layerFadeProgress = 0;
+        layerEditSceneOpacity = 0;
+        layerTransitionPhase = 'edit';
+      }
+    } else if (layerTransitionPhase === 'fading-to-normal') {
+      if (layerFadeProgress < 1) {
+        layerEditSceneOpacity = 1 - easeT;
+        layerNormalSceneOpacity = 0;
+      } else {
+        layerEditSceneOpacity = 0;
+
+        if (savedLayerCameraPosition && savedLayerCameraTarget) {
+          cam.position.copy(savedLayerCameraPosition);
+          cam.lookAt(savedLayerCameraTarget);
+        }
+
+        savedLayerCameraPosition = null;
+        savedLayerCameraTarget = null;
+        layerFadeProgress = 0;
+        layerNormalSceneOpacity = 0;
+        layerTransitionPhase = 'normal';
+      }
+    }
+  });
+
+  // Layer edit mode fade-in task
+  useTask((delta) => {
+    if (layerTransitionPhase === 'edit' && layerEditSceneOpacity < 1) {
+      layerFadeProgress += delta / FADE_DURATION;
+      const t = Math.min(layerFadeProgress, 1);
+      const easeT = 1 - Math.pow(1 - t, 2);
+      layerEditSceneOpacity = easeT;
+    } else if (layerTransitionPhase === 'normal' && layerNormalSceneOpacity < 1) {
+      layerFadeProgress += delta / FADE_DURATION;
+      const t = Math.min(layerFadeProgress, 1);
+      const easeT = 1 - Math.pow(1 - t, 2);
+      layerNormalSceneOpacity = easeT;
     }
   });
 
@@ -770,13 +882,23 @@
     transitionPhase === 'fading-to-edit' ||
     transitionPhase === 'fading-to-normal' ||
     (transitionPhase === 'edit' && editSceneOpacity < 1) ||
-    (transitionPhase === 'normal' && normalSceneOpacity < 1)}
+    (transitionPhase === 'normal' && normalSceneOpacity < 1) ||
+    layerTransitionPhase === 'fading-to-edit' ||
+    layerTransitionPhase === 'fading-to-normal' ||
+    (layerTransitionPhase === 'edit' && layerEditSceneOpacity < 1) ||
+    (layerTransitionPhase === 'normal' && layerNormalSceneOpacity < 1)}
+  {@const anyEditMode = visualEditMode || visualLayerEditMode}
+  {@const editTarget: [number, number, number] = visualLayerEditMode
+    ? [layerEditModeCenter.x, 0, layerEditModeCenter.z]
+    : visualEditMode
+      ? [editModeCenter.x, 0, editModeCenter.z]
+      : [0, 0, printBedSize / 2]}
   <OrbitControls
-    target={visualEditMode ? [editModeCenter.x, 0, editModeCenter.z] : [0, 0, printBedSize / 2]}
+    target={editTarget}
     enableDamping={!isTransitioning}
     enabled={!isTransitioning}
-    enableRotate={!visualEditMode && !isTransitioning}
-    enablePan={!visualEditMode && !isTransitioning}
+    enableRotate={!anyEditMode && !isTransitioning}
+    enablePan={!anyEditMode && !isTransitioning}
     enableZoom={!isTransitioning}
   />
   <!-- Fade overlay - positioned in front of camera, fades to black during transitions -->
@@ -938,27 +1060,41 @@
     position={[0, 0, printBedSize / 2]}
   />
 
-  <!-- Layer content using component -->
-  <LayerContent
-    boxPlacements={layerBoxPlacements}
-    looseTrayPlacements={layerLooseTrayPlacements}
-    allBoxGeometries={allBoxes}
-    allLooseTrayGeometries={allLooseTrays}
-    {gameContainerWidth}
-    {gameContainerDepth}
-    {printBedSize}
-    wallThickness={boxWallThickness}
-    tolerance={boxTolerance}
-    floorThickness={boxFloorThickness}
-    showCounters={showCounters && !isLayoutEditMode}
-    showLid={true}
-    layerName={viewTitle}
-    showLabel={true}
-    {labelQuaternion}
-    {monoFont}
-    onTrayClick={onTrayClick}
-    onTrayDoubleClick={isLayoutEditMode ? undefined : onTrayDoubleClick}
-  />
+  {#if visualLayerEditMode}
+    <!-- Layer layout editor scene -->
+    <LayerLayoutEditorScene
+      allBoxGeometries={allBoxes}
+      allLooseTrayGeometries={allLooseTrays}
+      {gameContainerWidth}
+      {gameContainerDepth}
+      boxWallThickness={boxWallThickness}
+      boxTolerance={boxTolerance}
+      boxFloorThickness={boxFloorThickness}
+      {printBedSize}
+    />
+  {:else}
+    <!-- Normal layer content -->
+    <LayerContent
+      boxPlacements={layerBoxPlacements}
+      looseTrayPlacements={layerLooseTrayPlacements}
+      allBoxGeometries={allBoxes}
+      allLooseTrayGeometries={allLooseTrays}
+      {gameContainerWidth}
+      {gameContainerDepth}
+      {printBedSize}
+      wallThickness={boxWallThickness}
+      tolerance={boxTolerance}
+      floorThickness={boxFloorThickness}
+      showCounters={showCounters}
+      showLid={true}
+      layerName={viewTitle}
+      showLabel={true}
+      {labelQuaternion}
+      {monoFont}
+      onTrayClick={onTrayClick}
+      onTrayDoubleClick={onTrayDoubleClick}
+    />
+  {/if}
 {/if}
 
 <!-- Box geometry (single box view) - hidden during edit mode -->
