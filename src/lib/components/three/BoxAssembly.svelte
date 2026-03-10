@@ -29,6 +29,7 @@
     depth: number;
     height: number;
     color: string;
+    type?: 'tray' | 'box';
   }
 
   interface Props {
@@ -36,6 +37,8 @@
     lidGeometry: THREE.BufferGeometry | null;
     trayGeometries: TrayGeometryData[];
     boxDimensions: { width: number; depth: number; height: number };
+    boxId?: string;
+    boxName?: string;
     wallThickness?: number;
     tolerance?: number;
     floorThickness?: number;
@@ -44,7 +47,7 @@
     triangleCornerRadius?: number;
     onTrayClick?: (info: TrayClickInfo | null) => void;
     onTrayDoubleClick?: (trayId: string) => void;
-    onBoxClick?: () => void;
+    onBoxClick?: (boxId: string) => void;
     // Index offset for tray letter calculation
     trayIndexOffset?: number;
   }
@@ -54,6 +57,8 @@
     lidGeometry,
     trayGeometries,
     boxDimensions,
+    boxId = '',
+    boxName = '',
     wallThickness = 3,
     tolerance = 0.5,
     floorThickness = 2,
@@ -116,9 +121,26 @@
     position.x={boxCenterX}
     position.y={0}
     position.z={boxCenterZ}
-    onclick={() => {
-      onTrayClick?.(null);
-      onBoxClick?.();
+    onclick={(e: { stopPropagation?: () => void }) => {
+      e.stopPropagation?.();
+      if (boxId && boxName) {
+        onTrayClick?.({
+          trayId: boxId,
+          name: boxName,
+          letter: '',
+          width: boxDimensions.width,
+          depth: boxDimensions.depth,
+          height: boxDimensions.height,
+          color: '#333333',
+          type: 'box'
+        });
+      }
+      onBoxClick?.(boxId);
+    }}
+    ondblclick={() => {
+      if (boxId && onBoxClick) {
+        onBoxClick(boxId);
+      }
     }}
   >
     <T.MeshStandardMaterial color="#333333" roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />

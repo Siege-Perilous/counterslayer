@@ -73,6 +73,7 @@
     depth: number;
     height: number;
     color: string;
+    type?: 'tray' | 'box';
   }
 
   interface Props {
@@ -105,6 +106,7 @@
     isLayerLayoutEditMode?: boolean;
     onTrayClick?: (info: TrayClickInfo | null) => void;
     onTrayDoubleClick?: (trayId: string) => void;
+    onBoxDoubleClick?: (boxId: string) => void;
     generating?: boolean;
     showLayerView?: boolean;
     layerBoxPlacements?: BoxPlacement[];
@@ -119,6 +121,7 @@
         layerHeight: number;
       };
     }>;
+    allLayersExplosionAmount?: number;
   }
 
   let {
@@ -151,12 +154,14 @@
     isLayerLayoutEditMode = false,
     onTrayClick,
     onTrayDoubleClick,
+    onBoxDoubleClick,
     generating = false,
     showLayerView = false,
     layerBoxPlacements = [],
     layerLooseTrayPlacements = [],
     showAllLayers = false,
-    allLayerArrangements = []
+    allLayerArrangements = [],
+    allLayersExplosionAmount = 50
   }: Props = $props();
 
   // Compute actual container dimensions (prefer new props, fallback to legacy printBedSize)
@@ -984,10 +989,13 @@
   {/each}
 {/if}
 
-<!-- All layers stacked view: Show all layers stacked vertically with 20mm separation -->
+<!-- All layers stacked view: Show all layers stacked vertically with dynamic separation -->
 {#if !generating && showAllLayers && allLayerArrangements.length > 0}
+  <!-- Calculate explosion phases: 0-50% = vertical separation, 50-100% = horizontal explosion -->
+  {@const verticalPhase = Math.min(allLayersExplosionAmount / 50, 1)}
+  {@const horizontalPhase = Math.max((allLayersExplosionAmount - 50) / 50, 0)}
+  {@const layerSeparation = 20 * verticalPhase}
   <!-- Calculate layer Y offsets (stack from bottom to top) -->
-  {@const layerSeparation = 20}
   {@const layerYOffsets = allLayerArrangements.reduce<number[]>((acc, _entry, i) => {
     if (i === 0) {
       acc.push(0);
@@ -1009,6 +1017,8 @@
 
   {#each allLayerArrangements as { layer, arrangement }, layerIndex (layer.id)}
     {@const yOffset = layerYOffsets[layerIndex]}
+    {@const layerCount = allLayerArrangements.length}
+    {@const layerMultiplier = layerCount > 1 ? (layerIndex + 1) / layerCount : 1}
     <T.Group position.y={yOffset}>
       <LayerContent
         boxPlacements={arrangement.boxes}
@@ -1030,6 +1040,8 @@
         {monoFont}
         {onTrayClick}
         onTrayDoubleClick={isLayoutEditMode ? undefined : onTrayDoubleClick}
+        onBoxDoubleClick={isLayoutEditMode ? undefined : onBoxDoubleClick}
+        horizontalExplosion={horizontalPhase * layerMultiplier}
       />
     </T.Group>
   {/each}
@@ -1091,6 +1103,7 @@
       {monoFont}
       {onTrayClick}
       {onTrayDoubleClick}
+      {onBoxDoubleClick}
     />
   {/if}
 {/if}

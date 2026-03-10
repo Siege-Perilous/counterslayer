@@ -52,6 +52,7 @@
     depth: number;
     height: number;
     color: string;
+    type?: 'tray' | 'box';
   }
 
   interface Props {
@@ -74,6 +75,8 @@
     monoFont?: string;
     onTrayClick?: (info: TrayClickInfo | null) => void;
     onTrayDoubleClick?: (trayId: string) => void;
+    onBoxDoubleClick?: (boxId: string) => void;
+    horizontalExplosion?: number; // 0 = no explosion, 1 = full explosion
   }
 
   let {
@@ -95,7 +98,9 @@
     labelQuaternion = [0, 0, 0, 1],
     monoFont = '/fonts/JetBrainsMono-Regular.ttf',
     onTrayClick,
-    onTrayDoubleClick
+    onTrayDoubleClick,
+    onBoxDoubleClick,
+    horizontalExplosion = 0
   }: Props = $props();
 
   // Layer content offset (center on game container)
@@ -120,6 +125,34 @@
   let maxBoxHeight = $derived.by(() => {
     return boxPlacements.reduce((max, bp) => Math.max(max, bp.dimensions.height), 0);
   });
+
+  // Calculate explosion offset for an item based on its position relative to container center
+  function calculateExplosionOffset(
+    itemCenterX: number,
+    itemCenterZ: number,
+    containerWidth: number,
+    containerDepth: number,
+    explosionPhase: number
+  ): { offsetX: number; offsetZ: number } {
+    if (explosionPhase <= 0) return { offsetX: 0, offsetZ: 0 };
+
+    // Calculate item center relative to container center
+    const centerX = itemCenterX - containerWidth / 2;
+    const centerZ = itemCenterZ - containerDepth / 2;
+
+    // Explosion distance scales with phase (max 100mm at edges)
+    // Higher layers get a larger explosionPhase multiplier from parent
+    const explosionDistance = 100 * explosionPhase;
+
+    // Scale by distance from center (items further from center move more)
+    const normalizedX = centerX / (containerWidth / 2);
+    const normalizedZ = centerZ / (containerDepth / 2);
+
+    return {
+      offsetX: normalizedX * explosionDistance,
+      offsetZ: normalizedZ * explosionDistance
+    };
+  }
 </script>
 
 <!-- Render boxes with actual geometry -->
@@ -127,8 +160,17 @@
   {@const boxData = allBoxGeometries.find((b) => b.boxId === boxPlacement.box.id)}
   {@const boxHeight = boxPlacement.dimensions.height}
   {@const isRotated = boxPlacement.rotation === 90 || boxPlacement.rotation === 270}
-  {@const baseX = layerOffsetX + boxPlacement.x + boxPlacement.dimensions.width / 2}
-  {@const baseZ = layerOffsetZ - boxPlacement.y - boxPlacement.dimensions.depth / 2}
+  {@const itemCenterX = boxPlacement.x + boxPlacement.dimensions.width / 2}
+  {@const itemCenterZ = boxPlacement.y + boxPlacement.dimensions.depth / 2}
+  {@const explosion = calculateExplosionOffset(
+    itemCenterX,
+    itemCenterZ,
+    gameContainerWidth,
+    gameContainerDepth,
+    horizontalExplosion
+  )}
+  {@const baseX = layerOffsetX + boxPlacement.x + boxPlacement.dimensions.width / 2 + explosion.offsetX}
+  {@const baseZ = layerOffsetZ - boxPlacement.y - boxPlacement.dimensions.depth / 2 - explosion.offsetZ}
 
   <!-- Group for entire box assembly - rotation applied to group -->
   <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
@@ -138,6 +180,8 @@
         lidGeometry={boxData.lidGeometry}
         trayGeometries={boxData.trayGeometries}
         boxDimensions={boxData.boxDimensions}
+        boxId={boxPlacement.box.id}
+        boxName={boxPlacement.box.name}
         {wallThickness}
         {tolerance}
         {floorThickness}
@@ -145,10 +189,27 @@
         {showLid}
         {onTrayClick}
         {onTrayDoubleClick}
+        onBoxClick={onBoxDoubleClick}
       />
     {:else}
       <!-- Fallback: simple box geometry if actual geometry not available -->
-      <T.Mesh position.y={boxHeight / 2}>
+      <T.Mesh
+        position.y={boxHeight / 2}
+        onclick={(e: { stopPropagation?: () => void }) => {
+          e.stopPropagation?.();
+          onTrayClick?.({
+            trayId: boxPlacement.box.id,
+            name: boxPlacement.box.name,
+            letter: '',
+            width: boxPlacement.dimensions.width,
+            depth: boxPlacement.dimensions.depth,
+            height: boxHeight,
+            color: '#444444',
+            type: 'box'
+          });
+        }}
+        ondblclick={() => onBoxDoubleClick?.(boxPlacement.box.id)}
+      >
         <T.BoxGeometry args={[boxPlacement.dimensions.width, boxHeight, boxPlacement.dimensions.depth]} />
         <T.MeshStandardMaterial color="#444444" roughness={0.7} metalness={0.1} />
       </T.Mesh>
@@ -176,8 +237,17 @@
   {@const trayHeight = trayPlacement.dimensions.height}
   {@const trayColor = trayPlacement.tray.color || TRAY_COLORS[0]}
   {@const isRotated = trayPlacement.rotation === 90 || trayPlacement.rotation === 270}
-  {@const baseX = layerOffsetX + trayPlacement.x + (isRotated ? trayPlacement.dimensions.width : 0)}
-  {@const baseZ = layerOffsetZ - trayPlacement.y}
+  {@const itemCenterX = trayPlacement.x + trayPlacement.dimensions.width / 2}
+  {@const itemCenterZ = trayPlacement.y + trayPlacement.dimensions.depth / 2}
+  {@const explosion = calculateExplosionOffset(
+    itemCenterX,
+    itemCenterZ,
+    gameContainerWidth,
+    gameContainerDepth,
+    horizontalExplosion
+  )}
+  {@const baseX = layerOffsetX + trayPlacement.x + (isRotated ? trayPlacement.dimensions.width : 0) + explosion.offsetX}
+  {@const baseZ = layerOffsetZ - trayPlacement.y - explosion.offsetZ}
 
   {#if looseTrayGeom}
     <!-- Render actual tray geometry -->
@@ -199,8 +269,8 @@
     </T.Group>
   {:else}
     <!-- Fallback: simple box geometry if actual geometry not available -->
-    {@const fallbackX = layerOffsetX + trayPlacement.x + trayPlacement.dimensions.width / 2}
-    {@const fallbackZ = layerOffsetZ - trayPlacement.y - trayPlacement.dimensions.depth / 2}
+    {@const fallbackX = layerOffsetX + trayPlacement.x + trayPlacement.dimensions.width / 2 + explosion.offsetX}
+    {@const fallbackZ = layerOffsetZ - trayPlacement.y - trayPlacement.dimensions.depth / 2 - explosion.offsetZ}
     <T.Mesh
       position.x={fallbackX}
       position.y={trayHeight / 2}
@@ -214,8 +284,8 @@
 
   <!-- Tray label -->
   {#if showLabel}
-    {@const labelX = layerOffsetX + trayPlacement.x + trayPlacement.dimensions.width / 2}
-    {@const labelZ = layerOffsetZ - trayPlacement.y - trayPlacement.dimensions.depth / 2}
+    {@const labelX = layerOffsetX + trayPlacement.x + trayPlacement.dimensions.width / 2 + explosion.offsetX}
+    {@const labelZ = layerOffsetZ - trayPlacement.y - trayPlacement.dimensions.depth / 2 - explosion.offsetZ}
     <Text
       text={trayPlacement.tray.name}
       font={monoFont}
@@ -231,7 +301,8 @@
 
 <!-- Layer height indicator and label (offset from bed edge, at front) -->
 {#if showLabel && layerName}
-  {@const indicatorX = -gameContainerWidth / 2 - 15}
+  {@const indicatorExplosionOffset = 100 * horizontalExplosion}
+  {@const indicatorX = -gameContainerWidth / 2 - 15 - indicatorExplosionOffset}
   {@const indicatorZ = printBedSize / 2 + gameContainerDepth / 2}
   {@const displayHeight = layerHeight || maxBoxHeight}
   {@const lineGeometry = new THREE.BufferGeometry().setFromPoints([

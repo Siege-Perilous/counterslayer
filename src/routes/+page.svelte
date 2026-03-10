@@ -128,6 +128,7 @@
   let lastGeneratedHash = $state('');
   let jsonFileInput = $state<HTMLInputElement | null>(null);
   let explosionAmount = $state(50);
+  let allLayersExplosionAmount = $state(50); // Default to current behavior (20mm separation)
   let showCounters = $state(false);
   let communityProjects = $state<CommunityProject[]>([]);
   let showReferenceLabels = $state(false);
@@ -346,9 +347,29 @@
       // Also check loose trays
       const looseTray = layer.looseTrays.find((t) => t.id === trayId);
       if (looseTray) {
+        // Clear box selection for loose trays
+        project.selectedBoxId = null;
         project.selectedTrayId = trayId;
         selectionType = 'tray';
         viewMode = 'tray';
+        return;
+      }
+    }
+  }
+
+  // Handle double-click on box to navigate to it
+  function handleBoxDoubleClick(boxId: string) {
+    const project = getProject();
+    for (const layer of project.layers) {
+      const box = layer.boxes.find((b) => b.id === boxId);
+      if (box) {
+        project.selectedBoxId = boxId;
+        // Select the first tray in the box if available
+        if (box.trays.length > 0) {
+          project.selectedTrayId = box.trays[0].id;
+        }
+        selectionType = 'box';
+        viewMode = 'exploded';
         return;
       }
     }
@@ -1447,11 +1468,13 @@
               {isLayoutEditMode}
               {isLayerLayoutEditMode}
               onTrayDoubleClick={handleTrayDoubleClick}
+              onBoxDoubleClick={handleBoxDoubleClick}
               showLayerView={visibleGeometries.showLayerView}
               layerBoxPlacements={visibleGeometries.layerBoxPlacements}
               layerLooseTrayPlacements={visibleGeometries.layerLooseTrayPlacements}
               showAllLayers={visibleGeometries.showAllLayers}
               allLayerArrangements={visibleGeometries.allLayerArrangements}
+              {allLayersExplosionAmount}
               {generating}
             />
           {/await}
@@ -1474,6 +1497,15 @@
               onRotate={handleRotateLayerItem}
               canEdit={(layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 1}
             />
+          </div>
+        {/if}
+
+        {#if viewMode === 'all-no-lid' && !generating}
+          <div class="viewToolbar">
+            <div class="sliderContainer">
+              <span class="sliderLabel">Explode</span>
+              <InputSlider min={0} max={100} bind:value={allLayersExplosionAmount} />
+            </div>
           </div>
         {/if}
 
@@ -1663,11 +1695,13 @@
               {isLayoutEditMode}
               {isLayerLayoutEditMode}
               onTrayDoubleClick={handleTrayDoubleClick}
+              onBoxDoubleClick={handleBoxDoubleClick}
               showLayerView={visibleGeometries.showLayerView}
               layerBoxPlacements={visibleGeometries.layerBoxPlacements}
               layerLooseTrayPlacements={visibleGeometries.layerLooseTrayPlacements}
               showAllLayers={visibleGeometries.showAllLayers}
               allLayerArrangements={visibleGeometries.allLayerArrangements}
+              {allLayersExplosionAmount}
               {generating}
             />
           {/await}
@@ -1690,6 +1724,15 @@
               onRotate={handleRotateLayerItem}
               canEdit={(layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 1}
             />
+          </div>
+        {/if}
+
+        {#if viewMode === 'all-no-lid' && !generating}
+          <div class="viewToolbar">
+            <div class="sliderContainer">
+              <span class="sliderLabel">Explode</span>
+              <InputSlider min={0} max={100} bind:value={allLayersExplosionAmount} />
+            </div>
           </div>
         {/if}
 
