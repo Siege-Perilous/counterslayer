@@ -12,8 +12,8 @@ import type {
   ManualLooseTrayPlacement,
   Tray
 } from '$lib/types/project';
-import { GuillotineBinPack, Rect } from 'rectangle-packer';
 import { getBoxExteriorDimensions, getTrayDimensionsForTray } from './box';
+import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
 
 export interface BoxDimensions {
   width: number;
@@ -240,32 +240,16 @@ function arrangeLayerManual(
   };
 }
 
-// Item data for bin packing
+// Item data for layer bin packing
 interface LayerItemData {
   itemType: 'box' | 'looseTray';
   item: Box | Tray;
-  width: number;  // Original width (without gap)
-  depth: number;  // Original depth (without gap)
-  height: number;
-}
-
-// Extended Rect class to store layer item data
-class LayerPackRect extends Rect {
-  itemData: LayerItemData;
   originalWidth: number;
-  originalHeight: number;
-
-  constructor(itemData: LayerItemData) {
-    // Don't add gap to dimensions - pack with exact sizes like box.ts does
-    super(0, 0, itemData.width, itemData.depth);
-    this.itemData = itemData;
-    this.originalWidth = itemData.width;
-    this.originalHeight = itemData.depth;
-  }
+  originalDepth: number;
 }
 
 /**
- * Auto-arrange layer contents using bin packing
+ * Auto-arrange layer contents using shared bin packing utility
  */
 function arrangeLayerAuto(
   layer: Layer,
@@ -275,10 +259,9 @@ function arrangeLayerAuto(
     gameContainerDepth: number;
     cardSizes: CardSize[];
     counterShapes: CounterShape[];
-    gap?: number;
   }
 ): LayerArrangement {
-  const { gameContainerWidth, gameContainerDepth, cardSizes, counterShapes, gap = 2 } = options;
+  const { gameContainerWidth, gameContainerDepth, cardSizes, counterShapes } = options;
 
   if (layer.boxes.length === 0 && layer.looseTrays.length === 0) {
     return {
@@ -291,213 +274,82 @@ function arrangeLayerAuto(
   }
 
   // Collect all items with their dimensions
-  const itemsData: LayerItemData[] = [];
+  const packingItems: PackingItem<LayerItemData>[] = [];
 
   // Add boxes
   for (const box of layer.boxes) {
     const dims = getBoxDimensions(box, cardSizes, counterShapes);
-    itemsData.push({
-      itemType: 'box',
-      item: box,
+    packingItems.push({
+      data: { itemType: 'box', item: box, originalWidth: dims.width, originalDepth: dims.depth },
       width: dims.width,
-      depth: dims.depth,
-      height: dims.height
+      depth: dims.depth
     });
   }
 
   // Add loose trays
   for (const tray of layer.looseTrays) {
     const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
-    itemsData.push({
-      itemType: 'looseTray',
-      item: tray,
+    packingItems.push({
+      data: { itemType: 'looseTray', item: tray, originalWidth: dims.width, originalDepth: dims.depth },
       width: dims.width,
-      depth: dims.depth,
-      height: dims.height
+      depth: dims.depth
     });
   }
 
-  // Sort by area (largest first) for better packing
-  itemsData.sort((a, b) => (b.width * b.depth) - (a.width * a.depth));
+  // Try bin packing
+  const packResult = packItems(packingItems, gameContainerWidth, gameContainerDepth);
 
-  // Try packing with specific heuristics (matches box.ts approach)
-  const tryPacking = (
-    allowFlip: boolean,
-    rectChoice: number,
-    splitMethod: number
-  ): { boxes: BoxPlacement[]; looseTrays: LooseTrayPlacement[] } | null => {
-    const packer = new GuillotineBinPack<LayerPackRect>(gameContainerWidth, gameContainerDepth, allowFlip);
+  // Convert packing result to layer placements
+  const convertToPlacement = (result: typeof packResult) => {
+    if (!result) return null;
 
-    // Create fresh rect objects for each attempt
-    const rects = itemsData.map((data) => new LayerPackRect(data));
-
-    // Insert all rectangles
-    packer.InsertSizes(rects, true, rectChoice, splitMethod);
-
-    // Check if all were placed
-    if (packer.usedRectangles.length !== itemsData.length) return null;
-
-    // Verify no overlaps
-    const OVERLAP_EPSILON = 0.01;
-    for (let i = 0; i < packer.usedRectangles.length; i++) {
-      for (let j = i + 1; j < packer.usedRectangles.length; j++) {
-        const r1 = packer.usedRectangles[i];
-        const r2 = packer.usedRectangles[j];
-        const noOverlapX = r1.x + r1.width <= r2.x + OVERLAP_EPSILON || r2.x + r2.width <= r1.x + OVERLAP_EPSILON;
-        const noOverlapY = r1.y + r1.height <= r2.y + OVERLAP_EPSILON || r2.y + r2.height <= r1.y + OVERLAP_EPSILON;
-        if (!noOverlapX && !noOverlapY) {
-          return null; // Overlap detected
-        }
-      }
-    }
-
-    // Verify fit within container
-    let maxX = 0;
-    let maxY = 0;
-    for (const rect of packer.usedRectangles) {
-      maxX = Math.max(maxX, rect.x + rect.width);
-      maxY = Math.max(maxY, rect.y + rect.height);
-    }
-    if (maxX > gameContainerWidth || maxY > gameContainerDepth) return null;
-
-    // Build placements
     const boxPlacements: BoxPlacement[] = [];
     const looseTrayPlacements: LooseTrayPlacement[] = [];
 
-    for (const rect of packer.usedRectangles) {
-      const data = (rect as LayerPackRect).itemData;
-      const originalWidth = (rect as LayerPackRect).originalWidth;
-      const originalHeight = (rect as LayerPackRect).originalHeight;
-
-      const wasRotated =
-        Math.abs(rect.width - originalHeight) < 0.01 &&
-        Math.abs(rect.height - originalWidth) < 0.01;
+    for (const packed of result.items) {
+      const { data, x, y, width, depth, rotated } = packed;
 
       if (data.itemType === 'box') {
-        const box = data.item as Box;
         boxPlacements.push({
-          box,
-          dimensions: wasRotated
-            ? { width: data.depth, depth: data.width, height: layerHeight }
-            : { width: data.width, depth: data.depth, height: layerHeight },
-          x: rect.x,
-          y: rect.y,
-          rotation: wasRotated ? 90 : 0
+          box: data.item as Box,
+          dimensions: { width, depth, height: layerHeight },
+          x,
+          y,
+          rotation: rotated ? 90 : 0
         });
       } else {
-        const tray = data.item as Tray;
         looseTrayPlacements.push({
-          tray,
-          dimensions: wasRotated
-            ? { width: data.depth, depth: data.width, height: layerHeight }
-            : { width: data.width, depth: data.depth, height: layerHeight },
-          x: rect.x,
-          y: rect.y,
-          rotation: wasRotated ? 90 : 0
+          tray: data.item as Tray,
+          dimensions: { width, depth, height: layerHeight },
+          x,
+          y,
+          rotation: rotated ? 90 : 0
         });
       }
-    }
-
-    return { boxes: boxPlacements, looseTrays: looseTrayPlacements };
-  };
-
-  // Try combinations of heuristics (same as box.ts)
-  // RectChoice: 0=BestAreaFit, 1=BestShortSideFit, 2=BestLongSideFit
-  // SplitMethod: 0-5 (all useful variants)
-  const rectChoices = [0, 1, 2];
-  const splitMethods = [0, 1, 2, 3, 4, 5];
-
-  interface PackResult {
-    boxes: BoxPlacement[];
-    looseTrays: LooseTrayPlacement[];
-    area: number;
-  }
-
-  const results: PackResult[] = [];
-
-  for (const allowFlip of [true, false]) {
-    for (const rectChoice of rectChoices) {
-      for (const splitMethod of splitMethods) {
-        const result = tryPacking(allowFlip, rectChoice, splitMethod);
-        if (result) {
-          let maxX = 0;
-          let maxY = 0;
-          for (const p of [...result.boxes, ...result.looseTrays]) {
-            maxX = Math.max(maxX, p.x + p.dimensions.width);
-            maxY = Math.max(maxY, p.y + p.dimensions.depth);
-          }
-          results.push({ ...result, area: maxX * maxY });
-        }
-      }
-    }
-  }
-
-  // If we found valid results, return the most compact one
-  if (results.length > 0) {
-    results.sort((a, b) => a.area - b.area);
-    const best = results[0];
-
-    // Calculate total dimensions
-    let totalWidth = 0;
-    let totalDepth = 0;
-    for (const p of [...best.boxes, ...best.looseTrays]) {
-      totalWidth = Math.max(totalWidth, p.x + p.dimensions.width);
-      totalDepth = Math.max(totalDepth, p.y + p.dimensions.depth);
     }
 
     return {
-      boxes: best.boxes,
-      looseTrays: best.looseTrays,
+      boxes: boxPlacements,
+      looseTrays: looseTrayPlacements,
       layerHeight,
-      totalWidth,
-      totalDepth
+      totalWidth: result.totalWidth,
+      totalDepth: result.totalDepth
     };
-  }
+  };
 
-  // Fallback: stack vertically (items don't fit within constraints)
-  const boxPlacements: BoxPlacement[] = [];
-  const looseTrayPlacements: LooseTrayPlacement[] = [];
-  let y = 0;
+  // Use packing result if successful
+  const placement = convertToPlacement(packResult);
+  if (placement) return placement;
 
-  for (const data of itemsData) {
-    if (data.itemType === 'box') {
-      boxPlacements.push({
-        box: data.item as Box,
-        dimensions: { width: data.width, depth: data.depth, height: layerHeight },
-        x: 0,
-        y,
-        rotation: 0
-      });
-    } else {
-      looseTrayPlacements.push({
-        tray: data.item as Tray,
-        dimensions: { width: data.width, depth: data.depth, height: layerHeight },
-        x: 0,
-        y,
-        rotation: 0
-      });
-    }
-    y += data.depth;
-  }
-
-  // Calculate total dimensions
-  let totalWidth = 0;
-  let totalDepth = 0;
-  for (const p of boxPlacements) {
-    totalWidth = Math.max(totalWidth, p.x + p.dimensions.width);
-    totalDepth = Math.max(totalDepth, p.y + p.dimensions.depth);
-  }
-  for (const p of looseTrayPlacements) {
-    totalWidth = Math.max(totalWidth, p.x + p.dimensions.width);
-    totalDepth = Math.max(totalDepth, p.y + p.dimensions.depth);
-  }
-
-  return {
-    boxes: boxPlacements,
-    looseTrays: looseTrayPlacements,
+  // Fallback: stack vertically
+  const fallback = stackItemsVertically(packingItems);
+  const fallbackPlacement = convertToPlacement(fallback);
+  return fallbackPlacement || {
+    boxes: [],
+    looseTrays: [],
     layerHeight,
-    totalWidth,
-    totalDepth
+    totalWidth: 0,
+    totalDepth: 0
   };
 }
 

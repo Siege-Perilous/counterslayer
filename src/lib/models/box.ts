@@ -2,7 +2,7 @@ import type { Box, CardSize, CounterShape, Tray } from '$lib/types/project';
 import { isCardDividerTray, isCardTray, isCupTray } from '$lib/types/project';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
-import { GuillotineBinPack, Rect } from 'rectangle-packer';
+import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
 import { getCardDividerTrayDimensions } from './cardDividerTray';
 import { getCardDrawTrayDimensions } from './cardTray';
 import type { CounterTrayParams } from './counterTray';
@@ -519,14 +519,15 @@ export function arrangeTrays(
   return arrangeTraysAuto(trays, options);
 }
 
-// Tray rectangle for packing
-interface TrayRect {
+// Tray data for bin packing
+interface TrayPackData {
   tray: Tray;
-  width: number;
-  depth: number;
   height: number;
 }
 
+/**
+ * Auto-arrange trays using shared bin packing utility
+ */
 function arrangeTraysAuto(
   trays: Tray[],
   options?: {
@@ -544,13 +545,12 @@ function arrangeTraysAuto(
   if (trays.length === 0) return [];
 
   // Get dimensions for each tray
-  const trayRects: TrayRect[] = trays.map((tray) => {
+  const packingItems: PackingItem<TrayPackData>[] = trays.map((tray) => {
     const dims = getTrayDimensionsForTray(tray, options?.cardSizes ?? [], options?.counterShapes ?? []);
     return {
-      tray,
+      data: { tray, height: dims.height },
       width: dims.width,
-      depth: dims.depth,
-      height: dims.height
+      depth: dims.depth
     };
   });
 
@@ -588,11 +588,9 @@ function arrangeTraysAuto(
     targetWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
     targetDepth = options.customBoxDepth - wallThickness * 2 - tolerance * 2;
   } else if (options?.customBoxWidth) {
-    // Only width constrained - use it for width, container max for depth
     targetWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
     targetDepth = interiorMaxDepth;
   } else if (options?.customBoxDepth) {
-    // Only depth constrained - use container max for width
     targetWidth = interiorMaxWidth;
     targetDepth = options.customBoxDepth - wallThickness * 2 - tolerance * 2;
   } else {
@@ -600,141 +598,36 @@ function arrangeTraysAuto(
     targetDepth = interiorMaxDepth;
   }
 
-  // Extended Rect class to store tray data
-  class TrayPackRect extends Rect {
-    trayRect: TrayRect;
-    originalWidth: number;
-    originalHeight: number;
+  // Try bin packing
+  const packResult = packItems(packingItems, targetWidth, targetDepth);
 
-    constructor(trayRect: TrayRect) {
-      super(0, 0, trayRect.width, trayRect.depth);
-      this.trayRect = trayRect;
-      this.originalWidth = trayRect.width;
-      this.originalHeight = trayRect.depth;
-    }
-  }
+  // Convert packing result to tray placements
+  const convertToPlacement = (
+    result: ReturnType<typeof packItems<TrayPackData>>
+  ): TrayPlacement[] => {
+    if (!result) return [];
 
-  // Try GuillotineBinPack with different heuristics
-  const tryGuillotine = (
-    width: number,
-    height: number,
-    allowFlip: boolean,
-    rectChoice: number,
-    splitMethod: number
-  ): TrayPlacement[] | null => {
-    const packer = new GuillotineBinPack<TrayPackRect>(width, height, allowFlip);
-
-    // Sort trays by area (largest first) for better packing
-    const sortedTrayRects = [...trayRects].sort((a, b) => b.width * b.depth - a.width * a.depth);
-
-    // Create rect objects for packing (sorted by area)
-    const rects = sortedTrayRects.map((r) => new TrayPackRect(r));
-
-    // Insert all rectangles
-    packer.InsertSizes(rects, true, rectChoice, splitMethod);
-
-    // Check if all were placed
-    if (packer.usedRectangles.length !== trayRects.length) return null;
-
-    // Verify no overlaps in the packing result
-    const OVERLAP_EPSILON = 0.01;
-    for (let i = 0; i < packer.usedRectangles.length; i++) {
-      for (let j = i + 1; j < packer.usedRectangles.length; j++) {
-        const r1 = packer.usedRectangles[i];
-        const r2 = packer.usedRectangles[j];
-        const noOverlapX = r1.x + r1.width <= r2.x + OVERLAP_EPSILON || r2.x + r2.width <= r1.x + OVERLAP_EPSILON;
-        const noOverlapY = r1.y + r1.height <= r2.y + OVERLAP_EPSILON || r2.y + r2.height <= r1.y + OVERLAP_EPSILON;
-        if (!noOverlapX && !noOverlapY) {
-          // Overlap detected - reject this packing
-          return null;
-        }
-      }
-    }
-
-    // Calculate bounding box and verify fit
-    let maxX = 0;
-    let maxY = 0;
-    for (const rect of packer.usedRectangles) {
-      maxX = Math.max(maxX, rect.x + rect.width);
-      maxY = Math.max(maxY, rect.y + rect.height);
-    }
-
-    if (maxX > targetWidth || maxY > targetDepth) return null;
-
-    // Convert to placements
-    const placements: TrayPlacement[] = [];
-    for (const rect of packer.usedRectangles) {
-      const trayRect = rect.trayRect;
-      // Check if rotated by comparing dimensions
-      const wasRotated =
-        Math.abs(rect.width - rect.originalHeight) < 0.01 && Math.abs(rect.height - rect.originalWidth) < 0.01;
-
-      placements.push({
-        tray: trayRect.tray,
-        dimensions: {
-          width: rect.width,
-          depth: rect.height,
-          height: trayRect.height
-        },
-        x: rect.x,
-        y: rect.y,
-        rotated: wasRotated
-      });
-    }
-
-    return placements;
+    return result.items.map((packed) => ({
+      tray: packed.data.tray,
+      dimensions: {
+        width: packed.width,
+        depth: packed.depth,
+        height: packed.data.height
+      },
+      x: packed.x,
+      y: packed.y,
+      rotated: packed.rotated
+    }));
   };
 
-  // Try combinations of heuristics
-  // RectChoice: 0=BestAreaFit, 1=BestShortSideFit, 2=BestLongSideFit (skip "Worst" variants 3-5)
-  // SplitMethod: all 6 are useful (no "worst" variants)
-  const rectChoices = [0, 1, 2];
-  const splitMethods = [0, 1, 2, 3, 4, 5];
-
-  interface PackResult {
-    placements: TrayPlacement[];
-    area: number;
+  // Use packing result if successful
+  if (packResult) {
+    return convertToPlacement(packResult);
   }
 
-  const results: PackResult[] = [];
-
-  // Try all combinations with and without rotation
-  for (const allowFlip of [true, false]) {
-    for (const rectChoice of rectChoices) {
-      for (const splitMethod of splitMethods) {
-        const placements = tryGuillotine(targetWidth, targetDepth, allowFlip, rectChoice, splitMethod);
-        if (placements) {
-          let maxX = 0;
-          let maxY = 0;
-          for (const p of placements) {
-            maxX = Math.max(maxX, p.x + p.dimensions.width);
-            maxY = Math.max(maxY, p.y + p.dimensions.depth);
-          }
-          results.push({ placements, area: maxX * maxY });
-        }
-      }
-    }
-  }
-
-  // If we found valid results, return the most compact one
-  if (results.length > 0) {
-    results.sort((a, b) => a.area - b.area);
-    return results[0].placements;
-  }
-
-  // Fallback: stack vertically (trays don't fit within constraints)
-  let y = 0;
-  return trayRects.map((rect) => {
-    const placement: TrayPlacement = {
-      tray: rect.tray,
-      dimensions: { width: rect.width, depth: rect.depth, height: rect.height },
-      x: 0,
-      y,
-      rotated: false
-    };
-    y += rect.depth;
-    return placement;
-  });
+  // Fallback: stack vertically
+  const fallback = stackItemsVertically(packingItems);
+  return convertToPlacement(fallback);
 }
 
 // Calculate box interior dimensions from tray placements
