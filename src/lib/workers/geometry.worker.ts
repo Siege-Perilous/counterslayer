@@ -956,7 +956,7 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
   const { id } = msg;
 
   try {
-    if (cachedAllBoxes.length === 0) {
+    if (cachedAllBoxes.length === 0 && cachedAllLooseTrays.length === 0) {
       self.postMessage({
         type: 'export-all-stls-result',
         id,
@@ -970,6 +970,7 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
     const transferables: ArrayBuffer[] = [];
     const usedFilenames = new Set<string>();
 
+    // Export boxes and their contents
     for (const boxData of cachedAllBoxes) {
       const boxPrefix = sanitizeFilename(boxData.boxName);
 
@@ -995,7 +996,7 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
         transferables.push(buffer);
       }
 
-      // Export trays
+      // Export trays in boxes
       for (const tray of boxData.trays) {
         const cleanedGeom = cleanGeometryForExport(tray.jscadGeom);
         const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
@@ -1006,6 +1007,18 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
         files.push({ filename, data: buffer });
         transferables.push(buffer);
       }
+    }
+
+    // Export loose trays
+    for (const looseTray of cachedAllLooseTrays) {
+      const cleanedGeom = cleanGeometryForExport(looseTray.trayGeom);
+      const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
+      const blob = new Blob(stlData, { type: 'application/octet-stream' });
+      const buffer = await blob.arrayBuffer();
+      const trayName = sanitizeFilename(looseTray.trayName);
+      const filename = getUniqueFilename(`${trayName}.stl`, usedFilenames);
+      files.push({ filename, data: buffer });
+      transferables.push(buffer);
     }
 
     self.postMessage(
@@ -1034,7 +1047,7 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
   const { id } = msg;
 
   try {
-    if (cachedAllBoxes.length === 0) {
+    if (cachedAllBoxes.length === 0 && cachedAllLooseTrays.length === 0) {
       self.postMessage({
         type: 'export-3mf-result',
         id,
@@ -1065,6 +1078,7 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
       return uniqueName;
     };
 
+    // Add boxes and their contents
     for (const boxData of cachedAllBoxes) {
       const boxPrefix = sanitizeFilename(boxData.boxName);
 
@@ -1080,7 +1094,7 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
         namedGeometries.push({ geom: cleanedGeom, name: getUniqueName(`${boxPrefix}-lid`) });
       }
 
-      // Add trays
+      // Add trays in boxes
       for (const tray of boxData.trays) {
         const cleanedGeom = cleanGeometryForExport(tray.jscadGeom);
         const trayName = sanitizeFilename(tray.name);
@@ -1089,6 +1103,16 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
           name: getUniqueName(`${boxPrefix}-${trayName}`)
         });
       }
+    }
+
+    // Add loose trays
+    for (const looseTray of cachedAllLooseTrays) {
+      const cleanedGeom = cleanGeometryForExport(looseTray.trayGeom);
+      const trayName = sanitizeFilename(looseTray.trayName);
+      namedGeometries.push({
+        geom: cleanedGeom,
+        name: getUniqueName(trayName)
+      });
     }
 
     if (namedGeometries.length === 0) {

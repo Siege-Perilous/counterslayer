@@ -20,7 +20,8 @@
   import { createCounterTray, getCounterPositions, type CounterStack } from '$lib/models/counterTray';
   import { createCardDrawTray, getCardDrawPositions, type CardStack } from '$lib/models/cardTray';
   import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
-  import { arrangeTrays, calculateTraySpacers } from '$lib/models/box';
+  import { arrangeTrays, calculateTraySpacers, getTrayDimensionsForTray } from '$lib/models/box';
+  import { createCupTray } from '$lib/models/cupTray';
   import { arrangeLayerContents, type BoxPlacement, type LooseTrayPlacement } from '$lib/models/layer';
   import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
   import {
@@ -44,9 +45,11 @@
     resetProject,
     getTrayLetterById,
     getAllBoxes,
+    getAllLooseTrays,
     isCounterTray,
     isCardTray,
     isCardDividerTray,
+    isCupTray,
     findTrayLocation,
     saveManualLayout,
     clearManualLayout
@@ -526,7 +529,8 @@
 
   async function handleExportAll() {
     const allBoxes = getAllBoxes();
-    if (allBoxes.length === 0) return;
+    const allLooseTrays = getAllLooseTrays();
+    if (allBoxes.length === 0 && allLooseTrays.length === 0) return;
 
     exportingStl = true;
     exportStlProgress = 'Generating STL files...';
@@ -560,8 +564,11 @@
 
       const zipBlob = await zipWriter.close();
 
-      // Download zip - use first box name or default
-      const projectName = allBoxes[0]?.name?.toLowerCase().replace(/\s+/g, '-') || 'counterslayer';
+      // Download zip - use first box name, first loose tray name, or default
+      const projectName =
+        allBoxes[0]?.name?.toLowerCase().replace(/\s+/g, '-') ||
+        allLooseTrays[0]?.name?.toLowerCase().replace(/\s+/g, '-') ||
+        'counterslayer';
       const url = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -595,7 +602,7 @@
   }
 
   async function handleExport3mf() {
-    if (getAllBoxes().length === 0) return;
+    if (getAllBoxes().length === 0 && getAllLooseTrays().length === 0) return;
 
     exporting3mf = true;
 
@@ -652,7 +659,8 @@
   async function handleExportPdf() {
     const project = getProject();
     const allBoxes = getAllBoxes();
-    if (allBoxes.length === 0) return;
+    const allLooseTrays = getAllLooseTrays();
+    if (allBoxes.length === 0 && allLooseTrays.length === 0) return;
 
     // If we don't have a capture function yet, fall back to SVG-based PDF
     if (!captureFunction) {
@@ -809,6 +817,109 @@
             dataUrl
           });
         }
+      }
+
+      // Capture loose trays
+      for (let looseIdx = 0; looseIdx < allLooseTrays.length; looseIdx++) {
+        const looseTray = allLooseTrays[looseIdx];
+        const trayLetter = getTrayLetterById(project.layers, looseTray.id) || 'A';
+        const dims = getTrayDimensionsForTray(looseTray, cardSizes, counterShapes);
+        const maxHeight = dims.height;
+        const spacerHeight = 0; // No spacer for loose trays
+
+        // Generate geometry for this tray based on tray type
+        let jscadGeom;
+        const showEmboss = looseTray.showEmboss ?? true;
+        if (isCounterTray(looseTray)) {
+          jscadGeom = createCounterTray(
+            looseTray.params,
+            counterShapes,
+            looseTray.name,
+            maxHeight,
+            spacerHeight,
+            showEmboss
+          );
+          selectedTrayCounters = getCounterPositions(looseTray.params, counterShapes, maxHeight, spacerHeight);
+        } else if (isCardDividerTray(looseTray)) {
+          const showStackLabels = looseTray.showStackLabels ?? true;
+          jscadGeom = createCardDividerTray(
+            looseTray.params,
+            cardSizes,
+            looseTray.name,
+            maxHeight,
+            spacerHeight,
+            showEmboss,
+            showStackLabels
+          );
+          const dividerPositions = getCardDividerPositions(looseTray.params, cardSizes, maxHeight, spacerHeight);
+          selectedTrayCounters = dividerPositions.map((pos) => ({
+            shape: 'custom' as const,
+            shapeId: pos.cardSizeId,
+            customShapeName: pos.label,
+            customBaseShape: 'rectangle' as const,
+            x: pos.x,
+            y: pos.y,
+            z: pos.z,
+            width: pos.slotWidth,
+            length: pos.slotDepth,
+            thickness: pos.cardThickness,
+            count: pos.count,
+            hexPointyTop: false,
+            color: pos.color,
+            isEdgeLoaded: true,
+            isCardDivider: true,
+            cardDividerHeight: pos.slotHeight,
+            slotWidth: pos.slotWidth,
+            slotDepth: pos.slotDepth
+          }));
+        } else if (isCardTray(looseTray)) {
+          jscadGeom = createCardDrawTray(
+            looseTray.params,
+            cardSizes,
+            looseTray.name,
+            maxHeight,
+            spacerHeight,
+            showEmboss
+          );
+          selectedTrayCounters = getCardDrawPositions(looseTray.params, cardSizes, maxHeight, spacerHeight);
+        } else if (isCupTray(looseTray)) {
+          jscadGeom = createCupTray(looseTray.params, looseTray.name, maxHeight, spacerHeight, showEmboss);
+          selectedTrayCounters = []; // Cup trays don't have counter positions
+        } else {
+          continue;
+        }
+
+        // Set up scene for this tray
+        selectedTrayGeometry = jscadToBufferGeometry(jscadGeom);
+        captureTrayLetter = trayLetter;
+
+        // Enable capture mode for fixed top-down label rotation
+        captureFunction.setCaptureMode?.(true);
+
+        // Wait for render
+        await new Promise((r) => requestAnimationFrame(r));
+        await new Promise((r) => requestAnimationFrame(r));
+        await new Promise((r) => requestAnimationFrame(r));
+        await new Promise((r) => setTimeout(r, 200));
+
+        // Capture screenshot
+        const dataUrl = captureFunction({
+          width: 1920,
+          height: 1080,
+          backgroundColor: '#f0f0f0',
+          bounds: {
+            width: dims.width,
+            depth: dims.depth,
+            height: dims.height
+          }
+        });
+
+        screenshots.push({
+          boxIndex: -1, // -1 indicates loose tray
+          trayIndex: looseIdx,
+          trayLetter,
+          dataUrl
+        });
       }
 
       // Restore original state
@@ -1580,7 +1691,7 @@
                   <Button
                     variant="ghost"
                     onclick={handleExportAll}
-                    disabled={generating || exportingStl || getAllBoxes().length === 0}
+                    disabled={generating || exportingStl || (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
                     isLoading={exportingStl}
                     style="width: 100%; justify-content: flex-start;"
                   >
@@ -1589,7 +1700,7 @@
                   <Button
                     variant="ghost"
                     onclick={handleExportPdf}
-                    disabled={getAllBoxes().length === 0 || exportingPdf}
+                    disabled={(getAllBoxes().length === 0 && getAllLooseTrays().length === 0) || exportingPdf}
                     isLoading={exportingPdf}
                     style="width: 100%; justify-content: flex-start;"
                   >
@@ -1806,7 +1917,7 @@
                 <Button
                   variant="ghost"
                   onclick={handleExportAll}
-                  disabled={generating || exportingStl || getAllBoxes().length === 0}
+                  disabled={generating || exportingStl || (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
                   isLoading={exportingStl}
                   style="width: 100%; justify-content: flex-start;"
                 >
@@ -1815,7 +1926,7 @@
                 <Button
                   variant="ghost"
                   onclick={handleExport3mf}
-                  disabled={generating || exporting3mf || getAllBoxes().length === 0}
+                  disabled={generating || exporting3mf || (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
                   isLoading={exporting3mf}
                   style="width: 100%; justify-content: flex-start;"
                 >
@@ -1824,7 +1935,7 @@
                 <Button
                   variant="ghost"
                   onclick={handleExportPdf}
-                  disabled={getAllBoxes().length === 0 || exportingPdf}
+                  disabled={(getAllBoxes().length === 0 && getAllLooseTrays().length === 0) || exportingPdf}
                   isLoading={exportingPdf}
                   style="width: 100%; justify-content: flex-start;"
                 >
