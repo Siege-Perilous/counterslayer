@@ -144,13 +144,6 @@ export function createBoxWithLidGrooves(
       ? Math.max(targetExteriorHeight - lidThickness, naturalHeight)
       : naturalHeight;
 
-  console.log(`[createBoxWithLidGrooves "${box.name}"]`);
-  console.log(`  targetExteriorHeight: ${targetExteriorHeight}`);
-  console.log(`  lidHeight: ${lidHeight}`);
-  console.log(`  naturalHeight: ${naturalHeight}`);
-  console.log(`  => extHeight (box body): ${extHeight}`);
-  console.log(`  => interior height: ${extHeight - floor}`);
-
   // Calculate gaps for fill logic
   const widthGap = extWidth - minimums.minWidth; // Extra space at east (high X)
   const depthGap = extDepth - minimums.minDepth; // Extra space at north (high Y)

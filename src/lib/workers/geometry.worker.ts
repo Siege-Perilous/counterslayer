@@ -516,35 +516,10 @@ function handleGenerate(msg: GenerateMessage): void {
     // Pre-calculate unified layer heights for all layers FIRST
     // All items in a layer should have the same total exterior height for proper stacking
     const layerHeights = new Map<string, number>();
-    console.log('\n========== LAYER HEIGHT DEBUG ==========');
     for (const layer of project.layers) {
-      console.log(`\n--- Layer: "${layer.name}" ---`);
-
-      // Show individual box heights
-      const boxHeightDetails = layer.boxes.map((b) => {
-        const dims = getBoxExteriorDimensions(b, cardSizes, counterShapes);
-        return `  Box "${b.name}": exterior=${dims.height.toFixed(1)}mm (wall=${b.wallThickness}, floor=${b.floorThickness})`;
-      });
-      if (boxHeightDetails.length > 0) {
-        console.log('Boxes:');
-        boxHeightDetails.forEach((d) => console.log(d));
-      }
-
-      // Show individual loose tray heights
-      const looseTrayDetails = layer.looseTrays.map((lt) => {
-        const dims = getTrayDimensionsForTray(lt, cardSizes, counterShapes);
-        return `  Loose tray "${lt.name}": content=${dims.height.toFixed(1)}mm`;
-      });
-      if (looseTrayDetails.length > 0) {
-        console.log('Loose trays:');
-        looseTrayDetails.forEach((d) => console.log(d));
-      }
-
       const layerHeight = calculateUnifiedLayerHeight(layer, cardSizes, counterShapes);
       layerHeights.set(layer.id, layerHeight);
-      console.log(`=> UNIFIED LAYER HEIGHT: ${layerHeight.toFixed(1)}mm`);
     }
-    console.log('\n========================================\n');
 
     // Helper to find which layer contains a box
     function findLayerForBox(boxId: string): Layer | undefined {
@@ -582,11 +557,6 @@ function handleGenerate(msg: GenerateMessage): void {
       // Calculate the required tray height to match the layer height
       const requiredTrayHeight = getRequiredTrayHeightForBox(box, selectedLayerHeight);
 
-      console.log(`[Selected Box "${box.name}"]`);
-      console.log(`  Layer: ${selectedBoxLayer?.name ?? 'unknown'}`);
-      console.log(`  Layer height: ${selectedLayerHeight.toFixed(1)}mm`);
-      console.log(`  Required tray height: ${requiredTrayHeight.toFixed(1)}mm`);
-
       // Generate all trays with their placements for selected box
       const placements = arrangeTrays(box.trays, {
         customBoxWidth: box.customWidth,
@@ -601,9 +571,6 @@ function handleGenerate(msg: GenerateMessage): void {
       // Use the layer-adjusted tray height instead of natural height
       const naturalMaxHeight = Math.max(...placements.map((p) => p.dimensions.height));
       const maxHeight = selectedLayerHeight > 0 ? requiredTrayHeight : naturalMaxHeight;
-
-      console.log(`  Natural tray height: ${naturalMaxHeight.toFixed(1)}mm`);
-      console.log(`  Using tray height: ${maxHeight.toFixed(1)}mm`);
 
       // Find spacer for selected tray
       const selectedSpacer = spacerInfo.find((s) => s.trayId === tray.id);
@@ -660,12 +627,6 @@ function handleGenerate(msg: GenerateMessage): void {
       const maxHeight = looseTrayLayerHeight > 0 ? looseTrayLayerHeight : naturalHeight;
       const spacerHeight = 0; // No spacer for loose trays
 
-      console.log(`[Selected Loose Tray "${tray.name}"]`);
-      console.log(`  Layer: ${looseTrayLayer?.name ?? 'unknown'}`);
-      console.log(`  Layer height: ${looseTrayLayerHeight.toFixed(1)}mm`);
-      console.log(`  Natural height: ${naturalHeight.toFixed(1)}mm`);
-      console.log(`  Using height: ${maxHeight.toFixed(1)}mm`);
-
       // Generate standalone tray
       cachedSelectedTray = createTrayGeometry(tray, cardSizes, counterShapes, maxHeight, spacerHeight);
       selectedTrayGeometry = jscadToArrays(cachedSelectedTray);
@@ -718,16 +679,6 @@ function handleGenerate(msg: GenerateMessage): void {
       // Get natural box dimensions for comparison
       const naturalDims = getBoxExteriorDimensions(projectBox, cardSizes, counterShapes);
       const lidHeight = getLidHeight(projectBox);
-      const expectedBoxBody = layerHeight > 0 ? layerHeight - lidHeight : naturalDims.height - lidHeight;
-
-      console.log(`[Box "${projectBox.name}"]`);
-      console.log(
-        `  Natural exterior: ${naturalDims.height.toFixed(1)}mm (body=${(naturalDims.height - lidHeight).toFixed(1)}, lid=${lidHeight})`
-      );
-      console.log(`  Layer height: ${layerHeight.toFixed(1)}mm`);
-      console.log(`  Target box body: ${expectedBoxBody.toFixed(1)}mm`);
-      console.log(`  Required tray height: ${requiredTrayHeight.toFixed(1)}mm`);
-
       // Generate box and lid - pass target height for box to match layer height
       const boxJscad = createBoxWithLidGrooves(projectBox, cardSizes, counterShapes, layerHeight);
       const boxBufferGeom = boxJscad ? jscadToArrays(boxJscad) : null;
@@ -750,9 +701,6 @@ function handleGenerate(msg: GenerateMessage): void {
       const naturalTrayHeights = boxPlacements.map((p) => p.dimensions.height);
       const maxNaturalTrayHeight = Math.max(...naturalTrayHeights, 0);
       const boxMaxHeight = Math.max(requiredTrayHeight, maxNaturalTrayHeight);
-
-      console.log(`  Natural tray heights: [${naturalTrayHeights.map((h) => h.toFixed(1)).join(', ')}]mm`);
-      console.log(`  => Trays generated at: ${boxMaxHeight.toFixed(1)}mm`);
 
       // Cache JSCAD geometries for this box's trays
       const cachedTraysForBox: { jscadGeom: Geom3; name: string }[] = [];
@@ -805,7 +753,6 @@ function handleGenerate(msg: GenerateMessage): void {
     cachedAllLooseTrays = [];
     const allLooseTrayGeometries: LooseTrayGeometryResult[] = [];
 
-    console.log('\n========== LOOSE TRAY DEBUG ==========');
     for (const layer of project.layers) {
       // Get the unified layer height - loose trays match box exterior height
       const layerHeight = layerHeights.get(layer.id) ?? 0;
@@ -816,11 +763,6 @@ function handleGenerate(msg: GenerateMessage): void {
         // Use layer height for the tray height so loose trays match box exterior height
         const maxHeight = layerHeight > 0 ? layerHeight : trayDims.height;
         const spacerHeight = 0; // No spacer for loose trays
-
-        console.log(`[Loose tray "${looseTray.name}"]`);
-        console.log(`  Natural height: ${trayDims.height.toFixed(1)}mm`);
-        console.log(`  Layer height: ${layerHeight.toFixed(1)}mm`);
-        console.log(`  => Generated at: ${maxHeight.toFixed(1)}mm`);
 
         // Generate tray geometry at the layer height
         const jscadGeom = createTrayGeometry(looseTray, cardSizes, counterShapes, maxHeight, spacerHeight);
@@ -844,7 +786,6 @@ function handleGenerate(msg: GenerateMessage): void {
         });
       }
     }
-    console.log('=======================================\n');
 
     // Collect all transferable arrays (use Set to avoid duplicates when same geometry is referenced multiple times)
     const transferableSet = new Set<ArrayBuffer>();

@@ -268,6 +268,32 @@ Available colors: `red`, `green`, `blue`, `yellow`, `cyan`, `magenta`, `orange`,
 - Z: Height (bottom/top)
 - Origin (0,0,0) is at front-left-bottom corner of box
 
+## App Screenshot & Console Capture
+
+Use Playwright to capture screenshots and console output from the running app:
+
+```bash
+# Ensure dev server is running first (npm run dev)
+npx tsx scripts/capture-screenshot.ts
+```
+
+This script:
+- Opens the app at http://localhost:5175 in a headless browser
+- Captures console logs (filtered for specific debug keywords)
+- Takes screenshots: `mesh-analysis/view-current.png`, `mesh-analysis/view-dimensions.png`
+
+**Use cases:**
+- Debugging layout issues that only appear in the live app
+- Capturing console output from geometry calculations
+- Verifying visual state matches expected geometry
+
+To capture different console output, edit the filter in `capture-screenshot.ts`:
+```typescript
+if (text.includes('yourKeyword')) {
+  consoleLogs.push(text);
+}
+```
+
 ## Project Structure
 
 - `src/lib/models/` - Geometry generation (counterTray.ts, box.ts, lid.ts)
@@ -276,6 +302,7 @@ Available colors: `red`, `green`, `blue`, `yellow`, `cyan`, `magenta`, `orange`,
 - `src/lib/utils/geometryWorker.ts` - Worker manager and STL export
 - `scripts/mesh-analyzer.py` - Python mesh analysis
 - `scripts/render-view.py` - Scriptable 3D camera renderer
+- `scripts/capture-screenshot.ts` - Playwright script for app screenshots and console capture
 - `mesh-analysis/` - Generated debug files (gitignored)
 
 ## CSS Naming Convention
