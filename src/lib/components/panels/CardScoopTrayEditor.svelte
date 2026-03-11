@@ -87,6 +87,8 @@
       cardSizes={getCardSizes()}
       trayWidth={dimensions.width}
       trayDepth={dimensions.depth}
+      clearance={tray.params.clearance}
+      wallThickness={tray.params.wallThickness}
       onUpdateLayout={handleLayoutUpdate}
     />
   </section>

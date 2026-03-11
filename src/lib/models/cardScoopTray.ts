@@ -1,10 +1,17 @@
-import type { CellId, CardScoopLayout, CardScoopLayoutNode } from '$lib/types/cardScoopLayout';
-import { generateCellId, isCellLeaf, isCellSplit, getAllCellIds } from '$lib/types/cardScoopLayout';
+import type { CellId, CardScoopLayout, LegacyCardScoopLayout } from '$lib/types/cardScoopLayout';
+import {
+  generateCellId,
+  getAllCellIds,
+  getGridDimensions,
+  createDefaultCardScoopLayout,
+  ensureGridLayout,
+  isLegacyLayout
+} from '$lib/types/cardScoopLayout';
 import type { CardSize } from '$lib/types/project';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
-const { cuboid, roundedCuboid, cylinder } = jscad.primitives;
+const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
 const { translate, mirrorY, scale } = jscad.transforms;
 const { vectorText } = jscad.text;
@@ -15,7 +22,7 @@ const { extrudeLinear } = jscad.extrusions;
 // Card scoop stack definition - links a cell to a card size and count
 export interface CardScoopStack {
   id: string; // Unique stack ID
-  cellId: CellId; // Links to cell in layout tree
+  cellId: CellId; // Links to cell in layout grid
   cardSizeId: string; // Reference to project.cardSizes[]
   count: number; // Number of cards in stack
   rotation: 0 | 90; // Card rotation in degrees (0 = card length along Y, 90 = card length along X)
@@ -23,7 +30,7 @@ export interface CardScoopStack {
 
 // Card scoop tray parameters
 export interface CardScoopTrayParams {
-  layout: CardScoopLayout; // Split-based grid layout tree
+  layout: CardScoopLayout | LegacyCardScoopLayout; // Grid-based layout (or legacy tree for migration)
   stacks: CardScoopStack[]; // Stack definitions per cell
   trayWidthOverride: number | null; // null = auto from cards
   trayDepthOverride: number | null; // null = auto from cards
@@ -33,16 +40,9 @@ export interface CardScoopTrayParams {
   rimHeight: number; // Height above card stacks
 }
 
-// Default single cell layout
-function createDefaultSingleCellLayout(): CardScoopLayout {
-  return {
-    root: { type: 'cell', id: generateCellId() }
-  };
-}
-
 // Default parameters
 export const defaultCardScoopTrayParams: CardScoopTrayParams = {
-  layout: createDefaultSingleCellLayout(),
+  layout: createDefaultCardScoopLayout(),
   stacks: [],
   trayWidthOverride: null,
   trayDepthOverride: null,
@@ -54,7 +54,7 @@ export const defaultCardScoopTrayParams: CardScoopTrayParams = {
 
 // Create default params with initial stack
 export function createDefaultCardScoopTrayParams(): CardScoopTrayParams {
-  const layout = createDefaultSingleCellLayout();
+  const layout = createDefaultCardScoopLayout();
   const cellIds = getAllCellIds(layout);
   return {
     ...defaultCardScoopTrayParams,
@@ -74,7 +74,9 @@ export function createDefaultCardScoopTrayParams(): CardScoopTrayParams {
 // Computed cell data for positioning
 export interface ComputedCell {
   id: CellId;
-  x: number; // Left edge in mm (relative to tray interior)
+  row: number; // Row index (0-based)
+  col: number; // Column index (0-based)
+  x: number; // Left edge in mm (relative to tray origin)
   y: number; // Front edge in mm
   width: number; // Cell width in mm
   depth: number; // Cell depth in mm
@@ -84,6 +86,8 @@ export interface ComputedCell {
 export interface CardScoopCellPosition {
   id: CellId;
   refNumber: number; // 1-based reference number
+  row: number; // Row index
+  col: number; // Column index
   x: number; // Left edge X position
   y: number; // Front edge Y position
   z: number; // Bottom Z position
@@ -92,59 +96,6 @@ export interface CardScoopCellPosition {
   height: number; // Cell cavity height
   cardSizeName?: string; // Card size name if stack assigned
   count?: number; // Card count if stack assigned
-}
-
-// Compute cell positions from layout tree (fixed 0.5 ratio)
-export function computeCellPositions(
-  layout: CardScoopLayout,
-  trayWidth: number,
-  trayDepth: number,
-  wallThickness: number
-): ComputedCell[] {
-  const cells: ComputedCell[] = [];
-
-  // Interior bounds (inside outer walls)
-  const interiorX = wallThickness;
-  const interiorY = wallThickness;
-  const interiorWidth = trayWidth - 2 * wallThickness;
-  const interiorDepth = trayDepth - 2 * wallThickness;
-
-  function traverseNode(node: CardScoopLayoutNode, x: number, y: number, width: number, depth: number): void {
-    if (isCellLeaf(node)) {
-      cells.push({
-        id: node.id,
-        x,
-        y,
-        width,
-        depth
-      });
-    } else if (isCellSplit(node)) {
-      // Split at fixed 0.5 ratio
-      const ratio = 0.5;
-
-      if (node.direction === 'vertical') {
-        // Left/right split
-        const leftWidth = width * ratio - wallThickness / 2;
-        const rightWidth = width * (1 - ratio) - wallThickness / 2;
-        const rightX = x + leftWidth + wallThickness;
-
-        traverseNode(node.first, x, y, leftWidth, depth);
-        traverseNode(node.second, rightX, y, rightWidth, depth);
-      } else {
-        // Top/bottom split (horizontal)
-        const bottomDepth = depth * ratio - wallThickness / 2;
-        const topDepth = depth * (1 - ratio) - wallThickness / 2;
-        const topY = y + bottomDepth + wallThickness;
-
-        traverseNode(node.first, x, y, width, bottomDepth);
-        traverseNode(node.second, x, topY, width, topDepth);
-      }
-    }
-  }
-
-  traverseNode(layout.root, interiorX, interiorY, interiorWidth, interiorDepth);
-
-  return cells;
 }
 
 // Helper to get card size by ID
@@ -165,35 +116,119 @@ function getEffectiveCardDimensions(
   return { effectiveWidth: cardSize.width, effectiveDepth: cardSize.length };
 }
 
-// Calculate layout factors - how many cells in each direction
-// Returns the maximum number of cells along width and depth based on split structure
-function getLayoutFactors(layout: CardScoopLayout): { widthFactor: number; depthFactor: number } {
-  function traverse(node: CardScoopLayoutNode): { widthFactor: number; depthFactor: number } {
-    if (isCellLeaf(node)) {
-      return { widthFactor: 1, depthFactor: 1 };
-    }
-    if (isCellSplit(node)) {
-      const first = traverse(node.first);
-      const second = traverse(node.second);
+// Grid size info
+export interface GridSizeInfo {
+  columnWidths: number[]; // Width of each column (mm)
+  rowDepths: number[]; // Depth of each row (mm)
+  totalWidth: number; // Total interior width (mm)
+  totalDepth: number; // Total interior depth (mm)
+}
 
-      if (node.direction === 'vertical') {
-        // Vertical split = cells side by side (adds to width)
-        return {
-          widthFactor: first.widthFactor + second.widthFactor,
-          depthFactor: Math.max(first.depthFactor, second.depthFactor)
-        };
-      } else {
-        // Horizontal split = cells stacked front to back (adds to depth)
-        return {
-          widthFactor: Math.max(first.widthFactor, second.widthFactor),
-          depthFactor: first.depthFactor + second.depthFactor
-        };
+// Calculate grid dimensions based on actual card sizes in each cell
+// Each column width = max(effective width of all cards in that column) + clearance*2
+// Each row depth = max(effective depth of all cards in that row) + clearance*2
+export function computeGridSizes(
+  layout: CardScoopLayout | LegacyCardScoopLayout,
+  stacks: CardScoopStack[],
+  cardSizes: CardSize[],
+  clearance: number,
+  wallThickness: number
+): GridSizeInfo {
+  // Ensure we have a grid layout
+  const gridLayout = ensureGridLayout(layout);
+  const { numRows, numCols } = getGridDimensions(gridLayout);
+
+  // Default card dimensions if no stack or card size found
+  const defaultCardWidth = 63.5;
+  const defaultCardLength = 88.9;
+
+  // Initialize arrays to track max dimensions per column/row
+  const columnWidths: number[] = new Array(numCols).fill(0);
+  const rowDepths: number[] = new Array(numRows).fill(0);
+
+  // Iterate through all cells to find max dimensions
+  for (let row = 0; row < numRows; row++) {
+    for (let col = 0; col < numCols; col++) {
+      const cellId = gridLayout.cells[row][col];
+      const stack = stacks.find((s) => s.cellId === cellId);
+
+      let effectiveWidth = defaultCardWidth;
+      let effectiveDepth = defaultCardLength;
+
+      if (stack) {
+        const cardSize = getCardSize(cardSizes, stack.cardSizeId);
+        if (cardSize) {
+          const dims = getEffectiveCardDimensions(cardSize, stack.rotation ?? 0);
+          effectiveWidth = dims.effectiveWidth;
+          effectiveDepth = dims.effectiveDepth;
+        }
       }
+
+      // Cell size = card dimensions + clearance on each side
+      const cellWidth = effectiveWidth + clearance * 2;
+      const cellDepth = effectiveDepth + clearance * 2;
+
+      // Update max for this column/row
+      columnWidths[col] = Math.max(columnWidths[col], cellWidth);
+      rowDepths[row] = Math.max(rowDepths[row], cellDepth);
     }
-    return { widthFactor: 1, depthFactor: 1 };
   }
 
-  return traverse(layout.root);
+  // Calculate totals (including walls between cells)
+  const totalWidth =
+    columnWidths.reduce((sum, w) => sum + w, 0) + (numCols > 1 ? (numCols - 1) * wallThickness : 0);
+  const totalDepth = rowDepths.reduce((sum, d) => sum + d, 0) + (numRows > 1 ? (numRows - 1) * wallThickness : 0);
+
+  return {
+    columnWidths,
+    rowDepths,
+    totalWidth,
+    totalDepth
+  };
+}
+
+// Compute cell positions from grid layout
+export function computeCellPositions(
+  layout: CardScoopLayout | LegacyCardScoopLayout,
+  stacks: CardScoopStack[],
+  cardSizes: CardSize[],
+  wallThickness: number,
+  clearance: number
+): ComputedCell[] {
+  const cells: ComputedCell[] = [];
+  // Ensure we have a grid layout
+  const gridLayout = ensureGridLayout(layout);
+  const { numRows, numCols } = getGridDimensions(gridLayout);
+  const gridSizes = computeGridSizes(gridLayout, stacks, cardSizes, clearance, wallThickness);
+
+  // Calculate cumulative positions for each column and row
+  const columnX: number[] = [wallThickness]; // Start after outer wall
+  for (let col = 1; col < numCols; col++) {
+    columnX[col] = columnX[col - 1] + gridSizes.columnWidths[col - 1] + wallThickness;
+  }
+
+  const rowY: number[] = [wallThickness]; // Start after outer wall
+  for (let row = 1; row < numRows; row++) {
+    rowY[row] = rowY[row - 1] + gridSizes.rowDepths[row - 1] + wallThickness;
+  }
+
+  // Create computed cells
+  for (let row = 0; row < numRows; row++) {
+    for (let col = 0; col < numCols; col++) {
+      const cellId = gridLayout.cells[row][col];
+      cells.push({
+        id: cellId,
+        row,
+        col,
+        x: columnX[col],
+        y: rowY[row],
+        width: gridSizes.columnWidths[col],
+        depth: gridSizes.rowDepths[row]
+      });
+    }
+  }
+
+  return cells;
 }
 
 // Calculate tray dimensions from parameters and card sizes
@@ -205,41 +240,27 @@ export function getCardScoopTrayDimensions(
   depth: number;
   height: number;
 } {
-  const { layout, stacks, wallThickness, floorThickness, clearance, rimHeight, trayWidthOverride, trayDepthOverride } =
-    params;
+  const { stacks, wallThickness, floorThickness, clearance, rimHeight, trayWidthOverride, trayDepthOverride } = params;
 
-  // Get layout factors to know how many cells in each direction
-  const { widthFactor, depthFactor } = getLayoutFactors(layout);
+  // Ensure we have a grid layout
+  const layout = ensureGridLayout(params.layout);
 
-  // Calculate auto dimensions from cards (accounting for rotation)
-  let maxEffectiveWidth = 0;
-  let maxEffectiveDepth = 0;
+  // Compute grid sizes based on card dimensions
+  const gridSizes = computeGridSizes(layout, stacks, cardSizes, clearance, wallThickness);
+
+  // Auto dimensions: interior (computed from cards) + outer walls
+  const autoWidth = gridSizes.totalWidth + 2 * wallThickness;
+  const autoDepth = gridSizes.totalDepth + 2 * wallThickness;
+
+  // Calculate max stack height
   let maxStackHeight = 0;
-
   for (const stack of stacks) {
     const cardSize = getCardSize(cardSizes, stack.cardSizeId);
     if (cardSize) {
-      const { effectiveWidth, effectiveDepth } = getEffectiveCardDimensions(cardSize, stack.rotation ?? 0);
-      maxEffectiveWidth = Math.max(maxEffectiveWidth, effectiveWidth);
-      maxEffectiveDepth = Math.max(maxEffectiveDepth, effectiveDepth);
-      // Stack height = count * thickness (cards lying flat)
       const stackHeight = stack.count * cardSize.thickness;
       maxStackHeight = Math.max(maxStackHeight, stackHeight);
     }
   }
-
-  // Default minimum dimensions if no stacks
-  if (maxEffectiveWidth === 0) maxEffectiveWidth = 63.5; // Standard card width
-  if (maxEffectiveDepth === 0) maxEffectiveDepth = 88.9; // Standard card length
-
-  // Auto width: (card width + clearance) * number of cells wide + walls between + outer walls
-  // For N cells wide: N * (cardWidth + clearance*2) + (N-1) * wallThickness + 2 * wallThickness
-  const cellWidth = maxEffectiveWidth + clearance * 2;
-  const autoWidth = widthFactor * cellWidth + (widthFactor - 1) * wallThickness + 2 * wallThickness;
-
-  // Auto depth: (card length + clearance) * number of cells deep + walls between + outer walls
-  const cellDepth = maxEffectiveDepth + clearance * 2;
-  const autoDepth = depthFactor * cellDepth + (depthFactor - 1) * wallThickness + 2 * wallThickness;
 
   // Height: floor + tallest stack + rim (cards lying flat, so height = count * thickness)
   const height = floorThickness + maxStackHeight + rimHeight;
@@ -262,9 +283,12 @@ export function getCardScoopCellPositions(
   const spacerOffset = floorSpacerHeight ?? 0;
   const trayHeight = targetHeight && targetHeight > dims.height ? targetHeight : dims.height;
 
-  const computedCells = computeCellPositions(params.layout, dims.width, dims.depth, params.wallThickness);
+  // Ensure we have a grid layout
+  const layout = ensureGridLayout(params.layout);
 
-  const cellIds = getAllCellIds(params.layout);
+  const computedCells = computeCellPositions(layout, params.stacks, cardSizes, params.wallThickness, params.clearance);
+
+  const cellIds = getAllCellIds(layout);
 
   return computedCells.map((cell) => {
     const refNumber = cellIds.indexOf(cell.id) + 1;
@@ -280,6 +304,8 @@ export function getCardScoopCellPositions(
     return {
       id: cell.id,
       refNumber,
+      row: cell.row,
+      col: cell.col,
       x: cell.x,
       y: cell.y,
       z: params.floorThickness + spacerOffset,
@@ -304,6 +330,9 @@ export function createCardScoopTray(
   const { wallThickness, floorThickness, clearance } = params;
   const nameLabel = trayName ? `Tray "${trayName}"` : 'Tray';
 
+  // Ensure we have a grid layout
+  const layout = ensureGridLayout(params.layout);
+
   const dims = getCardScoopTrayDimensions(params, cardSizes);
   const spacerHeight = floorSpacerHeight ?? 0;
   const trayHeight = (targetHeight && targetHeight > dims.height ? targetHeight : dims.height) + spacerHeight;
@@ -323,7 +352,7 @@ export function createCardScoopTray(
   });
 
   // Get computed cell positions
-  const computedCells = computeCellPositions(params.layout, trayWidth, trayDepth, wallThickness);
+  const computedCells = computeCellPositions(layout, params.stacks, cardSizes, wallThickness, clearance);
 
   // Create cell cavities and finger holes
   const cellCuts: Geom3[] = [];
@@ -357,15 +386,11 @@ export function createCardScoopTray(
     const centerX = cell.x + cell.width / 2;
     const centerY = cell.y + cell.depth / 2;
 
-    // Simple rounded cutout for the cell
-    const cornerRadius = Math.min(2, cavityWidth / 4, cavityDepth / 4);
-
+    // Hard-edged cutout for cards (no rounded corners)
     const cellCavity = translate(
       [centerX, centerY, cellFloorZ + cavityHeight / 2],
-      roundedCuboid({
+      cuboid({
         size: [cavityWidth, cavityDepth, cavityHeight],
-        roundRadius: cornerRadius,
-        segments: 16,
         center: [0, 0, 0]
       })
     );
@@ -464,10 +489,12 @@ export function createCardScoopTray(
 // Sync stacks with layout - remove stacks for deleted cells, add stacks for new cells
 export function syncStacksWithLayout(
   stacks: CardScoopStack[],
-  layout: CardScoopLayout,
+  layout: CardScoopLayout | LegacyCardScoopLayout,
   defaultCardSizeId?: string
 ): CardScoopStack[] {
-  const validCellIds = getAllCellIds(layout);
+  // Ensure we have a grid layout for getting cell IDs
+  const gridLayout = ensureGridLayout(layout);
+  const validCellIds = getAllCellIds(gridLayout);
   const validCellIdSet = new Set(validCellIds);
   const existingCellIds = new Set(stacks.map((s) => s.cellId));
 
@@ -490,3 +517,6 @@ export function syncStacksWithLayout(
 
   return [...keptStacks, ...newStacks];
 }
+
+// Re-export for convenience
+export { ensureGridLayout, isLegacyLayout };

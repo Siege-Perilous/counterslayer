@@ -1,29 +1,42 @@
 <script lang="ts">
   import { IconButton, Icon, Spacer } from '@tableslayer/ui';
-  import { IconLayoutAlignCenter, IconLayoutAlignMiddle, IconX } from '@tabler/icons-svelte';
-  import type { CardScoopLayout, CellId } from '$lib/types/cardScoopLayout';
-  import { splitCell, deleteCell, countCells, getAllCellIds } from '$lib/types/cardScoopLayout';
+  import { IconRowInsertBottom, IconColumnInsertRight, IconX } from '@tabler/icons-svelte';
+  import type { CardScoopLayout, LegacyCardScoopLayout, CellId } from '$lib/types/cardScoopLayout';
+  import {
+    addColumn,
+    addRow,
+    deleteCell,
+    countCells,
+    getAllCellIds,
+    getCellPosition,
+    ensureGridLayout
+  } from '$lib/types/cardScoopLayout';
   import type { CardScoopStack } from '$lib/models/cardScoopTray';
   import type { CardSize } from '$lib/types/project';
   import CardScoopLayoutPreview from './CardScoopLayoutPreview.svelte';
 
   interface Props {
-    layout: CardScoopLayout;
+    layout: CardScoopLayout | LegacyCardScoopLayout;
     stacks: CardScoopStack[];
     cardSizes: CardSize[];
     trayWidth: number;
     trayDepth: number;
+    clearance: number;
+    wallThickness: number;
     onUpdateLayout: (layout: CardScoopLayout) => void;
   }
 
-  let { layout, stacks, cardSizes, trayWidth, trayDepth, onUpdateLayout }: Props = $props();
+  let { layout, stacks, cardSizes, trayWidth, trayDepth, clearance, wallThickness, onUpdateLayout }: Props = $props();
+
+  // Ensure we have a grid layout
+  let gridLayout = $derived(ensureGridLayout(layout));
 
   // Selected cell state
   let selectedCellId = $state<CellId | null>(null);
 
   // Ensure selection is valid when layout changes
   $effect(() => {
-    const cellIds = getAllCellIds(layout);
+    const cellIds = getAllCellIds(gridLayout);
     if (selectedCellId && !cellIds.includes(selectedCellId)) {
       // Selected cell no longer exists, select first cell or null
       selectedCellId = cellIds[0] ?? null;
@@ -34,31 +47,32 @@
   });
 
   // Derived state for UI
-  let canDelete = $derived(countCells(layout) > 1 && selectedCellId !== null);
+  let canDelete = $derived(countCells(gridLayout) > 1 && selectedCellId !== null);
+
+  // Get selected cell position for context-aware operations
+  let selectedPosition = $derived(selectedCellId ? getCellPosition(gridLayout, selectedCellId) : null);
 
   function handleSelectCell(id: CellId) {
     selectedCellId = id;
   }
 
-  function handleSplitVertical() {
-    if (!selectedCellId) return;
-    const newLayout = splitCell(layout, selectedCellId, 'vertical');
+  function handleAddColumn() {
+    // Add column after the selected cell's column (or at the end if nothing selected)
+    const colIndex = selectedPosition?.col ?? -1;
+    const newLayout = addColumn(gridLayout, colIndex);
     onUpdateLayout(newLayout);
-    // Selection will be cleared since the cell no longer exists
-    selectedCellId = null;
   }
 
-  function handleSplitHorizontal() {
-    if (!selectedCellId) return;
-    const newLayout = splitCell(layout, selectedCellId, 'horizontal');
+  function handleAddRow() {
+    // Add row after the selected cell's row (or at the end if nothing selected)
+    const rowIndex = selectedPosition?.row ?? -1;
+    const newLayout = addRow(gridLayout, rowIndex);
     onUpdateLayout(newLayout);
-    // Selection will be cleared since the cell no longer exists
-    selectedCellId = null;
   }
 
   function handleDeleteCell() {
     if (!selectedCellId || !canDelete) return;
-    const newLayout = deleteCell(layout, selectedCellId);
+    const newLayout = deleteCell(gridLayout, selectedCellId);
     if (newLayout) {
       onUpdateLayout(newLayout);
       selectedCellId = null;
@@ -68,23 +82,13 @@
 
 <div class="cardScoopLayoutEditor">
   <div class="cardScoopLayoutEditor__toolbar">
-    <span class="cardScoopLayoutEditor__hint">Select cell, then split or delete</span>
+    <span class="cardScoopLayoutEditor__hint">Add rows or columns, delete selected</span>
     <div class="cardScoopLayoutEditor__toolbarButtons">
-      <IconButton
-        variant="ghost"
-        onclick={handleSplitVertical}
-        disabled={!selectedCellId}
-        title="Split selected cell left/right"
-      >
-        <Icon Icon={IconLayoutAlignCenter} size="1.25rem" />
+      <IconButton variant="ghost" onclick={handleAddColumn} title="Add column">
+        <Icon Icon={IconColumnInsertRight} size="1.25rem" />
       </IconButton>
-      <IconButton
-        variant="ghost"
-        onclick={handleSplitHorizontal}
-        disabled={!selectedCellId}
-        title="Split selected cell top/bottom"
-      >
-        <Icon Icon={IconLayoutAlignMiddle} size="1.25rem" />
+      <IconButton variant="ghost" onclick={handleAddRow} title="Add row">
+        <Icon Icon={IconRowInsertBottom} size="1.25rem" />
       </IconButton>
       <IconButton variant="ghost" onclick={handleDeleteCell} disabled={!canDelete} title="Delete selected cell">
         <Icon Icon={IconX} size="1.25rem" />
@@ -95,12 +99,14 @@
   <Spacer size="0.5rem" />
 
   <CardScoopLayoutPreview
-    {layout}
+    layout={gridLayout}
     {stacks}
     {cardSizes}
     {selectedCellId}
     {trayWidth}
     {trayDepth}
+    {clearance}
+    {wallThickness}
     onSelectCell={handleSelectCell}
   />
 </div>
