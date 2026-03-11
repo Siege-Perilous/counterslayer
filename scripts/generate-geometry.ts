@@ -16,12 +16,13 @@ import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import stlSerializer from '@jscad/stl-serializer';
 import { createCardDividerTray } from '../src/lib/models/cardDividerTray.js';
+import { createCardScoopTray } from '../src/lib/models/cardScoopTray.js';
 import { createCardDrawTray } from '../src/lib/models/cardTray.js';
 import { createCounterTray } from '../src/lib/models/counterTray.js';
 import { createCupTray } from '../src/lib/models/cupTray.js';
 import { createBoxWithLidGrooves, createLid } from '../src/lib/models/lid.js';
 import type { Box, Tray } from '../src/lib/types/project.js';
-import { isCardDividerTray, isCardTray, isCounterTray, isCupTray } from '../src/lib/types/project.js';
+import { isCardDividerTray, isCardScoopTray, isCardTray, isCounterTray, isCupTray } from '../src/lib/types/project.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const generalize = (jscad.modifiers as any).generalize as (
@@ -53,23 +54,78 @@ async function main() {
 
   // Support both old (project.boxes) and new (project.layers[].boxes) structure
   let allBoxes: Box[] = [];
+  let allLooseTrays: Tray[] = [];
   if (project.layers) {
     for (const layer of project.layers) {
       allBoxes.push(...(layer.boxes || []));
+      allLooseTrays.push(...(layer.looseTrays || []));
     }
   } else if (project.boxes) {
     allBoxes = project.boxes;
   }
 
-  console.log(`Loaded project with ${allBoxes.length} boxes`);
+  console.log(`Loaded project with ${allBoxes.length} boxes and ${allLooseTrays.length} loose trays`);
+
+  // Check if we should generate a specific loose tray
+  const targetId = process.argv[2];
+  const looseTray = allLooseTrays.find((t: Tray) => t.id === targetId);
+
+  if (looseTray) {
+    // Generate just this loose tray
+    console.log(`\nGenerating loose tray: "${looseTray.name}" (${looseTray.id})`);
+
+    const safeName = looseTray.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `loose_${safeName}.stl`;
+    const maxHeight = 50; // Default height for loose trays
+
+    try {
+      let trayGeom: Geom3 | null = null;
+      if (isCupTray(looseTray)) {
+        trayGeom = createCupTray(looseTray.params, looseTray.name, maxHeight, 0);
+      } else if (isCardScoopTray(looseTray)) {
+        trayGeom = createCardScoopTray(looseTray.params, project.cardSizes, looseTray.name, maxHeight, 0);
+      } else if (isCardTray(looseTray)) {
+        trayGeom = createCardDrawTray(looseTray.params, project.cardSizes, looseTray.name, maxHeight, 0);
+      } else if (isCardDividerTray(looseTray)) {
+        trayGeom = createCardDividerTray(looseTray.params, project.cardSizes, looseTray.name, maxHeight, 0);
+      } else if (isCounterTray(looseTray)) {
+        trayGeom = createCounterTray(looseTray.params, project.counterShapes, looseTray.name, maxHeight, 0);
+      }
+
+      if (trayGeom) {
+        const cleanedGeom = cleanGeometryForExport(trayGeom);
+        const trayStl = stlSerializer.serialize({ binary: true }, cleanedGeom);
+        const trayPath = join(MESH_ANALYSIS_DIR, filename);
+        writeFileSync(trayPath, Buffer.concat(trayStl.map((b: BlobPart) => Buffer.from(b as ArrayBuffer))));
+        console.log(`  Written: ${filename}`);
+      }
+    } catch (e) {
+      console.error(`  Error generating loose tray:`, e);
+    }
+
+    // Run mesh analyzer and exit
+    console.log('\nRunning mesh analyzer...');
+    try {
+      const result = execSync('source scripts/.venv/bin/activate && python scripts/mesh-analyzer.py', {
+        cwd: join(MESH_ANALYSIS_DIR, '..'),
+        encoding: 'utf-8',
+        shell: '/bin/bash'
+      });
+      console.log(result);
+    } catch (e) {
+      console.error('Error running mesh analyzer:', e instanceof Error ? e.message : e);
+    }
+    return;
+  }
 
   // Get box ID from command line or use first box
-  const boxId = process.argv[2] || allBoxes[0]?.id;
+  const boxId = targetId || allBoxes[0]?.id;
   const box: Box | undefined = allBoxes.find((b: Box) => b.id === boxId);
 
   if (!box) {
-    console.error(`Error: Box with ID "${boxId}" not found`);
+    console.error(`Error: Box or tray with ID "${boxId}" not found`);
     console.error('Available boxes:', allBoxes.map((b: Box) => `${b.id} (${b.name})`).join(', '));
+    console.error('Available loose trays:', allLooseTrays.map((t: Tray) => `${t.id} (${t.name})`).join(', '));
     process.exit(1);
   }
 
@@ -130,6 +186,8 @@ async function main() {
       let trayGeom: Geom3 | null = null;
       if (isCupTray(tray)) {
         trayGeom = createCupTray(tray.params, tray.name, maxHeight, 0);
+      } else if (isCardScoopTray(tray)) {
+        trayGeom = createCardScoopTray(tray.params, project.cardSizes, tray.name, maxHeight, 0);
       } else if (isCardTray(tray)) {
         trayGeom = createCardDrawTray(tray.params, project.cardSizes, tray.name, maxHeight, 0);
       } else if (isCardDividerTray(tray)) {

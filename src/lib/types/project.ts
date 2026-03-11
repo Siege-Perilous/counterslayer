@@ -1,4 +1,5 @@
 import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
+import type { CardScoopTrayParams } from '$lib/models/cardScoopTray';
 import type { CardDrawTrayParams } from '$lib/models/cardTray';
 import type { CounterTrayParams } from '$lib/models/counterTray';
 import type { CupTrayParams } from '$lib/models/cupTray';
@@ -61,11 +62,17 @@ export interface CupTray extends BaseTray {
   params: CupTrayParams;
 }
 
+// Card scoop tray for flat-laid cards in a grid of cutouts
+export interface CardScoopTray extends BaseTray {
+  type: 'cardScoop';
+  params: CardScoopTrayParams;
+}
+
 // Legacy alias for backwards compatibility
 export type CardTray = CardDrawTray;
 
 // Discriminated union of all tray types
-export type Tray = CounterTray | CardDrawTray | CardDividerTray | CupTray;
+export type Tray = CounterTray | CardDrawTray | CardDividerTray | CupTray | CardScoopTray;
 
 // Type guards for tray types
 export function isCounterTray(tray: Tray): tray is CounterTray {
@@ -82,6 +89,10 @@ export function isCardDividerTray(tray: Tray): tray is CardDividerTray {
 
 export function isCupTray(tray: Tray): tray is CupTray {
   return tray.type === 'cup';
+}
+
+export function isCardScoopTray(tray: Tray): tray is CardScoopTray {
+  return tray.type === 'cardScoop';
 }
 
 // Legacy alias - also matches old 'card' type for migration

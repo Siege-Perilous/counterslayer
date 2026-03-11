@@ -12,6 +12,7 @@ import {
   type TrayPlacement
 } from '$lib/models/box';
 import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
+import { createCardScoopTray } from '$lib/models/cardScoopTray';
 import { createCardDrawTray, getCardDrawPositions } from '$lib/models/cardTray';
 import {
   createCounterTray,
@@ -22,7 +23,7 @@ import {
 import { createCupTray } from '$lib/models/cupTray';
 import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
 import type { Box, CardSize, CounterShape, Layer, Tray } from '$lib/types/project';
-import { isCardDividerTray, isCardTray, isCupTray } from '$lib/types/project';
+import { isCardDividerTray, isCardScoopTray, isCardTray, isCupTray } from '$lib/types/project';
 import threemfSerializer from '@jscad/3mf-serializer';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -302,6 +303,9 @@ function createTrayGeometry(
   if (isCupTray(tray)) {
     return createCupTray(tray.params, tray.name, maxHeight, spacerHeight, showEmboss);
   }
+  if (isCardScoopTray(tray)) {
+    return createCardScoopTray(tray.params, cardSizes, tray.name, maxHeight, spacerHeight, showEmboss);
+  }
   if (isCardDividerTray(tray)) {
     const showStackLabels = tray.showStackLabels ?? true;
     return createCardDividerTray(
@@ -333,6 +337,10 @@ function getTrayPositions(
 ): CounterStack[] {
   if (isCupTray(tray)) {
     // Cup trays don't have counter previews - the cups themselves are the containers
+    return [];
+  }
+  if (isCardScoopTray(tray)) {
+    // Card scoop trays don't have counter previews - the card cutouts are the containers
     return [];
   }
   if (isCardDividerTray(tray)) {

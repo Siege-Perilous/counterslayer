@@ -13,12 +13,14 @@
     updateTrayParams,
     updateCardTrayParams,
     updateCardDividerTrayParams,
+    updateCardScoopTrayParams,
     updateCupTrayParams,
     updateLayer,
     getTrayLetterById,
     isCounterTray,
     isCardTray,
     isCardDividerTray,
+    isCardScoopTray,
     isCupTray,
     getGlobalSettings,
     updateGlobalSettings,
@@ -29,8 +31,10 @@
   import type { CounterTrayParams } from '$lib/models/counterTray';
   import type { CardDrawTrayParams } from '$lib/models/cardTray';
   import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
+  import type { CardScoopTrayParams } from '$lib/models/cardScoopTray';
   import type { CupTrayParams } from '$lib/models/cupTray';
   import { countCups } from '$lib/types/cupLayout';
+  import { countCells } from '$lib/types/cardScoopLayout';
   import { layoutEditorState } from '$lib/stores/layoutEditor.svelte';
   import { getTrayDimensionsForTray } from '$lib/models/box';
   import { getBoxDimensions, calculateLayerHeight } from '$lib/models/layer';
@@ -118,6 +122,12 @@
     }
   }
 
+  function handleCardScoopParamsChange(newParams: CardScoopTrayParams) {
+    if (selectedTray && isCardScoopTray(selectedTray)) {
+      updateCardScoopTrayParams(selectedTray.id, newParams);
+    }
+  }
+
   // Get tray stats for display
   function getTrayStats(tray: Tray): {
     stacks: number;
@@ -135,6 +145,10 @@
       stacks = countCups(tray.params.layout);
       counters = stacks;
       isCups = true;
+    } else if (isCardScoopTray(tray)) {
+      stacks = countCells(tray.params.layout);
+      counters = tray.params.stacks.reduce((sum, s) => sum + s.count, 0);
+      isCards = true;
     } else if (isCardDividerTray(tray)) {
       stacks = tray.params.stacks.length;
       counters = tray.params.stacks.reduce((sum, s) => sum + s.count, 0);
@@ -319,6 +333,7 @@
             onUpdateCounterParams={handleCounterParamsChange}
             onUpdateCardParams={handleCardParamsChange}
             onUpdateCardDividerParams={handleCardDividerParamsChange}
+            onUpdateCardScoopParams={handleCardScoopParamsChange}
             onUpdateCupParams={handleCupParamsChange}
             hideList={true}
           />

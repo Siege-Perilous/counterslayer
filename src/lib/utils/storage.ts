@@ -391,6 +391,14 @@ function migrateTray(
     } as Tray;
   }
 
+  if (trayType === 'cardScoop') {
+    // Card scoop tray - no migration needed, just ensure color is set
+    return {
+      ...tray,
+      color
+    } as Tray;
+  }
+
   // Counter tray (either explicit or migrated from old format)
   return {
     ...tray,
