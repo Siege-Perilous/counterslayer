@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { CellId } from '$lib/types/cardScoopLayout';
+  import type { CellId } from '$lib/types/cardWellLayout';
 
   interface Props {
     id: CellId;
@@ -49,8 +49,8 @@
 </script>
 
 <button
-  class="cardScoopCell"
-  class:cardScoopCell--selected={selected}
+  class="cardWellCell"
+  class:cardWellCell--selected={selected}
   style="left: {x}px; bottom: {y}px; width: {width}px; height: {height}px;"
   onclick={handleClick}
   onkeydown={handleKeydown}
@@ -58,21 +58,21 @@
   aria-pressed={selected}
 >
   <div
-    class="cardScoopCell__cavity"
-    class:cardScoopCell__cavity--selected={selected}
+    class="cardWellCell__cavity"
+    class:cardWellCell__cavity--selected={selected}
     style="left: {cavityOffsetX}px; bottom: {cavityOffsetY}px; width: {cavityWidth}px; height: {cavityHeight}px;"
   >
-    <span class="cardScoopCell__refNumber">{trayLetter}{refNumber}</span>
+    <span class="cardWellCell__refNumber">{trayLetter}{refNumber}</span>
     {#if cardSizeName}
-      <span class="cardScoopCell__cardSize">{cardSizeName}</span>
+      <span class="cardWellCell__cardSize">{cardSizeName}</span>
     {:else}
-      <span class="cardScoopCell__empty">Empty</span>
+      <span class="cardWellCell__empty">Empty</span>
     {/if}
   </div>
 </button>
 
 <style>
-  .cardScoopCell {
+  .cardWellCell {
     position: absolute;
     background: transparent;
     border: none;
@@ -83,7 +83,7 @@
     color: inherit;
   }
 
-  .cardScoopCell__cavity {
+  .cardWellCell__cavity {
     position: absolute;
     background: var(--inputBg);
     border: 1px solid transparent;
@@ -98,15 +98,15 @@
     pointer-events: none;
   }
 
-  .cardScoopCell:hover .cardScoopCell__cavity {
+  .cardWellCell:hover .cardWellCell__cavity {
     border-color: var(--fgPrimary);
   }
 
-  .cardScoopCell__cavity--selected {
+  .cardWellCell__cavity--selected {
     background: var(--contrastMedium);
   }
 
-  .cardScoopCell__refNumber {
+  .cardWellCell__refNumber {
     font-size: 0.875rem;
     font-weight: 600;
     color: var(--fgMuted);
@@ -114,11 +114,11 @@
     pointer-events: none;
   }
 
-  .cardScoopCell__cavity--selected .cardScoopCell__refNumber {
+  .cardWellCell__cavity--selected .cardWellCell__refNumber {
     color: var(--fg);
   }
 
-  .cardScoopCell__cardSize {
+  .cardWellCell__cardSize {
     font-size: 0.6rem;
     color: var(--fgMuted);
     text-transform: uppercase;
@@ -131,7 +131,7 @@
     white-space: nowrap;
   }
 
-  .cardScoopCell__empty {
+  .cardWellCell__empty {
     font-size: 0.6rem;
     color: var(--fgMuted);
     text-transform: uppercase;
@@ -142,8 +142,8 @@
     opacity: 0.6;
   }
 
-  .cardScoopCell__cavity--selected .cardScoopCell__cardSize,
-  .cardScoopCell__cavity--selected .cardScoopCell__empty {
+  .cardWellCell__cavity--selected .cardWellCell__cardSize,
+  .cardWellCell__cavity--selected .cardWellCell__empty {
     color: var(--fg);
   }
 </style>

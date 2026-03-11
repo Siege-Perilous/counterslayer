@@ -391,8 +391,8 @@ function migrateTray(
     } as Tray;
   }
 
-  if (trayType === 'cardScoop') {
-    // Card scoop tray - no migration needed, just ensure color is set
+  if (trayType === 'cardWell') {
+    // Card well tray - no migration needed, just ensure color is set
     return {
       ...tray,
       color

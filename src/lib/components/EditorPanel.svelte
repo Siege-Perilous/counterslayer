@@ -13,14 +13,14 @@
     updateTrayParams,
     updateCardTrayParams,
     updateCardDividerTrayParams,
-    updateCardScoopTrayParams,
+    updateCardWellTrayParams,
     updateCupTrayParams,
     updateLayer,
     getTrayLetterById,
     isCounterTray,
     isCardTray,
     isCardDividerTray,
-    isCardScoopTray,
+    isCardWellTray,
     isCupTray,
     getGlobalSettings,
     updateGlobalSettings,
@@ -31,10 +31,10 @@
   import type { CounterTrayParams } from '$lib/models/counterTray';
   import type { CardDrawTrayParams } from '$lib/models/cardTray';
   import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
-  import type { CardScoopTrayParams } from '$lib/models/cardScoopTray';
+  import type { CardWellTrayParams } from '$lib/models/cardWellTray';
   import type { CupTrayParams } from '$lib/models/cupTray';
   import { countCups } from '$lib/types/cupLayout';
-  import { countCells } from '$lib/types/cardScoopLayout';
+  import { countCells } from '$lib/types/cardWellLayout';
   import { layoutEditorState } from '$lib/stores/layoutEditor.svelte';
   import { getTrayDimensionsForTray } from '$lib/models/box';
   import { getBoxDimensions, calculateLayerHeight } from '$lib/models/layer';
@@ -122,9 +122,9 @@
     }
   }
 
-  function handleCardScoopParamsChange(newParams: CardScoopTrayParams) {
-    if (selectedTray && isCardScoopTray(selectedTray)) {
-      updateCardScoopTrayParams(selectedTray.id, newParams);
+  function handleCardWellParamsChange(newParams: CardWellTrayParams) {
+    if (selectedTray && isCardWellTray(selectedTray)) {
+      updateCardWellTrayParams(selectedTray.id, newParams);
     }
   }
 
@@ -145,7 +145,7 @@
       stacks = countCups(tray.params.layout);
       counters = stacks;
       isCups = true;
-    } else if (isCardScoopTray(tray)) {
+    } else if (isCardWellTray(tray)) {
       stacks = countCells(tray.params.layout);
       counters = tray.params.stacks.reduce((sum, s) => sum + s.count, 0);
       isCards = true;
@@ -333,7 +333,7 @@
             onUpdateCounterParams={handleCounterParamsChange}
             onUpdateCardParams={handleCardParamsChange}
             onUpdateCardDividerParams={handleCardDividerParamsChange}
-            onUpdateCardScoopParams={handleCardScoopParamsChange}
+            onUpdateCardWellParams={handleCardWellParamsChange}
             onUpdateCupParams={handleCupParamsChange}
             hideList={true}
           />

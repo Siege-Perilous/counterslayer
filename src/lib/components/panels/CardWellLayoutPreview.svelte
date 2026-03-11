@@ -1,14 +1,14 @@
 <script lang="ts">
-  import type { CardScoopLayout, LegacyCardScoopLayout, CellId } from '$lib/types/cardScoopLayout';
-  import { getAllCellIds, getLayoutDimensions, ensureColumnLayout } from '$lib/types/cardScoopLayout';
-  import type { CardScoopStack } from '$lib/models/cardScoopTray';
-  import { computeLayoutSizes } from '$lib/models/cardScoopTray';
+  import type { CardWellLayout, CellId } from '$lib/types/cardWellLayout';
+  import { getAllCellIds, getLayoutDimensions } from '$lib/types/cardWellLayout';
+  import type { CardWellStack } from '$lib/models/cardWellTray';
+  import { computeLayoutSizes } from '$lib/models/cardWellTray';
   import type { CardSize } from '$lib/types/project';
-  import CardScoopCell from './CardScoopCell.svelte';
+  import CardWellCell from './CardWellCell.svelte';
 
   interface Props {
-    layout: CardScoopLayout | LegacyCardScoopLayout;
-    stacks: CardScoopStack[];
+    layout: CardWellLayout;
+    stacks: CardWellStack[];
     cardSizes: CardSize[];
     trayLetter: string;
     selectedCellId: CellId | null;
@@ -61,11 +61,8 @@
     cardSizeName?: string;
   }
 
-  // Ensure we have a column layout
-  let columnLayout = $derived(ensureColumnLayout(layout));
-
   // Get all cell IDs in order for ref number calculation
-  let allCellIds = $derived(getAllCellIds(columnLayout));
+  let allCellIds = $derived(getAllCellIds(layout));
 
   // Helper to get card size for a cell
   function getCardSizeForCell(cellId: CellId): CardSize | undefined {
@@ -87,13 +84,13 @@
       return cells;
     }
 
-    const { numColumns } = getLayoutDimensions(columnLayout);
+    const { numColumns } = getLayoutDimensions(layout);
     if (numColumns === 0) {
       return cells;
     }
 
     // Get layout sizes in mm
-    const layoutSizes = computeLayoutSizes(columnLayout, stacks, cardSizes, clearance, wallThickness);
+    const layoutSizes = computeLayoutSizes(layout, stacks, cardSizes, clearance, wallThickness);
 
     // Available pixel space
     const availableWidth = containerWidth - 2 * EDGE_INSET;
@@ -106,8 +103,8 @@
     // Calculate pixel positions for each column
     let currentX = wallThickness; // Start after outer wall (in mm)
 
-    for (let colIndex = 0; colIndex < columnLayout.columns.length; colIndex++) {
-      const column = columnLayout.columns[colIndex];
+    for (let colIndex = 0; colIndex < layout.columns.length; colIndex++) {
+      const column = layout.columns[colIndex];
       const columnInfo = layoutSizes.columns[colIndex];
 
       // Calculate vertical centering offset for this column
@@ -171,13 +168,13 @@
 </script>
 
 <div
-  class="cardScoopLayoutPreview"
+  class="cardWellLayoutPreview"
   style="aspect-ratio: {trayWidth} / {trayDepth}; max-width: {previewMaxWidth}px;"
   bind:clientWidth={containerWidth}
   bind:clientHeight={containerHeight}
 >
   {#each renderedCells as cell (cell.id)}
-    <CardScoopCell
+    <CardWellCell
       id={cell.id}
       {trayLetter}
       refNumber={cell.refNumber}
@@ -195,7 +192,7 @@
 </div>
 
 <style>
-  .cardScoopLayoutPreview {
+  .cardWellLayoutPreview {
     position: relative;
     width: 100%;
     overflow: hidden;

@@ -18,21 +18,21 @@
     isCounterTray,
     isCardTray,
     isCardDividerTray,
-    isCardScoopTray,
+    isCardWellTray,
     isCupTray,
     type CounterTray,
     type CardDrawTray,
     type CardDividerTray,
-    type CardScoopTray,
+    type CardWellTray,
     type CupTray
   } from '$lib/types/project';
   import type { CounterTrayParams } from '$lib/models/counterTray';
   import type { CardDrawTrayParams } from '$lib/models/cardTray';
   import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
-  import type { CardScoopTrayParams } from '$lib/models/cardScoopTray';
+  import type { CardWellTrayParams } from '$lib/models/cardWellTray';
   import type { CupTrayParams } from '$lib/models/cupTray';
   import { countCups } from '$lib/types/cupLayout';
-  import { countCells } from '$lib/types/cardScoopLayout';
+  import { countCells } from '$lib/types/cardWellLayout';
   import { getTrayDimensionsForTray, arrangeTrays } from '$lib/models/box';
   import { calculateLayerHeight } from '$lib/models/layer';
   import {
@@ -48,7 +48,7 @@
   import CounterTrayEditor from './panels/CounterTrayEditor.svelte';
   import CardDrawTrayEditor from './panels/CardDrawTrayEditor.svelte';
   import CardDividerTrayEditor from './panels/CardDividerTrayEditor.svelte';
-  import CardScoopTrayEditor from './panels/CardScoopTrayEditor.svelte';
+  import CardWellTrayEditor from './panels/CardWellTrayEditor.svelte';
   import CupTrayEditor from './panels/CupTrayEditor.svelte';
 
   interface Props {
@@ -61,7 +61,7 @@
     onUpdateCounterParams?: (params: CounterTrayParams) => void;
     onUpdateCardParams?: (params: CardDrawTrayParams) => void;
     onUpdateCardDividerParams?: (params: CardDividerTrayParams) => void;
-    onUpdateCardScoopParams?: (params: CardScoopTrayParams) => void;
+    onUpdateCardWellParams?: (params: CardWellTrayParams) => void;
     onUpdateCupParams?: (params: CupTrayParams) => void;
     hideList?: boolean;
   }
@@ -76,7 +76,7 @@
     onUpdateCounterParams,
     onUpdateCardParams,
     onUpdateCardDividerParams,
-    onUpdateCardScoopParams,
+    onUpdateCardWellParams,
     onUpdateCupParams,
     hideList = false
   }: Props = $props();
@@ -203,7 +203,7 @@
     counters: number;
     isCardTray: boolean;
     isCardDivider: boolean;
-    isCardScoop: boolean;
+    isCardWell: boolean;
     isCupTray: boolean;
   } {
     if (isCupTray(tray)) {
@@ -213,11 +213,11 @@
         counters: cupTotal,
         isCardTray: false,
         isCardDivider: false,
-        isCardScoop: false,
+        isCardWell: false,
         isCupTray: true
       };
     }
-    if (isCardScoopTray(tray)) {
+    if (isCardWellTray(tray)) {
       const cellTotal = countCells(tray.params.layout);
       const totalCards = tray.params.stacks.reduce((sum, s) => sum + s.count, 0);
       return {
@@ -225,7 +225,7 @@
         counters: totalCards,
         isCardTray: false,
         isCardDivider: false,
-        isCardScoop: true,
+        isCardWell: true,
         isCupTray: false
       };
     }
@@ -236,7 +236,7 @@
         counters: totalCards,
         isCardTray: false,
         isCardDivider: true,
-        isCardScoop: false,
+        isCardWell: false,
         isCupTray: false
       };
     }
@@ -246,7 +246,7 @@
         counters: tray.params.cardCount,
         isCardTray: true,
         isCardDivider: false,
-        isCardScoop: false,
+        isCardWell: false,
         isCupTray: false
       };
     }
@@ -258,7 +258,7 @@
       counters: topCount + edgeCount,
       isCardTray: false,
       isCardDivider: false,
-      isCardScoop: false,
+      isCardWell: false,
       isCupTray: false
     };
   }
@@ -303,7 +303,7 @@
               ? stats.counters + ' cards'
               : stats.isCardDivider
                 ? stats.counters + ' cards in ' + stats.stacks + ' stacks'
-                : stats.isCardScoop
+                : stats.isCardWell
                   ? stats.counters + ' cards in ' + stats.stacks + ' cells'
                   : stats.isCupTray
                     ? stats.stacks + ' cups'
@@ -316,7 +316,7 @@
                   ? stats.counters + ' cards'
                   : stats.isCardDivider
                     ? stats.counters + ' cards/' + stats.stacks + 's'
-                    : stats.isCardScoop
+                    : stats.isCardWell
                       ? stats.counters + ' cards/' + stats.stacks + 'c'
                       : stats.isCupTray
                         ? stats.stacks + ' cups'
@@ -437,11 +437,11 @@
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
         />
-      {:else if isCardScoopTray(selectedTray) && onUpdateCardScoopParams}
-        <CardScoopTrayEditor
-          tray={selectedTray as CardScoopTray}
+      {:else if isCardWellTray(selectedTray) && onUpdateCardWellParams}
+        <CardWellTrayEditor
+          tray={selectedTray as CardWellTray}
           {trayLetter}
-          onUpdateParams={onUpdateCardScoopParams}
+          onUpdateParams={onUpdateCardWellParams}
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
         />

@@ -1,6 +1,6 @@
 import defaultProjectJson from '$lib/data/defaultProject.json';
 import { defaultCardDividerTrayParams, type CardDividerTrayParams } from '$lib/models/cardDividerTray';
-import { createDefaultCardScoopTrayParams, type CardScoopTrayParams } from '$lib/models/cardScoopTray';
+import { createDefaultCardWellTrayParams, type CardWellTrayParams } from '$lib/models/cardWellTray';
 import { defaultCardDrawTrayParams, type CardDrawTrayParams } from '$lib/models/cardTray';
 import {
   DEFAULT_CARD_SIZE_IDS,
@@ -15,7 +15,7 @@ import type {
   Box,
   CardDividerTray,
   CardDrawTray,
-  CardScoopTray,
+  CardWellTray,
   CardSize,
   CardTray,
   CounterShape,
@@ -32,7 +32,7 @@ import {
   findTrayLocation,
   isCardDividerTray,
   isCardDrawTray,
-  isCardScoopTray,
+  isCardWellTray,
   isCardTray,
   isCounterTray,
   isCupTray,
@@ -44,7 +44,7 @@ export {
   findTrayLocation,
   isCardDividerTray,
   isCardDrawTray,
-  isCardScoopTray,
+  isCardWellTray,
   isCardTray,
   isCounterTray,
   isCupTray,
@@ -54,7 +54,7 @@ export type {
   Box,
   CardDividerTray,
   CardDrawTray,
-  CardScoopTray,
+  CardWellTray,
   CardSize,
   CardTray,
   CounterShape,
@@ -314,8 +314,8 @@ function createDefaultCupTray(name: string, color: string): CupTray {
   };
 }
 
-function createDefaultCardScoopTray(name: string, color: string, cardSizes?: CardSize[]): CardScoopTray {
-  const params = createDefaultCardScoopTrayParams();
+function createDefaultCardWellTray(name: string, color: string, cardSizes?: CardSize[]): CardWellTray {
+  const params = createDefaultCardWellTrayParams();
   // Use the first available card size for the initial stack
   const cardSizeId = cardSizes?.[0]?.id ?? DEFAULT_CARD_SIZE_IDS.standard;
   if (params.stacks.length > 0) {
@@ -323,7 +323,7 @@ function createDefaultCardScoopTray(name: string, color: string, cardSizes?: Car
   }
   return {
     id: generateId(),
-    type: 'cardScoop',
+    type: 'cardWell',
     name,
     color,
     rotationOverride: 'auto',
@@ -589,8 +589,8 @@ export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
     tray = createDefaultCardDividerTray('Card Divider 1', color, project.cardSizes);
   } else if (trayType === 'cup') {
     tray = createDefaultCupTray('Cup Tray 1', color);
-  } else if (trayType === 'cardScoop') {
-    tray = createDefaultCardScoopTray('Card Scoop 1', color, project.cardSizes);
+  } else if (trayType === 'cardWell') {
+    tray = createDefaultCardWellTray('Card Well 1', color, project.cardSizes);
   } else {
     tray = createDefaultCounterTray('Tray 1', color, project.counterShapes);
     // Inherit global params (including customShapes) from existing counter trays
@@ -689,7 +689,7 @@ function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
 }
 
 // Tray type for addTray function
-export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'cup' | 'cardScoop' | 'card';
+export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'cup' | 'cardWell' | 'card';
 
 // Loose tray operations
 export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): Tray | null {
@@ -708,8 +708,8 @@ export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): 
     tray = createDefaultCardDividerTray(`Loose Divider ${trayNumber}`, color, project.cardSizes);
   } else if (trayType === 'cup') {
     tray = createDefaultCupTray(`Loose Cups ${trayNumber}`, color);
-  } else if (trayType === 'cardScoop') {
-    tray = createDefaultCardScoopTray(`Loose Scoop ${trayNumber}`, color, project.cardSizes);
+  } else if (trayType === 'cardWell') {
+    tray = createDefaultCardWellTray(`Loose Well ${trayNumber}`, color, project.cardSizes);
   } else {
     tray = createDefaultCounterTray(`Loose Tray ${trayNumber}`, color, project.counterShapes);
     // Inherit global params (including customShapes) from existing counter trays
@@ -766,8 +766,8 @@ export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | n
         tray = createDefaultCardDividerTray(`Card Divider ${trayNumber}`, color, project.cardSizes);
       } else if (trayType === 'cup') {
         tray = createDefaultCupTray(`Cup Tray ${trayNumber}`, color);
-      } else if (trayType === 'cardScoop') {
-        tray = createDefaultCardScoopTray(`Card Scoop ${trayNumber}`, color, project.cardSizes);
+      } else if (trayType === 'cardWell') {
+        tray = createDefaultCardWellTray(`Card Well ${trayNumber}`, color, project.cardSizes);
       } else {
         tray = createDefaultCounterTray(`Tray ${trayNumber}`, color, project.counterShapes);
         // Inherit global params (including customShapes) from existing counter trays
@@ -1120,19 +1120,19 @@ export function updateCupTrayParams(trayId: string, params: CupTrayParams): void
   }
 }
 
-// Update card scoop tray params
-export function updateCardScoopTrayParams(trayId: string, params: CardScoopTrayParams): void {
+// Update card well tray params
+export function updateCardWellTrayParams(trayId: string, params: CardWellTrayParams): void {
   for (const layer of project.layers) {
     for (const box of layer.boxes) {
       const tray = box.trays.find((t) => t.id === trayId);
-      if (tray && isCardScoopTray(tray)) {
+      if (tray && isCardWellTray(tray)) {
         tray.params = params;
         autosave();
         return;
       }
     }
     const looseTray = layer.looseTrays.find((t) => t.id === trayId);
-    if (looseTray && isCardScoopTray(looseTray)) {
+    if (looseTray && isCardWellTray(looseTray)) {
       looseTray.params = params;
       autosave();
       return;

@@ -1019,6 +1019,7 @@
     {@const yOffset = layerYOffsets[layerIndex]}
     {@const layerCount = allLayerArrangements.length}
     {@const layerMultiplier = layerCount > 1 ? (layerIndex + 1) / layerCount : 1}
+    {@const baseOffset = horizontalPhase * layerIndex * 40}
     <T.Group position.y={yOffset}>
       <LayerContent
         boxPlacements={arrangement.boxes}
@@ -1042,6 +1043,7 @@
         onTrayDoubleClick={isLayoutEditMode ? undefined : onTrayDoubleClick}
         onBoxDoubleClick={isLayoutEditMode ? undefined : onBoxDoubleClick}
         horizontalExplosion={horizontalPhase * layerMultiplier}
+        layerBaseOffset={baseOffset}
       />
     </T.Group>
   {/each}

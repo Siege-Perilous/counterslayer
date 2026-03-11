@@ -77,6 +77,7 @@
     onTrayDoubleClick?: (trayId: string) => void;
     onBoxDoubleClick?: (boxId: string) => void;
     horizontalExplosion?: number; // 0 = no explosion, 1 = full explosion
+    layerBaseOffset?: number; // Base offset for entire layer (higher layers get pushed out more)
   }
 
   let {
@@ -100,7 +101,8 @@
     onTrayClick,
     onTrayDoubleClick,
     onBoxDoubleClick,
-    horizontalExplosion = 0
+    horizontalExplosion = 0,
+    layerBaseOffset = 0
   }: Props = $props();
 
   // Layer content offset (center on game container)
@@ -134,7 +136,7 @@
     containerDepth: number,
     explosionPhase: number
   ): { offsetX: number; offsetZ: number } {
-    if (explosionPhase <= 0) return { offsetX: 0, offsetZ: 0 };
+    if (explosionPhase <= 0 && layerBaseOffset <= 0) return { offsetX: 0, offsetZ: 0 };
 
     // Calculate item center relative to container center
     const centerX = itemCenterX - containerWidth / 2;
@@ -148,9 +150,17 @@
     const normalizedX = centerX / (containerWidth / 2);
     const normalizedZ = centerZ / (containerDepth / 2);
 
+    // Base offset pushes all items outward from center based on their direction
+    // This ensures higher layers always move farther out regardless of item position
+    const directionX = centerX === 0 ? 0 : centerX > 0 ? 1 : -1;
+    const directionZ = centerZ === 0 ? 0 : centerZ > 0 ? 1 : -1;
+    // If item is exactly at center, push it diagonally outward
+    const baseX = directionX === 0 && directionZ === 0 ? layerBaseOffset * 0.707 : directionX * layerBaseOffset;
+    const baseZ = directionX === 0 && directionZ === 0 ? layerBaseOffset * 0.707 : directionZ * layerBaseOffset;
+
     return {
-      offsetX: normalizedX * explosionDistance,
-      offsetZ: normalizedZ * explosionDistance
+      offsetX: normalizedX * explosionDistance + baseX,
+      offsetZ: normalizedZ * explosionDistance + baseZ
     };
   }
 </script>

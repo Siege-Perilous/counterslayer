@@ -1,20 +1,20 @@
 <script lang="ts">
   import { Input, FormControl, Spacer, Select, IconButton, Icon } from '@tableslayer/ui';
   import { IconRotate2 } from '@tabler/icons-svelte';
-  import type { CardScoopTray } from '$lib/types/project';
+  import type { CardWellTray } from '$lib/types/project';
   import {
-    type CardScoopTrayParams,
-    getCardScoopTrayDimensions,
+    type CardWellTrayParams,
+    getCardWellTrayDimensions,
     syncStacksWithLayout
-  } from '$lib/models/cardScoopTray';
-  import { getAllCellIds, type CardScoopLayout } from '$lib/types/cardScoopLayout';
+  } from '$lib/models/cardWellTray';
+  import { getAllCellIds, type CardWellLayout } from '$lib/types/cardWellLayout';
   import { getCardSizes } from '$lib/stores/project.svelte';
-  import CardScoopLayoutEditor from './CardScoopLayoutEditor.svelte';
+  import CardWellLayoutEditor from './CardWellLayoutEditor.svelte';
 
   interface Props {
-    tray: CardScoopTray;
+    tray: CardWellTray;
     trayLetter: string;
-    onUpdateParams: (params: CardScoopTrayParams) => void;
+    onUpdateParams: (params: CardWellTrayParams) => void;
     actualHeight?: number;
     displayDimensions?: { width: number; depth: number; height: number } | null;
   }
@@ -32,19 +32,19 @@
     if (displayDimensions) {
       return displayDimensions;
     }
-    const baseDims = getCardScoopTrayDimensions(tray.params, getCardSizes());
+    const baseDims = getCardWellTrayDimensions(tray.params, getCardSizes());
     return {
       ...baseDims,
       height: actualHeight && actualHeight > baseDims.height ? actualHeight : baseDims.height
     };
   });
 
-  function updateParam<K extends keyof CardScoopTrayParams>(key: K, value: CardScoopTrayParams[K]) {
+  function updateParam<K extends keyof CardWellTrayParams>(key: K, value: CardWellTrayParams[K]) {
     onUpdateParams({ ...tray.params, [key]: value });
   }
 
   // Layout update handler - syncs stacks when layout changes (adds/removes as needed)
-  function handleLayoutUpdate(layout: CardScoopLayout) {
+  function handleLayoutUpdate(layout: CardWellLayout) {
     const syncedStacks = syncStacksWithLayout(tray.params.stacks, layout, defaultCardSizeId);
     onUpdateParams({ ...tray.params, layout, stacks: syncedStacks });
   }
@@ -84,7 +84,7 @@
 <div class="panelFormSection">
   <section class="section">
     <h3 class="sectionTitle">Layout</h3>
-    <CardScoopLayoutEditor
+    <CardWellLayoutEditor
       layout={tray.params.layout}
       stacks={tray.params.stacks}
       cardSizes={getCardSizes()}

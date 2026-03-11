@@ -148,7 +148,7 @@
     },
     {
       "id": "fnucg1h",
-      "name": "Top layer",
+      "name": "Middle layer",
       "boxes": [],
       "looseTrays": [
         {
@@ -255,6 +255,57 @@
           }
         ]
       }
+    },
+    {
+      "id": "7hvj1k8",
+      "name": "Top layer",
+      "boxes": [],
+      "looseTrays": [
+        {
+          "id": "nrme206",
+          "type": "cardWell",
+          "name": "Card well",
+          "color": "#c9503c",
+          "rotationOverride": "auto",
+          "params": {
+            "layout": {
+              "columns": [
+                ["lalhjbh", "l2mnoqz"],
+                ["3k64by4"]
+              ]
+            },
+            "stacks": [
+              {
+                "id": "cwy3n1d",
+                "cellId": "3k64by4",
+                "cardSizeId": "card-standard",
+                "count": 30,
+                "rotation": 0
+              },
+              {
+                "id": "75stmty",
+                "cellId": "lalhjbh",
+                "cardSizeId": "card-standard",
+                "count": 30,
+                "rotation": 0
+              },
+              {
+                "id": "dhiocl2",
+                "cellId": "l2mnoqz",
+                "cardSizeId": "card-mini-american",
+                "count": 30,
+                "rotation": 90
+              }
+            ],
+            "trayWidthOverride": null,
+            "trayDepthOverride": null,
+            "wallThickness": 2,
+            "floorThickness": 2,
+            "clearance": 1,
+            "rimHeight": 3
+          }
+        }
+      ]
     }
   ],
   "counterShapes": [
@@ -344,9 +395,9 @@
       "thickness": 0.5
     }
   ],
-  "selectedLayerId": "fnucg1h",
+  "selectedLayerId": "7hvj1k8",
   "selectedBoxId": null,
-  "selectedTrayId": "p8turve",
+  "selectedTrayId": "nrme206",
   "globalSettings": {
     "gameContainerWidth": 150,
     "gameContainerDepth": 200

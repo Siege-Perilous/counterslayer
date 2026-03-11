@@ -20,7 +20,7 @@
     getTrayLetterById,
     isCardTray,
     isCardDividerTray,
-    isCardScoopTray,
+    isCardWellTray,
     isCupTray,
     type Box,
     type Layer,
@@ -28,7 +28,7 @@
     type TrayType
   } from '$lib/stores/project.svelte';
   import { countCups } from '$lib/types/cupLayout';
-  import { countCells } from '$lib/types/cardScoopLayout';
+  import { countCells } from '$lib/types/cardWellLayout';
 
   type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
 
@@ -129,7 +129,7 @@
     counters: number;
     isCardTray: boolean;
     isCardDivider: boolean;
-    isCardScoop: boolean;
+    isCardWell: boolean;
     isCupTray: boolean;
   } {
     if (isCupTray(tray)) {
@@ -139,11 +139,11 @@
         counters: cupTotal,
         isCardTray: false,
         isCardDivider: false,
-        isCardScoop: false,
+        isCardWell: false,
         isCupTray: true
       };
     }
-    if (isCardScoopTray(tray)) {
+    if (isCardWellTray(tray)) {
       const cellTotal = countCells(tray.params.layout);
       const totalCards = tray.params.stacks.reduce((sum, s) => sum + s.count, 0);
       return {
@@ -151,7 +151,7 @@
         counters: totalCards,
         isCardTray: false,
         isCardDivider: false,
-        isCardScoop: true,
+        isCardWell: true,
         isCupTray: false
       };
     }
@@ -162,7 +162,7 @@
         counters: totalCards,
         isCardTray: false,
         isCardDivider: true,
-        isCardScoop: false,
+        isCardWell: false,
         isCupTray: false
       };
     }
@@ -172,7 +172,7 @@
         counters: tray.params.cardCount,
         isCardTray: true,
         isCardDivider: false,
-        isCardScoop: false,
+        isCardWell: false,
         isCupTray: false
       };
     }
@@ -183,7 +183,7 @@
       counters: topCount + edgeCount,
       isCardTray: false,
       isCardDivider: false,
-      isCardScoop: false,
+      isCardWell: false,
       isCupTray: false
     };
   }
@@ -304,7 +304,7 @@
                       ? stats.counters + ' cards'
                       : stats.isCardDivider
                         ? stats.counters + ' cards/' + stats.stacks + 's'
-                        : stats.isCardScoop
+                        : stats.isCardWell
                           ? stats.counters + ' cards/' + stats.stacks + 'c'
                           : stats.isCupTray
                             ? stats.stacks + ' cups'
@@ -385,11 +385,11 @@
                     <button
                       class="trayTypeOption"
                       onclick={() => {
-                        handleAddTray(box.id, 'cardScoop');
+                        handleAddTray(box.id, 'cardWell');
                         contentProps.close();
                       }}
                     >
-                      <Text weight={500}>Card scoop</Text>
+                      <Text weight={500}>Card well</Text>
                       <Text size="0.75rem" color="var(--fgMuted)">Grid of flat card cutouts</Text>
                     </button>
                     <button
@@ -421,7 +421,7 @@
                 ? stats.counters + ' cards'
                 : stats.isCardDivider
                   ? stats.counters + ' cards/' + stats.stacks + 's'
-                  : stats.isCardScoop
+                  : stats.isCardWell
                     ? stats.counters + ' cards/' + stats.stacks + 'c'
                     : stats.isCupTray
                       ? stats.stacks + ' cups'
@@ -501,11 +501,11 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddBox(layer.id, 'cardScoop');
+                  handleAddBox(layer.id, 'cardWell');
                   contentProps.close();
                 }}
               >
-                <Text weight={500}>Card scoop</Text>
+                <Text weight={500}>Card well</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Grid of flat card cutouts</Text>
               </button>
               <button
@@ -563,11 +563,11 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddLooseTray(layer.id, 'cardScoop');
+                  handleAddLooseTray(layer.id, 'cardWell');
                   contentProps.close();
                 }}
               >
-                <Text weight={500}>Card scoop</Text>
+                <Text weight={500}>Card well</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Grid of flat card cutouts</Text>
               </button>
               <button
