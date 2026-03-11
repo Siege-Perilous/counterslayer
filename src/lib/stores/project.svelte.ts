@@ -1316,13 +1316,15 @@ export function moveLooseTrayToBox(trayId: string, targetBoxId: string): void {
   autosave();
 }
 
-// Move a tray from a box to loose (in the same or specified layer)
+// Move a tray from a box to loose, or move a loose tray to a different layer
 export function moveTrayToLoose(trayId: string, targetLayerId?: string): void {
   let sourceTray: Tray | null = null;
   let sourceBox: Box | null = null;
   let sourceLayer: Layer | null = null;
   let sourceIndex = -1;
+  let isLooseTray = false;
 
+  // First, check if tray is in a box
   for (const layer of project.layers) {
     for (const box of layer.boxes) {
       const trayIndex = box.trays.findIndex((t) => t.id === trayId);
@@ -1337,14 +1339,35 @@ export function moveTrayToLoose(trayId: string, targetLayerId?: string): void {
     if (sourceTray) break;
   }
 
-  if (!sourceTray || !sourceBox || !sourceLayer) return;
+  // If not found in a box, check loose trays
+  if (!sourceTray) {
+    for (const layer of project.layers) {
+      const looseIndex = layer.looseTrays.findIndex((t) => t.id === trayId);
+      if (looseIndex !== -1) {
+        sourceTray = layer.looseTrays[looseIndex];
+        sourceLayer = layer;
+        sourceIndex = looseIndex;
+        isLooseTray = true;
+        break;
+      }
+    }
+  }
+
+  if (!sourceTray || !sourceLayer) return;
 
   const targetLayer = targetLayerId ? (project.layers.find((l) => l.id === targetLayerId) ?? sourceLayer) : sourceLayer;
 
-  // Remove from source box
-  sourceBox.trays.splice(sourceIndex, 1);
+  // If already loose and moving to same layer, nothing to do
+  if (isLooseTray && targetLayer.id === sourceLayer.id) return;
 
-  // Add to loose trays
+  // Remove from source
+  if (isLooseTray) {
+    sourceLayer.looseTrays.splice(sourceIndex, 1);
+  } else if (sourceBox) {
+    sourceBox.trays.splice(sourceIndex, 1);
+  }
+
+  // Add to target layer's loose trays
   targetLayer.looseTrays.push(sourceTray);
 
   // Update selection

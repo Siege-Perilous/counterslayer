@@ -302,6 +302,10 @@ export function getCardScoopCellPositions(
   const spacerOffset = floorSpacerHeight ?? 0;
   const trayHeight = targetHeight && targetHeight > dims.height ? targetHeight : dims.height;
 
+  // When tray height is increased, floor is raised to keep cards at proper level
+  const heightIncrease = targetHeight && targetHeight > dims.height ? targetHeight - dims.height : 0;
+  const baseFloorZ = params.floorThickness + spacerOffset + heightIncrease;
+
   // Ensure we have a column layout
   const layout = ensureColumnLayout(params.layout);
 
@@ -315,7 +319,7 @@ export function getCardScoopCellPositions(
     const cardSize = stack ? getCardSize(cardSizes, stack.cardSizeId) : undefined;
 
     // Calculate cell cavity height
-    let cavityHeight = trayHeight - params.floorThickness;
+    let cavityHeight = trayHeight - baseFloorZ;
     if (stack && cardSize) {
       cavityHeight = stack.count * cardSize.thickness + params.rimHeight;
     }
@@ -327,7 +331,7 @@ export function getCardScoopCellPositions(
       cellIndex: cell.cellIndex,
       x: cell.x,
       y: cell.y,
-      z: params.floorThickness + spacerOffset,
+      z: baseFloorZ,
       width: cell.width,
       depth: cell.depth,
       height: cavityHeight,
@@ -373,10 +377,25 @@ export function createCardScoopTray(
   // Get computed cell positions
   const computedCells = computeCellPositions(layout, params.stacks, cardSizes, wallThickness, clearance);
 
-  // Create cell cavities and finger holes
+  // Create cell cavities, finger holes, and wall cutouts
   const cellCuts: Geom3[] = [];
   const fingerHoleCuts: Geom3[] = [];
-  const cellFloorZ = floorThickness + spacerHeight;
+  const wallCutouts: Geom3[] = [];
+
+  // When tray height is increased (e.g., to match layer height), raise the floor
+  // so cards remain at the proper level relative to the top of the tray
+  const heightIncrease = targetHeight && targetHeight > dims.height ? targetHeight - dims.height : 0;
+  const baseFloorZ = floorThickness + spacerHeight + heightIncrease;
+
+  // Calculate max stack height to normalize floor levels
+  let maxStackHeight = 0;
+  for (const stack of params.stacks) {
+    const cardSize = getCardSize(cardSizes, stack.cardSizeId);
+    if (cardSize) {
+      const stackHeight = stack.count * cardSize.thickness;
+      maxStackHeight = Math.max(maxStackHeight, stackHeight);
+    }
+  }
 
   // Finger hole sizing
   const fingerHoleRatio = 0.35;
@@ -390,13 +409,19 @@ export function createCardScoopTray(
     // Calculate cavity dimensions
     let cavityWidth = cell.width;
     let cavityDepth = cell.depth;
+    let floorRaise = 0; // How much to raise the floor for shorter stacks
 
     if (stack && cardSize) {
       const { effectiveWidth, effectiveDepth } = getEffectiveCardDimensions(cardSize, stack.rotation ?? 0);
       cavityWidth = Math.min(cell.width, effectiveWidth + clearance * 2);
       cavityDepth = Math.min(cell.depth, effectiveDepth + clearance * 2);
+
+      // Raise floor for shorter stacks so all card tops are at same level
+      const thisStackHeight = stack.count * cardSize.thickness;
+      floorRaise = maxStackHeight - thisStackHeight;
     }
 
+    const cellFloorZ = baseFloorZ + floorRaise;
     const cavityHeight = trayHeight - cellFloorZ + 1;
 
     const centerX = cell.x + cell.width / 2;
@@ -418,16 +443,100 @@ export function createCardScoopTray(
     const fingerHoleRadius = Math.min(fingerHoleMax, smallerDimension * fingerHoleRatio);
 
     if (fingerHoleRadius >= 5) {
+      // Finger hole goes through the floor (including any raised floor section)
+      const fingerHoleHeight = cellFloorZ + 2;
       const fingerHole = translate(
         [centerX, centerY, 0],
         cylinder({
           radius: fingerHoleRadius,
-          height: floorThickness + spacerHeight + 2,
+          height: fingerHoleHeight,
           segments: 32,
-          center: [0, 0, (floorThickness + spacerHeight + 2) / 2 - 1]
+          center: [0, 0, fingerHoleHeight / 2 - 1]
         })
       );
       fingerHoleCuts.push(fingerHole);
+    }
+
+    // Wall cutouts - only on OUTER walls where the CAVITY actually touches the outer wall
+    // The cavity may be smaller than the cell (if cards in same column have different sizes)
+    // Interior walls between cells/columns do NOT get cutouts
+    if (stack && cardSize) {
+      const { effectiveWidth, effectiveDepth } = getEffectiveCardDimensions(cardSize, stack.rotation ?? 0);
+
+      const cutoutHeight = trayHeight - cellFloorZ + 1;
+      const cutoutZ = cellFloorZ + cutoutHeight / 2;
+      const tolerance = 0.01;
+
+      // Calculate cavity position (cavity is centered within cell)
+      const cavityWidthCalc = effectiveWidth + clearance * 2;
+      const cavityDepthCalc = effectiveDepth + clearance * 2;
+      const cavityOffsetX = (cell.width - cavityWidthCalc) / 2;
+      const cavityOffsetY = (cell.depth - cavityDepthCalc) / 2;
+      const cavityLeft = cell.x + cavityOffsetX;
+      const cavityRight = cavityLeft + cavityWidthCalc;
+      const cavityFront = cell.y + cavityOffsetY;
+      const cavityBack = cavityFront + cavityDepthCalc;
+
+      // Check if CAVITY touches each outer wall (not just the cell)
+      const cavityTouchesLeftWall = Math.abs(cavityLeft - wallThickness) < tolerance;
+      const cavityTouchesRightWall = Math.abs(cavityRight + wallThickness - trayWidth) < tolerance;
+      const cavityTouchesFrontWall = Math.abs(cavityFront - wallThickness) < tolerance;
+      const cavityTouchesBackWall = Math.abs(cavityBack + wallThickness - trayDepth) < tolerance;
+
+      const isFirstColumn = cell.colIndex === 0;
+      const isLastColumn = cell.colIndex === layout.columns.length - 1;
+
+      // Left outer wall - only if cavity touches the left wall
+      if (isFirstColumn && cavityTouchesLeftWall) {
+        const cutoutWidth = effectiveDepth / 2; // Half the card depth (Y dimension)
+        const leftCutout = translate(
+          [wallThickness / 2, centerY, cutoutZ],
+          cuboid({
+            size: [wallThickness + 2, cutoutWidth, cutoutHeight],
+            center: [0, 0, 0]
+          })
+        );
+        wallCutouts.push(leftCutout);
+      }
+
+      // Right outer wall - only if cavity touches the right wall
+      if (isLastColumn && cavityTouchesRightWall) {
+        const cutoutWidth = effectiveDepth / 2;
+        const rightCutout = translate(
+          [trayWidth - wallThickness / 2, centerY, cutoutZ],
+          cuboid({
+            size: [wallThickness + 2, cutoutWidth, cutoutHeight],
+            center: [0, 0, 0]
+          })
+        );
+        wallCutouts.push(rightCutout);
+      }
+
+      // Front outer wall - only if cavity touches the front wall
+      if (cavityTouchesFrontWall) {
+        const cutoutWidth = effectiveWidth / 2; // Half the card width (X dimension)
+        const frontCutout = translate(
+          [centerX, wallThickness / 2, cutoutZ],
+          cuboid({
+            size: [cutoutWidth, wallThickness + 2, cutoutHeight],
+            center: [0, 0, 0]
+          })
+        );
+        wallCutouts.push(frontCutout);
+      }
+
+      // Back outer wall - only if cavity touches the back wall
+      if (cavityTouchesBackWall) {
+        const cutoutWidth = effectiveWidth / 2;
+        const backCutout = translate(
+          [centerX, trayDepth - wallThickness / 2, cutoutZ],
+          cuboid({
+            size: [cutoutWidth, wallThickness + 2, cutoutHeight],
+            center: [0, 0, 0]
+          })
+        );
+        wallCutouts.push(backCutout);
+      }
     }
   }
 
@@ -435,6 +544,10 @@ export function createCardScoopTray(
 
   if (fingerHoleCuts.length > 0) {
     result = subtract(result, ...fingerHoleCuts);
+  }
+
+  if (wallCutouts.length > 0) {
+    result = subtract(result, ...wallCutouts);
   }
 
   // Emboss tray name on bottom
