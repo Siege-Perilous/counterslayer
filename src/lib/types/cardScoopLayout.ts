@@ -1,5 +1,5 @@
-// Card scoop layout types - simple grid-based layout system
-// Each cell is sized by its card stack, rows share depth, columns share width
+// Card scoop layout types - column-based layout system
+// Each column can have a different number of cells, centered vertically
 
 export type CellId = string;
 
@@ -8,34 +8,35 @@ export function generateCellId(): CellId {
   return Math.random().toString(36).substring(2, 9);
 }
 
-// Grid-based layout: cells[rowIndex][colIndex]
-// All rows have the same number of columns (regular grid)
+// Column-based layout: columns[colIndex][cellIndex]
+// Each column is a vertical stack of cells, centered within the tray depth
 export interface CardScoopLayout {
-  cells: CellId[][];
+  columns: CellId[][];
 }
 
-// Get grid dimensions
-export function getGridDimensions(layout: CardScoopLayout): { numRows: number; numCols: number } {
-  if (!layout.cells || !Array.isArray(layout.cells)) {
-    return { numRows: 0, numCols: 0 };
+// Get layout dimensions
+export function getLayoutDimensions(layout: CardScoopLayout): { numColumns: number; maxCellsPerColumn: number } {
+  if (!layout.columns || !Array.isArray(layout.columns)) {
+    return { numColumns: 0, maxCellsPerColumn: 0 };
   }
-  const numRows = layout.cells.length;
-  const numCols = numRows > 0 ? layout.cells[0].length : 0;
-  return { numRows, numCols };
+  const numColumns = layout.columns.length;
+  const maxCellsPerColumn = Math.max(0, ...layout.columns.map((col) => col.length));
+  return { numColumns, maxCellsPerColumn };
 }
 
-// Create a default single cell layout (1x1 grid)
+// Create a default single cell layout (1 column with 1 cell)
 export function createDefaultCardScoopLayout(): CardScoopLayout {
   return {
-    cells: [[generateCellId()]]
+    columns: [[generateCellId()]]
   };
 }
 
-// Get all cell IDs in row-major order (top-to-bottom, left-to-right)
+// Get all cell IDs in column-major order (left-to-right, top-to-bottom within each column)
 export function getAllCellIds(layout: CardScoopLayout): CellId[] {
+  if (!layout.columns) return [];
   const ids: CellId[] = [];
-  for (const row of layout.cells) {
-    for (const cellId of row) {
+  for (const column of layout.columns) {
+    for (const cellId of column) {
       ids.push(cellId);
     }
   }
@@ -44,132 +45,124 @@ export function getAllCellIds(layout: CardScoopLayout): CellId[] {
 
 // Count total cells in layout
 export function countCells(layout: CardScoopLayout): number {
-  const { numRows, numCols } = getGridDimensions(layout);
-  return numRows * numCols;
+  if (!layout.columns) return 0;
+  return layout.columns.reduce((sum, col) => sum + col.length, 0);
 }
 
-// Get row and column index for a cell
-export function getCellPosition(layout: CardScoopLayout, cellId: CellId): { row: number; col: number } | null {
-  for (let row = 0; row < layout.cells.length; row++) {
-    for (let col = 0; col < layout.cells[row].length; col++) {
-      if (layout.cells[row][col] === cellId) {
-        return { row, col };
+// Get column and cell index for a cell
+export function getCellPosition(
+  layout: CardScoopLayout,
+  cellId: CellId
+): { colIndex: number; cellIndex: number } | null {
+  if (!layout.columns) return null;
+  for (let colIndex = 0; colIndex < layout.columns.length; colIndex++) {
+    const column = layout.columns[colIndex];
+    for (let cellIndex = 0; cellIndex < column.length; cellIndex++) {
+      if (column[cellIndex] === cellId) {
+        return { colIndex, cellIndex };
       }
     }
   }
   return null;
 }
 
-// Get the reference number for a cell (1-based index in row-major order)
+// Get the reference number for a cell (1-based index in column-major order)
 export function getCellRefNumber(layout: CardScoopLayout, cellId: CellId): number {
   const allIds = getAllCellIds(layout);
   const index = allIds.indexOf(cellId);
   return index >= 0 ? index + 1 : 0;
 }
 
-// Add a column to the right of the specified column index
-// If colIndex is -1, adds to the far right
+// Add a cell to a column (vertically)
+// Adds after the specified cell index, or at the end if -1
+export function addCellToColumn(layout: CardScoopLayout, colIndex: number, afterCellIndex: number = -1): CardScoopLayout {
+  if (!layout.columns || colIndex < 0 || colIndex >= layout.columns.length) {
+    return layout;
+  }
+
+  const column = layout.columns[colIndex];
+  const insertIndex = afterCellIndex < 0 ? column.length : afterCellIndex + 1;
+
+  const newColumn = [...column];
+  newColumn.splice(insertIndex, 0, generateCellId());
+
+  const newColumns = [...layout.columns];
+  newColumns[colIndex] = newColumn;
+
+  return { columns: newColumns };
+}
+
+// Add a new column with a single cell (horizontally)
+// Adds after the specified column index, or at the end if -1
 export function addColumn(layout: CardScoopLayout, afterColIndex: number = -1): CardScoopLayout {
-  const { numCols } = getGridDimensions(layout);
-  const insertIndex = afterColIndex < 0 ? numCols : afterColIndex + 1;
-
-  const newCells = layout.cells.map((row) => {
-    const newRow = [...row];
-    newRow.splice(insertIndex, 0, generateCellId());
-    return newRow;
-  });
-
-  return { cells: newCells };
-}
-
-// Add a row below the specified row index
-// If rowIndex is -1, adds to the bottom
-export function addRow(layout: CardScoopLayout, afterRowIndex: number = -1): CardScoopLayout {
-  const { numRows, numCols } = getGridDimensions(layout);
-  const insertIndex = afterRowIndex < 0 ? numRows : afterRowIndex + 1;
-
-  // Create new row with same number of columns
-  const newRow: CellId[] = [];
-  for (let i = 0; i < numCols; i++) {
-    newRow.push(generateCellId());
+  if (!layout.columns) {
+    return { columns: [[generateCellId()]] };
   }
 
-  const newCells = [...layout.cells];
-  newCells.splice(insertIndex, 0, newRow);
+  const insertIndex = afterColIndex < 0 ? layout.columns.length : afterColIndex + 1;
 
-  return { cells: newCells };
+  const newColumns = [...layout.columns];
+  newColumns.splice(insertIndex, 0, [generateCellId()]);
+
+  return { columns: newColumns };
 }
 
-// Delete a column at the specified index
-// Returns null if this would result in 0 columns
-export function deleteColumn(layout: CardScoopLayout, colIndex: number): CardScoopLayout | null {
-  const { numCols } = getGridDimensions(layout);
-  if (numCols <= 1) {
-    return null; // Can't delete the last column
-  }
-
-  const newCells = layout.cells.map((row) => {
-    const newRow = [...row];
-    newRow.splice(colIndex, 1);
-    return newRow;
-  });
-
-  return { cells: newCells };
-}
-
-// Delete a row at the specified index
-// Returns null if this would result in 0 rows
-export function deleteRow(layout: CardScoopLayout, rowIndex: number): CardScoopLayout | null {
-  const { numRows } = getGridDimensions(layout);
-  if (numRows <= 1) {
-    return null; // Can't delete the last row
-  }
-
-  const newCells = [...layout.cells];
-  newCells.splice(rowIndex, 1);
-
-  return { cells: newCells };
-}
-
-// Delete a cell - removes the row or column that contains it
-// Prefers removing column if both row and column have only 1 cell
-// Returns null if this is the last cell
+// Delete a cell from a column
+// If the column becomes empty, removes the column
+// Returns null if this would result in no cells
 export function deleteCell(layout: CardScoopLayout, cellId: CellId): CardScoopLayout | null {
   const pos = getCellPosition(layout, cellId);
   if (!pos) return layout;
 
-  const { numRows, numCols } = getGridDimensions(layout);
+  const { colIndex, cellIndex } = pos;
+  const column = layout.columns[colIndex];
 
-  // Can't delete the last cell
-  if (numRows === 1 && numCols === 1) {
+  // If this is the only cell in the only column, can't delete
+  if (layout.columns.length === 1 && column.length === 1) {
     return null;
   }
 
-  // If only one column, delete the row
-  if (numCols === 1) {
-    return deleteRow(layout, pos.row);
+  // If this is the only cell in the column, remove the column
+  if (column.length === 1) {
+    const newColumns = [...layout.columns];
+    newColumns.splice(colIndex, 1);
+    return { columns: newColumns };
   }
 
-  // If only one row, delete the column
-  if (numRows === 1) {
-    return deleteColumn(layout, pos.col);
+  // Otherwise, just remove the cell from the column
+  const newColumn = [...column];
+  newColumn.splice(cellIndex, 1);
+
+  const newColumns = [...layout.columns];
+  newColumns[colIndex] = newColumn;
+
+  return { columns: newColumns };
+}
+
+// Delete an entire column
+// Returns null if this is the last column
+export function deleteColumn(layout: CardScoopLayout, colIndex: number): CardScoopLayout | null {
+  if (!layout.columns || layout.columns.length <= 1) {
+    return null;
   }
 
-  // Multiple rows and columns - prefer deleting column
-  return deleteColumn(layout, pos.col);
+  const newColumns = [...layout.columns];
+  newColumns.splice(colIndex, 1);
+
+  return { columns: newColumns };
 }
 
 // ============================================
-// Legacy binary tree types and migration
+// Legacy layout types and migration
 // ============================================
 
-// Legacy leaf node
+// Legacy leaf node (from binary tree layout)
 export interface CellLeaf {
   type: 'cell';
   id: CellId;
 }
 
-// Legacy split node
+// Legacy split node (from binary tree layout)
 export interface CellSplit {
   type: 'split';
   direction: 'horizontal' | 'vertical';
@@ -179,10 +172,18 @@ export interface CellSplit {
 
 export type CardScoopLayoutNode = CellLeaf | CellSplit;
 
-// Legacy layout structure
-export interface LegacyCardScoopLayout {
+// Legacy binary tree layout
+export interface LegacyTreeLayout {
   root: CardScoopLayoutNode;
 }
+
+// Legacy grid layout (cells[][])
+export interface LegacyGridLayout {
+  cells: CellId[][];
+}
+
+// Union of all legacy types
+export type LegacyCardScoopLayout = LegacyTreeLayout | LegacyGridLayout;
 
 // Check if a node is a leaf
 export function isCellLeaf(node: CardScoopLayoutNode): node is CellLeaf {
@@ -194,15 +195,23 @@ export function isCellSplit(node: CardScoopLayoutNode): node is CellSplit {
   return node.type === 'split';
 }
 
-// Check if a layout is in the legacy format
-export function isLegacyLayout(layout: CardScoopLayout | LegacyCardScoopLayout): layout is LegacyCardScoopLayout {
-  return 'root' in layout && !('cells' in layout);
+// Check if a layout is in the current column format
+export function isColumnLayout(layout: CardScoopLayout | LegacyCardScoopLayout): layout is CardScoopLayout {
+  return 'columns' in layout && Array.isArray(layout.columns);
 }
 
-// Migrate legacy binary tree layout to grid layout
-// Attempts to flatten the tree into a sensible grid
-export function migrateLegacyLayout(legacy: LegacyCardScoopLayout): CardScoopLayout {
-  // Collect all cells and try to determine grid structure
+// Check if a layout is in the legacy tree format
+export function isLegacyTreeLayout(layout: CardScoopLayout | LegacyCardScoopLayout): layout is LegacyTreeLayout {
+  return 'root' in layout;
+}
+
+// Check if a layout is in the legacy grid format
+export function isLegacyGridLayout(layout: CardScoopLayout | LegacyCardScoopLayout): layout is LegacyGridLayout {
+  return 'cells' in layout && Array.isArray(layout.cells);
+}
+
+// Migrate legacy tree layout to column layout
+function migrateTreeLayout(legacy: LegacyTreeLayout): CardScoopLayout {
   const allCells: CellId[] = [];
 
   function collectCells(node: CardScoopLayoutNode): void {
@@ -216,57 +225,47 @@ export function migrateLegacyLayout(legacy: LegacyCardScoopLayout): CardScoopLay
 
   collectCells(legacy.root);
 
-  // Try to determine a reasonable grid layout based on the tree structure
-  const gridInfo = analyzeTreeStructure(legacy.root);
-
-  // Create the grid
-  const cells: CellId[][] = [];
-  let cellIndex = 0;
-
-  for (let row = 0; row < gridInfo.rows; row++) {
-    const rowCells: CellId[] = [];
-    for (let col = 0; col < gridInfo.cols; col++) {
-      if (cellIndex < allCells.length) {
-        rowCells.push(allCells[cellIndex++]);
-      } else {
-        // Fill with new cells if we don't have enough
-        rowCells.push(generateCellId());
-      }
-    }
-    cells.push(rowCells);
-  }
-
-  return { cells };
+  // Put all cells in a single column for simplicity
+  // User can reorganize as needed
+  return { columns: [allCells] };
 }
 
-// Analyze tree structure to determine best grid dimensions
-function analyzeTreeStructure(node: CardScoopLayoutNode): { rows: number; cols: number } {
-  if (isCellLeaf(node)) {
-    return { rows: 1, cols: 1 };
+// Migrate legacy grid layout to column layout
+function migrateGridLayout(legacy: LegacyGridLayout): CardScoopLayout {
+  const numRows = legacy.cells.length;
+  const numCols = numRows > 0 ? legacy.cells[0].length : 0;
+
+  // Convert row-major grid to column-major
+  const columns: CellId[][] = [];
+  for (let col = 0; col < numCols; col++) {
+    const column: CellId[] = [];
+    for (let row = 0; row < numRows; row++) {
+      if (legacy.cells[row] && legacy.cells[row][col]) {
+        column.push(legacy.cells[row][col]);
+      }
+    }
+    if (column.length > 0) {
+      columns.push(column);
+    }
   }
 
-  const first = analyzeTreeStructure(node.first);
-  const second = analyzeTreeStructure(node.second);
-
-  if (node.direction === 'vertical') {
-    // Left/right split - cells are side by side (adds columns)
-    return {
-      rows: Math.max(first.rows, second.rows),
-      cols: first.cols + second.cols
-    };
-  } else {
-    // Top/bottom split - cells are stacked (adds rows)
-    return {
-      rows: first.rows + second.rows,
-      cols: Math.max(first.cols, second.cols)
-    };
-  }
+  return { columns: columns.length > 0 ? columns : [[generateCellId()]] };
 }
 
 // Auto-migrate layout if needed
-export function ensureGridLayout(layout: CardScoopLayout | LegacyCardScoopLayout): CardScoopLayout {
-  if (isLegacyLayout(layout)) {
-    return migrateLegacyLayout(layout);
+export function ensureColumnLayout(layout: CardScoopLayout | LegacyCardScoopLayout): CardScoopLayout {
+  if (isColumnLayout(layout)) {
+    return layout;
   }
-  return layout;
+  if (isLegacyTreeLayout(layout)) {
+    return migrateTreeLayout(layout);
+  }
+  if (isLegacyGridLayout(layout)) {
+    return migrateGridLayout(layout);
+  }
+  // Fallback
+  return createDefaultCardScoopLayout();
 }
+
+// Backwards compatibility aliases
+export { ensureColumnLayout as ensureGridLayout };

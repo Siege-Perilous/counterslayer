@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { CardScoopLayout, LegacyCardScoopLayout, CellId } from '$lib/types/cardScoopLayout';
-  import { getAllCellIds, getGridDimensions, ensureGridLayout } from '$lib/types/cardScoopLayout';
+  import { getAllCellIds, getLayoutDimensions, ensureColumnLayout } from '$lib/types/cardScoopLayout';
   import type { CardScoopStack } from '$lib/models/cardScoopTray';
-  import { computeGridSizes } from '$lib/models/cardScoopTray';
+  import { computeLayoutSizes } from '$lib/models/cardScoopTray';
   import type { CardSize } from '$lib/types/project';
   import CardScoopCell from './CardScoopCell.svelte';
 
@@ -40,8 +40,6 @@
     trayWidth >= trayDepth ? MAX_PREVIEW_SIZE : MAX_PREVIEW_SIZE * (trayWidth / trayDepth)
   );
 
-  // Fixed pixel gap between cells (representing wall thickness)
-  const GAP_PX = 8;
   // Inset from container edges
   const EDGE_INSET = 1;
 
@@ -49,8 +47,8 @@
   interface RenderedCell {
     id: CellId;
     refNumber: number;
-    row: number;
-    col: number;
+    colIndex: number;
+    cellIndex: number;
     x: number;
     y: number;
     width: number;
@@ -58,11 +56,11 @@
     cardSizeName?: string;
   }
 
-  // Ensure we have a grid layout
-  let gridLayout = $derived(ensureGridLayout(layout));
+  // Ensure we have a column layout
+  let columnLayout = $derived(ensureColumnLayout(layout));
 
   // Get all cell IDs in order for ref number calculation
-  let allCellIds = $derived(getAllCellIds(gridLayout));
+  let allCellIds = $derived(getAllCellIds(columnLayout));
 
   // Helper to get card size name for a cell
   function getCardSizeNameForCell(cellId: CellId): string | undefined {
@@ -72,7 +70,7 @@
     return cardSize?.name;
   }
 
-  // Compute rendered cells from grid layout based on actual card dimensions
+  // Compute rendered cells from column layout with vertical centering
   let renderedCells = $derived.by(() => {
     const cells: RenderedCell[] = [];
 
@@ -80,62 +78,63 @@
       return cells;
     }
 
-    const { numRows, numCols } = getGridDimensions(gridLayout);
-    if (numRows === 0 || numCols === 0) {
+    const { numColumns } = getLayoutDimensions(columnLayout);
+    if (numColumns === 0) {
       return cells;
     }
 
-    // Get grid sizes in mm
-    const gridSizes = computeGridSizes(gridLayout, stacks, cardSizes, clearance, wallThickness);
+    // Get layout sizes in mm
+    const layoutSizes = computeLayoutSizes(columnLayout, stacks, cardSizes, clearance, wallThickness);
 
-    // Calculate total interior size in mm (for scaling)
-    const interiorWidthMM = gridSizes.totalWidth;
-    const interiorDepthMM = gridSizes.totalDepth;
-
-    // Available pixel space (accounting for edge insets and gaps)
+    // Available pixel space
     const availableWidth = containerWidth - 2 * EDGE_INSET;
     const availableHeight = containerHeight - 2 * EDGE_INSET;
 
-    // Calculate pixel positions for each column and row
-    // We need to map mm positions to pixel positions proportionally
-    const scaleX = availableWidth / interiorWidthMM;
-    const scaleY = availableHeight / interiorDepthMM;
+    // Scale factors
+    const scaleX = availableWidth / (layoutSizes.totalWidth + 2 * wallThickness);
+    const scaleY = availableHeight / (layoutSizes.maxColumnDepth + 2 * wallThickness);
 
-    // Calculate cumulative mm positions
-    const columnXmm: number[] = [0];
-    for (let col = 1; col < numCols; col++) {
-      columnXmm[col] = columnXmm[col - 1] + gridSizes.columnWidths[col - 1] + wallThickness;
-    }
+    // Calculate pixel positions for each column
+    let currentX = wallThickness; // Start after outer wall (in mm)
 
-    const rowYmm: number[] = [0];
-    for (let row = 1; row < numRows; row++) {
-      rowYmm[row] = rowYmm[row - 1] + gridSizes.rowDepths[row - 1] + wallThickness;
-    }
+    for (let colIndex = 0; colIndex < columnLayout.columns.length; colIndex++) {
+      const column = columnLayout.columns[colIndex];
+      const columnInfo = layoutSizes.columns[colIndex];
 
-    // Create rendered cells
-    for (let row = 0; row < numRows; row++) {
-      for (let col = 0; col < numCols; col++) {
-        const cellId = gridLayout.cells[row][col];
+      // Calculate vertical centering offset for this column
+      const columnTotalDepth = columnInfo.totalDepth;
+      const verticalOffset = (layoutSizes.maxColumnDepth - columnTotalDepth) / 2;
+
+      // Calculate Y position for each cell in the column
+      let currentY = wallThickness + verticalOffset; // Start after outer wall + centering offset
+
+      for (let cellIndex = 0; cellIndex < column.length; cellIndex++) {
+        const cellId = column[cellIndex];
+        const cellDepth = columnInfo.cellDepths[cellIndex];
         const refNumber = allCellIds.indexOf(cellId) + 1;
 
         // Convert mm to pixels
-        const x = EDGE_INSET + columnXmm[col] * scaleX;
-        const y = EDGE_INSET + rowYmm[row] * scaleY;
-        const width = gridSizes.columnWidths[col] * scaleX;
-        const height = gridSizes.rowDepths[row] * scaleY;
+        const x = EDGE_INSET + currentX * scaleX;
+        const y = EDGE_INSET + currentY * scaleY;
+        const width = columnInfo.width * scaleX;
+        const height = cellDepth * scaleY;
 
         cells.push({
           id: cellId,
           refNumber,
-          row,
-          col,
+          colIndex,
+          cellIndex,
           x: Math.round(x),
           y: Math.round(y),
           width: Math.round(width),
           height: Math.round(height),
           cardSizeName: getCardSizeNameForCell(cellId)
         });
+
+        currentY += cellDepth + wallThickness;
       }
+
+      currentX += columnInfo.width + wallThickness;
     }
 
     return cells;

@@ -3,13 +3,13 @@
   import { IconRowInsertBottom, IconColumnInsertRight, IconX } from '@tabler/icons-svelte';
   import type { CardScoopLayout, LegacyCardScoopLayout, CellId } from '$lib/types/cardScoopLayout';
   import {
+    addCellToColumn,
     addColumn,
-    addRow,
     deleteCell,
     countCells,
     getAllCellIds,
     getCellPosition,
-    ensureGridLayout
+    ensureColumnLayout
   } from '$lib/types/cardScoopLayout';
   import type { CardScoopStack } from '$lib/models/cardScoopTray';
   import type { CardSize } from '$lib/types/project';
@@ -28,15 +28,15 @@
 
   let { layout, stacks, cardSizes, trayWidth, trayDepth, clearance, wallThickness, onUpdateLayout }: Props = $props();
 
-  // Ensure we have a grid layout
-  let gridLayout = $derived(ensureGridLayout(layout));
+  // Ensure we have a column layout
+  let columnLayout = $derived(ensureColumnLayout(layout));
 
   // Selected cell state
   let selectedCellId = $state<CellId | null>(null);
 
   // Ensure selection is valid when layout changes
   $effect(() => {
-    const cellIds = getAllCellIds(gridLayout);
+    const cellIds = getAllCellIds(columnLayout);
     if (selectedCellId && !cellIds.includes(selectedCellId)) {
       // Selected cell no longer exists, select first cell or null
       selectedCellId = cellIds[0] ?? null;
@@ -47,32 +47,37 @@
   });
 
   // Derived state for UI
-  let canDelete = $derived(countCells(gridLayout) > 1 && selectedCellId !== null);
+  let canDelete = $derived(countCells(columnLayout) > 1 && selectedCellId !== null);
 
   // Get selected cell position for context-aware operations
-  let selectedPosition = $derived(selectedCellId ? getCellPosition(gridLayout, selectedCellId) : null);
+  let selectedPosition = $derived(selectedCellId ? getCellPosition(columnLayout, selectedCellId) : null);
 
   function handleSelectCell(id: CellId) {
     selectedCellId = id;
   }
 
-  function handleAddColumn() {
-    // Add column after the selected cell's column (or at the end if nothing selected)
-    const colIndex = selectedPosition?.col ?? -1;
-    const newLayout = addColumn(gridLayout, colIndex);
+  function handleAddCellToColumn() {
+    // Add a cell to the same column (vertically) after the selected cell
+    if (!selectedPosition) {
+      // No selection, add to first column
+      const newLayout = addCellToColumn(columnLayout, 0, -1);
+      onUpdateLayout(newLayout);
+      return;
+    }
+    const newLayout = addCellToColumn(columnLayout, selectedPosition.colIndex, selectedPosition.cellIndex);
     onUpdateLayout(newLayout);
   }
 
-  function handleAddRow() {
-    // Add row after the selected cell's row (or at the end if nothing selected)
-    const rowIndex = selectedPosition?.row ?? -1;
-    const newLayout = addRow(gridLayout, rowIndex);
+  function handleAddColumn() {
+    // Add a new column (horizontally) after the selected cell's column
+    const colIndex = selectedPosition?.colIndex ?? -1;
+    const newLayout = addColumn(columnLayout, colIndex);
     onUpdateLayout(newLayout);
   }
 
   function handleDeleteCell() {
     if (!selectedCellId || !canDelete) return;
-    const newLayout = deleteCell(gridLayout, selectedCellId);
+    const newLayout = deleteCell(columnLayout, selectedCellId);
     if (newLayout) {
       onUpdateLayout(newLayout);
       selectedCellId = null;
@@ -82,12 +87,12 @@
 
 <div class="cardScoopLayoutEditor">
   <div class="cardScoopLayoutEditor__toolbar">
-    <span class="cardScoopLayoutEditor__hint">Add rows or columns, delete selected</span>
+    <span class="cardScoopLayoutEditor__hint">Add cells to columns or add new columns</span>
     <div class="cardScoopLayoutEditor__toolbarButtons">
-      <IconButton variant="ghost" onclick={handleAddColumn} title="Add column">
+      <IconButton variant="ghost" onclick={handleAddColumn} title="Add column (horizontal)">
         <Icon Icon={IconColumnInsertRight} size="1.25rem" />
       </IconButton>
-      <IconButton variant="ghost" onclick={handleAddRow} title="Add row">
+      <IconButton variant="ghost" onclick={handleAddCellToColumn} title="Add cell to column (vertical)">
         <Icon Icon={IconRowInsertBottom} size="1.25rem" />
       </IconButton>
       <IconButton variant="ghost" onclick={handleDeleteCell} disabled={!canDelete} title="Delete selected cell">
@@ -99,7 +104,7 @@
   <Spacer size="0.5rem" />
 
   <CardScoopLayoutPreview
-    layout={gridLayout}
+    layout={columnLayout}
     {stacks}
     {cardSizes}
     {selectedCellId}
