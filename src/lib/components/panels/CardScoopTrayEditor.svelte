@@ -2,7 +2,11 @@
   import { Input, FormControl, Spacer, Select, IconButton, Icon } from '@tableslayer/ui';
   import { IconRotate2 } from '@tabler/icons-svelte';
   import type { CardScoopTray } from '$lib/types/project';
-  import { type CardScoopTrayParams, getCardScoopTrayDimensions, syncStacksWithLayout } from '$lib/models/cardScoopTray';
+  import {
+    type CardScoopTrayParams,
+    getCardScoopTrayDimensions,
+    syncStacksWithLayout
+  } from '$lib/models/cardScoopTray';
   import { getAllCellIds, type CardScoopLayout } from '$lib/types/cardScoopLayout';
   import { getCardSizes } from '$lib/stores/project.svelte';
   import CardScoopLayoutEditor from './CardScoopLayoutEditor.svelte';
@@ -80,11 +84,11 @@
 <div class="panelFormSection">
   <section class="section">
     <h3 class="sectionTitle">Layout</h3>
-    <Spacer size="0.5rem" />
     <CardScoopLayoutEditor
       layout={tray.params.layout}
       stacks={tray.params.stacks}
       cardSizes={getCardSizes()}
+      {trayLetter}
       trayWidth={dimensions.width}
       trayDepth={dimensions.depth}
       clearance={tray.params.clearance}
@@ -216,7 +220,6 @@
   }
 
   .sectionTitle {
-    margin-bottom: 0.5rem;
     font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.05em;

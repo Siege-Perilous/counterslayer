@@ -10,6 +10,7 @@
     layout: CardScoopLayout | LegacyCardScoopLayout;
     stacks: CardScoopStack[];
     cardSizes: CardSize[];
+    trayLetter: string;
     selectedCellId: CellId | null;
     trayWidth: number; // Tray width in mm
     trayDepth: number; // Tray depth in mm
@@ -22,6 +23,7 @@
     layout,
     stacks,
     cardSizes,
+    trayLetter,
     selectedCellId,
     trayWidth,
     trayDepth,
@@ -53,6 +55,9 @@
     y: number;
     width: number;
     height: number;
+    // Actual card cavity dimensions (may be smaller than cell if column has larger cards)
+    cavityWidth: number;
+    cavityHeight: number;
     cardSizeName?: string;
   }
 
@@ -62,12 +67,16 @@
   // Get all cell IDs in order for ref number calculation
   let allCellIds = $derived(getAllCellIds(columnLayout));
 
-  // Helper to get card size name for a cell
-  function getCardSizeNameForCell(cellId: CellId): string | undefined {
+  // Helper to get card size for a cell
+  function getCardSizeForCell(cellId: CellId): CardSize | undefined {
     const stack = stacks.find((s) => s.cellId === cellId);
     if (!stack) return undefined;
-    const cardSize = cardSizes.find((cs) => cs.id === stack.cardSizeId);
-    return cardSize?.name;
+    return cardSizes.find((cs) => cs.id === stack.cardSizeId);
+  }
+
+  // Helper to get stack for a cell
+  function getStackForCell(cellId: CellId) {
+    return stacks.find((s) => s.cellId === cellId);
   }
 
   // Compute rendered cells from column layout with vertical centering
@@ -119,6 +128,24 @@
         const width = columnInfo.width * scaleX;
         const height = cellDepth * scaleY;
 
+        // Calculate actual cavity dimensions based on card size
+        const cardSize = getCardSizeForCell(cellId);
+        const stack = getStackForCell(cellId);
+        let cavityWidthMm = columnInfo.width; // Default to full cell width
+        let cavityDepthMm = cellDepth; // Default to full cell depth
+
+        if (cardSize && stack) {
+          // Get effective dimensions based on rotation
+          const rotation = stack.rotation ?? 0;
+          const effectiveWidth = rotation === 90 ? cardSize.length : cardSize.width;
+          const effectiveDepth = rotation === 90 ? cardSize.width : cardSize.length;
+          cavityWidthMm = effectiveWidth + clearance * 2;
+          cavityDepthMm = effectiveDepth + clearance * 2;
+        }
+
+        const cavityWidth = cavityWidthMm * scaleX;
+        const cavityHeight = cavityDepthMm * scaleY;
+
         cells.push({
           id: cellId,
           refNumber,
@@ -128,7 +155,9 @@
           y: Math.round(y),
           width: Math.round(width),
           height: Math.round(height),
-          cardSizeName: getCardSizeNameForCell(cellId)
+          cavityWidth: Math.round(cavityWidth),
+          cavityHeight: Math.round(cavityHeight),
+          cardSizeName: cardSize?.name
         });
 
         currentY += cellDepth + wallThickness;
@@ -150,11 +179,14 @@
   {#each renderedCells as cell (cell.id)}
     <CardScoopCell
       id={cell.id}
+      {trayLetter}
       refNumber={cell.refNumber}
       x={cell.x}
       y={cell.y}
       width={cell.width}
       height={cell.height}
+      cavityWidth={cell.cavityWidth}
+      cavityHeight={cell.cavityHeight}
       selected={selectedCellId === cell.id}
       cardSizeName={cell.cardSizeName}
       onSelect={onSelectCell}

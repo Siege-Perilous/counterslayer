@@ -3,17 +3,37 @@
 
   interface Props {
     id: CellId;
+    trayLetter: string;
     refNumber: number; // 1-based reference number
     x: number; // Left edge in pixels
     y: number; // Bottom edge in pixels
-    width: number; // Width in pixels
-    height: number; // Height in pixels
+    width: number; // Cell width in pixels (column width)
+    height: number; // Cell height in pixels
+    cavityWidth: number; // Actual card cavity width in pixels
+    cavityHeight: number; // Actual card cavity height in pixels
     selected: boolean;
     cardSizeName?: string; // Card size name if stack assigned
     onSelect: (id: CellId) => void;
   }
 
-  let { id, refNumber, x, y, width, height, selected, cardSizeName, onSelect }: Props = $props();
+  let {
+    id,
+    trayLetter,
+    refNumber,
+    x,
+    y,
+    width,
+    height,
+    cavityWidth,
+    cavityHeight,
+    selected,
+    cardSizeName,
+    onSelect
+  }: Props = $props();
+
+  // Calculate cavity position (centered within cell)
+  let cavityOffsetX = $derived((width - cavityWidth) / 2);
+  let cavityOffsetY = $derived((height - cavityHeight) / 2);
 
   function handleClick(e: MouseEvent) {
     e.stopPropagation();
@@ -34,23 +54,39 @@
   style="left: {x}px; bottom: {y}px; width: {width}px; height: {height}px;"
   onclick={handleClick}
   onkeydown={handleKeydown}
-  aria-label="Cell {refNumber}"
+  aria-label="Cell {trayLetter}{refNumber}"
   aria-pressed={selected}
 >
-  <span class="cardScoopCell__refNumber">{refNumber}</span>
-  {#if cardSizeName}
-    <span class="cardScoopCell__cardSize">{cardSizeName}</span>
-  {:else}
-    <span class="cardScoopCell__empty">Empty</span>
-  {/if}
+  <div
+    class="cardScoopCell__cavity"
+    class:cardScoopCell__cavity--selected={selected}
+    style="left: {cavityOffsetX}px; bottom: {cavityOffsetY}px; width: {cavityWidth}px; height: {cavityHeight}px;"
+  >
+    <span class="cardScoopCell__refNumber">{trayLetter}{refNumber}</span>
+    {#if cardSizeName}
+      <span class="cardScoopCell__cardSize">{cardSizeName}</span>
+    {:else}
+      <span class="cardScoopCell__empty">Empty</span>
+    {/if}
+  </div>
 </button>
 
 <style>
   .cardScoopCell {
     position: absolute;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: inherit;
+  }
+
+  .cardScoopCell__cavity {
+    position: absolute;
     background: var(--inputBg);
     border: 1px solid transparent;
-    cursor: pointer;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -59,17 +95,14 @@
     transition:
       border-color 0.15s ease,
       background 0.15s ease;
-    padding: 0;
-    margin: 0;
-    font: inherit;
-    color: inherit;
+    pointer-events: none;
   }
 
-  .cardScoopCell:hover {
+  .cardScoopCell:hover .cardScoopCell__cavity {
     border-color: var(--fgPrimary);
   }
 
-  .cardScoopCell--selected {
+  .cardScoopCell__cavity--selected {
     background: var(--contrastMedium);
   }
 
@@ -81,7 +114,7 @@
     pointer-events: none;
   }
 
-  .cardScoopCell--selected .cardScoopCell__refNumber {
+  .cardScoopCell__cavity--selected .cardScoopCell__refNumber {
     color: var(--fg);
   }
 
@@ -109,8 +142,8 @@
     opacity: 0.6;
   }
 
-  .cardScoopCell--selected .cardScoopCell__cardSize,
-  .cardScoopCell--selected .cardScoopCell__empty {
+  .cardScoopCell__cavity--selected .cardScoopCell__cardSize,
+  .cardScoopCell__cavity--selected .cardScoopCell__empty {
     color: var(--fg);
   }
 </style>

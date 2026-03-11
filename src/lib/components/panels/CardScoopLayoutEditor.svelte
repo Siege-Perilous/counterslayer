@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { IconButton, Icon, Spacer } from '@tableslayer/ui';
+  import { IconButton, Icon } from '@tableslayer/ui';
   import { IconRowInsertBottom, IconColumnInsertRight, IconX } from '@tabler/icons-svelte';
   import type { CardScoopLayout, LegacyCardScoopLayout, CellId } from '$lib/types/cardScoopLayout';
   import {
@@ -19,6 +19,7 @@
     layout: CardScoopLayout | LegacyCardScoopLayout;
     stacks: CardScoopStack[];
     cardSizes: CardSize[];
+    trayLetter: string;
     trayWidth: number;
     trayDepth: number;
     clearance: number;
@@ -26,7 +27,8 @@
     onUpdateLayout: (layout: CardScoopLayout) => void;
   }
 
-  let { layout, stacks, cardSizes, trayWidth, trayDepth, clearance, wallThickness, onUpdateLayout }: Props = $props();
+  let { layout, stacks, cardSizes, trayLetter, trayWidth, trayDepth, clearance, wallThickness, onUpdateLayout }: Props =
+    $props();
 
   // Ensure we have a column layout
   let columnLayout = $derived(ensureColumnLayout(layout));
@@ -101,12 +103,11 @@
     </div>
   </div>
 
-  <Spacer size="0.5rem" />
-
   <CardScoopLayoutPreview
     layout={columnLayout}
     {stacks}
     {cardSizes}
+    {trayLetter}
     {selectedCellId}
     {trayWidth}
     {trayDepth}
