@@ -269,10 +269,7 @@
           "rotationOverride": "auto",
           "params": {
             "layout": {
-              "columns": [
-                ["lalhjbh", "l2mnoqz"],
-                ["3k64by4"]
-              ]
+              "columns": [["lalhjbh", "l2mnoqz"], ["3k64by4"]]
             },
             "stacks": [
               {

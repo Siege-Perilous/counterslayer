@@ -1,5 +1,5 @@
-import type { CellId, CardWellLayout } from '$lib/types/cardWellLayout';
-import { getAllCellIds, getLayoutDimensions, createDefaultCardWellLayout } from '$lib/types/cardWellLayout';
+import type { CardWellLayout, CellId } from '$lib/types/cardWellLayout';
+import { createDefaultCardWellLayout, getAllCellIds, getLayoutDimensions } from '$lib/types/cardWellLayout';
 import type { CardSize } from '$lib/types/project';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -598,6 +598,97 @@ export function createCardWellTray(
   }
 
   return result;
+}
+
+// Card stack position for visualization (flat cards in wells)
+export interface CardWellStackPosition {
+  x: number; // Center X position
+  y: number; // Center Y position
+  z: number; // Bottom Z position (on floor)
+  width: number; // Card width (after rotation)
+  length: number; // Card length (after rotation)
+  thickness: number; // Card thickness
+  count: number; // Number of cards
+  label: string; // Card size name
+  // For sleeved card rendering
+  innerWidth?: number;
+  innerLength?: number;
+}
+
+// Get card positions for visualization (preview counters)
+export function getCardWellPositions(
+  params: CardWellTrayParams,
+  cardSizes: CardSize[],
+  targetHeight?: number,
+  spacerHeight?: number
+): CardWellStackPosition[] {
+  const dims = getCardWellTrayDimensions(params, cardSizes);
+  const spacerOffset = spacerHeight ?? 0;
+
+  // When tray height is increased, floor is raised to keep cards at proper level
+  const heightIncrease = targetHeight && targetHeight > dims.height ? targetHeight - dims.height : 0;
+  const baseFloorZ = params.floorThickness + spacerOffset + heightIncrease;
+
+  // Calculate max stack height to normalize floor levels (same as in createCardWellTray)
+  let maxStackHeight = 0;
+  for (const stack of params.stacks) {
+    const cardSize = getCardSize(cardSizes, stack.cardSizeId);
+    if (cardSize) {
+      const stackHeight = stack.count * cardSize.thickness;
+      maxStackHeight = Math.max(maxStackHeight, stackHeight);
+    }
+  }
+
+  const computedCells = computeCellPositions(
+    params.layout,
+    params.stacks,
+    cardSizes,
+    params.wallThickness,
+    params.clearance
+  );
+
+  const positions: CardWellStackPosition[] = [];
+
+  for (const cell of computedCells) {
+    const stack = params.stacks.find((s) => s.cellId === cell.id);
+    if (!stack) continue;
+
+    const cardSize = getCardSize(cardSizes, stack.cardSizeId);
+    if (!cardSize) continue;
+
+    const { effectiveWidth, effectiveDepth } = getEffectiveCardDimensions(cardSize, stack.rotation ?? 0);
+
+    // Calculate floor raise for shorter stacks (so all card tops are at same level)
+    const thisStackHeight = stack.count * cardSize.thickness;
+    const floorRaise = maxStackHeight - thisStackHeight;
+    const cellFloorZ = baseFloorZ + floorRaise;
+
+    // Calculate cavity position (centered within cell)
+    const cavityWidth = Math.min(cell.width, effectiveWidth + params.clearance * 2);
+    const cavityDepth = Math.min(cell.depth, effectiveDepth + params.clearance * 2);
+    const cavityOffsetX = (cell.width - cavityWidth) / 2;
+    const cavityOffsetY = (cell.depth - cavityDepth) / 2;
+
+    // Card center position
+    const centerX = cell.x + cavityOffsetX + cavityWidth / 2;
+    const centerY = cell.y + cavityOffsetY + cavityDepth / 2;
+
+    positions.push({
+      x: centerX,
+      y: centerY,
+      z: cellFloorZ,
+      width: effectiveWidth,
+      length: effectiveDepth,
+      thickness: cardSize.thickness,
+      count: stack.count,
+      label: cardSize.name,
+      // Inner card dimensions for sleeved rendering (assume 3mm sleeve margin)
+      innerWidth: Math.max(effectiveWidth - 3, effectiveWidth * 0.95),
+      innerLength: Math.max(effectiveDepth - 3, effectiveDepth * 0.95)
+    });
+  }
+
+  return positions;
 }
 
 // Sync stacks with layout - remove stacks for deleted cells, add stacks for new cells

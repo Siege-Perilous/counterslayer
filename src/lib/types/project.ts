@@ -1,6 +1,6 @@
 import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
-import type { CardWellTrayParams } from '$lib/models/cardWellTray';
 import type { CardDrawTrayParams } from '$lib/models/cardTray';
+import type { CardWellTrayParams } from '$lib/models/cardWellTray';
 import type { CounterTrayParams } from '$lib/models/counterTray';
 import type { CupTrayParams } from '$lib/models/cupTray';
 

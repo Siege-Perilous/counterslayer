@@ -2,11 +2,7 @@
   import { Input, FormControl, Spacer, Select, IconButton, Icon } from '@tableslayer/ui';
   import { IconRotate2 } from '@tabler/icons-svelte';
   import type { CardWellTray } from '$lib/types/project';
-  import {
-    type CardWellTrayParams,
-    getCardWellTrayDimensions,
-    syncStacksWithLayout
-  } from '$lib/models/cardWellTray';
+  import { type CardWellTrayParams, getCardWellTrayDimensions, syncStacksWithLayout } from '$lib/models/cardWellTray';
   import { getAllCellIds, type CardWellLayout } from '$lib/types/cardWellLayout';
   import { getCardSizes } from '$lib/stores/project.svelte';
   import CardWellLayoutEditor from './CardWellLayoutEditor.svelte';

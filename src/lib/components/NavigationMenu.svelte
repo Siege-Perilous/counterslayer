@@ -390,7 +390,7 @@
                       }}
                     >
                       <Text weight={500}>Card well</Text>
-                      <Text size="0.75rem" color="var(--fgMuted)">Grid of flat card cutouts</Text>
+                      <Text size="0.75rem" color="var(--fgMuted)">Flat stacks of cards</Text>
                     </button>
                     <button
                       class="trayTypeOption"
@@ -506,7 +506,7 @@
                 }}
               >
                 <Text weight={500}>Card well</Text>
-                <Text size="0.75rem" color="var(--fgMuted)">Grid of flat card cutouts</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Flat stacks of cards</Text>
               </button>
               <button
                 class="trayTypeOption"
@@ -568,7 +568,7 @@
                 }}
               >
                 <Text weight={500}>Card well</Text>
-                <Text size="0.75rem" color="var(--fgMuted)">Grid of flat card cutouts</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Flat stacks of cards</Text>
               </button>
               <button
                 class="trayTypeOption"

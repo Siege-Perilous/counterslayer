@@ -5,8 +5,12 @@ import { splitCell } from '../src/lib/types/cardScoopLayout.js';
 const singleCell: CardScoopTrayParams = {
   layout: { root: { type: 'cell', id: 'cell1' } },
   stacks: [{ id: 's1', cellId: 'cell1', cardSizeId: 'std', count: 30, rotation: 0 }],
-  trayWidthOverride: null, trayDepthOverride: null,
-  wallThickness: 2.0, floorThickness: 2.0, clearance: 1.0, rimHeight: 3.0
+  trayWidthOverride: null,
+  trayDepthOverride: null,
+  wallThickness: 2.0,
+  floorThickness: 2.0,
+  clearance: 1.0,
+  rimHeight: 3.0
 };
 
 // Vertical split (2 cells side by side)
@@ -16,15 +20,19 @@ const vertSplit: CardScoopTrayParams = {
     { id: 's1', cellId: 'cell1', cardSizeId: 'std', count: 30, rotation: 0 },
     { id: 's2', cellId: 'cell2', cardSizeId: 'std', count: 30, rotation: 0 }
   ],
-  trayWidthOverride: null, trayDepthOverride: null,
-  wallThickness: 2.0, floorThickness: 2.0, clearance: 1.0, rimHeight: 3.0
+  trayWidthOverride: null,
+  trayDepthOverride: null,
+  wallThickness: 2.0,
+  floorThickness: 2.0,
+  clearance: 1.0,
+  rimHeight: 3.0
 };
 
 // Fix cell IDs after split
 const splitLayout = vertSplit.layout;
 if (splitLayout.root.type === 'split') {
-  vertSplit.stacks[0].cellId = (splitLayout.root.first as any).id;
-  vertSplit.stacks[1].cellId = (splitLayout.root.second as any).id;
+  vertSplit.stacks[0].cellId = (splitLayout.root.first as { id: string }).id;
+  vertSplit.stacks[1].cellId = (splitLayout.root.second as { id: string }).id;
 }
 
 const cardSizes = [{ id: 'std', name: 'Standard', width: 63.5, length: 88.9, thickness: 0.5 }];

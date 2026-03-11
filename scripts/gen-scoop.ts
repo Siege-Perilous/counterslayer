@@ -1,7 +1,11 @@
+import stlSerializer from '@jscad/stl-serializer';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
-import stlSerializer from '@jscad/stl-serializer';
-import { createCardScoopTray, getCardScoopTrayDimensions, type CardScoopTrayParams } from '../src/lib/models/cardScoopTray.js';
+import {
+  createCardScoopTray,
+  getCardScoopTrayDimensions,
+  type CardScoopTrayParams
+} from '../src/lib/models/cardScoopTray.js';
 
 const params: CardScoopTrayParams = {
   layout: { root: { type: 'cell', id: 'cell1' } },

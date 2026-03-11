@@ -53,15 +53,15 @@ async function main() {
   const project = JSON.parse(readFileSync(projectPath, 'utf-8'));
 
   // Support both old (project.boxes) and new (project.layers[].boxes) structure
-  let allBoxes: Box[] = [];
-  let allLooseTrays: Tray[] = [];
+  const allBoxes: Box[] = [];
+  const allLooseTrays: Tray[] = [];
   if (project.layers) {
     for (const layer of project.layers) {
       allBoxes.push(...(layer.boxes || []));
       allLooseTrays.push(...(layer.looseTrays || []));
     }
   } else if (project.boxes) {
-    allBoxes = project.boxes;
+    allBoxes.push(...project.boxes);
   }
 
   console.log(`Loaded project with ${allBoxes.length} boxes and ${allLooseTrays.length} loose trays`);
