@@ -16,13 +16,13 @@ import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import stlSerializer from '@jscad/stl-serializer';
 import { createCardDividerTray } from '../src/lib/models/cardDividerTray.js';
-import { createCardScoopTray } from '../src/lib/models/cardScoopTray.js';
 import { createCardDrawTray } from '../src/lib/models/cardTray.js';
+import { createCardWellTray } from '../src/lib/models/cardWellTray.js';
 import { createCounterTray } from '../src/lib/models/counterTray.js';
 import { createCupTray } from '../src/lib/models/cupTray.js';
 import { createBoxWithLidGrooves, createLid } from '../src/lib/models/lid.js';
 import type { Box, Tray } from '../src/lib/types/project.js';
-import { isCardDividerTray, isCardScoopTray, isCardTray, isCounterTray, isCupTray } from '../src/lib/types/project.js';
+import { isCardDividerTray, isCardTray, isCardWellTray, isCounterTray, isCupTray } from '../src/lib/types/project.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const generalize = (jscad.modifiers as any).generalize as (
@@ -82,8 +82,8 @@ async function main() {
       let trayGeom: Geom3 | null = null;
       if (isCupTray(looseTray)) {
         trayGeom = createCupTray(looseTray.params, looseTray.name, maxHeight, 0);
-      } else if (isCardScoopTray(looseTray)) {
-        trayGeom = createCardScoopTray(looseTray.params, project.cardSizes, looseTray.name, maxHeight, 0);
+      } else if (isCardWellTray(looseTray)) {
+        trayGeom = createCardWellTray(looseTray.params, project.cardSizes, looseTray.name, maxHeight, 0);
       } else if (isCardTray(looseTray)) {
         trayGeom = createCardDrawTray(looseTray.params, project.cardSizes, looseTray.name, maxHeight, 0);
       } else if (isCardDividerTray(looseTray)) {
@@ -186,8 +186,8 @@ async function main() {
       let trayGeom: Geom3 | null = null;
       if (isCupTray(tray)) {
         trayGeom = createCupTray(tray.params, tray.name, maxHeight, 0);
-      } else if (isCardScoopTray(tray)) {
-        trayGeom = createCardScoopTray(tray.params, project.cardSizes, tray.name, maxHeight, 0);
+      } else if (isCardWellTray(tray)) {
+        trayGeom = createCardWellTray(tray.params, project.cardSizes, tray.name, maxHeight, 0);
       } else if (isCardTray(tray)) {
         trayGeom = createCardDrawTray(tray.params, project.cardSizes, tray.name, maxHeight, 0);
       } else if (isCardDividerTray(tray)) {
