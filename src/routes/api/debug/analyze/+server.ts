@@ -1,5 +1,4 @@
 import { json } from '@sveltejs/kit';
-import { spawn } from 'child_process';
 import { existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
@@ -9,26 +8,51 @@ import type { RequestHandler } from './$types';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..', '..', '..', '..', '..');
 const analysisDir = join(projectRoot, 'mesh-analysis');
-const scriptsDir = join(projectRoot, 'scripts');
 
-interface TrayInfo {
-  name: string;
-  letter: string;
-  id: string;
-  placement: unknown;
+interface ComputedLayout {
+  timestamp: string;
+  selectedBoxId: string | null;
+  selectedTrayId: string;
+  boxes: Array<{
+    boxId: string;
+    boxName: string;
+    exterior: { width: number; depth: number; height: number };
+    interior: { width: number; depth: number; height: number };
+    trays: Array<{
+      trayId: string;
+      name: string;
+      letter: string;
+      color: string;
+      x: number;
+      y: number;
+      width: number;
+      depth: number;
+      height: number;
+      rotated: boolean;
+      flushFront: boolean;
+      flushLeft: boolean;
+      flushBack: boolean;
+      flushRight: boolean;
+      stacks: unknown[];
+    }>;
+  }>;
+  looseTrays: Array<{
+    trayId: string;
+    layerId: string;
+    name: string;
+    letter: string;
+    color: string;
+    width: number;
+    depth: number;
+    height: number;
+    stacks: unknown[];
+  }>;
 }
 
 interface AnalyzeRequest {
-  project: unknown;
+  project: Record<string, unknown>;
   stls: Record<string, string>; // name -> Base64-encoded STL binary
-  context: {
-    box_name: string;
-    box_id: string;
-    selected_tray_name: string;
-    selected_tray_id: string;
-    selected_tray_letter: string;
-    trays: TrayInfo[];
-  };
+  computedLayout: ComputedLayout;
   screenshot?: string; // Base64-encoded data URL
 }
 
@@ -50,15 +74,12 @@ export const POST: RequestHandler = async ({ request }) => {
       await mkdir(analysisDir, { recursive: true });
     }
 
-    // Write context.json
-    const context = {
-      ...data.context,
-      timestamp: new Date().toISOString()
+    // Merge computedLayout into project and write as single file
+    const projectWithLayout = {
+      ...data.project,
+      computedLayout: data.computedLayout
     };
-    await writeFile(join(analysisDir, 'context.json'), JSON.stringify(context, null, 2));
-
-    // Write project.json
-    await writeFile(join(analysisDir, 'project.json'), JSON.stringify(data.project, null, 2));
+    await writeFile(join(analysisDir, 'project.json'), JSON.stringify(projectWithLayout, null, 2));
 
     // Decode and write all STLs
     const stlFiles: string[] = [];
@@ -68,9 +89,6 @@ export const POST: RequestHandler = async ({ request }) => {
       await writeFile(join(analysisDir, safeFilename), stlBuffer);
       stlFiles.push(safeFilename);
     }
-
-    // Write manifest of STL files
-    await writeFile(join(analysisDir, 'stl-manifest.json'), JSON.stringify(stlFiles, null, 2));
 
     // Save Three.js screenshot if provided
     if (data.screenshot) {
@@ -83,67 +101,10 @@ export const POST: RequestHandler = async ({ request }) => {
       }
     }
 
-    // Run Python analyzer
-    const venvPython = join(scriptsDir, '.venv', 'bin', 'python');
-    const analyzerScript = join(scriptsDir, 'mesh-analyzer.py');
-
-    // Check if venv exists
-    const pythonPath = existsSync(venvPython) ? venvPython : 'python3';
-
-    const result = await new Promise<{ success: boolean; output: string; error?: string }>((resolve) => {
-      const proc = spawn(pythonPath, [analyzerScript, analysisDir], {
-        cwd: scriptsDir,
-        env: { ...process.env }
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      proc.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      proc.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      proc.on('close', (code) => {
-        if (code === 0) {
-          resolve({ success: true, output: stdout });
-        } else {
-          resolve({
-            success: false,
-            output: stdout,
-            error: stderr || `Process exited with code ${code}`
-          });
-        }
-      });
-
-      proc.on('error', (err) => {
-        resolve({
-          success: false,
-          output: stdout,
-          error: `Failed to spawn process: ${err.message}`
-        });
-      });
-    });
-
-    if (!result.success) {
-      return json(
-        {
-          success: false,
-          error: result.error,
-          output: result.output,
-          hint: 'Make sure Python venv is set up: cd scripts && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt'
-        },
-        { status: 500 }
-      );
-    }
-
     return json({
       success: true,
-      message: 'Analysis complete. Files written to mesh-analysis/',
-      output: result.output
+      message: 'Debug files written to mesh-analysis/',
+      files: ['project.json', ...stlFiles]
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

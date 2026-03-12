@@ -271,10 +271,7 @@
 
   <!-- ViewCube for camera navigation (hidden in debug/capture mode) -->
   {#if !debugMode && !hideUI}
-    <ViewCube
-      {cameraQuaternion}
-      onSelectAngle={handleSelectCameraAngle}
-    />
+    <ViewCube {cameraQuaternion} onSelectAngle={handleSelectCameraAngle} />
   {/if}
 
   <!-- Tray/Box info overlay when clicked (non-edit mode only) -->

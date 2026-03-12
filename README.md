@@ -21,29 +21,23 @@ Counter Slayer is a small Svelte / JSCad application to help you build box and t
 
 ## Development
 
-Counter Slayer uses typically Node / Svelte tooling with `pnpm`. Run `pnpm install`, then `pnpm run dev` or `pnpm run build` to start working.
+Counter Slayer uses typical Node / Svelte tooling with `pnpm`. Run `pnpm install`, then `pnpm run dev` or `pnpm run build` to start working.
 
-### Optional Claude helper
+### Claude Code Integration
 
-I use Claude to help build this project. Outside of the typical [Claude.md](https://github.com/Siege-Perilous/counterslayer/blob/main/CLAUDE.md) file, there's also some Python scripts to help generate feedback loops and programmatic debug information which Claude can read. This helps Claude understand what you (as a developer) are looking at on the screen, and helps better it better converse with context about the models being generated.
+This project includes tooling for [Claude Code](https://github.com/anthropics/claude-code) to help with geometry debugging. See [CLAUDE.md](https://github.com/Siege-Perilous/counterslayer/blob/main/CLAUDE.md) for details.
 
-Requires Python 3.8+:
+**Auto-save**: In dev mode, clicking "Regenerate" automatically saves `project.json` with computed layout positions to `mesh-analysis/`.
+
+**Full export**: Click "Import / Export" → "Debug for Claude" to export STLs, screenshots, and layout data.
+
+**View capture**: Use Playwright to capture views at different angles:
 
 ```bash
-cd scripts
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+npx tsx scripts/capture-view.ts --angle iso
 ```
 
-### Usage
-
-1. Run `npm run dev`
-2. Select a tray in the UI
-3. Click "Debug for Claude" in the Import/Export menu
-4. Analysis files are written to `mesh-analysis/`
-
-You then can ask Claude questions, rerunning the debug whenever you make changes.
+The app also includes a TinkerCAD-style ViewCube for quick camera navigation.
 
 ## License & open source contributions
 

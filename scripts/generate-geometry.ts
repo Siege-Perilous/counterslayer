@@ -4,10 +4,9 @@
  *
  * Usage: npx tsx scripts/generate-geometry.ts [boxId]
  *
- * Reads project.json from mesh-analysis/, generates STLs, and runs mesh-analyzer.py
+ * Reads project.json from mesh-analysis/ and generates STLs.
  */
 
-import { execSync } from 'child_process';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
@@ -103,18 +102,7 @@ async function main() {
       console.error(`  Error generating loose tray:`, e);
     }
 
-    // Run mesh analyzer and exit
-    console.log('\nRunning mesh analyzer...');
-    try {
-      const result = execSync('source scripts/.venv/bin/activate && python scripts/mesh-analyzer.py', {
-        cwd: join(MESH_ANALYSIS_DIR, '..'),
-        encoding: 'utf-8',
-        shell: '/bin/bash'
-      });
-      console.log(result);
-    } catch (e) {
-      console.error('Error running mesh analyzer:', e instanceof Error ? e.message : e);
-    }
+    console.log('\nDone generating loose tray.');
     return;
   }
 
@@ -219,31 +207,7 @@ async function main() {
     }
   }
 
-  // Run mesh analyzer
-  console.log('\nRunning mesh analyzer...');
-  try {
-    const result = execSync('source scripts/.venv/bin/activate && python scripts/mesh-analyzer.py', {
-      cwd: join(MESH_ANALYSIS_DIR, '..'),
-      encoding: 'utf-8',
-      shell: '/bin/bash'
-    });
-    console.log(result);
-  } catch (e) {
-    console.error('Error running mesh analyzer:', e instanceof Error ? e.message : e);
-  }
-
-  // Extract and display ramp analysis
-  console.log('\n=== RAMP ANALYSIS ===');
-  const reportPath = join(MESH_ANALYSIS_DIR, 'report.json');
-  if (existsSync(reportPath)) {
-    const report = JSON.parse(readFileSync(reportPath, 'utf-8'));
-    const rampAnalysis = report.expected_ramp_analysis;
-    if (rampAnalysis) {
-      console.log(JSON.stringify(rampAnalysis, null, 2));
-    } else {
-      console.log('No ramp analysis found in report');
-    }
-  }
+  console.log('\nDone generating geometry.');
 }
 
 main().catch(console.error);

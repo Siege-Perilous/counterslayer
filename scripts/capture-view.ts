@@ -26,6 +26,7 @@ function parseArgs() {
     markers?: string;
     out?: string;
     port?: number;
+    debugExport?: boolean;
   } = {};
 
   for (let i = 0; i < args.length; i++) {
@@ -61,6 +62,9 @@ function parseArgs() {
         result.port = parseInt(next);
         i++;
         break;
+      case '--debug-export':
+        result.debugExport = true;
+        break;
       case '--help':
       case '-h':
         console.log(`
@@ -78,11 +82,12 @@ Options:
   --markers <file>     JSON file with colored markers
   --out <file>         Output file (default: mesh-analysis/view.png)
   --port <number>      Dev server port (default: 5175)
+  --debug-export       Click "Debug for Claude" button to export project.json
 
 Examples:
   npx tsx scripts/capture-view.ts --angle iso
   npx tsx scripts/capture-view.ts --angle front --zoom 2
-  npx tsx scripts/capture-view.ts --pos "100,80,150" --look-at "0,25,50"
+  npx tsx scripts/capture-view.ts --debug-export
 
 Markers JSON format:
   {
@@ -98,10 +103,63 @@ Colors: red, green, blue, yellow, cyan, magenta, orange, white
   return result;
 }
 
+async function runDebugExport(port: number) {
+  const url = `http://localhost:${port}/`;
+  console.log('Opening app to trigger debug export...');
+
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+
+  try {
+    await page.goto(url, { timeout: 60000 });
+    await page.waitForLoadState('domcontentloaded');
+
+    // Wait for geometry to generate (look for the Regenerate button which indicates app is ready)
+    console.log('Waiting for app to load...');
+    await page.waitForSelector('button:text("Regenerate")', { timeout: 60000 });
+
+    console.log('Waiting for geometry to generate...');
+    await page.waitForTimeout(3000);
+
+    // Click the "Import / Export" button to open the popover
+    console.log('Opening Import / Export menu...');
+    await page.click('button:text("Import / Export")');
+
+    // Wait for popover to open
+    await page.waitForTimeout(500);
+
+    // Click "Debug for Claude" button
+    console.log('Clicking Debug for Claude...');
+    await page.click('button:text("Debug for Claude")');
+
+    // Wait for export to complete by watching for success toast
+    console.log('Waiting for export to complete...');
+    await page.waitForSelector('text="Debug files written"', { timeout: 30000 }).catch(() => {
+      // Fallback: wait for button to return to normal state
+    });
+
+    // Give it extra time to finish writing files
+    await page.waitForTimeout(500);
+
+    console.log('Debug export complete. Files written to mesh-analysis/');
+  } catch (e) {
+    console.error('Debug export failed:', e);
+    process.exit(1);
+  } finally {
+    await browser.close();
+  }
+}
+
 async function captureView() {
   const args = parseArgs();
   const port = args.port ?? 5175;
   const outputPath = args.out ?? 'mesh-analysis/view.png';
+
+  // Handle debug export mode - clicks the button in the UI
+  if (args.debugExport) {
+    await runDebugExport(port);
+    return;
+  }
 
   // Build URL with debug parameters
   const params = new URLSearchParams();

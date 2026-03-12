@@ -236,35 +236,19 @@
         target: center
       },
       iso: {
-        pos: new THREE.Vector3(
-          center.x + distance * 0.7,
-          center.y + distance * 0.5,
-          center.z + distance * 0.7
-        ),
+        pos: new THREE.Vector3(center.x + distance * 0.7, center.y + distance * 0.5, center.z + distance * 0.7),
         target: center
       },
       'iso-back': {
-        pos: new THREE.Vector3(
-          center.x - distance * 0.7,
-          center.y + distance * 0.5,
-          center.z - distance * 0.7
-        ),
+        pos: new THREE.Vector3(center.x - distance * 0.7, center.y + distance * 0.5, center.z - distance * 0.7),
         target: center
       },
       'iso-left': {
-        pos: new THREE.Vector3(
-          center.x - distance * 0.7,
-          center.y + distance * 0.5,
-          center.z + distance * 0.7
-        ),
+        pos: new THREE.Vector3(center.x - distance * 0.7, center.y + distance * 0.5, center.z + distance * 0.7),
         target: center
       },
       'iso-right': {
-        pos: new THREE.Vector3(
-          center.x + distance * 0.7,
-          center.y + distance * 0.5,
-          center.z - distance * 0.7
-        ),
+        pos: new THREE.Vector3(center.x + distance * 0.7, center.y + distance * 0.5, center.z - distance * 0.7),
         target: center
       }
     };
@@ -679,9 +663,7 @@
 
     // Apply zoom by moving camera closer/further
     if (cameraZoom && cameraZoom !== 1) {
-      const target = cameraLookAt
-        ? new THREE.Vector3(cameraLookAt[0], cameraLookAt[1], cameraLookAt[2])
-        : sceneCenter;
+      const target = cameraLookAt ? new THREE.Vector3(cameraLookAt[0], cameraLookAt[1], cameraLookAt[2]) : sceneCenter;
       const dir = cam.position.clone().sub(target).normalize();
       const dist = cam.position.distanceTo(target) / cameraZoom;
       cam.position.copy(target).add(dir.multiplyScalar(dist));
