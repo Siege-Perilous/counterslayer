@@ -1,12 +1,20 @@
 <script lang="ts">
   import { Canvas } from '@threlte/core';
   import TrayScene from './TrayScene.svelte';
+  import ViewCube from './ViewCube.svelte';
   import type { BufferGeometry } from 'three';
   import type { TrayPlacement } from '$lib/models/box';
   import type { BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
   import type { CounterStack } from '$lib/models/counterTray';
   import type { CardStack } from '$lib/models/cardTray';
   import type { CaptureOptions } from '$lib/utils/screenshotCapture';
+
+  // Debug marker type
+  interface DebugMarker {
+    name: string;
+    pos: [number, number, number];
+    color: string;
+  }
 
   interface TrayGeometryData {
     trayId: string;
@@ -111,6 +119,14 @@
       };
     }>;
     allLayersExplosionAmount?: number;
+    // Debug mode props for URL-based capture
+    debugMode?: boolean;
+    cameraPreset?: string;
+    cameraPosition?: [number, number, number];
+    cameraLookAt?: [number, number, number];
+    cameraZoom?: number;
+    debugMarkers?: DebugMarker[];
+    hideUI?: boolean;
   }
 
   let {
@@ -149,8 +165,34 @@
     layerLooseTrayPlacements = [],
     showAllLayers = false,
     allLayerArrangements = [],
-    allLayersExplosionAmount = 50
+    allLayersExplosionAmount = 50,
+    // Debug mode props
+    debugMode = false,
+    cameraPreset,
+    cameraPosition,
+    cameraLookAt,
+    cameraZoom = 1,
+    debugMarkers = [],
+    hideUI = false
   }: Props = $props();
+
+  // Camera quaternion state for ViewCube sync
+  let cameraQuaternion = $state<[number, number, number, number]>([0, 0, 0, 1]);
+
+  // Handler for ViewCube angle selection - stored as state to pass to TrayScene
+  let pendingCameraAngle = $state<string | null>(null);
+
+  function handleCameraQuaternionChange(q: [number, number, number, number]) {
+    cameraQuaternion = q;
+  }
+
+  function handleSelectCameraAngle(angle: string) {
+    pendingCameraAngle = angle;
+    // Reset after a frame to allow TrayScene to pick it up
+    requestAnimationFrame(() => {
+      pendingCameraAngle = null;
+    });
+  }
 
   // Compute actual container dimensions (prefer new props, fallback to legacy printBedSize)
   let gameContainerWidth = $derived(propContainerWidth ?? legacyPrintBedSize ?? 256);
@@ -216,8 +258,24 @@
       {showAllLayers}
       {allLayerArrangements}
       {allLayersExplosionAmount}
+      {debugMode}
+      {cameraPreset}
+      {cameraPosition}
+      {cameraLookAt}
+      {cameraZoom}
+      {debugMarkers}
+      onCameraQuaternionChange={handleCameraQuaternionChange}
+      selectedCameraAngle={pendingCameraAngle}
     />
   </Canvas>
+
+  <!-- ViewCube for camera navigation (hidden in debug/capture mode) -->
+  {#if !debugMode && !hideUI}
+    <ViewCube
+      {cameraQuaternion}
+      onSelectAngle={handleSelectCameraAngle}
+    />
+  {/if}
 
   <!-- Tray/Box info overlay when clicked (non-edit mode only) -->
   {#if clickedTrayInfo && !isLayoutEditMode && !isLayerLayoutEditMode && (showAllTrays || showAllBoxes || showAllLayers || showLayerView)}

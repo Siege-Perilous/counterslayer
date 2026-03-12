@@ -13,7 +13,7 @@ When making geometry changes, use this self-contained loop to iterate without us
 ```
 1. Make code changes to geometry (lid.ts, counterTray.ts, box.ts)
 2. Regenerate STLs:     npx tsx scripts/generate-geometry.ts
-3. Verify with renders: python scripts/render-view.py --stl mesh-analysis/box.stl --angle iso
+3. Verify with renders: npx tsx scripts/capture-view.ts --angle iso
 4. Add markers at key positions to understand coordinates
 5. Check multiple angles, zoom into problem areas
 6. If not correct, go back to step 1
@@ -46,14 +46,13 @@ This creates the initial `project.json` that the CLI script reads from.
 
 ### Files in mesh-analysis/
 
-| File                 | Purpose                                         |
-| -------------------- | ----------------------------------------------- |
-| `report.json`        | Mesh stats, validation, spatial layout analysis |
-| `context.json`       | Selected box/tray info, placement data          |
-| `project.json`       | Full project configuration                      |
-| `app-screenshot.png` | Three.js render (authoritative app view)        |
-| `view-{name}.png`    | Individual STL renders (what gets printed)      |
-| `*.stl`              | Raw geometry files                              |
+| File                 | Purpose                                    |
+| -------------------- | ------------------------------------------ |
+| `context.json`       | Selected box/tray info, placement data     |
+| `project.json`       | Full project configuration                 |
+| `app-screenshot.png` | Three.js render (authoritative app view)   |
+| `view.png`           | Captured view from capture-view.ts         |
+| `*.stl`              | Raw geometry files                         |
 
 ### Stack Reference Codes
 
@@ -73,45 +72,9 @@ Example: `D3` = Third stack in Tray D
     "name": "Goblin",
     "stacks": [
       {"ref": "D1", "shape": "Circle Small", "count": 3, "x": 10.5, "y": 15.2},
-      {"ref": "D2", "shape": "Square Large", "count": 10, "x": 35.0, "y": 15.2},
-      ...
+      {"ref": "D2", "shape": "Square Large", "count": 10, "x": 35.0, "y": 15.2}
     ]
   }]
-}
-```
-
-### Reading the Analysis
-
-**report.json structure:**
-
-```json
-{
-  "meshes": {
-    "box": { "stats": {...}, "validation": {...}, "errors": [], "warnings": [] },
-    "lid": { ... },
-    "tray_D_Name": { ... }
-  },
-  "combined_analysis": {
-    "total_vertices": 22553,
-    "total_faces": 42562,
-    "issues": ["list of problems found"]
-  },
-  "spatial_layout": {
-    "box_params": { "wall_thickness": 3, "floor_thickness": 2, "tolerance": 0.5 },
-    "box_exterior_mm": [width, depth, height],
-    "box_interior_mm": [width, depth, height],
-    "trays": [
-      { "name": "tray_D_Goblin", "dimensions": {...}, "position": {x, y}, "bounds": {...} }
-    ],
-    "fit_check": {
-      "width_gap": 1.0,
-      "depth_gap": 1.0,
-      "height_clearance": 0.5,
-      "fits_width": true,
-      "fits_depth": true,
-      "fits_height": true
-    }
-  }
 }
 ```
 
@@ -133,31 +96,21 @@ Example workflow:
 
 **"Tray doesn't fit in box"**
 
-1. Check `spatial_layout.fit_check` - shows gaps and whether each dimension fits
-2. Compare `box_interior_mm` vs tray dimensions
-3. Check `box_params.tolerance` setting
+1. Check tray placement in `context.json` for position and dimensions
+2. Compare box dimensions vs tray dimensions in `project.json`
+3. Check tolerance setting in the box config
 
 **"Cutout looks wrong"**
 
 1. Find the tray in `project.json` → look at `topLoadedStacks` or `edgeLoadedStacks`
 2. Check `customShapes` for the shape definition (width, length, baseShape)
-3. View the STL render (`view-tray_X_Name.png`) to see actual geometry
+3. Use `capture-view.ts` to render different angles
 
 **"Trays overlap or collide"**
 
-1. Check `spatial_layout.trays` for position and bounds of each tray
+1. Check tray placements in `context.json` for position and bounds
 2. Verify Y positions are sequential (tray 1 ends where tray 2 starts)
-3. Look at `combined_analysis.issues` for collision warnings
-
-**"Degenerate faces" errors**
-
-- Normal for CSG operations, won't affect printing
-- Only concern if count is very high (1000+)
-
-**"Not watertight" warnings**
-
-- Expected for trays, boxes, and lids (they have open tops/cavities)
-- Not an error
+3. Use the app's layout editor to visualize positioning
 
 ### Key Dimensions to Check
 
@@ -169,52 +122,40 @@ Tray placement is relative to box interior origin
 Total tray depth = last_tray.position.y + last_tray.depth
 ```
 
-### Python Environment
-
-The mesh analyzer requires Python dependencies:
-
-```bash
-cd scripts
-python -m venv .venv
-source .venv/bin/activate  # fish: source .venv/bin/activate.fish
-pip install -r requirements.txt
-```
-
 ## 3D Navigation for Claude
 
-Claude can navigate and inspect 3D geometry using `scripts/render-view.py`.
+Claude can navigate and inspect 3D geometry using `scripts/capture-view.ts`, which uses Playwright to render the actual app with the same materials, lighting, and counters.
 
 ### Basic Usage
 
 ```bash
-# Activate Python environment first
-source scripts/.venv/bin/activate
+# Ensure dev server is running first (npm run dev)
 
 # View from preset angles
-python scripts/render-view.py --stl mesh-analysis/box.stl --angle iso
-python scripts/render-view.py --stl mesh-analysis/box.stl --angle left
-python scripts/render-view.py --stl mesh-analysis/box.stl --angle front
+npx tsx scripts/capture-view.ts --angle iso
+npx tsx scripts/capture-view.ts --angle left
+npx tsx scripts/capture-view.ts --angle front
 
 # Zoom in (2x, 3x, etc.)
-python scripts/render-view.py --stl mesh-analysis/box.stl --angle left --zoom 3
+npx tsx scripts/capture-view.ts --angle left --zoom 3
 
-# Get coordinate bounds
-python scripts/render-view.py --stl mesh-analysis/box.stl --probe
+# Custom camera position (Three.js Y-up coordinates)
+npx tsx scripts/capture-view.ts --pos "100,80,150" --look-at "0,25,50"
 
-# Custom camera position
-python scripts/render-view.py --stl mesh-analysis/box.stl --pos "50,0,30" --look-at "5,10,20"
+# Output to specific file
+npx tsx scripts/capture-view.ts --angle top --out mesh-analysis/view-top.png
 ```
 
 ### Preset Angles
 
 | Angle       | View                       |
 | ----------- | -------------------------- |
-| `front`     | Looking from -Y toward +Y  |
-| `back`      | Looking from +Y toward -Y  |
+| `front`     | Looking from +Z toward -Z  |
+| `back`      | Looking from -Z toward +Z  |
 | `left`      | Looking from -X toward +X  |
 | `right`     | Looking from +X toward -X  |
-| `top`       | Looking from +Z down       |
-| `bottom`    | Looking from -Z up         |
+| `top`       | Looking from +Y down       |
+| `bottom`    | Looking from -Y up         |
 | `iso`       | Isometric from front-right |
 | `iso-back`  | Isometric from back-left   |
 | `iso-left`  | Isometric from front-left  |
@@ -226,8 +167,8 @@ Create a JSON file with colored markers at key positions:
 
 ```json
 {
-  "groove_bottom": { "pos": [4.0, 10, 12], "color": "green" },
-  "ramp_position": { "pos": [4.0, 10, 15], "color": "red" },
+  "groove_bottom": { "pos": [4.0, 12, 10], "color": "green" },
+  "ramp_position": { "pos": [4.0, 15, 10], "color": "red" },
   "target_position": { "pos": [4.0, 10, 10], "color": "yellow" }
 }
 ```
@@ -235,7 +176,7 @@ Create a JSON file with colored markers at key positions:
 Then render with markers:
 
 ```bash
-python scripts/render-view.py --stl mesh-analysis/box.stl --markers markers.json --angle iso
+npx tsx scripts/capture-view.ts --markers mesh-analysis/markers.json --angle iso
 ```
 
 Available colors: `red`, `green`, `blue`, `yellow`, `cyan`, `magenta`, `orange`, `white`
@@ -246,27 +187,28 @@ Available colors: `red`, `green`, `blue`, `yellow`, `cyan`, `magenta`, `orange`,
 
 1. **Make code changes** to geometry files
 2. **Regenerate**: `npx tsx scripts/generate-geometry.ts`
-3. **Probe coordinates**: `python scripts/render-view.py --stl mesh-analysis/box.stl --probe`
-4. **Render overview**: `python scripts/render-view.py --stl mesh-analysis/box.stl --angle iso --out mesh-analysis/view.png`
-5. **Read the image**: Use Read tool on mesh-analysis/view.png
-6. **Add markers** to understand positions:
+3. **Render overview**: `npx tsx scripts/capture-view.ts --angle iso --out mesh-analysis/view.png`
+4. **Read the image**: Use Read tool on mesh-analysis/view.png
+5. **Add markers** to understand positions:
    ```bash
-   # Create mesh-analysis/test-markers.json with positions to check
-   echo '{"current": {"pos": [5, 2, 21], "color": "red"}, "target": {"pos": [5, 3, 21], "color": "green"}}' > mesh-analysis/test-markers.json
-   python scripts/render-view.py --stl mesh-analysis/box.stl --markers mesh-analysis/test-markers.json --pos "10,0,24" --look-at "5,2,21"
+   # Create mesh-analysis/markers.json with positions to check
+   echo '{"current": {"pos": [5, 21, 2], "color": "red"}, "target": {"pos": [5, 21, 3], "color": "green"}}' > mesh-analysis/markers.json
+   npx tsx scripts/capture-view.ts --markers mesh-analysis/markers.json --pos "10,24,0" --look-at "5,21,2"
    ```
-7. **Check multiple angles** - top, front, iso, custom positions
-8. **If not correct**: Go back to step 1, make more changes
-9. **When solved**: Inform the user with verification images
+6. **Check multiple angles** - top, front, iso, custom positions
+7. **If not correct**: Go back to step 1, make more changes
+8. **When solved**: Inform the user with verification images
 
 **Key principle**: Don't wait for the user to manually trigger exports. Iterate on your own until satisfied, then show the results.
 
-### Coordinate System
+### Coordinate System (Three.js)
 
 - X: Width (left/right)
-- Y: Depth (front/back)
-- Z: Height (bottom/top)
+- Y: Height (up/down) - **Note: Y is up in Three.js**
+- Z: Depth (front/back)
 - Origin (0,0,0) is at front-left-bottom corner of box
+
+**Important**: The browser-based capture uses Three.js conventions (Y-up), which differs from some 3D modeling tools that use Z-up.
 
 ## App Screenshot & Console Capture
 
@@ -283,19 +225,21 @@ This script:
 - Captures console logs (filtered for specific debug keywords)
 - Takes screenshots: `mesh-analysis/view-current.png`, `mesh-analysis/view-dimensions.png`
 
-**Use cases:**
+**For more control over camera angles and markers**, use `capture-view.ts` instead:
 
-- Debugging layout issues that only appear in the live app
-- Capturing console output from geometry calculations
-- Verifying visual state matches expected geometry
-
-To capture different console output, edit the filter in `capture-screenshot.ts`:
-
-```typescript
-if (text.includes('yourKeyword')) {
-  consoleLogs.push(text);
-}
+```bash
+npx tsx scripts/capture-view.ts --angle iso --out mesh-analysis/view.png
 ```
+
+## ViewCube Navigation
+
+The app includes a TinkerCAD-style ViewCube in the top-right corner of the 3D view:
+
+- **Click faces** (FRONT, TOP, etc.) to snap to orthographic views
+- **Click corners** to snap to isometric views
+- **Cube rotates** to match your current camera orientation
+
+The ViewCube is hidden in debug/capture mode for clean screenshots.
 
 ## Project Structure
 
@@ -303,9 +247,10 @@ if (text.includes('yourKeyword')) {
 - `src/lib/stores/project.svelte.ts` - Project state management
 - `src/lib/workers/geometry.worker.ts` - Web worker for non-blocking geometry generation
 - `src/lib/utils/geometryWorker.ts` - Worker manager and STL export
-- `scripts/mesh-analyzer.py` - Python mesh analysis
-- `scripts/render-view.py` - Scriptable 3D camera renderer
+- `src/lib/components/ViewCube.svelte` - TinkerCAD-style camera navigation cube
+- `scripts/capture-view.ts` - Playwright-based camera capture with debug markers
 - `scripts/capture-screenshot.ts` - Playwright script for app screenshots and console capture
+- `scripts/generate-geometry.ts` - CLI for regenerating STLs from project.json
 - `mesh-analysis/` - Generated debug files (gitignored)
 
 ## CSS Naming Convention

@@ -76,6 +76,13 @@
     type?: 'tray' | 'box';
   }
 
+  // Debug marker type for URL-based rendering
+  interface DebugMarker {
+    name: string;
+    pos: [number, number, number];
+    color: string;
+  }
+
   interface Props {
     geometry: BufferGeometry | null;
     allTrays?: TrayGeometryData[];
@@ -122,6 +129,17 @@
       };
     }>;
     allLayersExplosionAmount?: number;
+    // Debug mode props for URL-based capture
+    debugMode?: boolean;
+    cameraPreset?: string;
+    cameraPosition?: [number, number, number];
+    cameraLookAt?: [number, number, number];
+    cameraZoom?: number;
+    debugMarkers?: DebugMarker[];
+    // Callback to expose camera quaternion for ViewCube sync
+    onCameraQuaternionChange?: (quaternion: [number, number, number, number]) => void;
+    // Selected camera angle from ViewCube (triggers animation)
+    selectedCameraAngle?: string | null;
   }
 
   let {
@@ -161,8 +179,144 @@
     layerLooseTrayPlacements = [],
     showAllLayers = false,
     allLayerArrangements = [],
-    allLayersExplosionAmount = 50
+    allLayersExplosionAmount = 50,
+    // Debug mode props
+    debugMode = false,
+    cameraPreset,
+    cameraPosition,
+    cameraLookAt,
+    cameraZoom = 1,
+    debugMarkers = [],
+    onCameraQuaternionChange,
+    selectedCameraAngle
   }: Props = $props();
+
+  // Debug marker color map
+  const DEBUG_COLORS: Record<string, number> = {
+    red: 0xff0000,
+    green: 0x00ff00,
+    blue: 0x0000ff,
+    yellow: 0xffff00,
+    cyan: 0x00ffff,
+    magenta: 0xff00ff,
+    orange: 0xff8800,
+    white: 0xffffff
+  };
+
+  // Camera preset angles - calculates camera position based on scene bounds
+  function getPresetCamera(
+    angle: string,
+    center: THREE.Vector3,
+    size: number
+  ): { pos: THREE.Vector3; target: THREE.Vector3 } {
+    const distance = size * 2.5;
+    const presets: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }> = {
+      front: {
+        pos: new THREE.Vector3(center.x, center.y + size * 0.3, center.z + distance),
+        target: center
+      },
+      back: {
+        pos: new THREE.Vector3(center.x, center.y + size * 0.3, center.z - distance),
+        target: center
+      },
+      left: {
+        pos: new THREE.Vector3(center.x - distance, center.y + size * 0.3, center.z),
+        target: center
+      },
+      right: {
+        pos: new THREE.Vector3(center.x + distance, center.y + size * 0.3, center.z),
+        target: center
+      },
+      top: {
+        pos: new THREE.Vector3(center.x, center.y + distance, center.z),
+        target: center
+      },
+      bottom: {
+        pos: new THREE.Vector3(center.x, center.y - distance, center.z),
+        target: center
+      },
+      iso: {
+        pos: new THREE.Vector3(
+          center.x + distance * 0.7,
+          center.y + distance * 0.5,
+          center.z + distance * 0.7
+        ),
+        target: center
+      },
+      'iso-back': {
+        pos: new THREE.Vector3(
+          center.x - distance * 0.7,
+          center.y + distance * 0.5,
+          center.z - distance * 0.7
+        ),
+        target: center
+      },
+      'iso-left': {
+        pos: new THREE.Vector3(
+          center.x - distance * 0.7,
+          center.y + distance * 0.5,
+          center.z + distance * 0.7
+        ),
+        target: center
+      },
+      'iso-right': {
+        pos: new THREE.Vector3(
+          center.x + distance * 0.7,
+          center.y + distance * 0.5,
+          center.z - distance * 0.7
+        ),
+        target: center
+      }
+    };
+    return presets[angle] || presets['iso'];
+  }
+
+  // Animate camera to a preset angle (used by ViewCube)
+  function animateCameraToAngle(angle: string) {
+    if (!camera.current) return;
+    const cam = camera.current as THREE.PerspectiveCamera;
+
+    // Calculate scene center and size
+    const sceneCenter = new THREE.Vector3(0, printBedSize * 0.3, printBedSize / 2);
+    const sceneSize = printBedSize;
+
+    const preset = getPresetCamera(angle, sceneCenter, sceneSize);
+    const zoomedPos = preset.pos.clone();
+    if (cameraZoom && cameraZoom !== 1) {
+      // Move camera closer/further based on zoom
+      const dir = zoomedPos.clone().sub(preset.target).normalize();
+      const dist = zoomedPos.distanceTo(preset.target) / cameraZoom;
+      zoomedPos.copy(preset.target).add(dir.multiplyScalar(dist));
+    }
+
+    // Animate smoothly (simple lerp over frames)
+    const startPos = cam.position.clone();
+    const startTarget = new THREE.Vector3();
+    cam.getWorldDirection(startTarget);
+    startTarget.multiplyScalar(100).add(cam.position);
+
+    let progress = 0;
+    const animate = () => {
+      progress += 0.1;
+      if (progress >= 1) {
+        cam.position.copy(zoomedPos);
+        cam.lookAt(preset.target);
+        return;
+      }
+      const t = 1 - Math.pow(1 - progress, 3); // ease out cubic
+      cam.position.lerpVectors(startPos, zoomedPos, t);
+      cam.lookAt(preset.target);
+      requestAnimationFrame(animate);
+    };
+    animate();
+  }
+
+  // Respond to ViewCube angle selection
+  $effect(() => {
+    if (selectedCameraAngle && !debugMode) {
+      animateCameraToAngle(selectedCameraAngle);
+    }
+  });
 
   // Compute actual container dimensions (prefer new props, fallback to legacy printBedSize)
   let gameContainerWidth = $derived(propContainerWidth ?? legacyPrintBedSize ?? 256);
@@ -497,6 +651,46 @@
     }
   });
 
+  // Debug mode: Apply camera settings from URL params
+  let debugCameraApplied = $state(false);
+  $effect(() => {
+    if (!debugMode || !camera.current) return;
+    if (debugCameraApplied) return; // Only apply once
+
+    const cam = camera.current as THREE.PerspectiveCamera;
+
+    // Calculate scene center and size for presets
+    const sceneCenter = new THREE.Vector3(0, printBedSize * 0.3, printBedSize / 2);
+    const sceneSize = printBedSize;
+
+    // Apply camera preset or custom position
+    if (cameraPreset) {
+      const preset = getPresetCamera(cameraPreset, sceneCenter, sceneSize);
+      cam.position.copy(preset.pos);
+      cam.lookAt(preset.target);
+    } else if (cameraPosition) {
+      cam.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+      if (cameraLookAt) {
+        cam.lookAt(cameraLookAt[0], cameraLookAt[1], cameraLookAt[2]);
+      } else {
+        cam.lookAt(sceneCenter);
+      }
+    }
+
+    // Apply zoom by moving camera closer/further
+    if (cameraZoom && cameraZoom !== 1) {
+      const target = cameraLookAt
+        ? new THREE.Vector3(cameraLookAt[0], cameraLookAt[1], cameraLookAt[2])
+        : sceneCenter;
+      const dir = cam.position.clone().sub(target).normalize();
+      const dist = cam.position.distanceTo(target) / cameraZoom;
+      cam.position.copy(target).add(dir.multiplyScalar(dist));
+    }
+
+    cam.updateProjectionMatrix();
+    debugCameraApplied = true;
+  });
+
   // Generate a display label from a counter stack
   function getStackLabel(stack: CounterStack): string {
     // Use user-provided label if available
@@ -513,11 +707,14 @@
   }
 
   // Update label rotation each frame to face the camera (true billboard)
+  // Also track camera quaternion for ViewCube sync
   useTask(() => {
     if (camera.current) {
       // Copy the camera's quaternion so text always faces the camera directly
       const q = camera.current.quaternion;
       labelQuaternion = [q.x, q.y, q.z, q.w];
+      // Notify ViewCube of camera orientation changes
+      onCameraQuaternionChange?.([q.x, q.y, q.z, q.w]);
     }
   });
 
@@ -898,11 +1095,11 @@
       : [0, 0, printBedSize / 2]}
   <OrbitControls
     target={editTarget}
-    enableDamping={!isTransitioning}
-    enabled={!isTransitioning}
-    enableRotate={!anyEditMode && !isTransitioning}
-    enablePan={!anyEditMode && !isTransitioning}
-    enableZoom={!isTransitioning}
+    enableDamping={!isTransitioning && !debugMode}
+    enabled={!isTransitioning && !debugMode}
+    enableRotate={!anyEditMode && !isTransitioning && !debugMode}
+    enablePan={!anyEditMode && !isTransitioning && !debugMode}
+    enableZoom={!isTransitioning && !debugMode}
   />
   <!-- Fade overlay - positioned in front of camera, fades to black during transitions -->
   {#if fadeOverlayOpacity > 0}
@@ -1785,8 +1982,34 @@
   {/each}
 {/if}
 
-<!-- Reference labels for multi-box (print) view (hidden in edit mode) -->
-{#if showReferenceLabels && !isLayoutEditMode && showAllBoxes && allBoxes.length > 0}
+<!-- Debug markers for URL-based capture mode -->
+{#if debugMode && debugMarkers.length > 0}
+  {#each debugMarkers as marker (marker.name)}
+    <T.Mesh position={marker.pos}>
+      <T.SphereGeometry args={[3, 16, 16]} />
+      <T.MeshStandardMaterial
+        color={DEBUG_COLORS[marker.color] ?? DEBUG_COLORS.white}
+        emissive={DEBUG_COLORS[marker.color] ?? DEBUG_COLORS.white}
+        emissiveIntensity={0.5}
+      />
+    </T.Mesh>
+    <!-- Label for marker -->
+    <Text
+      text={marker.name}
+      font={monoFont}
+      fontSize={3}
+      position={[marker.pos[0], marker.pos[1] + 5, marker.pos[2]]}
+      quaternion={labelQuaternion}
+      color="#ffffff"
+      anchorX="center"
+      anchorY="bottom"
+      outlineWidth="10%"
+      outlineColor="#000000"
+    />
+  {/each}
+{/if}
+
+<!-- Reference labels for multi-box (print) view (hidden in edit mode) -->{#if showReferenceLabels && !isLayoutEditMode && showAllBoxes && allBoxes.length > 0}
   {#each allBoxes as boxData, boxIndex (boxData.boxId)}
     {@const boxPos = boxPositions[boxIndex]}
     {@const boxWidth = boxData.boxDimensions.width}

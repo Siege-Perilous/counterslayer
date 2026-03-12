@@ -147,6 +147,97 @@
   let captureTrayLetter = $state<string | null>(null); // Override during PDF export
   let debugExporting = $state(false);
 
+  // Debug mode URL params for Playwright capture
+  interface DebugParams {
+    debugMode: boolean;
+    cameraPreset?: string;
+    cameraPosition?: [number, number, number];
+    cameraLookAt?: [number, number, number];
+    cameraZoom: number;
+    debugMarkers: Array<{ name: string; pos: [number, number, number]; color: string }>;
+    hideUI: boolean;
+  }
+
+  let debugParams = $state<DebugParams>({
+    debugMode: false,
+    cameraZoom: 1,
+    debugMarkers: [],
+    hideUI: false
+  });
+
+  // Parse URL params for debug mode
+  $effect(() => {
+    if (!browser) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const debug = params.get('debug') === '1';
+
+    if (debug) {
+      const angle = params.get('angle') || undefined;
+      const posStr = params.get('pos');
+      const lookAtStr = params.get('lookAt');
+      const zoomStr = params.get('zoom');
+      const markersStr = params.get('markers');
+      const hideUI = params.get('hideUI') === '1';
+
+      // Parse position "x,y,z"
+      let cameraPosition: [number, number, number] | undefined;
+      if (posStr) {
+        const parts = posStr.split(',').map(Number);
+        if (parts.length === 3 && parts.every((n) => !isNaN(n))) {
+          cameraPosition = parts as [number, number, number];
+        }
+      }
+
+      // Parse lookAt "x,y,z"
+      let cameraLookAt: [number, number, number] | undefined;
+      if (lookAtStr) {
+        const parts = lookAtStr.split(',').map(Number);
+        if (parts.length === 3 && parts.every((n) => !isNaN(n))) {
+          cameraLookAt = parts as [number, number, number];
+        }
+      }
+
+      // Parse zoom
+      const cameraZoom = zoomStr ? parseFloat(zoomStr) : 1;
+
+      // Parse markers (base64 JSON)
+      let debugMarkers: Array<{ name: string; pos: [number, number, number]; color: string }> = [];
+      if (markersStr) {
+        try {
+          const decoded = atob(markersStr);
+          const parsed = JSON.parse(decoded);
+          // Convert object format to array format
+          if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+            debugMarkers = Object.entries(parsed).map(([name, value]) => {
+              const v = value as { pos: [number, number, number]; color: string };
+              return { name, pos: v.pos, color: v.color };
+            });
+          }
+        } catch (e) {
+          console.warn('Failed to parse markers:', e);
+        }
+      }
+
+      debugParams = {
+        debugMode: true,
+        cameraPreset: angle,
+        cameraPosition,
+        cameraLookAt,
+        cameraZoom,
+        debugMarkers,
+        hideUI
+      };
+    } else {
+      debugParams = {
+        debugMode: false,
+        cameraZoom: 1,
+        debugMarkers: [],
+        hideUI: false
+      };
+    }
+  });
+
   // Initialize project from localStorage and fetch community projects
   $effect(() => {
     if (browser) {
@@ -1662,11 +1753,18 @@
               allLayerArrangements={visibleGeometries.allLayerArrangements}
               {allLayersExplosionAmount}
               {generating}
+              debugMode={debugParams.debugMode}
+              cameraPreset={debugParams.cameraPreset}
+              cameraPosition={debugParams.cameraPosition}
+              cameraLookAt={debugParams.cameraLookAt}
+              cameraZoom={debugParams.cameraZoom}
+              debugMarkers={debugParams.debugMarkers}
+              hideUI={debugParams.hideUI}
             />
           {/await}
         {/if}
 
-        {#if generating}
+        {#if generating && !debugParams.hideUI}
           <div class="generatingOverlay">
             <Loader />
             <div class="generatingText">Generating geometry...</div>
@@ -1843,15 +1941,17 @@
   </PaneGroup>
 {:else}
   <!-- DESKTOP LAYOUT: PaneGroup with resizable panels -->
-  <NavigationMenu
-    {selectionType}
-    onSelectionChange={handleSelectionChange}
-    onExpandPanel={handleExpandPanel}
-    {isMobile}
-  />
+  {#if !debugParams.hideUI}
+    <NavigationMenu
+      {selectionType}
+      onSelectionChange={handleSelectionChange}
+      onExpandPanel={handleExpandPanel}
+      {isMobile}
+    />
+  {/if}
 
   <PaneGroup direction="horizontal" class="paneGroup">
-    <Pane defaultSize={75} minSize={30}>
+    <Pane defaultSize={debugParams.hideUI ? 100 : 75} minSize={30}>
       <main class="mainView">
         {#if browser}
           {#await import('$lib/components/TrayViewer.svelte') then { default: TrayViewer }}
@@ -1891,18 +1991,25 @@
               allLayerArrangements={visibleGeometries.allLayerArrangements}
               {allLayersExplosionAmount}
               {generating}
+              debugMode={debugParams.debugMode}
+              cameraPreset={debugParams.cameraPreset}
+              cameraPosition={debugParams.cameraPosition}
+              cameraLookAt={debugParams.cameraLookAt}
+              cameraZoom={debugParams.cameraZoom}
+              debugMarkers={debugParams.debugMarkers}
+              hideUI={debugParams.hideUI}
             />
           {/await}
         {/if}
 
-        {#if generating}
+        {#if generating && !debugParams.hideUI}
           <div class="generatingOverlay">
             <Loader />
             <div class="generatingText">Generating geometry...</div>
           </div>
         {/if}
 
-        {#if viewMode === 'layer' && !generating}
+        {#if viewMode === 'layer' && !generating && !debugParams.hideUI}
           <div class="viewToolbar">
             <LayerLayoutEditorOverlay
               onEnterEdit={handleEnterLayerLayoutEdit}
@@ -1915,7 +2022,7 @@
           </div>
         {/if}
 
-        {#if viewMode === 'all-no-lid' && !generating}
+        {#if viewMode === 'all-no-lid' && !generating && !debugParams.hideUI}
           <div class="viewToolbar">
             <div class="sliderContainer">
               <span class="sliderLabel">Explode</span>
@@ -1924,7 +2031,7 @@
           </div>
         {/if}
 
-        {#if (viewMode === 'exploded' || viewMode === 'all') && !generating}
+        {#if (viewMode === 'exploded' || viewMode === 'all') && !generating && !debugParams.hideUI}
           <div class="viewToolbar">
             {#if viewMode === 'exploded' && !isLayoutEditMode}
               <div class="sliderContainer">
@@ -1943,6 +2050,7 @@
           </div>
         {/if}
 
+        {#if !debugParams.hideUI}
         <div class="bottomToolbar">
           <input
             bind:this={jsonFileInput}
@@ -2064,8 +2172,9 @@
             </div>
           {/if}
         </div>
+        {/if}
 
-        {#if error}
+        {#if error && !debugParams.hideUI}
           <div class="errorBanner">
             {error}
           </div>
@@ -2073,29 +2182,31 @@
       </main>
     </Pane>
 
-    <PaneResizer class="resizer">
-      <button
-        class="resizer__handle"
-        aria-label={isEditorCollapsed ? 'Expand editor panel' : 'Collapse editor panel'}
-        title={isEditorCollapsed ? 'Expand editor panel' : 'Collapse editor panel'}
-        onclick={handleToggleCollapse}
-      >
-        <Icon Icon={isEditorCollapsed ? IconChevronLeft : IconChevronRight} />
-      </button>
-    </PaneResizer>
+    {#if !debugParams.hideUI}
+      <PaneResizer class="resizer">
+        <button
+          class="resizer__handle"
+          aria-label={isEditorCollapsed ? 'Expand editor panel' : 'Collapse editor panel'}
+          title={isEditorCollapsed ? 'Expand editor panel' : 'Collapse editor panel'}
+          onclick={handleToggleCollapse}
+        >
+          <Icon Icon={isEditorCollapsed ? IconChevronLeft : IconChevronRight} />
+        </button>
+      </PaneResizer>
 
-    <Pane
-      defaultSize={25}
-      minSize={15}
-      maxSize={50}
-      collapsible={true}
-      collapsedSize={0}
-      bind:this={editorPane}
-      onCollapse={() => (isEditorCollapsed = true)}
-      onExpand={() => (isEditorCollapsed = false)}
-    >
-      <EditorPanel {selectionType} {isLayoutEditMode} {gameContainerWidth} {gameContainerDepth} />
-    </Pane>
+      <Pane
+        defaultSize={25}
+        minSize={15}
+        maxSize={50}
+        collapsible={true}
+        collapsedSize={0}
+        bind:this={editorPane}
+        onCollapse={() => (isEditorCollapsed = true)}
+        onExpand={() => (isEditorCollapsed = false)}
+      >
+        <EditorPanel {selectionType} {isLayoutEditMode} {gameContainerWidth} {gameContainerDepth} />
+      </Pane>
+    {/if}
   </PaneGroup>
 {/if}
 
