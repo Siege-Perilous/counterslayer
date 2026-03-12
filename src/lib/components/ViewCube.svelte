@@ -25,15 +25,12 @@
   ];
 
   // Corner definitions - positioned at cube vertices
-  // Cube is 50x50 with faces at ±25px from center.
-  // Corner buttons are 8x8, positioned so their center is at the vertex.
-  // translate3d positions the element's top-left corner, so offset by -4 in X/Y.
-  // Vertices: front-right-top = (25, -25, 25), centered button at (21, -29, 25)
+  // Button is 10x10, offset by -5 to center on vertex
   const corners = [
-    { angle: 'iso', x: 21, y: -29, z: 25 },        // front-right-top
-    { angle: 'iso-left', x: -29, y: -29, z: 25 },  // front-left-top
-    { angle: 'iso-back', x: -29, y: -29, z: -25 }, // back-left-top
-    { angle: 'iso-right', x: 21, y: -29, z: -25 }  // back-right-top
+    { angle: 'iso', x: 45, y: -5, z: 25 },          // front-right-top
+    { angle: 'iso-left', x: -5, y: -5, z: 25 },     // front-left-top
+    { angle: 'iso-back', x: -5, y: -5, z: -25 },    // back-left-top
+    { angle: 'iso-right', x: 45, y: -5, z: -25 }    // back-right-top
   ];
 
   // Convert camera quaternion to CSS 3D matrix
@@ -90,14 +87,18 @@
           </button>
         {/each}
 
-        <!-- Corner click zones - positioned at cube vertices -->
+        <!-- Corner click zones - 3D spheres made of intersecting planes -->
         {#each corners as corner}
           <button
             class="viewCube__corner"
             style="transform: translate3d({corner.x}px, {corner.y}px, {corner.z}px)"
             onclick={() => handleCornerClick(corner.angle)}
             aria-label="Isometric view"
-          ></button>
+          >
+            <span class="viewCube__cornerPlane viewCube__cornerPlane--xy"></span>
+            <span class="viewCube__cornerPlane viewCube__cornerPlane--xz"></span>
+            <span class="viewCube__cornerPlane viewCube__cornerPlane--yz"></span>
+          </button>
         {/each}
       </div>
     </div>
@@ -166,19 +167,47 @@
 
   .viewCube__corner {
     position: absolute;
-    width: 8px;
-    height: 8px;
-    background: rgba(80, 80, 90, 0.9);
-    border: 1px solid rgba(120, 120, 130, 0.8);
-    border-radius: 50%;
+    width: 10px;
+    height: 10px;
     cursor: pointer;
-    transition: background 0.15s;
     padding: 0;
+    border: none;
+    background: transparent;
     transform-style: preserve-3d;
   }
 
-  .viewCube__corner:hover {
-    background: rgba(60, 120, 200, 0.95);
-    border-color: rgba(100, 160, 255, 0.9);
+  .viewCube__cornerPlane {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at 30% 30%,
+      rgba(130, 130, 140, 0.9) 0%,
+      rgba(70, 70, 80, 0.85) 60%,
+      rgba(50, 50, 60, 0.8) 100%
+    );
+    pointer-events: none;
+  }
+
+  .viewCube__cornerPlane--xy {
+    transform: rotateX(0deg);
+  }
+
+  .viewCube__cornerPlane--xz {
+    transform: rotateX(90deg);
+  }
+
+  .viewCube__cornerPlane--yz {
+    transform: rotateY(90deg);
+  }
+
+  .viewCube__corner:hover .viewCube__cornerPlane {
+    background: radial-gradient(
+      circle at 30% 30%,
+      rgba(120, 180, 255, 0.95) 0%,
+      rgba(60, 120, 200, 0.9) 60%,
+      rgba(40, 100, 180, 0.85) 100%
+    );
   }
 </style>
