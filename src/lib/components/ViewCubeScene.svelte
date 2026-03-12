@@ -94,7 +94,7 @@
   const colors = {
     face: '#2a2a2d',
     faceHover: '#555560',
-    edge: '#555560',
+    edge: '#3a3a3d',
     text: '#c8c8d2',
     corner: '#707078'
   };
