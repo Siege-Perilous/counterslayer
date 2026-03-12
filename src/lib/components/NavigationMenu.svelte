@@ -1,6 +1,9 @@
 <script lang="ts">
   import { IconButton, Icon, ConfirmActionButton, Hr, Panel, Popover, Text } from '@tableslayer/ui';
   import { IconX, IconPackage, IconRuler, IconStack2 } from '@tabler/icons-svelte';
+  import { computePosition, offset, flip, shift } from '@floating-ui/dom';
+  import { tick } from 'svelte';
+  import TrayTypePreview from './TrayTypePreview.svelte';
   import {
     getProject,
     getSelectedBox,
@@ -45,6 +48,41 @@
   let selectedLayer = $derived(getSelectedLayer());
   let selectedBox = $derived(getSelectedBox());
   let selectedTray = $derived(getSelectedTray());
+
+  // Hover preview state
+  let hoveredTrayType = $state<TrayType | null>(null);
+  let hoverAnchorElement = $state<HTMLElement | null>(null);
+  let previewElement = $state<HTMLElement | null>(null);
+  let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
+  let previewStyles = $state('');
+
+  function handleTrayTypeHover(trayType: TrayType, element: HTMLElement) {
+    hoverAnchorElement = element;
+    if (hoverTimeout) clearTimeout(hoverTimeout);
+    hoverTimeout = setTimeout(() => {
+      hoveredTrayType = trayType;
+    }, 150);
+  }
+
+  function handleTrayTypeLeave() {
+    if (hoverTimeout) clearTimeout(hoverTimeout);
+    hoverTimeout = null;
+    hoveredTrayType = null;
+  }
+
+  // Position the preview popover using floating-ui
+  $effect(() => {
+    if (hoverAnchorElement && hoveredTrayType && previewElement) {
+      tick().then(async () => {
+        if (!hoverAnchorElement || !previewElement) return;
+        const result = await computePosition(hoverAnchorElement, previewElement, {
+          placement: 'right',
+          middleware: [offset(8), flip(), shift({ padding: 8 })]
+        });
+        previewStyles = `left: ${result.x}px; top: ${result.y}px;`;
+      });
+    }
+  });
 
   function handleDimensionsClick() {
     onSelectionChange('dimensions');
@@ -358,6 +396,8 @@
                         handleAddTray(box.id, 'counter');
                         contentProps.close();
                       }}
+                      onmouseenter={(e) => handleTrayTypeHover('counter', e.currentTarget)}
+                      onmouseleave={handleTrayTypeLeave}
                     >
                       <Text weight={500}>Counters</Text>
                       <Text size="0.75rem" color="var(--fgMuted)">Stacks of geometric tokens</Text>
@@ -368,6 +408,8 @@
                         handleAddTray(box.id, 'cardDraw');
                         contentProps.close();
                       }}
+                      onmouseenter={(e) => handleTrayTypeHover('cardDraw', e.currentTarget)}
+                      onmouseleave={handleTrayTypeLeave}
                     >
                       <Text weight={500}>Card draw</Text>
                       <Text size="0.75rem" color="var(--fgMuted)">Single stack of cards, draw from top</Text>
@@ -378,6 +420,8 @@
                         handleAddTray(box.id, 'cardDivider');
                         contentProps.close();
                       }}
+                      onmouseenter={(e) => handleTrayTypeHover('cardDivider', e.currentTarget)}
+                      onmouseleave={handleTrayTypeLeave}
                     >
                       <Text weight={500}>Card divider</Text>
                       <Text size="0.75rem" color="var(--fgMuted)">Divided stacks of cards, divided by walls</Text>
@@ -388,6 +432,8 @@
                         handleAddTray(box.id, 'cardWell');
                         contentProps.close();
                       }}
+                      onmouseenter={(e) => handleTrayTypeHover('cardWell', e.currentTarget)}
+                      onmouseleave={handleTrayTypeLeave}
                     >
                       <Text weight={500}>Card well</Text>
                       <Text size="0.75rem" color="var(--fgMuted)">Flat stacks of cards</Text>
@@ -398,6 +444,8 @@
                         handleAddTray(box.id, 'cup');
                         contentProps.close();
                       }}
+                      onmouseenter={(e) => handleTrayTypeHover('cup', e.currentTarget)}
+                      onmouseleave={handleTrayTypeLeave}
                     >
                       <Text weight={500}>Cups</Text>
                       <Text size="0.75rem" color="var(--fgMuted)">Segmented cups for loose objects</Text>
@@ -474,6 +522,8 @@
                   handleAddBox(layer.id, 'counter');
                   contentProps.close();
                 }}
+                onmouseenter={(e) => handleTrayTypeHover('counter', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Counters</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Stacks of geometric tokens</Text>
@@ -484,6 +534,8 @@
                   handleAddBox(layer.id, 'cardDraw');
                   contentProps.close();
                 }}
+                onmouseenter={(e) => handleTrayTypeHover('cardDraw', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Card draw</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Single stack of cards, draw from top</Text>
@@ -494,6 +546,8 @@
                   handleAddBox(layer.id, 'cardDivider');
                   contentProps.close();
                 }}
+                onmouseenter={(e) => handleTrayTypeHover('cardDivider', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Card divider</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Divided stacks of cards, divided by walls</Text>
@@ -504,6 +558,8 @@
                   handleAddBox(layer.id, 'cardWell');
                   contentProps.close();
                 }}
+                onmouseenter={(e) => handleTrayTypeHover('cardWell', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Card well</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Flat stacks of cards</Text>
@@ -514,6 +570,8 @@
                   handleAddBox(layer.id, 'cup');
                   contentProps.close();
                 }}
+                onmouseenter={(e) => handleTrayTypeHover('cup', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Cup tray</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Bowl-shaped cups for dice and tokens</Text>
@@ -536,6 +594,8 @@
                   handleAddLooseTray(layer.id, 'counter');
                   contentProps.close();
                 }}
+                onmouseenter={(e) => handleTrayTypeHover('counter', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Counters</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Stacks of geometric tokens</Text>
@@ -546,6 +606,8 @@
                   handleAddLooseTray(layer.id, 'cardDraw');
                   contentProps.close();
                 }}
+                onmouseenter={(e) => handleTrayTypeHover('cardDraw', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Card draw</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Single stack of cards, draw from top</Text>
@@ -556,6 +618,8 @@
                   handleAddLooseTray(layer.id, 'cardDivider');
                   contentProps.close();
                 }}
+                onmouseenter={(e) => handleTrayTypeHover('cardDivider', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Card divider</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Divided stacks of cards, divided by walls</Text>
@@ -566,6 +630,8 @@
                   handleAddLooseTray(layer.id, 'cardWell');
                   contentProps.close();
                 }}
+                onmouseenter={(e) => handleTrayTypeHover('cardWell', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Card well</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Flat stacks of cards</Text>
@@ -576,6 +642,8 @@
                   handleAddLooseTray(layer.id, 'cup');
                   contentProps.close();
                 }}
+                onmouseenter={(e) => handleTrayTypeHover('cup', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Cup tray</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Bowl-shaped cups for dice and tokens</Text>
@@ -594,6 +662,13 @@
     </button>
   </div>
 </Panel>
+
+<!-- Tray type preview popover -->
+{#if hoveredTrayType && hoverAnchorElement}
+  <div bind:this={previewElement} class="popContent trayTypePreviewPopover" style={previewStyles}>
+    <TrayTypePreview trayType={hoveredTrayType} />
+  </div>
+{/if}
 
 <style>
   :global(.navMenu) {
@@ -770,5 +845,14 @@
 
   :global(.trayTypeOption:hover) {
     background: var(--contrastLow);
+  }
+
+  :global(.trayTypePreviewPopover) {
+    position: fixed;
+    z-index: 1100;
+    pointer-events: none;
+    background: var(--contrastLowest);
+    border: var(--borderThin);
+    overflow: hidden;
   }
 </style>

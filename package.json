@@ -17,6 +17,7 @@
     "test": "npm run test:e2e"
   },
   "dependencies": {
+    "@floating-ui/dom": "^1.7.6",
     "@jscad/3mf-serializer": "^2.1.17",
     "@jscad/modeling": "^2.13.0",
     "@jscad/stl-serializer": "^2.1.23",

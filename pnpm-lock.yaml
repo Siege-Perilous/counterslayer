@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@floating-ui/dom':
+        specifier: ^1.7.6
+        version: 1.7.6
       '@jscad/3mf-serializer':
         specifier: ^2.1.17
         version: 2.1.17
