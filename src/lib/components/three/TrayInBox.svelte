@@ -121,7 +121,8 @@
     });
   }
 
-  function handleDoubleClick() {
+  function handleDoubleClick(e: IntersectionEvent<MouseEvent>) {
+    e.stopPropagation();
     onDoubleClick?.(trayId);
   }
 </script>
