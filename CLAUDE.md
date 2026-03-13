@@ -132,7 +132,29 @@ npx tsx scripts/capture-view.ts --pos "100,80,150" --look-at "0,25,50"
 
 # Output to specific file
 npx tsx scripts/capture-view.ts --angle top --out mesh-analysis/view-top.png
+
+# View specific items by ID (selects item and sets appropriate view mode)
+npx tsx scripts/capture-view.ts --trayId nrme206 --angle bottom --zoom 2
 ```
+
+### Viewing Specific Items by ID
+
+Use `--trayId` to view a specific tray in isolation (sets view mode to "tray"):
+
+```bash
+# View a specific tray's bottom (useful for checking text emboss)
+npx tsx scripts/capture-view.ts --trayId <id> --angle bottom --zoom 2
+
+# Get tray IDs from project.json
+cat mesh-analysis/project.json | jq '.layers[].looseTrays[] | {id, name}'
+cat mesh-analysis/project.json | jq '.layers[].boxes[].trays[] | {id, name}'
+```
+
+The app also supports these URL parameters directly:
+- `?trayId=<id>` - Select tray and switch to tray view
+- `?boxId=<id>` - Select box and switch to exploded view
+- `?layerId=<id>` - Select layer and switch to layer view
+- `?view=<mode>` - Set view mode (tray, layer, exploded, all, all-no-lid)
 
 ### Preset Angles
 

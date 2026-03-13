@@ -575,21 +575,75 @@ export function createCardWellTray(
         const textHeightY = maxY - minY + strokeWidth;
 
         const availableWidth = trayWidth - margin * 2;
-        const availableDepth = trayDepth - margin * 2;
         const scaleX = Math.min(1, availableWidth / textWidthCalc);
-        const scaleY = Math.min(1, availableDepth / textHeightY);
-        const textScale = Math.min(scaleX, scaleY);
+        const textScale = Math.min(scaleX, 1);
+        const scaledTextHeight = textHeightY * textScale;
 
+        // Calculate finger hole positions to avoid placing text over them
+        // Finger holes are at the center (Y) of each cell
+        const fingerHoleYPositions: number[] = [];
+        for (const cell of computedCells) {
+          const stack = params.stacks.find((s) => s.cellId === cell.id);
+          if (stack) {
+            const cardSize = getCardSize(cardSizes, stack.cardSizeId);
+            if (cardSize) {
+              const { effectiveWidth, effectiveDepth } = getEffectiveCardDimensions(cardSize, stack.rotation ?? 0);
+              const cavityWidth = Math.min(cell.width, effectiveWidth + clearance * 2);
+              const cavityDepth = Math.min(cell.depth, effectiveDepth + clearance * 2);
+              const smallerDimension = Math.min(cavityWidth, cavityDepth);
+              const fingerHoleRadius = Math.min(fingerHoleMax, smallerDimension * fingerHoleRatio);
+              if (fingerHoleRadius >= 5) {
+                // This cell has a finger hole at its center
+                fingerHoleYPositions.push(cell.y + cell.depth / 2);
+              }
+            }
+          }
+        }
+
+        // Find safe Y position for text (front or back edge where floor is solid)
+        // Front safe zone: from margin to first finger hole minus radius
+        // Back safe zone: from last finger hole plus radius to trayDepth - margin
         const centerX = trayWidth / 2;
-        const centerY = trayDepth / 2;
-        const textCenterX = (minX + maxX) / 2;
-        const textCenterY = (minY + maxY) / 2;
+        let textCenterY: number;
+
+        if (fingerHoleYPositions.length > 0) {
+          const sortedHoles = [...fingerHoleYPositions].sort((a, b) => a - b);
+          const firstHoleY = sortedHoles[0];
+          const lastHoleY = sortedHoles[sortedHoles.length - 1];
+          const holeRadius = fingerHoleMax; // Use max radius for safety margin
+
+          // Calculate available space at front and back
+          const frontSpace = firstHoleY - holeRadius - margin;
+          const backSpace = trayDepth - margin - (lastHoleY + holeRadius);
+
+          // Choose the larger safe area
+          if (frontSpace >= scaledTextHeight / 2 + 1) {
+            // Place at front
+            textCenterY = margin + scaledTextHeight / 2 + 1;
+          } else if (backSpace >= scaledTextHeight / 2 + 1) {
+            // Place at back
+            textCenterY = trayDepth - margin - scaledTextHeight / 2 - 1;
+          } else {
+            // Not enough space, use the larger of the two
+            if (frontSpace > backSpace) {
+              textCenterY = margin + Math.max(scaledTextHeight / 2, frontSpace / 2);
+            } else {
+              textCenterY = trayDepth - margin - Math.max(scaledTextHeight / 2, backSpace / 2);
+            }
+          }
+        } else {
+          // No finger holes, center as before
+          textCenterY = trayDepth / 2;
+        }
+
+        const textCenterXCalc = (minX + maxX) / 2;
+        const textCenterYCalc = (minY + maxY) / 2;
 
         let combinedText = union(...textShapes);
         combinedText = mirrorY(combinedText);
 
         const positionedText = translate(
-          [centerX - textCenterX * textScale, centerY + textCenterY * textScale, -0.1],
+          [centerX - textCenterXCalc * textScale, textCenterY + textCenterYCalc * textScale, -0.1],
           scale([textScale, textScale, 1], combinedText)
         );
         result = subtract(result, positionedText);

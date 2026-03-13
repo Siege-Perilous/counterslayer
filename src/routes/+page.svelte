@@ -78,7 +78,7 @@
     getManualLayerPlacements,
     rotateSelectedItem
   } from '$lib/stores/layerLayoutEditor.svelte';
-  import { saveLayerLayout, clearLayerLayout } from '$lib/stores/project.svelte';
+  import { saveLayerLayout, clearLayerLayout, selectTray, selectBox, selectLayer } from '$lib/stores/project.svelte';
   import { findLayerOverlaps, type LayerItemForSnapping } from '$lib/utils/layerLayoutSnapping';
 
   type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid' | 'layer';
@@ -179,6 +179,25 @@
       const zoomStr = params.get('zoom');
       const markersStr = params.get('markers');
       const hideUI = params.get('hideUI') === '1';
+      const viewParam = params.get('view') as ViewMode | null;
+      const trayIdParam = params.get('trayId');
+      const boxIdParam = params.get('boxId');
+      const layerIdParam = params.get('layerId');
+
+      // Select specific items by ID from URL params
+      if (trayIdParam) {
+        selectTray(trayIdParam);
+        viewMode = 'tray';
+      } else if (boxIdParam) {
+        selectBox(boxIdParam);
+        viewMode = 'exploded';
+      } else if (layerIdParam) {
+        selectLayer(layerIdParam);
+        viewMode = 'layer';
+      } else if (viewParam && ['tray', 'layer', 'exploded', 'all', 'all-no-lid'].includes(viewParam)) {
+        // Set view mode from URL parameter
+        viewMode = viewParam;
+      }
 
       // Parse position "x,y,z"
       let cameraPosition: [number, number, number] | undefined;
@@ -1897,6 +1916,10 @@
           </div>
         {/if}
 
+        {#if !generating}
+          <div data-testid="geometry-ready" style="display: none;"></div>
+        {/if}
+
         {#if viewMode === 'layer' && !generating}
           <div class="viewToolbar">
             <LayerLayoutEditorOverlay
@@ -2133,6 +2156,10 @@
             <Loader />
             <div class="generatingText">Generating geometry...</div>
           </div>
+        {/if}
+
+        {#if !generating}
+          <div data-testid="geometry-ready" style="display: none;"></div>
         {/if}
 
         {#if viewMode === 'layer' && !generating && !debugParams.hideUI}

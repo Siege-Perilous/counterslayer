@@ -27,6 +27,8 @@ function parseArgs() {
     out?: string;
     port?: number;
     debugExport?: boolean;
+    view?: string;
+    trayId?: string;
   } = {};
 
   for (let i = 0; i < args.length; i++) {
@@ -60,6 +62,14 @@ function parseArgs() {
         break;
       case '--port':
         result.port = parseInt(next);
+        i++;
+        break;
+      case '--view':
+        result.view = next;
+        i++;
+        break;
+      case '--trayId':
+        result.trayId = next;
         i++;
         break;
       case '--debug-export':
@@ -178,6 +188,12 @@ async function captureView() {
   if (args.zoom) {
     params.set('zoom', args.zoom.toString());
   }
+  if (args.view) {
+    params.set('view', args.view);
+  }
+  if (args.trayId) {
+    params.set('trayId', args.trayId);
+  }
 
   // Load markers from file if specified
   if (args.markers) {
@@ -205,13 +221,13 @@ async function captureView() {
     await page.goto(url);
 
     // Wait for the page to load
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
 
-    // Wait for geometry to generate
-    await page.waitForTimeout(2000);
+    // Wait for geometry generation to complete (data-testid appears when not generating)
+    await page.waitForSelector('[data-testid="geometry-ready"]', { state: 'attached', timeout: 60000 });
 
-    // Additional wait for WebGL to render
-    await page.waitForTimeout(500);
+    // Additional wait for WebGL to fully render
+    await page.waitForTimeout(1000);
 
     // Ensure output directory exists
     const outputDir = path.dirname(outputPath);
