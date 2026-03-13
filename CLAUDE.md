@@ -151,6 +151,7 @@ cat mesh-analysis/project.json | jq '.layers[].boxes[].trays[] | {id, name}'
 ```
 
 The app also supports these URL parameters directly:
+
 - `?trayId=<id>` - Select tray and switch to tray view
 - `?boxId=<id>` - Select box and switch to exploded view
 - `?layerId=<id>` - Select layer and switch to layer view
