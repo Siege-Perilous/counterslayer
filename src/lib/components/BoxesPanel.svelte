@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon, Select } from '@tableslayer/ui';
+  import { Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon, Select, Text } from '@tableslayer/ui';
   import { IconX, IconPlus } from '@tabler/icons-svelte';
   import type { Box } from '$lib/types/project';
   import { getAllBoxes, getProject, moveBoxToLayer } from '$lib/stores/project.svelte';
@@ -307,7 +307,14 @@
             {#snippet end()}mm{/snippet}
           </FormControl>
         </div>
+      </div>
 
+      <Hr />
+
+      <div class="panelFormSection">
+        <div class="sectionHeader">
+          <h4 class="sectionTitle">Print options</h4>
+        </div>
         <Spacer size="0.5rem" />
         <InputCheckbox
           checked={selectedBox.fillSolidEmpty ?? false}
@@ -316,28 +323,41 @@
         />
         <Spacer size="0.5rem" />
         <InputCheckbox
-          checked={selectedBox.lidParams?.showName ?? true}
-          onchange={(e) =>
+          checked={selectedBox.lidParams?.honeycombEnabled ?? false}
+          onchange={(e) => {
+            const enabled = (e.target as HTMLInputElement).checked;
             onUpdateBox({
               lidParams: {
                 ...selectedBox.lidParams,
-                showName: (e.target as HTMLInputElement).checked
+                honeycombEnabled: enabled,
+                // Turn off emboss when honeycomb is enabled
+                showName: enabled ? false : (selectedBox.lidParams?.showName ?? true)
               }
-            })}
-          label="Emboss name on lid top"
+            });
+          }}
+          label="Honeycomb for lid and box bottom"
         />
         <Spacer size="0.5rem" />
-        <InputCheckbox
-          checked={selectedBox.lidParams?.honeycombEnabled ?? false}
-          onchange={(e) =>
-            onUpdateBox({
-              lidParams: {
-                ...selectedBox.lidParams,
-                honeycombEnabled: (e.target as HTMLInputElement).checked
-              }
-            })}
-          label="Honeycomb lid pattern"
-        />
+        <span class={selectedBox.lidParams?.honeycombEnabled ? 'disabledOption' : ''}>
+          <InputCheckbox
+            checked={!selectedBox.lidParams?.honeycombEnabled && (selectedBox.lidParams?.showName ?? true)}
+            disabled={selectedBox.lidParams?.honeycombEnabled ?? false}
+            onchange={(e) =>
+              onUpdateBox({
+                lidParams: {
+                  ...selectedBox.lidParams,
+                  showName: (e.target as HTMLInputElement).checked
+                }
+              })}
+            label="Emboss name on lid top"
+          />
+        </span>
+        {#if selectedBox.lidParams?.honeycombEnabled}
+          <Spacer size="0.5rem" />
+          <Text color="var(--fgMuted)" size="0.875rem">
+            Text embossing is disabled when honeycomb pattern is enabled
+          </Text>
+        {/if}
       </div>
     </div>
   {:else}
@@ -464,5 +484,17 @@
 
   .emptyStateText {
     font-size: 0.875rem;
+  }
+
+  .helperText {
+    font-size: 0.75rem;
+    color: var(--fgMuted);
+    margin: 0.25rem 0 0 0;
+    font-style: italic;
+  }
+
+  .disabledOption {
+    text-decoration: line-through;
+    opacity: 0.6;
   }
 </style>

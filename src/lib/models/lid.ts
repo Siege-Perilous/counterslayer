@@ -2,6 +2,7 @@ import type { Box, CardSize, CounterShape, LidParams } from '$lib/types/project'
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { arrangeTrays, calculateMinimumBoxDimensions, getBoxInteriorDimensions } from './box';
+import { createHoneycombCutouts, defaultHoneycombParams, type HoneycombExclusion } from './honeycomb';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union, intersect } = jscad.booleans;
@@ -62,126 +63,6 @@ function createRampWedge(
 
   return hull(bottom1, bottom2, bottom3, bottom4, top1, top2, top3, top4);
 }
-
-/**
- * Creates a honeycomb pattern of hexagonal cutouts for lid top.
- * Based on Red Blob Games hex grid math: https://www.redblobgames.com/grids/hexagons/
- *
- * Uses pointy-top hexagons (rotated 30° from JSCAD default).
- * Pointy-top hex with circumradius (size) r:
- *   - Width (flat to flat) = √3 * r
- *   - Height (point to point) = 2r
- *   - Horizontal spacing = √3 * r (hexes share vertical edges)
- *   - Vertical spacing = 1.5 * r (hexes interlock vertically)
- *   - Odd rows offset by √3/2 * r
- *
- * @param width - Total width of the area
- * @param depth - Total depth of the area
- * @param cutDepth - How deep to cut (full plate thickness)
- * @param hexSize - Circumradius of hexagons in mm
- * @param wallThickness - Wall thickness between hexagons
- * @param borderOffset - Solid border width from edges
- * @returns Array of hexagonal cutouts
- */
-function createHoneycombCutouts(
-  width: number,
-  depth: number,
-  cutDepth: number,
-  hexSize: number,
-  wallThickness: number,
-  borderOffset: number
-): Geom3[] {
-  const cutouts: Geom3[] = [];
-
-  // The cut radius is reduced to leave walls between hexes
-  const cutRadius = hexSize - wallThickness / 2;
-  if (cutRadius <= 0) return cutouts;
-
-  // Pointy-top hex grid spacing (from Red Blob Games)
-  const horizSpacing = Math.sqrt(3) * hexSize;
-  const vertSpacing = 1.5 * hexSize;
-  const rowOffset = (Math.sqrt(3) / 2) * hexSize; // Odd row X offset
-
-  // Active area for honeycomb (inside the border)
-  const activeMinX = borderOffset;
-  const activeMaxX = width - borderOffset;
-  const activeMinY = borderOffset;
-  const activeMaxY = depth - borderOffset;
-
-  if (activeMinX >= activeMaxX || activeMinY >= activeMaxY) return cutouts;
-
-  // Clipping box to enforce the border
-  const activeWidth = activeMaxX - activeMinX;
-  const activeHeight = activeMaxY - activeMinY;
-  const cutHeight = cutDepth + 1;
-
-  const clipBox = cuboid({
-    size: [activeWidth, activeHeight, cutHeight + 2],
-    center: [activeMinX + activeWidth / 2, activeMinY + activeHeight / 2, cutHeight / 2 - 0.5]
-  });
-
-  // Extend grid beyond active area so partial hexes appear at edges
-  const gridMinX = activeMinX - cutRadius;
-  const gridMaxX = activeMaxX + cutRadius;
-  const gridMinY = activeMinY - cutRadius;
-  const gridMaxY = activeMaxY + cutRadius;
-
-  const gridWidth = gridMaxX - gridMinX;
-  const gridHeight = gridMaxY - gridMinY;
-
-  const cols = Math.floor(gridWidth / horizSpacing) + 2;
-  const rows = Math.floor(gridHeight / vertSpacing) + 2;
-
-  // Center the grid within the extended area
-  const actualWidth = (cols - 1) * horizSpacing;
-  const actualHeight = (rows - 1) * vertSpacing;
-  const startX = gridMinX + (gridWidth - actualWidth) / 2;
-  const startY = gridMinY + (gridHeight - actualHeight) / 2;
-
-  for (let row = 0; row < rows; row++) {
-    const isOddRow = row % 2 === 1;
-    const xOffset = isOddRow ? rowOffset : 0;
-    const y = startY + row * vertSpacing;
-
-    for (let col = 0; col < cols; col++) {
-      const x = startX + col * horizSpacing + xOffset;
-
-      // Include hex if ANY part of it intersects the active area
-      const hexMinX = x - cutRadius;
-      const hexMaxX = x + cutRadius;
-      const hexMinY = y - cutRadius;
-      const hexMaxY = y + cutRadius;
-
-      const intersectsActive =
-        hexMaxX > activeMinX &&
-        hexMinX < activeMaxX &&
-        hexMaxY > activeMinY &&
-        hexMinY < activeMaxY;
-
-      if (!intersectsActive) continue;
-
-      // Create pointy-top hex by rotating 30° (π/6 radians)
-      let hex: Geom3 = rotateZ(
-        Math.PI / 6,
-        cylinder({
-          radius: cutRadius,
-          height: cutHeight,
-          segments: 6,
-          center: [0, 0, cutHeight / 2]
-        })
-      );
-      hex = translate([x, y, -0.5], hex);
-
-      // Clip hex to active area (creates partial hexes at borders)
-      hex = intersect(hex, clipBox);
-
-      cutouts.push(hex);
-    }
-  }
-
-  return cutouts;
-}
-
 export const defaultLidParams: LidParams = {
   thickness: 2.0,
   railHeight: 6.0,
@@ -199,7 +80,9 @@ export const defaultLidParams: LidParams = {
   rampLockEnabled: true,
   rampHeight: 0.5,
   rampLengthIn: 4.0,
-  rampLengthOut: 1.5
+  rampLengthOut: 1.5,
+  // Honeycomb pattern defaults to off for backwards compatibility
+  honeycombEnabled: false
 };
 
 /**
@@ -1056,6 +939,29 @@ export function createBoxWithLidGrooves(
     }
   }
 
+  // Honeycomb pattern on box floor (uses same toggle as lid honeycomb)
+  const honeycombEnabled = box.lidParams?.honeycombEnabled ?? false;
+  if (honeycombEnabled) {
+    // Create exclusion zones around poke holes
+    const pokeHoleExclusions: HoneycombExclusion[] = placements.map((p) => ({
+      x: wall + tolerance + p.x + p.dimensions.width / 2,
+      y: wall + tolerance + p.y + p.dimensions.depth / 2,
+      radius: POKE_HOLE_DIAMETER / 2
+    }));
+
+    const honeycombCuts = createHoneycombCutouts(
+      extWidth,
+      extDepth,
+      floor,
+      defaultHoneycombParams,
+      pokeHoleExclusions
+    );
+
+    if (honeycombCuts.length > 0) {
+      result = subtract(result, ...honeycombCuts);
+    }
+  }
+
   return result;
 }
 
@@ -1150,14 +1056,11 @@ export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: C
     const borderOffset = box.lidParams?.honeycombBorderOffset ?? 3;
     const plateThickness = wall; // Top plate is 1x wall thickness
 
-    const honeycombCuts = createHoneycombCutouts(
-      extWidth,
-      extDepth,
-      plateThickness,
+    const honeycombCuts = createHoneycombCutouts(extWidth, extDepth, plateThickness, {
       hexSize,
-      honeycombWall,
+      wallThickness: honeycombWall,
       borderOffset
-    );
+    });
 
     if (honeycombCuts.length > 0) {
       lid = subtract(lid, ...honeycombCuts);

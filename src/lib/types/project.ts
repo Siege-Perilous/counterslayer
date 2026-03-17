@@ -179,6 +179,8 @@ export interface Box {
   fillSolidEmpty?: boolean; // true = solid fill (default), false = walls only
   // Manual layout (when set, overrides auto-arrangement)
   manualLayout?: ManualTrayPlacement[];
+  // Honeycomb pattern on box bottom (reduces filament)
+  bottomHoneycombEnabled?: boolean;
 }
 
 // Project-level global settings (used as defaults and shown even without counter trays)
