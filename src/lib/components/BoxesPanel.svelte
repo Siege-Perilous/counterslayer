@@ -326,6 +326,18 @@
             })}
           label="Emboss name on lid top"
         />
+        <Spacer size="0.5rem" />
+        <InputCheckbox
+          checked={selectedBox.lidParams?.honeycombEnabled ?? false}
+          onchange={(e) =>
+            onUpdateBox({
+              lidParams: {
+                ...selectedBox.lidParams,
+                honeycombEnabled: (e.target as HTMLInputElement).checked
+              }
+            })}
+          label="Honeycomb lid pattern"
+        />
       </div>
     </div>
   {:else}

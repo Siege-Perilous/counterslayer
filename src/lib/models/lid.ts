@@ -63,6 +63,73 @@ function createRampWedge(
   return hull(bottom1, bottom2, bottom3, bottom4, top1, top2, top3, top4);
 }
 
+/**
+ * Creates a grid pattern of square cutouts for lid top.
+ *
+ * @param width - Total width of the area
+ * @param depth - Total depth of the area
+ * @param cutDepth - How deep to cut (full plate thickness)
+ * @param cellSize - Size of each cell (square side + wall)
+ * @param wallThickness - Wall thickness between squares
+ * @param borderOffset - Solid border width from edges
+ * @returns Array of square cutouts
+ */
+function createHoneycombCutouts(
+  width: number,
+  depth: number,
+  cutDepth: number,
+  cellSize: number,
+  wallThickness: number,
+  borderOffset: number
+): Geom3[] {
+  const cutouts: Geom3[] = [];
+
+  // Square cutout size (cell minus wall)
+  const squareSize = cellSize * 2 - wallThickness;
+  if (squareSize <= 0) return cutouts;
+
+  // Grid spacing (center to center)
+  const spacing = cellSize * 2;
+
+  // Usable area (leave solid border for wall connection)
+  const halfSquare = squareSize / 2;
+  const minX = borderOffset + halfSquare;
+  const maxX = width - borderOffset - halfSquare;
+  const minY = borderOffset + halfSquare;
+  const maxY = depth - borderOffset - halfSquare;
+
+  if (minX >= maxX || minY >= maxY) return cutouts;
+
+  // Calculate grid dimensions
+  const gridWidth = maxX - minX;
+  const gridHeight = maxY - minY;
+  const cols = Math.floor(gridWidth / spacing) + 1;
+  const rows = Math.floor(gridHeight / spacing) + 1;
+
+  // Center the grid
+  const actualWidth = (cols - 1) * spacing;
+  const actualHeight = (rows - 1) * spacing;
+  const startX = minX + (gridWidth - actualWidth) / 2;
+  const startY = minY + (gridHeight - actualHeight) / 2;
+
+  const cutHeight = cutDepth + 1;
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const x = startX + col * spacing;
+      const y = startY + row * spacing;
+
+      const square = cuboid({
+        size: [squareSize, squareSize, cutHeight],
+        center: [x, y, cutHeight / 2 - 0.5]
+      });
+      cutouts.push(square);
+    }
+  }
+
+  return cutouts;
+}
+
 export const defaultLidParams: LidParams = {
   thickness: 2.0,
   railHeight: 6.0,
@@ -1022,6 +1089,29 @@ export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: C
 
   let lid = subtract(solid, cavity);
 
+  // Honeycomb pattern on top plate only (if enabled)
+  // The "top plate" is the flat printing surface at Z=0 to Z=wall
+  const honeycombEnabled = box.lidParams?.honeycombEnabled ?? false;
+  if (honeycombEnabled) {
+    const hexSize = box.lidParams?.honeycombHexSize ?? 5;
+    const honeycombWall = box.lidParams?.honeycombWallThickness ?? 1.2;
+    const borderOffset = box.lidParams?.honeycombBorderOffset ?? 3;
+    const plateThickness = wall; // Top plate is 1x wall thickness
+
+    const honeycombCuts = createHoneycombCutouts(
+      extWidth,
+      extDepth,
+      plateThickness,
+      hexSize,
+      honeycombWall,
+      borderOffset
+    );
+
+    if (honeycombCuts.length > 0) {
+      lid = subtract(lid, ...honeycombCuts);
+    }
+  }
+
   // Lid slides along the LONGEST dimension for better ergonomics
   const slidesAlongX = extWidth > extDepth;
 
@@ -1529,9 +1619,9 @@ export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: C
     }
   }
 
-  // 4. Emboss box name on lid top if enabled
+  // 4. Emboss box name on lid top if enabled (disabled when honeycomb is enabled)
   const showName = box.lidParams?.showName ?? true;
-  if (showName && box.name && box.name.trim().length > 0) {
+  if (showName && !honeycombEnabled && box.name && box.name.trim().length > 0) {
     const textDepth = 0.6; // How deep the text is recessed
     const strokeWidth = 1.4; // Width of the text strokes (thicker = bolder)
     const textHeight = 8; // Font height in mm

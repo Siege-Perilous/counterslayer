@@ -120,6 +120,11 @@ export interface LidParams {
   rampLengthOut: number; // Exit slope length in mm (default: 1.5, shorter = harder to remove)
   // Text embossing
   showName: boolean; // Emboss box name on lid top (default true)
+  // Honeycomb infill pattern (reduces filament, maintains structure)
+  honeycombEnabled?: boolean; // Enable honeycomb pattern on lid top (default: false)
+  honeycombHexSize?: number; // Hexagon circumradius in mm (default: 5)
+  honeycombWallThickness?: number; // Wall thickness between hexagons (default: 1.2)
+  honeycombBorderOffset?: number; // Solid border width from edges (default: 3)
 }
 
 // Manual tray placement for layout editor (within a box)
