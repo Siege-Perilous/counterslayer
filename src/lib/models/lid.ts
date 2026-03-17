@@ -5,7 +5,7 @@ import { arrangeTrays, calculateMinimumBoxDimensions, getBoxInteriorDimensions }
 import { createHoneycombCutouts, defaultHoneycombParams, type HoneycombExclusion } from './honeycomb';
 
 const { cuboid, cylinder } = jscad.primitives;
-const { subtract, union, intersect } = jscad.booleans;
+const { subtract, union } = jscad.booleans;
 const { hull } = jscad.hulls;
 const { translate, rotateX, rotateY, rotateZ, scale, mirrorY } = jscad.transforms;
 const { vectorText } = jscad.text;
@@ -949,13 +949,7 @@ export function createBoxWithLidGrooves(
       radius: POKE_HOLE_DIAMETER / 2
     }));
 
-    const honeycombCuts = createHoneycombCutouts(
-      extWidth,
-      extDepth,
-      floor,
-      defaultHoneycombParams,
-      pokeHoleExclusions
-    );
+    const honeycombCuts = createHoneycombCutouts(extWidth, extDepth, floor, defaultHoneycombParams, pokeHoleExclusions);
 
     if (honeycombCuts.length > 0) {
       result = subtract(result, ...honeycombCuts);

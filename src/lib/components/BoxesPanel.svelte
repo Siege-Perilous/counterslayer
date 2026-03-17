@@ -486,13 +486,6 @@
     font-size: 0.875rem;
   }
 
-  .helperText {
-    font-size: 0.75rem;
-    color: var(--fgMuted);
-    margin: 0.25rem 0 0 0;
-    font-style: italic;
-  }
-
   .disabledOption {
     text-decoration: line-through;
     opacity: 0.6;
