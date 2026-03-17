@@ -4,7 +4,7 @@ import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { arrangeTrays, calculateMinimumBoxDimensions, getBoxInteriorDimensions } from './box';
 
 const { cuboid, cylinder } = jscad.primitives;
-const { subtract, union } = jscad.booleans;
+const { subtract, union, intersect } = jscad.booleans;
 const { hull } = jscad.hulls;
 const { translate, rotateX, rotateY, rotateZ, scale, mirrorY } = jscad.transforms;
 const { vectorText } = jscad.text;
@@ -64,66 +64,118 @@ function createRampWedge(
 }
 
 /**
- * Creates a grid pattern of square cutouts for lid top.
+ * Creates a honeycomb pattern of hexagonal cutouts for lid top.
+ * Based on Red Blob Games hex grid math: https://www.redblobgames.com/grids/hexagons/
+ *
+ * Uses pointy-top hexagons (rotated 30° from JSCAD default).
+ * Pointy-top hex with circumradius (size) r:
+ *   - Width (flat to flat) = √3 * r
+ *   - Height (point to point) = 2r
+ *   - Horizontal spacing = √3 * r (hexes share vertical edges)
+ *   - Vertical spacing = 1.5 * r (hexes interlock vertically)
+ *   - Odd rows offset by √3/2 * r
  *
  * @param width - Total width of the area
  * @param depth - Total depth of the area
  * @param cutDepth - How deep to cut (full plate thickness)
- * @param cellSize - Size of each cell (square side + wall)
- * @param wallThickness - Wall thickness between squares
+ * @param hexSize - Circumradius of hexagons in mm
+ * @param wallThickness - Wall thickness between hexagons
  * @param borderOffset - Solid border width from edges
- * @returns Array of square cutouts
+ * @returns Array of hexagonal cutouts
  */
 function createHoneycombCutouts(
   width: number,
   depth: number,
   cutDepth: number,
-  cellSize: number,
+  hexSize: number,
   wallThickness: number,
   borderOffset: number
 ): Geom3[] {
   const cutouts: Geom3[] = [];
 
-  // Square cutout size (cell minus wall)
-  const squareSize = cellSize * 2 - wallThickness;
-  if (squareSize <= 0) return cutouts;
+  // The cut radius is reduced to leave walls between hexes
+  const cutRadius = hexSize - wallThickness / 2;
+  if (cutRadius <= 0) return cutouts;
 
-  // Grid spacing (center to center)
-  const spacing = cellSize * 2;
+  // Pointy-top hex grid spacing (from Red Blob Games)
+  const horizSpacing = Math.sqrt(3) * hexSize;
+  const vertSpacing = 1.5 * hexSize;
+  const rowOffset = (Math.sqrt(3) / 2) * hexSize; // Odd row X offset
 
-  // Usable area (leave solid border for wall connection)
-  const halfSquare = squareSize / 2;
-  const minX = borderOffset + halfSquare;
-  const maxX = width - borderOffset - halfSquare;
-  const minY = borderOffset + halfSquare;
-  const maxY = depth - borderOffset - halfSquare;
+  // Active area for honeycomb (inside the border)
+  const activeMinX = borderOffset;
+  const activeMaxX = width - borderOffset;
+  const activeMinY = borderOffset;
+  const activeMaxY = depth - borderOffset;
 
-  if (minX >= maxX || minY >= maxY) return cutouts;
+  if (activeMinX >= activeMaxX || activeMinY >= activeMaxY) return cutouts;
 
-  // Calculate grid dimensions
-  const gridWidth = maxX - minX;
-  const gridHeight = maxY - minY;
-  const cols = Math.floor(gridWidth / spacing) + 1;
-  const rows = Math.floor(gridHeight / spacing) + 1;
-
-  // Center the grid
-  const actualWidth = (cols - 1) * spacing;
-  const actualHeight = (rows - 1) * spacing;
-  const startX = minX + (gridWidth - actualWidth) / 2;
-  const startY = minY + (gridHeight - actualHeight) / 2;
-
+  // Clipping box to enforce the border
+  const activeWidth = activeMaxX - activeMinX;
+  const activeHeight = activeMaxY - activeMinY;
   const cutHeight = cutDepth + 1;
 
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const x = startX + col * spacing;
-      const y = startY + row * spacing;
+  const clipBox = cuboid({
+    size: [activeWidth, activeHeight, cutHeight + 2],
+    center: [activeMinX + activeWidth / 2, activeMinY + activeHeight / 2, cutHeight / 2 - 0.5]
+  });
 
-      const square = cuboid({
-        size: [squareSize, squareSize, cutHeight],
-        center: [x, y, cutHeight / 2 - 0.5]
-      });
-      cutouts.push(square);
+  // Extend grid beyond active area so partial hexes appear at edges
+  const gridMinX = activeMinX - cutRadius;
+  const gridMaxX = activeMaxX + cutRadius;
+  const gridMinY = activeMinY - cutRadius;
+  const gridMaxY = activeMaxY + cutRadius;
+
+  const gridWidth = gridMaxX - gridMinX;
+  const gridHeight = gridMaxY - gridMinY;
+
+  const cols = Math.floor(gridWidth / horizSpacing) + 2;
+  const rows = Math.floor(gridHeight / vertSpacing) + 2;
+
+  // Center the grid within the extended area
+  const actualWidth = (cols - 1) * horizSpacing;
+  const actualHeight = (rows - 1) * vertSpacing;
+  const startX = gridMinX + (gridWidth - actualWidth) / 2;
+  const startY = gridMinY + (gridHeight - actualHeight) / 2;
+
+  for (let row = 0; row < rows; row++) {
+    const isOddRow = row % 2 === 1;
+    const xOffset = isOddRow ? rowOffset : 0;
+    const y = startY + row * vertSpacing;
+
+    for (let col = 0; col < cols; col++) {
+      const x = startX + col * horizSpacing + xOffset;
+
+      // Include hex if ANY part of it intersects the active area
+      const hexMinX = x - cutRadius;
+      const hexMaxX = x + cutRadius;
+      const hexMinY = y - cutRadius;
+      const hexMaxY = y + cutRadius;
+
+      const intersectsActive =
+        hexMaxX > activeMinX &&
+        hexMinX < activeMaxX &&
+        hexMaxY > activeMinY &&
+        hexMinY < activeMaxY;
+
+      if (!intersectsActive) continue;
+
+      // Create pointy-top hex by rotating 30° (π/6 radians)
+      let hex: Geom3 = rotateZ(
+        Math.PI / 6,
+        cylinder({
+          radius: cutRadius,
+          height: cutHeight,
+          segments: 6,
+          center: [0, 0, cutHeight / 2]
+        })
+      );
+      hex = translate([x, y, -0.5], hex);
+
+      // Clip hex to active area (creates partial hexes at borders)
+      hex = intersect(hex, clipBox);
+
+      cutouts.push(hex);
     }
   }
 
