@@ -2,7 +2,12 @@ import type { Box, CardSize, CounterShape, LidParams } from '$lib/types/project'
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { arrangeTrays, calculateMinimumBoxDimensions, getBoxInteriorDimensions } from './box';
-import { createHoneycombCutouts, defaultHoneycombParams, type HoneycombExclusion } from './honeycomb';
+import {
+  createHoneycombCutouts,
+  createHoneycombUnion,
+  defaultHoneycombParams,
+  type HoneycombExclusion
+} from './honeycomb';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
@@ -949,10 +954,10 @@ export function createBoxWithLidGrooves(
       radius: POKE_HOLE_DIAMETER / 2
     }));
 
-    const honeycombCuts = createHoneycombCutouts(extWidth, extDepth, floor, defaultHoneycombParams, pokeHoleExclusions);
+    const honeycombUnion = createHoneycombUnion(extWidth, extDepth, floor, defaultHoneycombParams, pokeHoleExclusions);
 
-    if (honeycombCuts.length > 0) {
-      result = subtract(result, ...honeycombCuts);
+    if (honeycombUnion) {
+      result = subtract(result, honeycombUnion);
     }
   }
 
@@ -1050,14 +1055,14 @@ export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: C
     const borderOffset = box.lidParams?.honeycombBorderOffset ?? 3;
     const plateThickness = wall; // Top plate is 1x wall thickness
 
-    const honeycombCuts = createHoneycombCutouts(extWidth, extDepth, plateThickness, {
+    const honeycombUnion = createHoneycombUnion(extWidth, extDepth, plateThickness, {
       hexSize,
       wallThickness: honeycombWall,
       borderOffset
     });
 
-    if (honeycombCuts.length > 0) {
-      lid = subtract(lid, ...honeycombCuts);
+    if (honeycombUnion) {
+      lid = subtract(lid, honeycombUnion);
     }
   }
 

@@ -8,7 +8,7 @@ import { getCardDrawTrayDimensions } from './cardTray';
 import { getCardWellTrayDimensions } from './cardWellTray';
 import type { CounterTrayParams } from './counterTray';
 import { getCupTrayDimensions } from './cupTray';
-import { createHoneycombCutouts, defaultHoneycombParams } from './honeycomb';
+import { createHoneycombUnion, defaultHoneycombParams } from './honeycomb';
 
 const { cylinder } = jscad.primitives;
 const { subtract } = jscad.booleans;
@@ -749,15 +749,15 @@ export function createBox(box: Box, cardSizes: CardSize[] = [], counterShapes: C
 
   // Honeycomb pattern on floor (if enabled)
   if (box.bottomHoneycombEnabled) {
-    const honeycombCuts = createHoneycombCutouts(
+    const honeycombUnion = createHoneycombUnion(
       exteriorWidth,
       exteriorDepth,
       box.floorThickness,
       defaultHoneycombParams
     );
 
-    if (honeycombCuts.length > 0) {
-      result = subtract(result, ...honeycombCuts);
+    if (honeycombUnion) {
+      result = subtract(result, honeycombUnion);
     }
   }
 

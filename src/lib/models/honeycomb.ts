@@ -7,7 +7,7 @@ import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
 const { cuboid, cylinder } = jscad.primitives;
-const { intersect, subtract } = jscad.booleans;
+const { intersect, subtract, union } = jscad.booleans;
 const { translate, rotateZ } = jscad.transforms;
 
 export interface HoneycombParams {
@@ -128,6 +128,18 @@ export function createHoneycombCutouts(
 
       if (!intersectsActive) continue;
 
+      // Check if hex is fully inside the active area (no clipping needed)
+      const fullyInside =
+        hexMinX >= activeMinX && hexMaxX <= activeMaxX && hexMinY >= activeMinY && hexMaxY <= activeMaxY;
+
+      // For exclusions, check if hex is near any exclusion zone
+      const nearExclusion = exclusions.some((exc) => {
+        const dx = x - exc.x;
+        const dy = y - exc.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        return dist < exc.radius + borderOffset + cutRadius;
+      });
+
       // Create pointy-top hex by rotating 30° (π/6 radians)
       let hex: Geom3 = rotateZ(
         Math.PI / 6,
@@ -140,12 +152,38 @@ export function createHoneycombCutouts(
       );
       hex = translate([x, y, -0.5], hex);
 
-      // Clip hex to active area and exclusions (creates partial hexes at borders)
-      hex = intersect(hex, clipRegion);
+      // Only clip hexes at edges or near exclusions - interior hexes don't need expensive CSG
+      if (!fullyInside || nearExclusion) {
+        hex = intersect(hex, clipRegion);
+      }
 
       cutouts.push(hex);
     }
   }
 
   return cutouts;
+}
+
+/**
+ * Creates a honeycomb pattern as a single unioned geometry.
+ * More efficient than createHoneycombCutouts when subtracting from a complex shape.
+ *
+ * @param width - Total width of the area (X)
+ * @param depth - Total depth of the area (Y)
+ * @param cutDepth - How deep to cut (full plate thickness)
+ * @param params - Honeycomb parameters
+ * @param exclusions - Optional circular exclusion zones (e.g., poke holes)
+ * @returns Single unioned geometry of all hexagonal cutouts, or null if no cutouts
+ */
+export function createHoneycombUnion(
+  width: number,
+  depth: number,
+  cutDepth: number,
+  params: HoneycombParams = defaultHoneycombParams,
+  exclusions: HoneycombExclusion[] = []
+): Geom3 | null {
+  const cutouts = createHoneycombCutouts(width, depth, cutDepth, params, exclusions);
+  if (cutouts.length === 0) return null;
+  if (cutouts.length === 1) return cutouts[0];
+  return union(cutouts);
 }
