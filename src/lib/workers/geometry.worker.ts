@@ -518,6 +518,13 @@ function findTrayById(layers: Layer[], trayId: string): Tray | undefined {
  */
 function handleGenerate(msg: GenerateMessage): void {
   const { id, project, selectedBoxId, selectedTrayId } = msg;
+  const timings: { name: string; ms: number }[] = [];
+  const time = (name: string, fn: () => void) => {
+    const start = performance.now();
+    fn();
+    const elapsed = performance.now() - start;
+    timings.push({ name, ms: elapsed });
+  };
 
   try {
     const box = selectedBoxId ? findBoxById(project.layers, selectedBoxId) : undefined;
@@ -609,7 +616,10 @@ function handleGenerate(msg: GenerateMessage): void {
       allTrayGeometries = placements.map((placement) => {
         const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
         const spacerHeight = spacer?.floorSpacerHeight ?? 0;
-        const jscadGeom = createTrayGeometry(placement.tray, cardSizes, counterShapes, maxHeight, spacerHeight);
+        let jscadGeom!: Geom3;
+        time(`createTray (${placement.tray.name})`, () => {
+          jscadGeom = createTrayGeometry(placement.tray, cardSizes, counterShapes, maxHeight, spacerHeight);
+        });
 
         cachedAllTrays.push({ jscadGeom, name: placement.tray.name });
 
@@ -631,8 +641,12 @@ function handleGenerate(msg: GenerateMessage): void {
       });
 
       // Generate box and lid - pass layer height so box exterior matches layer
-      cachedBox = createBoxWithLidGrooves(box, cardSizes, counterShapes, selectedLayerHeight);
-      cachedLid = createLid(box, cardSizes, counterShapes);
+      time(`createBoxWithLidGrooves (${box.name})`, () => {
+        cachedBox = createBoxWithLidGrooves(box, cardSizes, counterShapes, selectedLayerHeight);
+      });
+      time(`createLid (${box.name})`, () => {
+        cachedLid = createLid(box, cardSizes, counterShapes);
+      });
       cachedBoxName = box.name;
 
       boxGeometry = cachedBox ? jscadToArrays(cachedBox) : null;
@@ -700,10 +714,16 @@ function handleGenerate(msg: GenerateMessage): void {
       const requiredTrayHeight = getRequiredTrayHeightForBox(projectBox, layerHeight);
 
       // Generate box and lid - pass target height for box to match layer height
-      const boxJscad = createBoxWithLidGrooves(projectBox, cardSizes, counterShapes, layerHeight);
+      let boxJscad: Geom3 | null = null;
+      let lidJscad: Geom3 | null = null;
+      time(`createBoxWithLidGrooves (${projectBox.name})`, () => {
+        boxJscad = createBoxWithLidGrooves(projectBox, cardSizes, counterShapes, layerHeight);
+      });
       const boxBufferGeom = boxJscad ? jscadToArrays(boxJscad) : null;
       // Lid dimensions are fixed (2x wall thickness) and don't depend on layer height
-      const lidJscad = createLid(projectBox, cardSizes, counterShapes);
+      time(`createLid (${projectBox.name})`, () => {
+        lidJscad = createLid(projectBox, cardSizes, counterShapes);
+      });
       const lidBufferGeom = lidJscad ? jscadToArrays(lidJscad) : null;
 
       // Use the global cardSizes and counterShapes
@@ -850,6 +870,19 @@ function handleGenerate(msg: GenerateMessage): void {
     }
 
     const transferables: Transferable[] = Array.from(transferableSet);
+
+    // Log performance timings
+    if (timings.length > 0) {
+      const totalMs = timings.reduce((sum, t) => sum + t.ms, 0);
+      console.group(`[Geometry Worker] Generation complete (${totalMs.toFixed(0)}ms total)`);
+      // Sort by time descending to show slowest first
+      const sorted = [...timings].sort((a, b) => b.ms - a.ms);
+      for (const t of sorted) {
+        const pct = ((t.ms / totalMs) * 100).toFixed(1);
+        console.log(`${t.ms.toFixed(0)}ms (${pct}%) - ${t.name}`);
+      }
+      console.groupEnd();
+    }
 
     const result: GenerateResult = {
       type: 'generate-result',

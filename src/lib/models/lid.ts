@@ -2,6 +2,7 @@ import type { Box, CardSize, CounterShape, LidParams } from '$lib/types/project'
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { arrangeTrays, calculateMinimumBoxDimensions, getBoxInteriorDimensions } from './box';
+import { createHoneycombUnion, defaultHoneycombParams, type HoneycombExclusion } from './honeycomb';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
@@ -62,7 +63,6 @@ function createRampWedge(
 
   return hull(bottom1, bottom2, bottom3, bottom4, top1, top2, top3, top4);
 }
-
 export const defaultLidParams: LidParams = {
   thickness: 2.0,
   railHeight: 6.0,
@@ -80,7 +80,9 @@ export const defaultLidParams: LidParams = {
   rampLockEnabled: true,
   rampHeight: 0.5,
   rampLengthIn: 4.0,
-  rampLengthOut: 1.5
+  rampLengthOut: 1.5,
+  // Honeycomb pattern defaults to off for backwards compatibility
+  honeycombEnabled: false
 };
 
 /**
@@ -937,6 +939,23 @@ export function createBoxWithLidGrooves(
     }
   }
 
+  // Honeycomb pattern on box floor (uses same toggle as lid honeycomb)
+  const honeycombEnabled = box.lidParams?.honeycombEnabled ?? false;
+  if (honeycombEnabled) {
+    // Create exclusion zones around poke holes
+    const pokeHoleExclusions: HoneycombExclusion[] = placements.map((p) => ({
+      x: wall + tolerance + p.x + p.dimensions.width / 2,
+      y: wall + tolerance + p.y + p.dimensions.depth / 2,
+      radius: POKE_HOLE_DIAMETER / 2
+    }));
+
+    const honeycombUnion = createHoneycombUnion(extWidth, extDepth, floor, defaultHoneycombParams, pokeHoleExclusions);
+
+    if (honeycombUnion) {
+      result = subtract(result, honeycombUnion);
+    }
+  }
+
   return result;
 }
 
@@ -1021,6 +1040,26 @@ export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: C
   });
 
   let lid = subtract(solid, cavity);
+
+  // Honeycomb pattern on top plate only (if enabled)
+  // The "top plate" is the flat printing surface at Z=0 to Z=wall
+  const honeycombEnabled = box.lidParams?.honeycombEnabled ?? false;
+  if (honeycombEnabled) {
+    const hexSize = box.lidParams?.honeycombHexSize ?? 5;
+    const honeycombWall = box.lidParams?.honeycombWallThickness ?? 1.2;
+    const borderOffset = box.lidParams?.honeycombBorderOffset ?? 3;
+    const plateThickness = wall; // Top plate is 1x wall thickness
+
+    const honeycombUnion = createHoneycombUnion(extWidth, extDepth, plateThickness, {
+      hexSize,
+      wallThickness: honeycombWall,
+      borderOffset
+    });
+
+    if (honeycombUnion) {
+      lid = subtract(lid, honeycombUnion);
+    }
+  }
 
   // Lid slides along the LONGEST dimension for better ergonomics
   const slidesAlongX = extWidth > extDepth;
@@ -1529,9 +1568,9 @@ export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: C
     }
   }
 
-  // 4. Emboss box name on lid top if enabled
+  // 4. Emboss box name on lid top if enabled (disabled when honeycomb is enabled)
   const showName = box.lidParams?.showName ?? true;
-  if (showName && box.name && box.name.trim().length > 0) {
+  if (showName && !honeycombEnabled && box.name && box.name.trim().length > 0) {
     const textDepth = 0.6; // How deep the text is recessed
     const strokeWidth = 1.4; // Width of the text strokes (thicker = bolder)
     const textHeight = 8; // Font height in mm

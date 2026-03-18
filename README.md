@@ -15,6 +15,7 @@ Counter Slayer is a small Svelte / JSCad application to help you build box and t
 - Counters can be custom sized in hex, square, rectangle, circle and triangles.
 - Add playing card trays that support custom sized cards.
 - Generate boxes for groups of trays with "snap to close" lids.
+- Optional honeycomb pattern for boxes to save on filament.
 - Bin-packing autosorts for the counters and trays so you don't need to think too much about layouts.
 - Generate a PDF reference diagram to let you know which counters go in which stack.
 - Export printable STLs with built in tolerances to make sure everything fits together well.
