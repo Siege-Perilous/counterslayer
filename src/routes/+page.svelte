@@ -1833,7 +1833,11 @@
 </script>
 
 <svelte:head>
-  <title>Counter Tray Generator</title>
+  <title>Counter Slayer - design inserts for your board games</title>
+  <meta
+    name="description"
+    content="Design and 3D print custom inserts for board game boxes to organize your components. Create trays for cards, tokens, and miniatures with adjustable layouts."
+  />
 </svelte:head>
 
 {#if isMobile}
