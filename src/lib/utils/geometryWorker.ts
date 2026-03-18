@@ -85,6 +85,20 @@ interface Export3mfResult {
   error?: string;
 }
 
+interface GenerationProgressMessage {
+  type: 'generation-progress';
+  id: number;
+  current: number;
+  total: number;
+  currentItem: string;
+}
+
+export interface GenerationProgress {
+  current: number;
+  total: number;
+  currentItem: string;
+}
+
 // Result interfaces with BufferGeometry
 export interface TrayGeometryData {
   trayId: string;
@@ -126,7 +140,7 @@ export interface GenerationResult {
   allLooseTrayGeometries: LooseTrayGeometryData[];
 }
 
-type WorkerResult = GenerateResult | ExportStlResult | ExportAllStlsResult | Export3mfResult;
+type WorkerResult = GenerateResult | ExportStlResult | ExportAllStlsResult | Export3mfResult | GenerationProgressMessage;
 
 /**
  * Convert raw geometry data to Three.js BufferGeometry
@@ -152,6 +166,7 @@ export class GeometryWorkerManager {
       resolve: (value: unknown) => void;
       reject: (reason: unknown) => void;
       isGenerateRequest?: boolean;
+      onProgress?: (progress: GenerationProgress) => void;
     }
   >();
 
@@ -168,6 +183,20 @@ export class GeometryWorkerManager {
 
     this.worker.onmessage = (event: MessageEvent<WorkerResult>) => {
       const result = event.data;
+
+      // Handle progress messages without removing the pending request
+      if (result.type === 'generation-progress') {
+        const pending = this.pendingRequests.get(result.id);
+        if (pending?.onProgress) {
+          pending.onProgress({
+            current: result.current,
+            total: result.total,
+            currentItem: result.currentItem
+          });
+        }
+        return;
+      }
+
       const pending = this.pendingRequests.get(result.id);
 
       if (pending) {
@@ -201,7 +230,12 @@ export class GeometryWorkerManager {
   /**
    * Generate all geometries for a project
    */
-  async generate(project: Project, selectedBoxId: string, selectedTrayId: string): Promise<GenerationResult> {
+  async generate(
+    project: Project,
+    selectedBoxId: string,
+    selectedTrayId: string,
+    onProgress?: (progress: GenerationProgress) => void
+  ): Promise<GenerationResult> {
     if (!this.worker) {
       await this.init();
     }
@@ -212,6 +246,7 @@ export class GeometryWorkerManager {
     return new Promise((resolve, reject) => {
       this.pendingRequests.set(id, {
         isGenerateRequest: true,
+        onProgress,
         resolve: (result) => {
           const r = result as GenerateResult;
 
