@@ -2,12 +2,7 @@ import type { Box, CardSize, CounterShape, LidParams } from '$lib/types/project'
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { arrangeTrays, calculateMinimumBoxDimensions, getBoxInteriorDimensions } from './box';
-import {
-  createHoneycombCutouts,
-  createHoneycombUnion,
-  defaultHoneycombParams,
-  type HoneycombExclusion
-} from './honeycomb';
+import { createHoneycombUnion, defaultHoneycombParams, type HoneycombExclusion } from './honeycomb';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
