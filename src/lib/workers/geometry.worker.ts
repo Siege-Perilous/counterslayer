@@ -254,6 +254,14 @@ interface Export3mfResult {
   error?: string;
 }
 
+interface GenerationProgressMessage {
+  type: 'generation-progress';
+  id: number;
+  current: number;
+  total: number;
+  currentItem: string;
+}
+
 // Cache the last generated JSCAD geometries for STL export
 let cachedSelectedTray: Geom3 | null = null;
 let cachedBox: Geom3 | null = null;
@@ -697,9 +705,25 @@ function handleGenerate(msg: GenerateMessage): void {
     // Get all boxes from all layers
     const allBoxes = getAllBoxes(project.layers);
 
+    // Count all loose trays for progress tracking
+    const allLooseTrays = project.layers.flatMap((layer) => layer.looseTrays);
+    const totalOperations = allBoxes.length + allLooseTrays.length;
+    let currentOperation = 0;
+
     // Generate geometries for ALL boxes (for all-no-lid view) and cache JSCAD for STL export
     cachedAllBoxes = [];
-    const allBoxGeometries: BoxGeometryResult[] = allBoxes.map((projectBox) => {
+    const allBoxGeometries: BoxGeometryResult[] = [];
+
+    for (const projectBox of allBoxes) {
+      // Send progress update
+      currentOperation++;
+      self.postMessage({
+        type: 'generation-progress',
+        id,
+        current: currentOperation,
+        total: totalOperations,
+        currentItem: projectBox.name
+      } as GenerationProgressMessage);
       const boxValidation = validateCustomDimensions(projectBox, cardSizes, counterShapes);
       if (!boxValidation.valid) {
         console.warn(`Box "${projectBox.name}" validation failed:`, boxValidation.errors);
@@ -778,16 +802,16 @@ function handleGenerate(msg: GenerateMessage): void {
         trays: cachedTraysForBox
       });
 
-      // Return box dimensions using the layer height (so all boxes in layer report same height)
-      return {
+      // Add box dimensions using the layer height (so all boxes in layer report same height)
+      allBoxGeometries.push({
         boxId: projectBox.id,
         boxName: projectBox.name,
         boxGeometry: boxBufferGeom,
         lidGeometry: lidBufferGeom,
         trayGeometries: trayGeoms,
         boxDimensions: { width: projectBox.customWidth ?? 0, depth: projectBox.customDepth ?? 0, height: layerHeight }
-      };
-    });
+      });
+    }
 
     // Generate geometries for all loose trays across all layers
     cachedAllLooseTrays = [];
@@ -798,6 +822,16 @@ function handleGenerate(msg: GenerateMessage): void {
       const layerHeight = layerHeights.get(layer.id) ?? 0;
 
       for (const looseTray of layer.looseTrays) {
+        // Send progress update
+        currentOperation++;
+        self.postMessage({
+          type: 'generation-progress',
+          id,
+          current: currentOperation,
+          total: totalOperations,
+          currentItem: looseTray.name
+        } as GenerationProgressMessage);
+
         // Calculate tray dimensions for width/depth
         const trayDims = getTrayDimensionsForTray(looseTray, cardSizes, counterShapes);
         // Use layer height for the tray height so loose trays match box exterior height

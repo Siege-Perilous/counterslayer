@@ -26,6 +26,7 @@
   import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
   import {
     getGeometryWorker,
+    type GenerationProgress,
     type TrayGeometryData,
     type BoxGeometryData,
     type LooseTrayGeometryData
@@ -125,6 +126,7 @@
   let boxGeometry = $state<BufferGeometry | null>(null);
   let lidGeometry = $state<BufferGeometry | null>(null);
   let generating = $state(false);
+  let generationProgress = $state<GenerationProgress | null>(null);
   let geometryWorker = getGeometryWorker();
   let error = $state('');
   let isDirty = $state(false);
@@ -661,6 +663,7 @@
     });
 
     generating = true;
+    generationProgress = null;
     error = '';
 
     // Clear stale geometry when forcing regeneration (structural changes)
@@ -674,7 +677,9 @@
     try {
       // Use web worker for geometry generation (handles both boxed and loose trays)
       // Pass empty string for boxId if it's a loose tray - worker handles this case
-      const result = await geometryWorker.generate(project, box?.id ?? '', tray.id);
+      const result = await geometryWorker.generate(project, box?.id ?? '', tray.id, (progress) => {
+        generationProgress = progress;
+      });
 
       selectedTrayGeometry = result.selectedTrayGeometry;
       selectedTrayCounters = result.selectedTrayCounters;
@@ -696,6 +701,7 @@
       // Don't update state for superseded requests - a newer request will handle it
       if (!wasSuperseded) {
         generating = false;
+        generationProgress = null;
         // Use the hash captured at generation start, not current
         // This prevents marking cache as valid if params changed during generation
         lastGeneratedHash = hashAtGenerationStart;
@@ -1916,7 +1922,13 @@
         {#if generating && !debugParams.hideUI}
           <div class="generatingOverlay">
             <Loader />
-            <div class="generatingText">Generating geometry...</div>
+            <div class="generatingProgress">
+              <span class="generatingProgress__label">Generating</span>
+              <span class="generatingProgress__name">{generationProgress?.currentItem ?? 'geometry...'}</span>
+              {#if generationProgress}
+                <span class="generatingProgress__count">({generationProgress.current}/{generationProgress.total})</span>
+              {/if}
+            </div>
           </div>
         {/if}
 
@@ -2158,7 +2170,13 @@
         {#if generating && !debugParams.hideUI}
           <div class="generatingOverlay">
             <Loader />
-            <div class="generatingText">Generating geometry...</div>
+            <div class="generatingProgress">
+              <span class="generatingProgress__label">Generating</span>
+              <span class="generatingProgress__name">{generationProgress?.currentItem ?? 'geometry...'}</span>
+              {#if generationProgress}
+                <span class="generatingProgress__count">({generationProgress.current}/{generationProgress.total})</span>
+              {/if}
+            </div>
           </div>
         {/if}
 
@@ -2447,8 +2465,31 @@
     background: rgba(0, 0, 0, 0.5);
   }
 
-  .generatingText {
+  .generatingProgress {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
     font-size: 1.125rem;
+    width: 20rem;
+  }
+
+  .generatingProgress__label {
+    flex-shrink: 0;
+  }
+
+  .generatingProgress__name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .generatingProgress__count {
+    flex-shrink: 0;
+    font-family: var(--fontMono, monospace);
+    text-align: right;
+    width: 4.5rem;
   }
 
   /* Resizer styling */
