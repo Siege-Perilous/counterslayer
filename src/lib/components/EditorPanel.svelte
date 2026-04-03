@@ -85,22 +85,8 @@
   }
 
   function handleCounterParamsChange(newParams: CounterTrayParams) {
-    // Find any counter tray to update (for backwards compatibility with tray-specific params)
-    for (const layer of project.layers) {
-      for (const box of layer.boxes) {
-        for (const tray of box.trays) {
-          if (isCounterTray(tray)) {
-            updateTrayParams(tray.id, newParams);
-            return;
-          }
-        }
-      }
-      for (const tray of layer.looseTrays) {
-        if (isCounterTray(tray)) {
-          updateTrayParams(tray.id, newParams);
-          return;
-        }
-      }
+    if (selectedTray && isCounterTray(selectedTray)) {
+      updateTrayParams(selectedTray.id, newParams);
     }
   }
 
