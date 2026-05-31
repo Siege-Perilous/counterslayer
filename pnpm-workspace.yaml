@@ -1,0 +1,7 @@
+packages: []
+
+pnpm:
+  onlyBuiltDependencies:
+    - esbuild
+  minimumReleaseAgeExclude:
+    - "@tableslayer/*"
