@@ -3,5 +3,4 @@ packages: []
 pnpm:
   onlyBuiltDependencies:
     - esbuild
-  minimumReleaseAgeExclude:
-    - "@tableslayer/*"
+  minimumReleaseAge: 0
