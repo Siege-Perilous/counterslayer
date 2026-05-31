@@ -1,0 +1,14 @@
+packages: []
+
+minimumReleaseAge: 1440
+
+minimumReleaseAgeExclude:
+  - '@tableslayer/ui'
+
+onlyBuiltDependencies:
+  - esbuild
+  - core-js
+
+allowBuilds:
+  core-js: true
+  esbuild: true

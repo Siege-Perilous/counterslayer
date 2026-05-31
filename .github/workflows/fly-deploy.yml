@@ -18,4 +18,4 @@ jobs:
         uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy to production
-        run: flyctl deploy --remote-only --config fly.toml
+        run: flyctl deploy --remote-only --no-cache --config fly.toml
