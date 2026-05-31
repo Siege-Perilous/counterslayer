@@ -10,6 +10,7 @@ RUN apt-get update -qq && \
 
 RUN npm install -g pnpm@latest
 
+# Cache bust: 2026-05-31
 COPY package.json pnpm-lock.yaml .npmrc ./
 RUN pnpm install --frozen-lockfile
 
