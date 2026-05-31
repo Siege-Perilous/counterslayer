@@ -23,7 +23,7 @@
     "@jscad/stl-serializer": "^2.1.23",
     "@melt-ui/svelte": "^0.86.6",
     "@tabler/icons-svelte": "^3.44.0",
-    "@tableslayer/ui": "0.1.22",
+    "@tableslayer/ui": "0.1.23",
     "@threlte/core": "^8.5.15",
     "@threlte/extras": "^9.20.0",
     "@zip.js/zip.js": "^2.8.26",
