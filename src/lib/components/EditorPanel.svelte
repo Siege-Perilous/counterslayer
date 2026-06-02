@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { Panel, Title, Input, FormControl, Spacer, Text } from '@tableslayer/ui';
+  import { Panel, Title, Input, FormControl, Spacer, Text, addToast } from '@tableslayer/ui';
   import GlobalsPanel from './GlobalsPanel.svelte';
   import BoxesPanel from './BoxesPanel.svelte';
   import TraysPanel from './TraysPanel.svelte';
+  import PanelBottomBar from './PanelBottomBar.svelte';
   import {
     getProject,
     getSelectedBox,
@@ -24,6 +25,14 @@
     isCupTray,
     getGlobalSettings,
     updateGlobalSettings,
+    deleteLayer,
+    deleteBox,
+    deleteTray,
+    deleteLooseTray,
+    duplicateLayer,
+    duplicateBox,
+    duplicateTray,
+    findTrayLocation,
     type Box,
     type Layer,
     type Tray
@@ -46,9 +55,16 @@
     isLayoutEditMode?: boolean;
     gameContainerWidth?: number;
     gameContainerDepth?: number;
+    onSelectionChange?: (type: SelectionType) => void;
   }
 
-  let { selectionType, isLayoutEditMode = false, gameContainerWidth = 256, gameContainerDepth = 256 }: Props = $props();
+  let {
+    selectionType,
+    isLayoutEditMode = false,
+    gameContainerWidth = 256,
+    gameContainerDepth = 256,
+    onSelectionChange
+  }: Props = $props();
 
   // Layout editor dimensions
   let interiorWidth = $derived(layoutEditorState.boundsWidth);
@@ -156,6 +172,70 @@
       letter = 'A';
     }
     return { stacks, counters, letter, isCards, isCups };
+  }
+
+  // Determine if delete is allowed (can't delete last item)
+  let canDelete = $derived.by(() => {
+    if (selectionType === 'layer') {
+      return project.layers.length > 1;
+    }
+    if (selectionType === 'box' && selectedLayer) {
+      // Can delete if there's more than one item in the layer (boxes + loose trays)
+      return selectedLayer.boxes.length + selectedLayer.looseTrays.length > 1;
+    }
+    if (selectionType === 'tray' && selectedTray) {
+      const location = findTrayLocation(project, selectedTray.id);
+      if (location) {
+        const layer = project.layers.find((l) => l.id === location.layerId);
+        if (layer) {
+          // Total items in layer
+          const totalItems = layer.boxes.length + layer.looseTrays.length;
+          const boxHasMultipleTrays = location.boxId !== null && selectedBox !== null && selectedBox.trays.length > 1;
+          return totalItems > 1 || boxHasMultipleTrays;
+        }
+      }
+    }
+    return false;
+  });
+
+  function handleDuplicate() {
+    if (selectionType === 'layer' && selectedLayer) {
+      const name = selectedLayer.name;
+      duplicateLayer(selectedLayer.id);
+      addToast({ data: { title: 'Layer duplicated', body: `"${name}" has been duplicated`, type: 'success' } });
+    } else if (selectionType === 'box' && selectedBox) {
+      const name = selectedBox.name;
+      duplicateBox(selectedBox.id);
+      addToast({ data: { title: 'Box duplicated', body: `"${name}" has been duplicated`, type: 'success' } });
+    } else if (selectionType === 'tray' && selectedTray) {
+      const name = selectedTray.name;
+      duplicateTray(selectedTray.id);
+      addToast({ data: { title: 'Tray duplicated', body: `"${name}" has been duplicated`, type: 'success' } });
+    }
+  }
+
+  function handleDelete() {
+    if (selectionType === 'layer' && selectedLayer) {
+      const name = selectedLayer.name;
+      deleteLayer(selectedLayer.id);
+      addToast({ data: { title: 'Layer deleted', body: `"${name}" has been deleted`, type: 'success' } });
+      onSelectionChange?.('layer');
+    } else if (selectionType === 'box' && selectedBox) {
+      const name = selectedBox.name;
+      deleteBox(selectedBox.id);
+      addToast({ data: { title: 'Box deleted', body: `"${name}" has been deleted`, type: 'success' } });
+      onSelectionChange?.('layer');
+    } else if (selectionType === 'tray' && selectedTray) {
+      const name = selectedTray.name;
+      const location = findTrayLocation(project, selectedTray.id);
+      if (location?.boxId) {
+        deleteTray(location.boxId, selectedTray.id);
+      } else {
+        deleteLooseTray(selectedTray.id);
+      }
+      addToast({ data: { title: 'Tray deleted', body: `"${name}" has been deleted`, type: 'success' } });
+      onSelectionChange?.('layer');
+    }
   }
 
   let panelTitle = $derived.by(() => {
@@ -330,6 +410,9 @@
         {/if}
       {/if}
     </div>
+    {#if !isLayoutEditMode}
+      <PanelBottomBar {selectionType} {canDelete} onDuplicate={handleDuplicate} onDelete={handleDelete} />
+    {/if}
   </Panel>
 </aside>
 
