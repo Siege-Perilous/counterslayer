@@ -2100,7 +2100,7 @@
     <!-- Mobile Editor Pane (bottom) -->
     <Pane defaultSize={0} minSize={0} maxSize={60} bind:this={mobileEditorPane}>
       <div class="mobilePanelContent">
-        <EditorPanel {selectionType} {isLayoutEditMode} {gameContainerWidth} {gameContainerDepth} />
+        <EditorPanel {selectionType} {isLayoutEditMode} {gameContainerWidth} {gameContainerDepth} onSelectionChange={handleSelectionChange} />
       </div>
     </Pane>
   </PaneGroup>
@@ -2379,7 +2379,7 @@
         onCollapse={() => (isEditorCollapsed = true)}
         onExpand={() => (isEditorCollapsed = false)}
       >
-        <EditorPanel {selectionType} {isLayoutEditMode} {gameContainerWidth} {gameContainerDepth} />
+        <EditorPanel {selectionType} {isLayoutEditMode} {gameContainerWidth} {gameContainerDepth} onSelectionChange={handleSelectionChange} />
       </Pane>
     {/if}
   </PaneGroup>

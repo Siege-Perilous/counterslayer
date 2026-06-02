@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { IconButton, Icon, ConfirmActionButton, Hr, Panel, Popover, Text } from '@tableslayer/ui';
+  import { IconButton, Icon, ConfirmActionButton, Hr, Panel, Popover, Text, addToast } from '@tableslayer/ui';
   import { IconX, IconPackage, IconRuler, IconStack2 } from '@tabler/icons-svelte';
   import { computePosition, offset, flip, shift } from '@floating-ui/dom';
   import { tick } from 'svelte';
@@ -134,28 +134,31 @@
     onExpandPanel();
   }
 
-  function handleDeleteLayer(layerId: string) {
+  function handleDeleteLayer(layerId: string, layerName: string) {
     deleteLayer(layerId);
+    addToast({ data: { title: 'Layer deleted', body: `"${layerName}" has been deleted`, type: 'success' } });
     // If we deleted the selected layer, switch to first layer
     if (selectedLayer?.id === layerId) {
       onSelectionChange('layer');
     }
   }
 
-  function handleDeleteBox(boxId: string) {
+  function handleDeleteBox(boxId: string, boxName: string) {
     deleteBox(boxId);
+    addToast({ data: { title: 'Box deleted', body: `"${boxName}" has been deleted`, type: 'success' } });
     // If we deleted the selected box, switch to layer view
     if (selectedBox?.id === boxId) {
       onSelectionChange('layer');
     }
   }
 
-  function handleDeleteTray(boxId: string | null, trayId: string) {
+  function handleDeleteTray(boxId: string | null, trayId: string, trayName: string) {
     if (boxId) {
       deleteTray(boxId, trayId);
     } else {
       deleteLooseTray(trayId);
     }
+    addToast({ data: { title: 'Tray deleted', body: `"${trayName}" has been deleted`, type: 'success' } });
     // If we deleted the selected tray, switch to layer view
     if (selectedTray?.id === trayId) {
       onSelectionChange('layer');
@@ -266,7 +269,7 @@
               onkeydown={(e) => e.stopPropagation()}
             >
               <ConfirmActionButton
-                action={() => handleDeleteLayer(layer.id)}
+                action={() => handleDeleteLayer(layer.id, layer.name)}
                 actionButtonText="Delete layer"
                 positioning={{ placement: 'right' }}
                 portal=".appContainer"
@@ -310,7 +313,7 @@
                     onkeydown={(e) => e.stopPropagation()}
                   >
                     <ConfirmActionButton
-                      action={() => handleDeleteBox(box.id)}
+                      action={() => handleDeleteBox(box.id, box.name)}
                       actionButtonText="Delete box"
                       positioning={{ placement: 'right' }}
                       portal=".appContainer"
@@ -359,7 +362,7 @@
                       onkeydown={(e) => e.stopPropagation()}
                     >
                       <ConfirmActionButton
-                        action={() => handleDeleteTray(box.id, tray.id)}
+                        action={() => handleDeleteTray(box.id, tray.id, tray.name)}
                         actionButtonText="Delete tray"
                         positioning={{ placement: 'right' }}
                         portal=".appContainer"
@@ -488,7 +491,7 @@
                   onkeydown={(e) => e.stopPropagation()}
                 >
                   <ConfirmActionButton
-                    action={() => handleDeleteTray(null, tray.id)}
+                    action={() => handleDeleteTray(null, tray.id, tray.name)}
                     actionButtonText="Delete tray"
                     positioning={{ placement: 'right' }}
                     portal=".appContainer"

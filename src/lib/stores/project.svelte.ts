@@ -1497,3 +1497,148 @@ export function getLayerLayout(
   const layer = project.layers.find((l) => l.id === layerId);
   return layer?.manualLayout;
 }
+
+// Deep clone helper for duplicating objects
+function deepClone<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+// Duplicate a tray (works for both box trays and loose trays)
+export function duplicateTray(trayId: string): Tray | null {
+  // Find the tray and its location
+  for (const layer of project.layers) {
+    // Check box trays
+    for (const box of layer.boxes) {
+      const trayIndex = box.trays.findIndex((t) => t.id === trayId);
+      if (trayIndex !== -1) {
+        const originalTray = box.trays[trayIndex];
+        const newTray: Tray = deepClone(originalTray);
+        newTray.id = generateId();
+        newTray.name = `${originalTray.name} copy`;
+        newTray.color = getNextTrayColor(project.layers);
+
+        // Insert after the original tray
+        box.trays.splice(trayIndex + 1, 0, newTray);
+
+        // Clear manual layout since we added a tray
+        box.manualLayout = undefined;
+        box.customWidth = undefined;
+        box.customDepth = undefined;
+
+        // Select the new tray
+        project.selectedLayerId = layer.id;
+        project.selectedBoxId = box.id;
+        project.selectedTrayId = newTray.id;
+
+        autosave();
+        return newTray;
+      }
+    }
+
+    // Check loose trays
+    const looseTrayIndex = layer.looseTrays.findIndex((t) => t.id === trayId);
+    if (looseTrayIndex !== -1) {
+      const originalTray = layer.looseTrays[looseTrayIndex];
+      const newTray: Tray = deepClone(originalTray);
+      newTray.id = generateId();
+      newTray.name = `${originalTray.name} copy`;
+      newTray.color = getNextTrayColor(project.layers);
+
+      // Insert after the original tray
+      layer.looseTrays.splice(looseTrayIndex + 1, 0, newTray);
+
+      // Select the new tray
+      project.selectedLayerId = layer.id;
+      project.selectedBoxId = null;
+      project.selectedTrayId = newTray.id;
+
+      autosave();
+      return newTray;
+    }
+  }
+
+  return null;
+}
+
+// Duplicate a box (including all its trays)
+export function duplicateBox(boxId: string): Box | null {
+  for (const layer of project.layers) {
+    const boxIndex = layer.boxes.findIndex((b) => b.id === boxId);
+    if (boxIndex !== -1) {
+      const originalBox = layer.boxes[boxIndex];
+      const newBox: Box = deepClone(originalBox);
+
+      // Generate new IDs for box and all trays
+      newBox.id = generateId();
+      newBox.name = `${originalBox.name} copy`;
+      newBox.manualLayout = undefined;
+      newBox.customWidth = undefined;
+      newBox.customDepth = undefined;
+
+      // Generate new IDs and colors for all trays
+      for (const tray of newBox.trays) {
+        tray.id = generateId();
+        tray.color = getNextTrayColor(project.layers);
+      }
+
+      // Insert after the original box
+      layer.boxes.splice(boxIndex + 1, 0, newBox);
+
+      // Clear layer manual layout since we added a box
+      layer.manualLayout = undefined;
+
+      // Select the new box
+      project.selectedLayerId = layer.id;
+      project.selectedBoxId = newBox.id;
+      project.selectedTrayId = newBox.trays[0]?.id ?? null;
+
+      autosave();
+      return newBox;
+    }
+  }
+
+  return null;
+}
+
+// Duplicate a layer (including all boxes and loose trays)
+export function duplicateLayer(layerId: string): Layer | null {
+  const layerIndex = project.layers.findIndex((l) => l.id === layerId);
+  if (layerIndex === -1) return null;
+
+  const originalLayer = project.layers[layerIndex];
+  const newLayer: Layer = deepClone(originalLayer);
+
+  // Generate new IDs
+  newLayer.id = generateId();
+  newLayer.name = `${originalLayer.name} copy`;
+  newLayer.manualLayout = undefined;
+
+  // Generate new IDs for all boxes and their trays
+  for (const box of newLayer.boxes) {
+    box.id = generateId();
+    box.manualLayout = undefined;
+    box.customWidth = undefined;
+    box.customDepth = undefined;
+    for (const tray of box.trays) {
+      tray.id = generateId();
+      tray.color = getNextTrayColor(project.layers);
+    }
+  }
+
+  // Generate new IDs for all loose trays
+  for (const tray of newLayer.looseTrays) {
+    tray.id = generateId();
+    tray.color = getNextTrayColor(project.layers);
+  }
+
+  // Insert after the original layer
+  project.layers.splice(layerIndex + 1, 0, newLayer);
+
+  // Select the new layer
+  project.selectedLayerId = newLayer.id;
+  project.selectedBoxId = newLayer.boxes[0]?.id ?? null;
+  project.selectedTrayId = newLayer.boxes[0]?.trays[0]?.id ?? newLayer.looseTrays[0]?.id ?? null;
+
+  autosave();
+  return newLayer;
+}
