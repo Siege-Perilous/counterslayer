@@ -411,12 +411,7 @@
       {/if}
     </div>
     {#if !isLayoutEditMode}
-      <PanelBottomBar
-        {selectionType}
-        {canDelete}
-        onDuplicate={handleDuplicate}
-        onDelete={handleDelete}
-      />
+      <PanelBottomBar {selectionType} {canDelete} onDuplicate={handleDuplicate} onDelete={handleDelete} />
     {/if}
   </Panel>
 </aside>
