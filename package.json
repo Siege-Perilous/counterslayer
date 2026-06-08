@@ -25,10 +25,10 @@
     "@tabler/icons-svelte": "^3.44.0",
     "@tableslayer/ui": "0.1.24",
     "@threlte/core": "^8.5.16",
-    "@threlte/extras": "^9.20.1",
+    "@threlte/extras": "^9.21.0",
     "@zip.js/zip.js": "^2.8.26",
     "jspdf": "^4.2.1",
-    "marked": "^18.0.4",
+    "marked": "^18.0.5",
     "mode-watcher": "^1.1.0",
     "paneforge": "^1.0.2",
     "rectangle-packer": "^1.0.4",
@@ -41,7 +41,7 @@
     "@melt-ui/pp": "^0.3.2",
     "@playwright/test": "^1.60.0",
     "@sveltejs/adapter-static": "^3.0.10",
-    "@sveltejs/kit": "^2.61.1",
+    "@sveltejs/kit": "^2.63.0",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@types/node": "^25",
     "@types/three": "^0.184.1",
@@ -51,11 +51,11 @@
     "globals": "^17.6.0",
     "prettier": "^3.8.3",
     "prettier-plugin-organize-imports": "^4.3.0",
-    "prettier-plugin-svelte": "^4.0.1",
-    "svelte": "^5.56.0",
-    "svelte-check": "^4.4.8",
+    "prettier-plugin-svelte": "^4.1.0",
+    "svelte": "^5.56.2",
+    "svelte-check": "^4.6.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.60.0",
-    "vite": "^8.0.14"
+    "typescript-eslint": "^8.60.1",
+    "vite": "^8.0.16"
   }
 }
