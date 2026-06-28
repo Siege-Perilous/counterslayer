@@ -35,8 +35,20 @@
     };
   });
 
+  // Auto dimensions (ignoring overrides) - used as placeholders / minimums for the width & depth inputs
+  let autoDimensions = $derived(
+    getCardWellTrayDimensions({ ...tray.params, trayWidthOverride: null, trayDepthOverride: null }, getCardSizes())
+  );
+
   function updateParam<K extends keyof CardWellTrayParams>(key: K, value: CardWellTrayParams[K]) {
     onUpdateParams({ ...tray.params, [key]: value });
+  }
+
+  // Width/depth overrides: blank = auto, otherwise the value (clamped to the auto minimum at generation)
+  function updateSizeOverride(key: 'trayWidthOverride' | 'trayDepthOverride', raw: string) {
+    const trimmed = raw.trim();
+    const parsed = parseFloat(trimmed);
+    updateParam(key, trimmed === '' || Number.isNaN(parsed) ? null : parsed);
   }
 
   // Layout update handler - syncs stacks when layout changes (adds/removes as needed)
@@ -191,6 +203,32 @@
             step="0.1"
             value={tray.params.rimHeight}
             onchange={(e) => updateParam('rimHeight', parseFloat(e.currentTarget.value))}
+          />
+        {/snippet}
+        {#snippet end()}mm{/snippet}
+      </FormControl>
+      <FormControl label="Width" name="trayWidthOverride">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            step="0.1"
+            placeholder={`Auto (${autoDimensions.width.toFixed(1)})`}
+            value={tray.params.trayWidthOverride ?? ''}
+            onchange={(e) => updateSizeOverride('trayWidthOverride', e.currentTarget.value)}
+          />
+        {/snippet}
+        {#snippet end()}mm{/snippet}
+      </FormControl>
+      <FormControl label="Depth" name="trayDepthOverride">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            step="0.1"
+            placeholder={`Auto (${autoDimensions.depth.toFixed(1)})`}
+            value={tray.params.trayDepthOverride ?? ''}
+            onchange={(e) => updateSizeOverride('trayDepthOverride', e.currentTarget.value)}
           />
         {/snippet}
         {#snippet end()}mm{/snippet}
