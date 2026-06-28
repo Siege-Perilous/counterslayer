@@ -92,16 +92,23 @@
     // Get layout sizes in mm
     const layoutSizes = computeLayoutSizes(layout, stacks, cardSizes, clearance, wallThickness);
 
+    // Auto dimensions, and the centering offset when the tray is larger than the cards need.
+    // The extra material is split equally across all four sides (matches the 3D geometry).
+    const autoWidth = layoutSizes.totalWidth + 2 * wallThickness;
+    const autoDepth = layoutSizes.maxColumnDepth + 2 * wallThickness;
+    const offsetX = Math.max(0, (trayWidth - autoWidth) / 2);
+    const offsetY = Math.max(0, (trayDepth - autoDepth) / 2);
+
     // Available pixel space
     const availableWidth = containerWidth - 2 * EDGE_INSET;
     const availableHeight = containerHeight - 2 * EDGE_INSET;
 
-    // Scale factors
-    const scaleX = availableWidth / (layoutSizes.totalWidth + 2 * wallThickness);
-    const scaleY = availableHeight / (layoutSizes.maxColumnDepth + 2 * wallThickness);
+    // Scale factors (scale to the actual tray size so overrides render correctly)
+    const scaleX = availableWidth / trayWidth;
+    const scaleY = availableHeight / trayDepth;
 
     // Calculate pixel positions for each column
-    let currentX = wallThickness; // Start after outer wall (in mm)
+    let currentX = wallThickness + offsetX; // Start after outer wall + centering offset (in mm)
 
     for (let colIndex = 0; colIndex < layout.columns.length; colIndex++) {
       const column = layout.columns[colIndex];
@@ -112,7 +119,7 @@
       const verticalOffset = (layoutSizes.maxColumnDepth - columnTotalDepth) / 2;
 
       // Calculate Y position for each cell in the column
-      let currentY = wallThickness + verticalOffset; // Start after outer wall + centering offset
+      let currentY = wallThickness + verticalOffset + offsetY; // Start after outer wall + centering offset
 
       for (let cellIndex = 0; cellIndex < column.length; cellIndex++) {
         const cellId = column[cellIndex];

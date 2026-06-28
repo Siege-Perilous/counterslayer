@@ -198,14 +198,27 @@ export function computeCellPositions(
   stacks: CardWellStack[],
   cardSizes: CardSize[],
   wallThickness: number,
-  clearance: number
+  clearance: number,
+  trayWidthOverride: number | null = null,
+  trayDepthOverride: number | null = null
 ): ComputedCell[] {
   const cells: ComputedCell[] = [];
 
   const layoutSizes = computeLayoutSizes(layout, stacks, cardSizes, clearance, wallThickness);
 
+  // Auto dimensions (interior + outer walls)
+  const autoWidth = layoutSizes.totalWidth + 2 * wallThickness;
+  const autoDepth = layoutSizes.maxColumnDepth + 2 * wallThickness;
+
+  // When a larger width/depth is requested, center the wells so the extra material
+  // is split equally across all four sides. Offsets are 0 when no override is set.
+  const trayWidth = trayWidthOverride != null ? Math.max(trayWidthOverride, autoWidth) : autoWidth;
+  const trayDepth = trayDepthOverride != null ? Math.max(trayDepthOverride, autoDepth) : autoDepth;
+  const offsetX = (trayWidth - autoWidth) / 2;
+  const offsetY = (trayDepth - autoDepth) / 2;
+
   // Calculate X position for each column
-  let currentX = wallThickness; // Start after outer wall
+  let currentX = wallThickness + offsetX; // Start after outer wall + centering offset
 
   for (let colIndex = 0; colIndex < layout.columns.length; colIndex++) {
     const column = layout.columns[colIndex];
@@ -216,7 +229,7 @@ export function computeCellPositions(
     const verticalOffset = (layoutSizes.maxColumnDepth - columnTotalDepth) / 2;
 
     // Calculate Y position for each cell in the column
-    let currentY = wallThickness + verticalOffset; // Start after outer wall + centering offset
+    let currentY = wallThickness + verticalOffset + offsetY; // Start after outer wall + centering offset
 
     for (let cellIndex = 0; cellIndex < column.length; cellIndex++) {
       const cellId = column[cellIndex];
@@ -273,8 +286,9 @@ export function getCardWellTrayDimensions(
   const height = floorThickness + maxStackHeight + rimHeight;
 
   return {
-    width: trayWidthOverride ?? autoWidth,
-    depth: trayDepthOverride ?? autoDepth,
+    // Override acts as a minimum: if smaller than the space the cards need, fall back to auto
+    width: trayWidthOverride != null ? Math.max(trayWidthOverride, autoWidth) : autoWidth,
+    depth: trayDepthOverride != null ? Math.max(trayDepthOverride, autoDepth) : autoDepth,
     height: Math.max(height, floorThickness + rimHeight + 10) // Minimum height
   };
 }
@@ -299,7 +313,9 @@ export function getCardWellCellPositions(
     params.stacks,
     cardSizes,
     params.wallThickness,
-    params.clearance
+    params.clearance,
+    params.trayWidthOverride,
+    params.trayDepthOverride
   );
 
   const cellIds = getAllCellIds(params.layout);
@@ -351,6 +367,14 @@ export function createCardWellTray(
   const trayWidth = dims.width;
   const trayDepth = dims.depth;
 
+  // Auto dimensions and centering offsets. When a larger width/depth is set, the extra
+  // material is split equally across all four sides (offsets are 0 with no override).
+  const layoutSizes = computeLayoutSizes(params.layout, params.stacks, cardSizes, clearance, wallThickness);
+  const autoWidth = layoutSizes.totalWidth + 2 * wallThickness;
+  const autoDepth = layoutSizes.maxColumnDepth + 2 * wallThickness;
+  const offsetX = Math.max(0, (trayWidth - autoWidth) / 2);
+  const offsetY = Math.max(0, (trayDepth - autoDepth) / 2);
+
   // Validate dimensions
   if (trayWidth <= 0 || trayDepth <= 0 || trayHeight <= 0) {
     throw new Error(`${nameLabel}: Invalid tray dimensions.`);
@@ -363,7 +387,15 @@ export function createCardWellTray(
   });
 
   // Get computed cell positions
-  const computedCells = computeCellPositions(params.layout, params.stacks, cardSizes, wallThickness, clearance);
+  const computedCells = computeCellPositions(
+    params.layout,
+    params.stacks,
+    cardSizes,
+    wallThickness,
+    clearance,
+    params.trayWidthOverride,
+    params.trayDepthOverride
+  );
 
   // Create cell cavities, finger holes, and wall cutouts
   const cellCuts: Geom3[] = [];
@@ -445,9 +477,11 @@ export function createCardWellTray(
       fingerHoleCuts.push(fingerHole);
     }
 
-    // Wall cutouts - only on OUTER walls where the CAVITY actually touches the outer wall
-    // The cavity may be smaller than the cell (if cards in same column have different sizes)
-    // Interior walls between cells/columns do NOT get cutouts
+    // Wall cutouts (finger grip notches) - only on OUTER walls where the CAVITY is
+    // adjacent to the outer wall in the auto layout. The cavity may be smaller than the
+    // cell (if cards in the same column have different sizes); interior walls between
+    // cells/columns do NOT get cutouts. When a larger width/depth is set, the wells are
+    // centered and each notch extends across the added material out to the new outer edge.
     if (stack && cardSize) {
       const { effectiveWidth, effectiveDepth } = getEffectiveCardDimensions(cardSize, stack.rotation ?? 0);
 
@@ -465,61 +499,62 @@ export function createCardWellTray(
       const cavityFront = cell.y + cavityOffsetY;
       const cavityBack = cavityFront + cavityDepthCalc;
 
-      // Check if CAVITY touches each outer wall (not just the cell)
-      const cavityTouchesLeftWall = Math.abs(cavityLeft - wallThickness) < tolerance;
-      const cavityTouchesRightWall = Math.abs(cavityRight + wallThickness - trayWidth) < tolerance;
-      const cavityTouchesFrontWall = Math.abs(cavityFront - wallThickness) < tolerance;
-      const cavityTouchesBackWall = Math.abs(cavityBack + wallThickness - trayDepth) < tolerance;
+      // Check if the CAVITY is adjacent to each outer wall. The auto outer wall sits
+      // `offset` in from the (possibly enlarged) tray edge, so account for the centering.
+      const cavityTouchesLeftWall = Math.abs(cavityLeft - (wallThickness + offsetX)) < tolerance;
+      const cavityTouchesRightWall = Math.abs(cavityRight - (trayWidth - wallThickness - offsetX)) < tolerance;
+      const cavityTouchesFrontWall = Math.abs(cavityFront - (wallThickness + offsetY)) < tolerance;
+      const cavityTouchesBackWall = Math.abs(cavityBack - (trayDepth - wallThickness - offsetY)) < tolerance;
 
       const isFirstColumn = cell.colIndex === 0;
       const isLastColumn = cell.colIndex === params.layout.columns.length - 1;
 
-      // Left outer wall - only if cavity touches the left wall
+      // Left outer wall - notch spans from the left edge (x = -1) to the cavity
       if (isFirstColumn && cavityTouchesLeftWall) {
-        const cutoutWidth = effectiveDepth / 2; // Half the card depth (Y dimension)
+        const spanWidth = cavityLeft + 1;
         const leftCutout = translate(
-          [wallThickness / 2, centerY, cutoutZ],
+          [(cavityLeft - 1) / 2, centerY, cutoutZ],
           cuboid({
-            size: [wallThickness + 2, cutoutWidth, cutoutHeight],
+            size: [spanWidth, effectiveDepth / 2, cutoutHeight], // Half the card depth (Y dimension)
             center: [0, 0, 0]
           })
         );
         wallCutouts.push(leftCutout);
       }
 
-      // Right outer wall - only if cavity touches the right wall
+      // Right outer wall - notch spans from the cavity to the right edge (x = trayWidth + 1)
       if (isLastColumn && cavityTouchesRightWall) {
-        const cutoutWidth = effectiveDepth / 2;
+        const spanWidth = trayWidth + 1 - cavityRight;
         const rightCutout = translate(
-          [trayWidth - wallThickness / 2, centerY, cutoutZ],
+          [(cavityRight + trayWidth + 1) / 2, centerY, cutoutZ],
           cuboid({
-            size: [wallThickness + 2, cutoutWidth, cutoutHeight],
+            size: [spanWidth, effectiveDepth / 2, cutoutHeight],
             center: [0, 0, 0]
           })
         );
         wallCutouts.push(rightCutout);
       }
 
-      // Front outer wall - only if cavity touches the front wall
+      // Front outer wall - notch spans from the front edge (y = -1) to the cavity
       if (cavityTouchesFrontWall) {
-        const cutoutWidth = effectiveWidth / 2; // Half the card width (X dimension)
+        const spanDepth = cavityFront + 1;
         const frontCutout = translate(
-          [centerX, wallThickness / 2, cutoutZ],
+          [centerX, (cavityFront - 1) / 2, cutoutZ],
           cuboid({
-            size: [cutoutWidth, wallThickness + 2, cutoutHeight],
+            size: [effectiveWidth / 2, spanDepth, cutoutHeight], // Half the card width (X dimension)
             center: [0, 0, 0]
           })
         );
         wallCutouts.push(frontCutout);
       }
 
-      // Back outer wall - only if cavity touches the back wall
+      // Back outer wall - notch spans from the cavity to the back edge (y = trayDepth + 1)
       if (cavityTouchesBackWall) {
-        const cutoutWidth = effectiveWidth / 2;
+        const spanDepth = trayDepth + 1 - cavityBack;
         const backCutout = translate(
-          [centerX, trayDepth - wallThickness / 2, cutoutZ],
+          [centerX, (cavityBack + trayDepth + 1) / 2, cutoutZ],
           cuboid({
-            size: [cutoutWidth, wallThickness + 2, cutoutHeight],
+            size: [effectiveWidth / 2, spanDepth, cutoutHeight],
             center: [0, 0, 0]
           })
         );
@@ -698,7 +733,9 @@ export function getCardWellPositions(
     params.stacks,
     cardSizes,
     params.wallThickness,
-    params.clearance
+    params.clearance,
+    params.trayWidthOverride,
+    params.trayDepthOverride
   );
 
   const positions: CardWellStackPosition[] = [];
