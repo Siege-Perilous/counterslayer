@@ -10,6 +10,7 @@ import {
 } from '$lib/models/counterTray';
 import { defaultCupTrayParams, type CupTrayParams } from '$lib/models/cupTray';
 import { defaultLidParams } from '$lib/models/lid';
+import { defaultStandeeTrayParams, type StandeeTrayParams } from '$lib/models/standeeTray';
 import { saveNow, scheduleSave } from '$lib/stores/saveManager';
 import type {
   Box,
@@ -26,6 +27,8 @@ import type {
   ManualBoxPlacement,
   ManualLooseTrayPlacement,
   Project,
+  Standee,
+  StandeeTray,
   Tray
 } from '$lib/types/project';
 import {
@@ -36,7 +39,8 @@ import {
   isCardWellTray,
   isCounterTray,
   isCupTray,
-  isLooseTray
+  isLooseTray,
+  isStandeeTray
 } from '$lib/types/project';
 import { loadProject, migrateProjectData } from '$lib/utils/storage';
 
@@ -48,7 +52,8 @@ export {
   isCardWellTray,
   isCounterTray,
   isCupTray,
-  isLooseTray
+  isLooseTray,
+  isStandeeTray
 };
 export type {
   Box,
@@ -65,6 +70,8 @@ export type {
   ManualBoxPlacement,
   ManualLooseTrayPlacement,
   Project,
+  Standee,
+  StandeeTray,
   Tray
 };
 
@@ -130,6 +137,24 @@ export const DEFAULT_CARD_SIZES: CardSize[] = [
   { id: DEFAULT_CARD_SIZE_IDS.japanese, name: 'Japanese', width: 62, length: 89, thickness: 0.5 },
   { id: DEFAULT_CARD_SIZE_IDS.tarot, name: 'Tarot', width: 73, length: 123, thickness: 0.5 },
   { id: DEFAULT_CARD_SIZE_IDS.square, name: 'Square', width: 73, length: 73, thickness: 0.5 }
+];
+
+// Default standee IDs (stable so references survive re-imports)
+export const DEFAULT_STANDEE_IDS = {
+  standard: 'standee-standard'
+};
+
+// Default standees (global)
+export const DEFAULT_STANDEES: Standee[] = [
+  {
+    id: DEFAULT_STANDEE_IDS.standard,
+    name: 'Standard',
+    baseRadius: 9,
+    baseThickness: 3,
+    standeeHeight: 40,
+    standeeWidth: 25,
+    standeeThickness: 1.5
+  }
 ];
 
 function generateId(): string {
@@ -328,6 +353,19 @@ function createDefaultCardWellTray(name: string, color: string, cardSizes?: Card
     color,
     rotationOverride: 'auto',
     params
+  };
+}
+
+function createDefaultStandeeTray(name: string, color: string, standees?: Standee[]): StandeeTray {
+  // Use the first available standee, falling back to the default ID
+  const standeeId = standees?.[0]?.id ?? DEFAULT_STANDEE_IDS.standard;
+  return {
+    id: generateId(),
+    type: 'standee',
+    name,
+    color,
+    rotationOverride: 'auto',
+    params: { ...defaultStandeeTrayParams, standeeId }
   };
 }
 
@@ -591,6 +629,8 @@ export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
     tray = createDefaultCupTray('Cup Tray 1', color);
   } else if (trayType === 'cardWell') {
     tray = createDefaultCardWellTray('Card Well 1', color, project.cardSizes);
+  } else if (trayType === 'standee') {
+    tray = createDefaultStandeeTray('Standee Tray 1', color, project.standees);
   } else {
     tray = createDefaultCounterTray('Tray 1', color, project.counterShapes);
     // Inherit global params (including customShapes) from existing counter trays
@@ -689,7 +729,7 @@ function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
 }
 
 // Tray type for addTray function
-export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'cup' | 'cardWell' | 'card';
+export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'cup' | 'cardWell' | 'standee' | 'card';
 
 // Loose tray operations
 export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): Tray | null {
@@ -710,6 +750,8 @@ export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): 
     tray = createDefaultCupTray(`Loose Cups ${trayNumber}`, color);
   } else if (trayType === 'cardWell') {
     tray = createDefaultCardWellTray(`Loose Well ${trayNumber}`, color, project.cardSizes);
+  } else if (trayType === 'standee') {
+    tray = createDefaultStandeeTray(`Loose Standees ${trayNumber}`, color, project.standees);
   } else {
     tray = createDefaultCounterTray(`Loose Tray ${trayNumber}`, color, project.counterShapes);
     // Inherit global params (including customShapes) from existing counter trays
@@ -768,6 +810,8 @@ export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | n
         tray = createDefaultCupTray(`Cup Tray ${trayNumber}`, color);
       } else if (trayType === 'cardWell') {
         tray = createDefaultCardWellTray(`Card Well ${trayNumber}`, color, project.cardSizes);
+      } else if (trayType === 'standee') {
+        tray = createDefaultStandeeTray(`Standee Tray ${trayNumber}`, color, project.standees);
       } else {
         tray = createDefaultCounterTray(`Tray ${trayNumber}`, color, project.counterShapes);
         // Inherit global params (including customShapes) from existing counter trays
@@ -976,6 +1020,52 @@ export function deleteCardSize(id: string): void {
   }
 }
 
+// Standee operations (global)
+export function getStandees(): Standee[] {
+  return project.standees;
+}
+
+export function getStandee(id: string): Standee | null {
+  return project.standees.find((s) => s.id === id) ?? null;
+}
+
+export function addStandee(standee: Omit<Standee, 'id'>): Standee {
+  const newStandee: Standee = { ...standee, id: generateId() };
+  project.standees.push(newStandee);
+  autosave();
+  return newStandee;
+}
+
+export function updateStandee(id: string, updates: Partial<Omit<Standee, 'id'>>): void {
+  const standee = project.standees.find((s) => s.id === id);
+  if (standee) {
+    Object.assign(standee, updates);
+    autosave();
+  }
+}
+
+export function deleteStandee(id: string): void {
+  const index = project.standees.findIndex((s) => s.id === id);
+  if (index < 0) return;
+  project.standees.splice(index, 1);
+
+  // Re-point any standee trays that referenced the deleted standee to the first
+  // remaining standee so geometry keeps generating.
+  const fallbackId = project.standees[0]?.id ?? '';
+  const repoint = (tray: Tray) => {
+    if (isStandeeTray(tray) && tray.params.standeeId === id) {
+      tray.params.standeeId = fallbackId;
+    }
+  };
+  for (const layer of project.layers) {
+    for (const box of layer.boxes) {
+      for (const tray of box.trays) repoint(tray);
+    }
+    for (const tray of layer.looseTrays) repoint(tray);
+  }
+  autosave();
+}
+
 // Default global settings
 export const DEFAULT_GLOBAL_SETTINGS = {
   gameContainerWidth: 256,
@@ -1133,6 +1223,26 @@ export function updateCardWellTrayParams(trayId: string, params: CardWellTrayPar
     }
     const looseTray = layer.looseTrays.find((t) => t.id === trayId);
     if (looseTray && isCardWellTray(looseTray)) {
+      looseTray.params = params;
+      autosave();
+      return;
+    }
+  }
+}
+
+// Update standee tray params
+export function updateStandeeTrayParams(trayId: string, params: StandeeTrayParams): void {
+  for (const layer of project.layers) {
+    for (const box of layer.boxes) {
+      const tray = box.trays.find((t) => t.id === trayId);
+      if (tray && isStandeeTray(tray)) {
+        tray.params = params;
+        autosave();
+        return;
+      }
+    }
+    const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+    if (looseTray && isStandeeTray(looseTray)) {
       looseTray.params = params;
       autosave();
       return;

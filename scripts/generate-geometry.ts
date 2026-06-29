@@ -20,8 +20,16 @@ import { createCardWellTray } from '../src/lib/models/cardWellTray.js';
 import { createCounterTray } from '../src/lib/models/counterTray.js';
 import { createCupTray } from '../src/lib/models/cupTray.js';
 import { createBoxWithLidGrooves, createLid } from '../src/lib/models/lid.js';
+import { createStandeeTray } from '../src/lib/models/standeeTray.js';
 import type { Box, Tray } from '../src/lib/types/project.js';
-import { isCardDividerTray, isCardTray, isCardWellTray, isCounterTray, isCupTray } from '../src/lib/types/project.js';
+import {
+  isCardDividerTray,
+  isCardTray,
+  isCardWellTray,
+  isCounterTray,
+  isCupTray,
+  isStandeeTray
+} from '../src/lib/types/project.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const generalize = (jscad.modifiers as any).generalize as (
@@ -81,6 +89,8 @@ async function main() {
       let trayGeom: Geom3 | null = null;
       if (isCupTray(looseTray)) {
         trayGeom = createCupTray(looseTray.params, looseTray.name, maxHeight, 0);
+      } else if (isStandeeTray(looseTray)) {
+        trayGeom = createStandeeTray(looseTray.params, project.standees ?? [], looseTray.name, maxHeight, 0);
       } else if (isCardWellTray(looseTray)) {
         trayGeom = createCardWellTray(looseTray.params, project.cardSizes, looseTray.name, maxHeight, 0);
       } else if (isCardTray(looseTray)) {
@@ -125,7 +135,13 @@ async function main() {
   // Generate box geometry
   console.log('\nGenerating box geometry...');
   try {
-    const boxGeom = createBoxWithLidGrooves(box);
+    const boxGeom = createBoxWithLidGrooves(
+      box,
+      project.cardSizes,
+      project.counterShapes,
+      undefined,
+      project.standees ?? []
+    );
     if (boxGeom) {
       const cleanedGeom = cleanGeometryForExport(boxGeom);
       const boxStl = stlSerializer.serialize({ binary: true }, cleanedGeom);
@@ -142,7 +158,7 @@ async function main() {
   // Generate lid geometry
   console.log('Generating lid geometry...');
   try {
-    const lidGeom = createLid(box);
+    const lidGeom = createLid(box, project.cardSizes, project.counterShapes, project.standees ?? []);
     if (lidGeom) {
       const cleanedGeom = cleanGeometryForExport(lidGeom);
       const lidStl = stlSerializer.serialize({ binary: true }, cleanedGeom);
@@ -174,6 +190,8 @@ async function main() {
       let trayGeom: Geom3 | null = null;
       if (isCupTray(tray)) {
         trayGeom = createCupTray(tray.params, tray.name, maxHeight, 0);
+      } else if (isStandeeTray(tray)) {
+        trayGeom = createStandeeTray(tray.params, project.standees ?? [], tray.name, maxHeight, 0);
       } else if (isCardWellTray(tray)) {
         trayGeom = createCardWellTray(tray.params, project.cardSizes, tray.name, maxHeight, 0);
       } else if (isCardTray(tray)) {

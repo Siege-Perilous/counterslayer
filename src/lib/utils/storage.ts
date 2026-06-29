@@ -11,11 +11,22 @@ import {
   DEFAULT_CARD_SIZES,
   DEFAULT_COUNTER_SHAPES,
   DEFAULT_COUNTER_THICKNESS,
+  DEFAULT_STANDEES,
   TRAY_COLORS
 } from '$lib/stores/project.svelte';
 import type { CupLayout } from '$lib/types/cupLayout';
 import { gridToSplitLayout } from '$lib/types/cupLayout';
-import type { Box, CardSize, CounterShape, Layer, LegacyProject, LidParams, Project, Tray } from '$lib/types/project';
+import type {
+  Box,
+  CardSize,
+  CounterShape,
+  Layer,
+  LegacyProject,
+  LidParams,
+  Project,
+  Standee,
+  Tray
+} from '$lib/types/project';
 import { isLegacyProject } from '$lib/types/project';
 const STORAGE_KEY = 'counter-tray-project';
 
@@ -495,6 +506,18 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
     }
   }
 
+  // Standees are a newer global - older projects won't have them. Start from any
+  // existing array and backfill the defaults.
+  let standees: Standee[] = Array.isArray((project as { standees?: unknown }).standees)
+    ? (project as { standees: Standee[] }).standees.map((s) => (s.id ? s : { ...s, id: generateId() }))
+    : [];
+  const existingStandeeIds = new Set(standees.map((s) => s.id));
+  for (const defaultStandee of DEFAULT_STANDEES) {
+    if (!existingStandeeIds.has(defaultStandee.id)) {
+      standees.push({ ...defaultStandee });
+    }
+  }
+
   // Migrate counterShapes to include thickness if missing
   // Get default thickness from first counter tray's params, or use default
   let defaultThickness = DEFAULT_COUNTER_THICKNESS;
@@ -555,6 +578,7 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
       layers: [layer],
       counterShapes,
       cardSizes,
+      standees,
       selectedLayerId: layerId,
       selectedBoxId: project.selectedBoxId,
       selectedTrayId: project.selectedTrayId,
@@ -590,6 +614,7 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
     layers: migratedLayers,
     counterShapes,
     cardSizes,
+    standees,
     globalSettings
   };
 }
