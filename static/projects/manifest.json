@@ -11,6 +11,12 @@
       "name": "Burning Banners",
       "author": "Dave Snider",
       "file": "burning-banners.json"
+    },
+    {
+      "id": "witchcraft",
+      "name": "Witchcraft",
+      "author": "Dave Snider",
+      "file": "witchcraft.json"
     }
   ]
 }
