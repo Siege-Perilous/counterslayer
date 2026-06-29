@@ -392,6 +392,17 @@
       "thickness": 0.5
     }
   ],
+  "standees": [
+    {
+      "id": "standee-standard",
+      "name": "Standard",
+      "baseRadius": 9,
+      "baseThickness": 3,
+      "standeeHeight": 40,
+      "standeeWidth": 25,
+      "standeeThickness": 1.5
+    }
+  ],
   "selectedLayerId": "7hvj1k8",
   "selectedBoxId": null,
   "selectedTrayId": "nrme206",
