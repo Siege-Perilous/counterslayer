@@ -22,7 +22,7 @@ import {
 } from '$lib/models/counterTray';
 import { createCupTray } from '$lib/models/cupTray';
 import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
-import { createStandeeTray } from '$lib/models/standeeTray';
+import { createStandeeTray, getStandeePositions } from '$lib/models/standeeTray';
 import type { Box, CardSize, CounterShape, Layer, Standee, Tray } from '$lib/types/project';
 import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isStandeeTray } from '$lib/types/project';
 import threemfSerializer from '@jscad/3mf-serializer';
@@ -352,15 +352,35 @@ function getTrayPositions(
   cardSizes: CustomCardSize[],
   counterShapes: CounterShape[],
   maxHeight: number,
-  spacerHeight: number
+  spacerHeight: number,
+  standees: Standee[] = []
 ): CounterStack[] {
   if (isCupTray(tray)) {
     // Cup trays don't have counter previews - the cups themselves are the containers
     return [];
   }
   if (isStandeeTray(tray)) {
-    // Standee trays don't render content previews yet
-    return [];
+    // Each standee = a round base disc with a perpendicular rectangular figure, leaning in its slot.
+    const placed = getStandeePositions(tray.params, standees, maxHeight, spacerHeight);
+    return placed.map((s) => ({
+      shape: 'custom' as const,
+      customShapeName: 'Standee',
+      customBaseShape: 'rectangle' as const,
+      x: s.x,
+      y: s.y,
+      z: s.z,
+      width: s.figureWidth,
+      length: s.figureLength,
+      thickness: s.figureThickness,
+      count: 1,
+      hexPointyTop: false,
+      color: '#c9a36a',
+      isStandee: true,
+      standeeBaseRadius: s.baseRadius,
+      standeeBaseThickness: s.baseThickness,
+      standeeFigureDir: s.figureDir,
+      standeeTilt: s.tilt
+    }));
   }
   if (isCardWellTray(tray)) {
     // Convert card well positions to CounterStack format for visualization
@@ -641,7 +661,14 @@ function handleGenerate(msg: GenerateMessage): void {
         standees
       );
       selectedTrayGeometry = jscadToArrays(cachedSelectedTray);
-      selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, maxHeight, selectedSpacerHeight);
+      selectedTrayCounters = getTrayPositions(
+        tray,
+        cardSizes,
+        counterShapes,
+        maxHeight,
+        selectedSpacerHeight,
+        standees
+      );
 
       // Generate all trays for selected box
       cachedAllTrays = [];
@@ -667,7 +694,7 @@ function handleGenerate(msg: GenerateMessage): void {
               height: maxHeight
             }
           },
-          counterStacks: getTrayPositions(placement.tray, cardSizes, counterShapes, maxHeight, spacerHeight),
+          counterStacks: getTrayPositions(placement.tray, cardSizes, counterShapes, maxHeight, spacerHeight, standees),
           trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, placement.tray.id))
         };
       });
@@ -699,7 +726,7 @@ function handleGenerate(msg: GenerateMessage): void {
       // Generate standalone tray
       cachedSelectedTray = createTrayGeometry(tray, cardSizes, counterShapes, maxHeight, spacerHeight, standees);
       selectedTrayGeometry = jscadToArrays(cachedSelectedTray);
-      selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, maxHeight, spacerHeight);
+      selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, maxHeight, spacerHeight, standees);
 
       cachedAllTrays = [{ jscadGeom: cachedSelectedTray, name: tray.name }];
       cachedBox = null;
@@ -821,7 +848,14 @@ function handleGenerate(msg: GenerateMessage): void {
               height: boxMaxHeight
             }
           },
-          counterStacks: getTrayPositions(placement.tray, cardSizes, counterShapes, boxMaxHeight, spacerHeight),
+          counterStacks: getTrayPositions(
+            placement.tray,
+            cardSizes,
+            counterShapes,
+            boxMaxHeight,
+            spacerHeight,
+            standees
+          ),
           trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, placement.tray.id))
         };
       });
@@ -887,7 +921,7 @@ function handleGenerate(msg: GenerateMessage): void {
           color: looseTray.color,
           geometry: jscadToArrays(jscadGeom),
           dimensions: { width: trayDims.width, depth: trayDims.depth, height: maxHeight },
-          counterStacks: getTrayPositions(looseTray, cardSizes, counterShapes, maxHeight, spacerHeight),
+          counterStacks: getTrayPositions(looseTray, cardSizes, counterShapes, maxHeight, spacerHeight, standees),
           trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, looseTray.id))
         });
       }

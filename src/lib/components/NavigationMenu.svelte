@@ -485,7 +485,7 @@
                       onmouseleave={handleTrayTypeLeave}
                     >
                       <Text weight={500}>Standees</Text>
-                      <Text size="0.75rem" color="var(--fgMuted)">Cardboard standees on their sides</Text>
+                      <Text size="0.75rem" color="var(--fgMuted)">Slotted tray for vertical standees</Text>
                     </button>
                   {/snippet}
                 </Popover>
@@ -623,7 +623,7 @@
                 onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Standees</Text>
-                <Text size="0.75rem" color="var(--fgMuted)">Cardboard standees on their sides</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Slotted tray for vertical standees</Text>
               </button>
             {/snippet}
           </Popover>
@@ -707,7 +707,7 @@
                 onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Standees</Text>
-                <Text size="0.75rem" color="var(--fgMuted)">Cardboard standees on their sides</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Slotted tray for vertical standees</Text>
               </button>
             {/snippet}
           </Popover>

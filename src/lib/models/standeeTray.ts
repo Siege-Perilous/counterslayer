@@ -206,6 +206,68 @@ export function getStandeeTrayDimensions(
   return { width: layout.trayWidth, depth: layout.trayDepth, height: layout.trayHeight };
 }
 
+// One placed standee for the 3D content preview: a round base disc against a side wall with a
+// rectangular figure perpendicular to it, leaning by the slot angle. Positions are in the model's
+// Z-up coordinates (x = width, y = depth, z = height).
+export interface StandeePosition {
+  x: number; // base disc centre (against the side wall)
+  y: number; // slot position along the depth
+  z: number; // figure axis height (disc centre)
+  figureDir: number; // +1 / -1: the X direction the figure points (toward the centre)
+  tilt: number; // signed lean angle (radians)
+  baseRadius: number;
+  baseThickness: number;
+  figureWidth: number; // standee width (vertical extent)
+  figureLength: number; // standee height (length the figure reaches inward)
+  figureThickness: number;
+}
+
+export function getStandeePositions(
+  params: StandeeTrayParams,
+  standees: Standee[],
+  targetHeight?: number,
+  floorSpacerHeight?: number
+): StandeePosition[] {
+  const standee = getStandee(params.standeeId, standees);
+  const layout = computeLayout(params, standee, targetHeight, floorSpacerHeight);
+  const { wallThickness } = params;
+  const { baseRadius, baseThickness, standeeWidth, standeeHeight, standeeThickness } = standee;
+
+  // Base disc sits flush against the side wall in the outer cavity.
+  const leftX = wallThickness + baseThickness / 2;
+  const rightX = layout.trayWidth - wallThickness - baseThickness / 2;
+
+  const common = {
+    z: layout.axisZ,
+    baseRadius,
+    baseThickness,
+    figureWidth: standeeWidth,
+    figureLength: standeeHeight,
+    figureThickness: standeeThickness
+  };
+
+  const positions: StandeePosition[] = [];
+  for (let i = 0; i < layout.leftRowCount; i++) {
+    positions.push({
+      ...common,
+      x: leftX,
+      y: layout.firstSlotY + i * layout.slotPitch,
+      figureDir: 1,
+      tilt: SLOT_ANGLE
+    });
+  }
+  for (let i = 0; i < layout.rightRowCount; i++) {
+    positions.push({
+      ...common,
+      x: rightX,
+      y: layout.firstSlotY + layout.staggerY + i * layout.slotPitch,
+      figureDir: -1,
+      tilt: -SLOT_ANGLE
+    });
+  }
+  return positions;
+}
+
 export function createStandeeTray(
   params: StandeeTrayParams,
   standees: Standee[],

@@ -29,6 +29,7 @@ function parseArgs() {
     debugExport?: boolean;
     view?: string;
     trayId?: string;
+    counters?: boolean;
   } = {};
 
   for (let i = 0; i < args.length; i++) {
@@ -71,6 +72,9 @@ function parseArgs() {
       case '--trayId':
         result.trayId = next;
         i++;
+        break;
+      case '--counters':
+        result.counters = true;
         break;
       case '--debug-export':
         result.debugExport = true;
@@ -193,6 +197,9 @@ async function captureView() {
   }
   if (args.trayId) {
     params.set('trayId', args.trayId);
+  }
+  if (args.counters) {
+    params.set('counters', '1');
   }
 
   // Load markers from file if specified
