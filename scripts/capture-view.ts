@@ -29,6 +29,7 @@ function parseArgs() {
     debugExport?: boolean;
     view?: string;
     trayId?: string;
+    boxId?: string;
     counters?: boolean;
   } = {};
 
@@ -71,6 +72,10 @@ function parseArgs() {
         break;
       case '--trayId':
         result.trayId = next;
+        i++;
+        break;
+      case '--boxId':
+        result.boxId = next;
         i++;
         break;
       case '--counters':
@@ -197,6 +202,9 @@ async function captureView() {
   }
   if (args.trayId) {
     params.set('trayId', args.trayId);
+  }
+  if (args.boxId) {
+    params.set('boxId', args.boxId);
   }
   if (args.counters) {
     params.set('counters', '1');
