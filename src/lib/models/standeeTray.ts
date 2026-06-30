@@ -75,7 +75,8 @@ interface StandeeLayout {
   trayWidth: number;
   trayDepth: number;
   trayHeight: number;
-  innerWallTopZ: number; // top of the inner walls/slots — stays at the natural height when the box stretches the tray taller
+  floorRefZ: number; // top of the (raised) solid floor the standees rest on
+  innerWallTopZ: number; // top of the inner walls/slots (the rim); the walls run up from floorRefZ
   // X positions (front face of each inner wall)
   leftWallX: number;
   rightWallX: number;
@@ -117,31 +118,38 @@ function computeLayout(
 
   // --- Height (Z) ---
   // The base lies on its side as a vertical disc (baseDiameter tall) and the figure (standeeWidth
-  // tall) is centred on the disc centre. The figure axis is at floor + baseRadius.
+  // tall) is centred on the disc centre. The figure axis sits a base-radius above whatever floor the
+  // standees rest on.
   const spacerHeight = floorSpacerHeight ?? 0;
-  const axisZ = floorThickness + baseRadius;
-  const contentTopZ = Math.max(floorThickness + baseDiameter, axisZ + standeeWidth / 2);
-  // Natural height the standee + rim need on their own. The inner walls, slots and the standee
-  // spacing below are all sized from this, so they never change when the box stretches the tray
-  // taller to match the other trays in a box/layer — otherwise the slot sweep (and therefore the
-  // tray depth) would grow with the box height and overflow the footprint the packer reserved.
+  // Natural height the standee + rim need on their own (measured from a floor at floorThickness). The
+  // inner walls, slots and the standee spacing below are all sized from this so they never change
+  // when the box stretches the tray taller — otherwise the slot sweep (and therefore the tray depth)
+  // would grow with the box height and overflow the footprint the packer reserved.
+  const naturalAxisZ = floorThickness + baseRadius;
+  const contentTopZ = Math.max(floorThickness + baseDiameter, naturalAxisZ + standeeWidth / 2);
   const naturalTrayHeight = contentTopZ + rimHeight;
   // Outer tray height: raise the rim to the box/layer height (targetHeight), then add any floor
   // spacer — same order as the counter tray so the box's height normalisation lines up.
   const trayHeightWithoutSpacer = targetHeight && targetHeight > naturalTrayHeight ? targetHeight : naturalTrayHeight;
   const trayHeight = trayHeightWithoutSpacer + spacerHeight;
-  // The inner walls (and their slots) stop at the natural height; only the outer walls grow.
-  const innerWallTopZ = naturalTrayHeight;
+  // When the tray is stretched taller, raise the floor with a solid spacer (like the counter tray)
+  // so the standees sit up near the rim rather than buried at the bottom. The whole standee layout —
+  // floor, inner walls, slots and figures — shifts up by this lift; the cavity above stays the
+  // natural size and the slot spacing is unchanged (it uses differences that cancel the lift).
+  const lift = trayHeight - naturalTrayHeight;
+  const floorRefZ = floorThickness + lift; // top of the raised solid floor the standees rest on
+  const axisZ = naturalAxisZ + lift;
+  const innerWallTopZ = naturalTrayHeight + lift; // inner walls run from the raised floor to the rim
 
   // --- Slot vertical extent (Z) ---
   // The slot holds the figure (centred on the axis) and stays open at the top of the inner wall so
   // the standee drops in. It plunges only as deep as the figure reaches: if the figure bottom is at
-  // or below the floor (standee as wide as / wider than the base) it cuts all the way through —
-  // extended a few mm below the floor so the angled cut leaves no sliver; otherwise it stops at the
-  // figure bottom.
+  // or below the (raised) floor the standee is as wide as / wider than the base, so it cuts all the
+  // way through — extended a few mm below the floor so the angled cut leaves no sliver; otherwise it
+  // stops at the figure bottom.
   const figureBottomZ = axisZ - standeeWidth / 2;
-  const cutsThrough = figureBottomZ <= floorThickness;
-  const slotBottomZ = cutsThrough ? floorThickness - 4 : figureBottomZ;
+  const cutsThrough = figureBottomZ <= floorRefZ;
+  const slotBottomZ = cutsThrough ? floorRefZ - 4 : figureBottomZ;
   const slotTopZ = innerWallTopZ + 1;
 
   // --- Depth (Y): one slot per standee ---
@@ -152,7 +160,7 @@ function computeLayout(
   // exceed that larger one-sided sweep plus the slot width and a clearance gap, otherwise the
   // staggered slots — and the standees in them — would touch.
   const topSweep = (innerWallTopZ - axisZ) * Math.tan(SLOT_ANGLE);
-  const botSweep = (axisZ - floorThickness) * Math.tan(SLOT_ANGLE);
+  const botSweep = (axisZ - floorRefZ) * Math.tan(SLOT_ANGLE);
   const requiredStagger = 2 * Math.max(topSweep, botSweep) + slotWidth + STANDEE_GAP;
   const slotPitch = Math.max(baseDiameter + 1, 2 * requiredStagger);
   const staggerY = slotPitch / 2; // right wall offset so figures interleave
@@ -183,6 +191,7 @@ function computeLayout(
     trayWidth,
     trayDepth,
     trayHeight,
+    floorRefZ,
     innerWallTopZ,
     leftWallX,
     rightWallX,
@@ -286,15 +295,15 @@ export function createStandeeTray(
   floorSpacerHeight?: number,
   showEmboss: boolean = true
 ): Geom3 {
-  const { wallThickness, innerWallThickness, floorThickness } = params;
+  const { wallThickness, innerWallThickness } = params;
   const standee = getStandee(params.standeeId, standees);
   const layout = computeLayout(params, standee, targetHeight, floorSpacerHeight);
 
-  const { trayWidth, trayDepth, trayHeight, innerWallTopZ, leftWallX, rightWallX } = layout;
-  const wallHeight = trayHeight - floorThickness;
-  // Inner walls stop at the natural height (the slots/figures live there); the outer walls grow
-  // with the box, so a stretched-tall tray keeps the same inner-wall slot geometry.
-  const innerWallHeight = innerWallTopZ - floorThickness;
+  const { trayWidth, trayDepth, trayHeight, floorRefZ, innerWallTopZ, leftWallX, rightWallX } = layout;
+  // The cavity (and the inner walls) start at floorRefZ, which is raised above the real floor when
+  // the tray is stretched taller — leaving a solid spacer below so the standees sit near the rim.
+  const cavityHeight = trayHeight - floorRefZ;
+  const innerWallHeight = innerWallTopZ - floorRefZ;
 
   // === OPEN-TOP BOX (floor + 4 outer walls) ===
   const outerBox = translate(
@@ -302,8 +311,8 @@ export function createStandeeTray(
     cuboid({ size: [trayWidth, trayDepth, trayHeight] })
   );
   const innerCavity = translate(
-    [trayWidth / 2, trayDepth / 2, floorThickness + wallHeight / 2 + 0.1],
-    cuboid({ size: [trayWidth - wallThickness * 2, trayDepth - wallThickness * 2, wallHeight + 0.2] })
+    [trayWidth / 2, trayDepth / 2, floorRefZ + cavityHeight / 2 + 0.1],
+    cuboid({ size: [trayWidth - wallThickness * 2, trayDepth - wallThickness * 2, cavityHeight + 0.2] })
   );
   let tray = subtract(outerBox, innerCavity);
 
@@ -311,7 +320,7 @@ export function createStandeeTray(
   const innerCavityDepth = trayDepth - wallThickness * 2;
   const makeInnerWall = (frontFaceX: number): Geom3 =>
     translate(
-      [frontFaceX + innerWallThickness / 2, trayDepth / 2, floorThickness + innerWallHeight / 2],
+      [frontFaceX + innerWallThickness / 2, trayDepth / 2, floorRefZ + innerWallHeight / 2],
       cuboid({ size: [innerWallThickness, innerCavityDepth, innerWallHeight] })
     );
 
