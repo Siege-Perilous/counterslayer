@@ -308,7 +308,9 @@
             "innerWallThickness": 2,
             "floorThickness": 2,
             "clearance": 0.5,
-            "rimHeight": 2
+            "rimHeight": 2,
+            "trayDepthOverride": null,
+            "trayWidthOverride": null
           }
         }
       ],

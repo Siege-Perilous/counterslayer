@@ -30,6 +30,8 @@ export interface StandeeTrayParams {
   floorThickness: number;
   clearance: number; // Tolerance around standees
   rimHeight: number; // Extra height above the tallest content
+  trayWidthOverride: number | null; // null = auto from standees; acts as a minimum, content is centred
+  trayDepthOverride: number | null; // null = auto from standees; acts as a minimum, content is centred
 }
 
 export const defaultStandeeTrayParams: StandeeTrayParams = {
@@ -39,7 +41,9 @@ export const defaultStandeeTrayParams: StandeeTrayParams = {
   innerWallThickness: 2.0,
   floorThickness: 2.0,
   clearance: 0.5,
-  rimHeight: 2.0
+  rimHeight: 2.0,
+  trayWidthOverride: null,
+  trayDepthOverride: null
 };
 
 // Helper to get a standee from the global standees by ID.
@@ -77,7 +81,8 @@ interface StandeeLayout {
   trayHeight: number;
   floorRefZ: number; // top of the (raised) solid floor the standees rest on
   innerWallTopZ: number; // top of the inner walls/slots (the rim); the walls run up from floorRefZ
-  // X positions (front face of each inner wall)
+  // X positions (front face of each inner wall). The left wall is anchored to the left outer wall and
+  // the right wall to the right outer wall, so a custom width grows the middle cavity between them.
   leftWallX: number;
   rightWallX: number;
   innerWallThickness: number;
@@ -172,9 +177,9 @@ function computeLayout(
   // toward the end by the slot's sweep before seating — so add that sweep on top of the radius.
   const endSweep = Math.max(topSweep, botSweep);
   const endMargin = wallThickness + clearance + baseRadius + endSweep;
-  const firstSlotY = endMargin;
+  const naturalFirstSlotY = endMargin;
   const lastSlotY = endMargin + (maxRowCount - 1) * slotPitch + staggerY;
-  const trayDepth = lastSlotY + baseRadius + endSweep + clearance + wallThickness;
+  const autoDepth = lastSlotY + baseRadius + endSweep + clearance + wallThickness;
 
   // --- Width (X) ---
   // The base is a thin vertical disc against the side wall, so the outer cavity only needs the base
@@ -186,8 +191,21 @@ function computeLayout(
   const middleCavityWidth = Math.max(standeeLength + clearance - outerCavityWidth, outerCavityWidth);
 
   const leftWallX = wallThickness + outerCavityWidth;
-  const rightWallX = leftWallX + innerWallThickness + middleCavityWidth;
-  const trayWidth = rightWallX + innerWallThickness + outerCavityWidth + wallThickness;
+  const naturalRightWallX = leftWallX + innerWallThickness + middleCavityWidth;
+  const autoWidth = naturalRightWallX + innerWallThickness + outerCavityWidth + wallThickness;
+
+  // --- Custom width / length override ---
+  // Each override is a minimum; values below the auto size are ignored. Widening keeps the outer
+  // walls and the outer cavities (where the bases sit) exactly where auto fit put them — only the
+  // MIDDLE cavity grows, so the two opposing rows spread apart. Lengthening centres the slot row
+  // along the depth. The outer-wall thickness never changes.
+  const trayWidth = params.trayWidthOverride != null ? Math.max(params.trayWidthOverride, autoWidth) : autoWidth;
+  const trayDepth = params.trayDepthOverride != null ? Math.max(params.trayDepthOverride, autoDepth) : autoDepth;
+  // Left inner wall stays put; the right inner wall is anchored to the right outer wall so the middle
+  // cavity absorbs the extra width.
+  const rightWallX = trayWidth - wallThickness - outerCavityWidth - innerWallThickness;
+  // Centre the slot row along the (possibly longer) depth.
+  const firstSlotY = naturalFirstSlotY + (trayDepth - autoDepth) / 2;
 
   return {
     trayWidth,
@@ -254,7 +272,8 @@ export function getStandeePositions(
   const { wallThickness } = params;
   const { baseRadius, baseThickness, standeeWidth, standeeHeight, standeeThickness } = standee;
 
-  // Base disc sits flush against the side wall in the outer cavity.
+  // Base disc sits flush against the side outer wall in its outer cavity (unchanged by a custom
+  // width — only the middle cavity between the rows grows).
   const leftX = wallThickness + baseThickness / 2;
   const rightX = layout.trayWidth - wallThickness - baseThickness / 2;
 
@@ -306,6 +325,9 @@ export function createStandeeTray(
   // the tray is stretched taller — leaving a solid spacer below so the standees sit near the rim.
   const cavityHeight = trayHeight - floorRefZ;
   const innerWallHeight = innerWallTopZ - floorRefZ;
+  // The cavity spans the whole interior (only the outer walls stay solid). A custom width just makes
+  // the middle cavity wider; a custom length just makes the cavity longer.
+  const innerCavityDepth = trayDepth - wallThickness * 2;
 
   // === OPEN-TOP BOX (floor + 4 outer walls) ===
   const outerBox = translate(
@@ -314,12 +336,11 @@ export function createStandeeTray(
   );
   const innerCavity = translate(
     [trayWidth / 2, trayDepth / 2, floorRefZ + cavityHeight / 2 + 0.1],
-    cuboid({ size: [trayWidth - wallThickness * 2, trayDepth - wallThickness * 2, cavityHeight + 0.2] })
+    cuboid({ size: [trayWidth - wallThickness * 2, innerCavityDepth, cavityHeight + 0.2] })
   );
   let tray = subtract(outerBox, innerCavity);
 
   // === TWO INNER WALLS spanning the depth ===
-  const innerCavityDepth = trayDepth - wallThickness * 2;
   const makeInnerWall = (frontFaceX: number): Geom3 =>
     translate(
       [frontFaceX + innerWallThickness / 2, trayDepth / 2, floorRefZ + innerWallHeight / 2],
