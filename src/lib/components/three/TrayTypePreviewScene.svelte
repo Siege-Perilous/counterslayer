@@ -25,7 +25,8 @@
     cardDraw: '/stls/card-draw.stl',
     cardDivider: '/stls/card-divider.stl',
     cardWell: '/stls/card-well.stl',
-    cup: '/stls/cups.stl'
+    cup: '/stls/cups.stl',
+    standee: '/stls/standees.stl'
   };
 
   // Uniform tray color

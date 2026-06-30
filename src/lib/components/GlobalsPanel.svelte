@@ -13,21 +13,34 @@
     ConfirmActionButton,
     Text
   } from '@tableslayer/ui';
-  import { IconSquare, IconCircle, IconHexagon, IconTriangle, IconRectangle, IconCards } from '@tabler/icons-svelte';
-  import type { CounterShape, CounterBaseShape, CardSize } from '$lib/types/project';
+  import {
+    IconSquare,
+    IconCircle,
+    IconHexagon,
+    IconTriangle,
+    IconRectangle,
+    IconCards,
+    IconUser
+  } from '@tabler/icons-svelte';
+  import type { CounterShape, CounterBaseShape, CardSize, Standee } from '$lib/types/project';
   import {
     getProject,
     isCounterTray,
     isCardDrawTray,
     isCardDividerTray,
+    isStandeeTray,
     getCounterShapes,
     getCardSizes,
+    getStandees,
     addCounterShape,
     updateCounterShape,
     deleteCounterShape,
     addCardSize,
     updateCardSize,
     deleteCardSize,
+    addStandee,
+    updateStandee,
+    deleteStandee,
     DEFAULT_COUNTER_THICKNESS
   } from '$lib/stores/project.svelte';
 
@@ -42,10 +55,13 @@
   let expandedIndex: number | null = $state(null);
   // Track which card size is expanded (null = none)
   let expandedCardIndex: number | null = $state(null);
+  // Track which standee is expanded (null = none)
+  let expandedStandeeIndex: number | null = $state(null);
 
-  // Get shapes and card sizes from project level
+  // Get shapes, card sizes and standees from project level
   let counterShapes = $derived(getCounterShapes());
   let cardSizes = $derived(getCardSizes());
+  let standees = $derived(getStandees());
 
   // Get the shape icon component for a base shape
   function getShapeIcon(baseShape: CounterBaseShape) {
@@ -241,6 +257,54 @@
   function handleRemoveCardSize(cardSizeId: string) {
     deleteCardSize(cardSizeId);
     expandedCardIndex = null;
+  }
+
+  // Standee handlers - using project-level store functions
+  function handleAddStandee() {
+    const newName = `Custom Standee ${standees.length + 1}`;
+    const newStandee = addStandee({
+      name: newName,
+      baseRadius: 9,
+      baseThickness: 3,
+      standeeHeight: 40,
+      standeeWidth: 25,
+      standeeThickness: 1.5
+    });
+    const newIndex = getStandees().findIndex((s) => s.id === newStandee.id);
+    expandedStandeeIndex = newIndex;
+  }
+
+  function handleUpdateStandee(standeeId: string, field: keyof Standee, value: string | number) {
+    if (field === 'name') {
+      const newName = value as string;
+      // Don't allow duplicate names
+      if (standees.some((s) => s.id !== standeeId && s.name === newName)) {
+        return;
+      }
+    }
+    updateStandee(standeeId, { [field]: value });
+  }
+
+  // Count standee trays using a given standee
+  function countTraysUsingStandee(standeeId: string): number {
+    const project = getProject();
+    let count = 0;
+    for (const layer of project.layers) {
+      for (const box of layer.boxes) {
+        for (const tray of box.trays) {
+          if (isStandeeTray(tray) && tray.params.standeeId === standeeId) count++;
+        }
+      }
+      for (const tray of layer.looseTrays) {
+        if (isStandeeTray(tray) && tray.params.standeeId === standeeId) count++;
+      }
+    }
+    return count;
+  }
+
+  function handleRemoveStandee(standeeId: string) {
+    deleteStandee(standeeId);
+    expandedStandeeIndex = null;
   }
 </script>
 
@@ -597,6 +661,152 @@
     </div>
     <Spacer />
     <Link as="button" onclick={handleAddCardSize}>+ New card size</Link>
+  </section>
+
+  <Hr />
+
+  <section class="section">
+    <h3 class="sectionTitle">Standees</h3>
+    <Spacer size="0.5rem" />
+    <div class="customShapesList">
+      {#each standees as standee, index (standee.id)}
+        {@const isExpanded = expandedStandeeIndex === index}
+        {#if isExpanded}
+          <!-- Expanded view: full form in Panel -->
+          <Panel class="shapePanel">
+            <div class="shapePanelContent">
+              <div class="shapeFormGrid">
+                <FormControl label="Name" name="standeeName-{index}">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="text"
+                      value={standee.name}
+                      onchange={(e) => handleUpdateStandee(standee.id, 'name', e.currentTarget.value)}
+                      placeholder="Name"
+                    />
+                  {/snippet}
+                </FormControl>
+                <FormControl label="Base radius" name="baseRadius-{index}">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.5"
+                      min="1"
+                      value={standee.baseRadius}
+                      onchange={(e) => handleUpdateStandee(standee.id, 'baseRadius', parseFloat(e.currentTarget.value))}
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+                <FormControl label="Base thickness" name="baseThickness-{index}">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.5"
+                      min="0.5"
+                      value={standee.baseThickness}
+                      onchange={(e) =>
+                        handleUpdateStandee(standee.id, 'baseThickness', parseFloat(e.currentTarget.value))}
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+                <FormControl label="Standee height" name="standeeHeight-{index}">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.5"
+                      min="1"
+                      value={standee.standeeHeight}
+                      onchange={(e) =>
+                        handleUpdateStandee(standee.id, 'standeeHeight', parseFloat(e.currentTarget.value))}
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+                <FormControl label="Standee width" name="standeeWidth-{index}">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.5"
+                      min="1"
+                      value={standee.standeeWidth}
+                      onchange={(e) =>
+                        handleUpdateStandee(standee.id, 'standeeWidth', parseFloat(e.currentTarget.value))}
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+                <FormControl label="Standee thickness" name="standeeThickness-{index}">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      value={standee.standeeThickness}
+                      onchange={(e) =>
+                        handleUpdateStandee(standee.id, 'standeeThickness', parseFloat(e.currentTarget.value))}
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+              </div>
+            </div>
+            <Hr />
+            {@const trayCount = countTraysUsingStandee(standee.id)}
+            <div class="shapePanelActions">
+              <Button size="sm" onclick={() => (expandedStandeeIndex = null)}>Save</Button>
+              <ConfirmActionButton action={() => handleRemoveStandee(standee.id)} actionButtonText="Delete standee">
+                {#snippet trigger({ triggerProps })}
+                  <Button {...triggerProps} size="sm" variant="ghost">Delete</Button>
+                {/snippet}
+                {#snippet actionMessage()}
+                  <div style="max-width: 15rem;">
+                    <Text weight={600} color="var(--fgDanger)">Warning</Text>
+                    <Spacer size="0.5rem" />
+                    {#if trayCount > 0}
+                      <Text size="0.875rem">
+                        Deleting "{standee.name}" will affect
+                        <Text as="span" color="var(--fgDanger)">
+                          {trayCount}
+                          standee tray{trayCount === 1 ? '' : 's'}
+                        </Text> using it.
+                      </Text>
+                    {:else}
+                      <Text size="0.875rem">Delete the "{standee.name}" standee?</Text>
+                    {/if}
+                    <Spacer size="0.5rem" />
+                  </div>
+                {/snippet}
+              </ConfirmActionButton>
+            </div>
+          </Panel>
+        {:else}
+          <div class="shapeCard">
+            <!-- Collapsed view: compact summary -->
+            <button
+              class="shapeSummary"
+              onclick={() => (expandedStandeeIndex = index)}
+              title="Click to edit {standee.name}"
+            >
+              <span class="shapeIcon">
+                <Icon Icon={IconUser} size={16} />
+              </span>
+              <span class="shapeName">{standee.name}</span>
+              <span class="shapeSize">{standee.standeeWidth}×{standee.standeeHeight} mm</span>
+            </button>
+          </div>
+        {/if}
+      {/each}
+    </div>
+    <Spacer />
+    <Link as="button" onclick={handleAddStandee}>+ New standee</Link>
   </section>
 
   <Hr />
