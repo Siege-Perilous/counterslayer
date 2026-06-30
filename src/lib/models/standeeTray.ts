@@ -153,17 +153,19 @@ function computeLayout(
   const slotTopZ = innerWallTopZ + 1;
 
   // --- Depth (Y): one slot per standee ---
-  // Spacing must clear both the base discs (baseDiameter + 1) and the angled slots. A slot tilted
-  // SLOT_ANGLE sweeps sideways (Y) above the figure axis (topSweep) and below it (botSweep). The
-  // opposing row tilts the other way and is staggered by half a pitch, so each slot approaches the
-  // next slot on the other wall on whichever side sweeps farther. The half-pitch must therefore
-  // exceed that larger one-sided sweep plus the slot width and a clearance gap, otherwise the
-  // staggered slots — and the standees in them — would touch.
+  // Both inner walls tilt their slots the SAME direction, so the standees on the two walls run
+  // parallel rather than converging like a herringbone — which lets the row pitch be set by the base
+  // discs (the widest part) instead of the slot's sideways sweep, packing the tray much shorter than
+  // opposed slots would. The right row is then offset by HALF a pitch so its standees sit centred
+  // between the left row's, so each reads clearly from above instead of hiding behind its neighbour.
+  // The pitch is floored at twice the parallel-figure clearance so that half-pitch offset always
+  // keeps opposing figures apart. topSweep/botSweep (the slot's sideways sweep above/below the figure
+  // axis) are still used for the end margins below.
   const topSweep = (innerWallTopZ - axisZ) * Math.tan(SLOT_ANGLE);
   const botSweep = (axisZ - floorRefZ) * Math.tan(SLOT_ANGLE);
-  const requiredStagger = 2 * Math.max(topSweep, botSweep) + slotWidth + STANDEE_GAP;
-  const slotPitch = Math.max(baseDiameter + 1, 2 * requiredStagger);
-  const staggerY = slotPitch / 2; // right wall offset so figures interleave
+  const figureClearance = slotWidth + STANDEE_GAP; // min offset for opposing parallel figures to clear
+  const slotPitch = Math.max(baseDiameter + 1, 2 * figureClearance);
+  const staggerY = slotPitch / 2; // half-pitch so the right row centres between the left row's standees
 
   // End margin so the end standees still slide in past the end walls. The base disc needs
   // baseRadius, and because the standee enters from the (tilted) top of the slot its base swings
@@ -281,7 +283,7 @@ export function getStandeePositions(
       x: rightX,
       y: layout.firstSlotY + layout.staggerY + i * layout.slotPitch,
       figureDir: -1,
-      tilt: -SLOT_ANGLE
+      tilt: SLOT_ANGLE // same slant as the left row (figureDir still points inward from the right wall)
     });
   }
   return positions;
@@ -365,8 +367,10 @@ export function createStandeeTray(
     return wall;
   };
 
+  // Both walls tilt the same way (SLOT_ANGLE), so the standees all slant in one direction; the right
+  // row is just nudged by staggerY so its figures interleave with the left row's in the middle.
   const leftWall = buildWall(leftWallX, layout.leftRowCount, SLOT_ANGLE, 0);
-  const rightWall = buildWall(rightWallX, layout.rightRowCount, -SLOT_ANGLE, layout.staggerY);
+  const rightWall = buildWall(rightWallX, layout.rightRowCount, SLOT_ANGLE, layout.staggerY);
   tray = union(tray, leftWall, rightWall);
 
   // === EMBOSS TRAY NAME ON BOTTOM ===

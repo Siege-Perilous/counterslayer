@@ -269,19 +269,12 @@
           "rotationOverride": "auto",
           "params": {
             "layout": {
-              "columns": [["lalhjbh", "l2mnoqz"], ["3k64by4"]]
+              "columns": [["l2mnoqz"], ["3k64by4"]]
             },
             "stacks": [
               {
                 "id": "cwy3n1d",
                 "cellId": "3k64by4",
-                "cardSizeId": "card-standard",
-                "count": 30,
-                "rotation": 0
-              },
-              {
-                "id": "75stmty",
-                "cellId": "lalhjbh",
                 "cardSizeId": "card-standard",
                 "count": 30,
                 "rotation": 0
@@ -301,8 +294,41 @@
             "clearance": 1,
             "rimHeight": 3
           }
+        },
+        {
+          "id": "rg4klk5",
+          "type": "standee",
+          "name": "Standee Tray",
+          "color": "#3d7a6a",
+          "rotationOverride": "auto",
+          "params": {
+            "standeeId": "standee-standard",
+            "count": 10,
+            "wallThickness": 2,
+            "innerWallThickness": 2,
+            "floorThickness": 2,
+            "clearance": 0.5,
+            "rimHeight": 2
+          }
         }
-      ]
+      ],
+      "manualLayout": {
+        "boxes": [],
+        "looseTrays": [
+          {
+            "trayId": "nrme206",
+            "x": 0,
+            "y": 0,
+            "rotation": 0
+          },
+          {
+            "trayId": "rg4klk5",
+            "x": 0,
+            "y": 97,
+            "rotation": 90
+          }
+        ]
+      }
     }
   ],
   "counterShapes": [
