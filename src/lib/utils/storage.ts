@@ -508,7 +508,7 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
 
   // Standees are a newer global - older projects won't have them. Start from any
   // existing array and backfill the defaults.
-  let standees: Standee[] = Array.isArray((project as { standees?: unknown }).standees)
+  const standees: Standee[] = Array.isArray((project as { standees?: unknown }).standees)
     ? (project as { standees: Standee[] }).standees.map((s) => (s.id ? s : { ...s, id: generateId() }))
     : [];
   const existingStandeeIds = new Set(standees.map((s) => s.id));
