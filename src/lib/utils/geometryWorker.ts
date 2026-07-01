@@ -141,11 +141,7 @@ export interface GenerationResult {
 }
 
 type WorkerResult =
-  | GenerateResult
-  | ExportStlResult
-  | ExportAllStlsResult
-  | Export3mfResult
-  | GenerationProgressMessage;
+  GenerateResult | ExportStlResult | ExportAllStlsResult | Export3mfResult | GenerationProgressMessage;
 
 /**
  * Convert raw geometry data to Three.js BufferGeometry
