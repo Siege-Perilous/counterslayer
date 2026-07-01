@@ -296,7 +296,8 @@ export class GeometryWorkerManager {
         JSON.stringify({
           layers: project.layers,
           cardSizes: project.cardSizes,
-          counterShapes: project.counterShapes
+          counterShapes: project.counterShapes,
+          standees: project.standees
         })
       );
 

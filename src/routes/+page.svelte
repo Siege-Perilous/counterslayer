@@ -181,6 +181,10 @@
       const zoomStr = params.get('zoom');
       const markersStr = params.get('markers');
       const hideUI = params.get('hideUI') === '1';
+      // Allow enabling the content preview from the URL (used by capture-view for debugging)
+      if (params.get('counters') === '1') {
+        showCounters = true;
+      }
       const viewParam = params.get('view') as ViewMode | null;
       const trayIdParam = params.get('trayId');
       const boxIdParam = params.get('boxId');

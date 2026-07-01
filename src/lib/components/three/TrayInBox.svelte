@@ -8,6 +8,7 @@
   import type { IntersectionEvent } from '@threlte/extras';
   import * as THREE from 'three';
   import CounterMesh from './CounterMesh.svelte';
+  import StandeeMesh from './StandeeMesh.svelte';
   import { getAlternateColor, getSleeveColors } from '$lib/three/materials';
   import type { CounterStack } from '$lib/models/counterTray';
 
@@ -135,7 +136,22 @@
 <!-- Counter previews in tray-local coordinates -->
 {#if showCounters && counterStacks.length > 0}
   {#each counterStacks as stack, stackIdx (stackIdx)}
-    {#if stack.isEdgeLoaded}
+    {#if stack.isStandee}
+      <!-- Standee: round base disc + perpendicular rectangle, leaning in its slot -->
+      <StandeeMesh
+        posX={stack.x}
+        posY={stack.z}
+        posZ={-stack.y}
+        baseRadius={stack.standeeBaseRadius ?? 5}
+        baseThickness={stack.standeeBaseThickness ?? 3}
+        figureWidth={stack.width}
+        figureLength={stack.length}
+        figureThickness={stack.thickness}
+        figureDir={stack.standeeFigureDir ?? 1}
+        tilt={stack.standeeTilt ?? 0}
+        color={stack.color}
+      />
+    {:else if stack.isEdgeLoaded}
       <!-- Edge-loaded: counters standing on edge like books -->
       {#each Array(stack.count) as _, counterIdx (counterIdx)}
         {@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}

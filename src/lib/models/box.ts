@@ -1,5 +1,5 @@
-import type { Box, CardSize, CounterShape, Tray } from '$lib/types/project';
-import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray } from '$lib/types/project';
+import type { Box, CardSize, CounterShape, Standee, Tray } from '$lib/types/project';
+import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isStandeeTray } from '$lib/types/project';
 import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -9,6 +9,7 @@ import { getCardWellTrayDimensions } from './cardWellTray';
 import type { CounterTrayParams } from './counterTray';
 import { getCupTrayDimensions } from './cupTray';
 import { createHoneycombUnion, defaultHoneycombParams } from './honeycomb';
+import { getStandeeTrayDimensions } from './standeeTray';
 
 const { cylinder } = jscad.primitives;
 const { subtract } = jscad.booleans;
@@ -51,7 +52,8 @@ export interface TraySpacerInfo {
 export function getTrayDimensionsForTray(
   tray: Tray,
   cardSizes: CardSize[] = [],
-  counterShapes: CounterShape[] = []
+  counterShapes: CounterShape[] = [],
+  standees: Standee[] = []
 ): TrayDimensions {
   if (isCupTray(tray)) {
     return getCupTrayDimensions(tray.params);
@@ -64,6 +66,9 @@ export function getTrayDimensionsForTray(
   }
   if (isCardTray(tray)) {
     return getCardDrawTrayDimensions(tray.params, cardSizes);
+  }
+  if (isStandeeTray(tray)) {
+    return getStandeeTrayDimensions(tray.params, standees);
   }
   // Default to counter tray
   return getCounterTrayDimensions(tray.params, counterShapes);
@@ -473,6 +478,7 @@ export function arrangeTrays(
     tolerance?: number;
     cardSizes?: CardSize[];
     counterShapes?: CounterShape[];
+    standees?: Standee[];
     manualLayout?: ManualTrayPlacement[];
     printBedSize?: number; // Legacy - use gameContainerWidth/gameContainerDepth
     gameContainerWidth?: number;
@@ -488,7 +494,12 @@ export function arrangeTrays(
       const tray = trays.find((t) => t.id === manual.trayId);
       if (!tray) continue;
 
-      const dims = getTrayDimensionsForTray(tray, options?.cardSizes ?? [], options?.counterShapes ?? []);
+      const dims = getTrayDimensionsForTray(
+        tray,
+        options?.cardSizes ?? [],
+        options?.counterShapes ?? [],
+        options?.standees ?? []
+      );
       // Apply rotation: 90° and 270° swap width/depth
       const swapDims = manual.rotation === 90 || manual.rotation === 270;
       const effectiveDims: TrayDimensions = swapDims
@@ -542,6 +553,7 @@ function arrangeTraysAuto(
     tolerance?: number;
     cardSizes?: CardSize[];
     counterShapes?: CounterShape[];
+    standees?: Standee[];
     printBedSize?: number; // Legacy - use gameContainerWidth/gameContainerDepth
     gameContainerWidth?: number;
     gameContainerDepth?: number;
@@ -551,7 +563,12 @@ function arrangeTraysAuto(
 
   // Get dimensions for each tray
   const packingItems: PackingItem<TrayPackData>[] = trays.map((tray) => {
-    const dims = getTrayDimensionsForTray(tray, options?.cardSizes ?? [], options?.counterShapes ?? []);
+    const dims = getTrayDimensionsForTray(
+      tray,
+      options?.cardSizes ?? [],
+      options?.counterShapes ?? [],
+      options?.standees ?? []
+    );
     return {
       data: { tray, height: dims.height },
       width: dims.width,
@@ -689,7 +706,12 @@ function createRoundedBox(
 const POKE_HOLE_DIAMETER = 15;
 
 // Create box geometry with rounded corners
-export function createBox(box: Box, cardSizes: CardSize[] = [], counterShapes: CounterShape[] = []): Geom3 | null {
+export function createBox(
+  box: Box,
+  cardSizes: CardSize[] = [],
+  counterShapes: CounterShape[] = [],
+  standees: Standee[] = []
+): Geom3 | null {
   if (box.trays.length === 0) return null;
 
   const placements = arrangeTrays(box.trays, {
@@ -698,6 +720,7 @@ export function createBox(box: Box, cardSizes: CardSize[] = [], counterShapes: C
     tolerance: box.tolerance,
     cardSizes,
     counterShapes,
+    standees,
     manualLayout: box.manualLayout
   });
   const interior = getBoxInteriorDimensions(placements, box.tolerance);
@@ -768,7 +791,8 @@ export function createBox(box: Box, cardSizes: CardSize[] = [], counterShapes: C
 export function calculateMinimumBoxDimensions(
   box: Box,
   cardSizes: CardSize[] = [],
-  counterShapes: CounterShape[] = []
+  counterShapes: CounterShape[] = [],
+  standees: Standee[] = []
 ): BoxMinimumDimensions {
   if (box.trays.length === 0) {
     return { minWidth: 0, minDepth: 0, minHeight: 0 };
@@ -780,6 +804,7 @@ export function calculateMinimumBoxDimensions(
     tolerance: box.tolerance,
     cardSizes,
     counterShapes,
+    standees,
     manualLayout: box.manualLayout
   });
   const interior = getBoxInteriorDimensions(placements, box.tolerance);
@@ -795,7 +820,8 @@ export function calculateMinimumBoxDimensions(
 export function validateCustomDimensions(
   box: Box,
   cardSizes: CardSize[] = [],
-  counterShapes: CounterShape[] = []
+  counterShapes: CounterShape[] = [],
+  standees: Standee[] = []
 ): ValidationResult {
   const errors: string[] = [];
 
@@ -805,7 +831,7 @@ export function validateCustomDimensions(
     const interiorWidth = box.customWidth - box.wallThickness * 2 - box.tolerance * 2;
 
     for (const tray of box.trays) {
-      const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
+      const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes, standees);
       // Check both orientations - tray can be rotated to fit
       const minWidth = Math.min(dims.width, dims.depth);
 
@@ -822,7 +848,7 @@ export function validateCustomDimensions(
     const interiorDepth = box.customDepth - box.wallThickness * 2 - box.tolerance * 2;
 
     for (const tray of box.trays) {
-      const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
+      const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes, standees);
       // Check both orientations
       const minDepth = Math.min(dims.width, dims.depth);
 
@@ -835,7 +861,7 @@ export function validateCustomDimensions(
   }
 
   // Calculate minimums based on actual arrangement (which now respects customWidth)
-  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
+  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes, standees);
 
   // Only validate customDepth if it's explicitly set (width can grow to accommodate)
   // The arrangement algorithm handles width constraints by using more rows
@@ -863,7 +889,8 @@ export function validateCustomDimensions(
 export function calculateTraySpacers(
   box: Box,
   cardSizes: CardSize[] = [],
-  counterShapes: CounterShape[] = []
+  counterShapes: CounterShape[] = [],
+  standees: Standee[] = []
 ): TraySpacerInfo[] {
   if (box.trays.length === 0) return [];
 
@@ -873,9 +900,10 @@ export function calculateTraySpacers(
     tolerance: box.tolerance,
     cardSizes,
     counterShapes,
+    standees,
     manualLayout: box.manualLayout
   });
-  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
+  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes, standees);
 
   // Target exterior height (custom or auto)
   const targetExteriorHeight = box.customBoxHeight ?? minimums.minHeight;
@@ -907,13 +935,14 @@ export function getBoxDimensions(box: Box): TrayDimensions | null {
 export function getBoxExteriorDimensions(
   box: Box,
   cardSizes: CardSize[] = [],
-  counterShapes: CounterShape[] = []
+  counterShapes: CounterShape[] = [],
+  standees: Standee[] = []
 ): TrayDimensions {
   if (box.trays.length === 0) {
     return { width: 0, depth: 0, height: 0 };
   }
 
-  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
+  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes, standees);
   const lidHeight = getLidHeight(box);
 
   return {

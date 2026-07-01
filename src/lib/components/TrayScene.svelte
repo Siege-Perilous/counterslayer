@@ -4,6 +4,7 @@
   import { OrbitControls, Grid, Text, interactivity, type IntersectionEvent } from '@threlte/extras';
   import PrintBed from './PrintBed.svelte';
   import CounterMesh from './three/CounterMesh.svelte';
+  import StandeeMesh from './three/StandeeMesh.svelte';
   import SceneLighting from './three/SceneLighting.svelte';
   import BoxAssembly from './three/BoxAssembly.svelte';
   import LayerContent from './three/LayerContent.svelte';
@@ -1543,6 +1544,21 @@
           <T.MeshStandardMaterial color={innerCardColor} roughness={0.5} metalness={0.1} />
         </T.Mesh>
       {/each}
+    {:else if stack.isStandee}
+      <!-- Standee: round base disc + perpendicular rectangle, leaning in its slot -->
+      <StandeeMesh
+        posX={meshOffset.x + stack.x}
+        posY={stack.z}
+        posZ={meshOffset.z - stack.y}
+        baseRadius={stack.standeeBaseRadius ?? 5}
+        baseThickness={stack.standeeBaseThickness ?? 3}
+        figureWidth={stack.width}
+        figureLength={stack.length}
+        figureThickness={stack.thickness}
+        figureDir={stack.standeeFigureDir ?? 1}
+        tilt={stack.standeeTilt ?? 0}
+        color={stack.color}
+      />
     {:else if stack.isEdgeLoaded}
       <!-- Edge-loaded: counters standing on edge like books -->
       {#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
@@ -1659,7 +1675,22 @@
     {@const groupZ = exploded ? meshOffset.z - interiorStartOffset - placement.y : traysGroupDepth - placement.y}
     <T.Group position.x={groupX} position.y={groupY} position.z={groupZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
       {#each trayData.counterStacks as stack, stackIdx (stackIdx)}
-        {#if stack.isEdgeLoaded}
+        {#if stack.isStandee}
+          <!-- Standee: round base disc + perpendicular rectangle, leaning in its slot -->
+          <StandeeMesh
+            posX={stack.x}
+            posY={stack.z}
+            posZ={-stack.y}
+            baseRadius={stack.standeeBaseRadius ?? 5}
+            baseThickness={stack.standeeBaseThickness ?? 3}
+            figureWidth={stack.width}
+            figureLength={stack.length}
+            figureThickness={stack.thickness}
+            figureDir={stack.standeeFigureDir ?? 1}
+            tilt={stack.standeeTilt ?? 0}
+            color={stack.color}
+          />
+        {:else if stack.isEdgeLoaded}
           <!-- Edge-loaded: counters standing on edge like books -->
           {#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
             {@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}

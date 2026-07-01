@@ -3,6 +3,7 @@ import type { CardDrawTrayParams } from '$lib/models/cardTray';
 import type { CardWellTrayParams } from '$lib/models/cardWellTray';
 import type { CounterTrayParams } from '$lib/models/counterTray';
 import type { CupTrayParams } from '$lib/models/cupTray';
+import type { StandeeTrayParams } from '$lib/models/standeeTray';
 
 // Base shape types for counter shapes
 export type CounterBaseShape = 'rectangle' | 'square' | 'circle' | 'hex' | 'triangle';
@@ -26,6 +27,18 @@ export interface CardSize {
   width: number; // Sleeved width in mm
   length: number; // Sleeved length in mm
   thickness: number; // Sleeved thickness in mm
+}
+
+// Standee definition (global, referenced by ID)
+// A standee is a cardboard figure that slots into a plastic base.
+export interface Standee {
+  id: string;
+  name: string;
+  baseRadius: number; // Radius of the circular base in mm
+  baseThickness: number; // Thickness of the base disc in mm
+  standeeHeight: number; // Height of the figure (base to top) in mm
+  standeeWidth: number; // Width of the figure in mm
+  standeeThickness: number; // Thickness of the cardboard figure in mm
 }
 
 // Base tray interface shared by all tray types
@@ -68,11 +81,17 @@ export interface CardWellTray extends BaseTray {
   params: CardWellTrayParams;
 }
 
+// Standee tray for cardboard standees lying on their side in a herringbone of slotted walls
+export interface StandeeTray extends BaseTray {
+  type: 'standee';
+  params: StandeeTrayParams;
+}
+
 // Legacy alias for backwards compatibility
 export type CardTray = CardDrawTray;
 
 // Discriminated union of all tray types
-export type Tray = CounterTray | CardDrawTray | CardDividerTray | CupTray | CardWellTray;
+export type Tray = CounterTray | CardDrawTray | CardDividerTray | CupTray | CardWellTray | StandeeTray;
 
 // Type guards for tray types
 export function isCounterTray(tray: Tray): tray is CounterTray {
@@ -93,6 +112,10 @@ export function isCupTray(tray: Tray): tray is CupTray {
 
 export function isCardWellTray(tray: Tray): tray is CardWellTray {
   return tray.type === 'cardWell';
+}
+
+export function isStandeeTray(tray: Tray): tray is StandeeTray {
+  return tray.type === 'standee';
 }
 
 // Legacy alias - also matches old 'card' type for migration
@@ -194,6 +217,7 @@ export interface Project {
   layers: Layer[];
   counterShapes: CounterShape[];
   cardSizes: CardSize[];
+  standees: Standee[];
   selectedLayerId: string | null;
   selectedBoxId: string | null;
   selectedTrayId: string | null;
@@ -205,6 +229,7 @@ export interface LegacyProject {
   boxes: Box[];
   counterShapes: CounterShape[];
   cardSizes: CardSize[];
+  standees?: Standee[];
   selectedBoxId: string | null;
   selectedTrayId: string | null;
   globalSettings?: GlobalSettings;

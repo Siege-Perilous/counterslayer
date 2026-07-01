@@ -10,6 +10,7 @@ import type {
   Layer,
   ManualBoxPlacement,
   ManualLooseTrayPlacement,
+  Standee,
   Tray
 } from '$lib/types/project';
 import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
@@ -54,19 +55,20 @@ export function calculateLayerHeight(
   options: {
     cardSizes: CardSize[];
     counterShapes: CounterShape[];
+    standees?: Standee[];
   }
 ): number {
-  const { cardSizes, counterShapes } = options;
+  const { cardSizes, counterShapes, standees = [] } = options;
 
   // Get all box exterior heights
   const boxHeights = layer.boxes.map((box) => {
-    const dims = getBoxExteriorDimensions(box, cardSizes, counterShapes);
+    const dims = getBoxExteriorDimensions(box, cardSizes, counterShapes, standees);
     return dims.height;
   });
 
   // Get all loose tray content heights (minimum required height)
   const looseTrayHeights = layer.looseTrays.map((tray) => {
-    const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
+    const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes, standees);
     return dims.height;
   });
 
@@ -78,8 +80,13 @@ export function calculateLayerHeight(
  * Get dimensions of a box's exterior (including walls, floor, lid)
  * This is used for layer-level arrangement
  */
-export function getBoxDimensions(box: Box, cardSizes: CardSize[], counterShapes: CounterShape[]): BoxDimensions {
-  return getBoxExteriorDimensions(box, cardSizes, counterShapes);
+export function getBoxDimensions(
+  box: Box,
+  cardSizes: CardSize[],
+  counterShapes: CounterShape[],
+  standees: Standee[] = []
+): BoxDimensions {
+  return getBoxExteriorDimensions(box, cardSizes, counterShapes, standees);
 }
 
 /**
@@ -93,13 +100,14 @@ export function arrangeLayerContents(
     gameContainerDepth: number;
     cardSizes: CardSize[];
     counterShapes: CounterShape[];
+    standees?: Standee[];
     gap?: number;
   }
 ): LayerArrangement {
-  const { cardSizes, counterShapes } = options;
+  const { cardSizes, counterShapes, standees = [] } = options;
 
   // Calculate layer height first
-  const layerHeight = calculateLayerHeight(layer, { cardSizes, counterShapes });
+  const layerHeight = calculateLayerHeight(layer, { cardSizes, counterShapes, standees });
 
   // If manual layout exists, use it
   if (layer.manualLayout) {
@@ -121,9 +129,10 @@ function arrangeLayerManual(
     gameContainerDepth: number;
     cardSizes: CardSize[];
     counterShapes: CounterShape[];
+    standees?: Standee[];
   }
 ): LayerArrangement {
-  const { cardSizes, counterShapes } = options;
+  const { cardSizes, counterShapes, standees = [] } = options;
   const boxPlacements: BoxPlacement[] = [];
   const looseTrayPlacements: LooseTrayPlacement[] = [];
 
@@ -133,7 +142,7 @@ function arrangeLayerManual(
       const box = layer.boxes.find((b) => b.id === manual.boxId);
       if (!box) continue;
 
-      const dims = getBoxDimensions(box, cardSizes, counterShapes);
+      const dims = getBoxDimensions(box, cardSizes, counterShapes, standees);
       // Apply rotation: 90° and 270° swap width/depth
       // Use layerHeight for consistent layer stacking
       const swapDims = manual.rotation === 90 || manual.rotation === 270;
@@ -157,7 +166,7 @@ function arrangeLayerManual(
       const tray = layer.looseTrays.find((t) => t.id === manual.trayId);
       if (!tray) continue;
 
-      const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
+      const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes, standees);
       // Apply rotation: 90° and 270° swap width/depth
       const swapDims = manual.rotation === 90 || manual.rotation === 270;
       const effectiveDims = swapDims
@@ -255,9 +264,10 @@ function arrangeLayerAuto(
     gameContainerDepth: number;
     cardSizes: CardSize[];
     counterShapes: CounterShape[];
+    standees?: Standee[];
   }
 ): LayerArrangement {
-  const { gameContainerWidth, gameContainerDepth, cardSizes, counterShapes } = options;
+  const { gameContainerWidth, gameContainerDepth, cardSizes, counterShapes, standees = [] } = options;
 
   if (layer.boxes.length === 0 && layer.looseTrays.length === 0) {
     return {
@@ -274,7 +284,7 @@ function arrangeLayerAuto(
 
   // Add boxes
   for (const box of layer.boxes) {
-    const dims = getBoxDimensions(box, cardSizes, counterShapes);
+    const dims = getBoxDimensions(box, cardSizes, counterShapes, standees);
     packingItems.push({
       data: { itemType: 'box', item: box, originalWidth: dims.width, originalDepth: dims.depth },
       width: dims.width,
@@ -284,7 +294,7 @@ function arrangeLayerAuto(
 
   // Add loose trays
   for (const tray of layer.looseTrays) {
-    const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
+    const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes, standees);
     packingItems.push({
       data: { itemType: 'looseTray', item: tray, originalWidth: dims.width, originalDepth: dims.depth },
       width: dims.width,

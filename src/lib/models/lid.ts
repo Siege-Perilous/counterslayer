@@ -1,4 +1,4 @@
-import type { Box, CardSize, CounterShape, LidParams } from '$lib/types/project';
+import type { Box, CardSize, CounterShape, LidParams, Standee } from '$lib/types/project';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { arrangeTrays, calculateMinimumBoxDimensions, getBoxInteriorDimensions } from './box';
@@ -104,7 +104,8 @@ export function createBoxWithLidGrooves(
   box: Box,
   cardSizes: CardSize[] = [],
   counterShapes: CounterShape[] = [],
-  targetExteriorHeight?: number
+  targetExteriorHeight?: number,
+  standees: Standee[] = []
 ): Geom3 | null {
   if (box.trays.length === 0) return null;
 
@@ -114,6 +115,7 @@ export function createBoxWithLidGrooves(
     tolerance: box.tolerance,
     cardSizes,
     counterShapes,
+    standees,
     manualLayout: box.manualLayout
   });
   const interior = getBoxInteriorDimensions(placements, box.tolerance);
@@ -128,7 +130,7 @@ export function createBoxWithLidGrooves(
   const recessDepth = wall; // How deep the lid lip goes
 
   // Calculate minimum (auto) dimensions
-  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
+  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes, standees);
 
   // Box exterior dimensions (use custom if set, otherwise auto)
   // If targetExteriorHeight is provided (for layer unification), use it minus lid VISIBLE height for box height
@@ -971,7 +973,12 @@ export function createBoxWithLidGrooves(
  *   |___|           |___|
  *       (open here)
  */
-export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: CounterShape[] = []): Geom3 | null {
+export function createLid(
+  box: Box,
+  cardSizes: CardSize[] = [],
+  counterShapes: CounterShape[] = [],
+  standees: Standee[] = []
+): Geom3 | null {
   if (box.trays.length === 0) return null;
 
   const placements = arrangeTrays(box.trays, {
@@ -980,6 +987,7 @@ export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: C
     tolerance: box.tolerance,
     cardSizes,
     counterShapes,
+    standees,
     manualLayout: box.manualLayout
   });
   const interior = getBoxInteriorDimensions(placements, box.tolerance);
@@ -1005,7 +1013,7 @@ export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: C
   const rampLengthOut = box.lidParams?.rampLengthOut ?? 1.5;
 
   // Calculate minimum (auto) dimensions
-  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
+  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes, standees);
 
   // Lid exterior matches box exterior (uses custom dimensions if set)
   const extWidth = box.customWidth ?? minimums.minWidth;

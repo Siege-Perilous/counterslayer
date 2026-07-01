@@ -21,10 +21,12 @@
     addLooseTray,
     deleteLooseTray,
     getTrayLetterById,
+    isCounterTray,
     isCardTray,
     isCardDividerTray,
     isCardWellTray,
     isCupTray,
+    isStandeeTray,
     type Box,
     type Layer,
     type Tray,
@@ -212,6 +214,26 @@
         stacks: 1,
         counters: tray.params.cardCount,
         isCardTray: true,
+        isCardDivider: false,
+        isCardWell: false,
+        isCupTray: false
+      };
+    }
+    if (isStandeeTray(tray)) {
+      return {
+        stacks: 1,
+        counters: tray.params.count,
+        isCardTray: false,
+        isCardDivider: false,
+        isCardWell: false,
+        isCupTray: false
+      };
+    }
+    if (!isCounterTray(tray)) {
+      return {
+        stacks: 0,
+        counters: 0,
+        isCardTray: false,
         isCardDivider: false,
         isCardWell: false,
         isCupTray: false
@@ -453,6 +475,18 @@
                       <Text weight={500}>Cups</Text>
                       <Text size="0.75rem" color="var(--fgMuted)">Segmented cups for loose objects</Text>
                     </button>
+                    <button
+                      class="trayTypeOption"
+                      onclick={() => {
+                        handleAddTray(box.id, 'standee');
+                        contentProps.close();
+                      }}
+                      onmouseenter={(e) => handleTrayTypeHover('standee', e.currentTarget)}
+                      onmouseleave={handleTrayTypeLeave}
+                    >
+                      <Text weight={500}>Standees</Text>
+                      <Text size="0.75rem" color="var(--fgMuted)">Slotted tray for vertical standees</Text>
+                    </button>
                   {/snippet}
                 </Popover>
               </div>
@@ -579,6 +613,18 @@
                 <Text weight={500}>Cup tray</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Bowl-shaped cups for dice and tokens</Text>
               </button>
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddBox(layer.id, 'standee');
+                  contentProps.close();
+                }}
+                onmouseenter={(e) => handleTrayTypeHover('standee', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
+              >
+                <Text weight={500}>Standees</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Slotted tray for vertical standees</Text>
+              </button>
             {/snippet}
           </Popover>
 
@@ -650,6 +696,18 @@
               >
                 <Text weight={500}>Cup tray</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Bowl-shaped cups for dice and tokens</Text>
+              </button>
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLooseTray(layer.id, 'standee');
+                  contentProps.close();
+                }}
+                onmouseenter={(e) => handleTrayTypeHover('standee', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
+              >
+                <Text weight={500}>Standees</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Slotted tray for vertical standees</Text>
               </button>
             {/snippet}
           </Popover>
