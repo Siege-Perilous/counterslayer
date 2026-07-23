@@ -79,6 +79,23 @@ jobs:
             echo "has_major=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: List pinned dependencies
+        id: pinned
+        run: |
+          # Deps pinned with "=x.y.z" are skipped by ncu (--filterVersion "/^[^=]/").
+          # List them in the PR body as a weekly reminder to re-check whether they can be unpinned.
+          PINNED=$(jq -r '(.dependencies // {}) + (.devDependencies // {}) + (.optionalDependencies // {}) | to_entries[] | select(.value | startswith("=")) | "\(.key)  \(.value)"' package.json)
+
+          echo "list<<EOF" >> $GITHUB_OUTPUT
+          echo "$PINNED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          if [[ -n "$PINNED" ]]; then
+            echo "has_pinned=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_pinned=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Install new versions
         run: |
           pnpm install --no-frozen-lockfile
@@ -104,4 +121,9 @@ jobs:
             ```
             ${{ steps.ncu.outputs.stdout }}
             ```
+
+            ${{ steps.pinned.outputs.has_pinned == 'true' && '## 📌 Pinned dependencies (skipped by this bot)' || '' }}
+            ${{ steps.pinned.outputs.has_pinned == 'true' && 'These use `=x.y.z` versions, so updates are never proposed. Check whether any can be unpinned (change back to `^x.y.z`).' || '' }}
+            ${{ steps.pinned.outputs.has_pinned == 'true' && '```' || '' }}
+            ${{ steps.pinned.outputs.list }}${{ steps.pinned.outputs.has_pinned == 'true' && '```' || '' }}
           branch: update-dependencies-${{ github.run_id }}
