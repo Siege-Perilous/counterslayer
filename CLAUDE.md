@@ -4,6 +4,10 @@
 
 Counterslayer is a Svelte/JSCad application for generating 3D-printable counter tray inserts for board games. It creates STL files for trays, boxes, and lids organized into stackable layers.
 
+## Git Policy
+
+**Never commit or push.** Do not run `git commit`, `git push`, or create PRs in this repo, even for small fixes or on branches you are reviewing. Leave all changes uncommitted in the working tree and summarize what changed — the user will review and commit. Only commit if explicitly asked to in that specific request.
+
 ## Geometry Iteration Workflow
 
 When making geometry changes, use this self-contained loop to iterate without user intervention:
