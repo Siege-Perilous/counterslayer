@@ -7,6 +7,7 @@ import {
   type TopLoadedStackDef
 } from '$lib/models/counterTray';
 import { defaultLidParams } from '$lib/models/lid';
+import { defaultStandeeTrayParams, type StandeeTrayParams } from '$lib/models/standeeTray';
 import {
   DEFAULT_CARD_SIZES,
   DEFAULT_COUNTER_SHAPES,
@@ -407,6 +408,17 @@ function migrateTray(
     return {
       ...tray,
       color
+    } as Tray;
+  }
+
+  if (trayType === 'standee') {
+    // Standee tray - fill in any missing params with defaults and ensure color is set
+    const params = (tray as { params?: Partial<StandeeTrayParams> }).params ?? {};
+    return {
+      ...tray,
+      type: 'standee',
+      color,
+      params: { ...defaultStandeeTrayParams, ...params }
     } as Tray;
   }
 
