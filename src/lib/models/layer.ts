@@ -12,8 +12,8 @@ import type {
   ManualLooseTrayPlacement,
   Standee,
   Tray
-} from '$lib/types/project';
-import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
+} from '#lib/types/project.js';
+import { packItems, stackItemsVertically, type PackingItem } from '#lib/utils/binPacking.js';
 import { getBoxExteriorDimensions, getTrayDimensionsForTray } from './box';
 
 export interface BoxDimensions {

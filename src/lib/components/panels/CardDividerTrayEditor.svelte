@@ -1,10 +1,10 @@
 <script lang="ts">
   import { Input, InputCheckbox, FormControl, Spacer, Select, Link, IconButton, Icon } from '@tableslayer/ui';
   import { IconX, IconMenu } from '@tabler/icons-svelte';
-  import type { CardDividerTray } from '$lib/types/project';
-  import { type CardDividerTrayParams, getCardDividerTrayDimensions } from '$lib/models/cardDividerTray';
-  import { getCardSizes } from '$lib/stores/project.svelte';
-  import { DEFAULT_CARD_SIZE_IDS } from '$lib/models/counterTray';
+  import type { CardDividerTray } from '#lib/types/project.js';
+  import { type CardDividerTrayParams, getCardDividerTrayDimensions } from '#lib/models/cardDividerTray.js';
+  import { getCardSizes } from '#lib/stores/project.svelte.js';
+  import { DEFAULT_CARD_SIZE_IDS } from '#lib/models/counterTray.js';
 
   interface Props {
     tray: CardDividerTray;

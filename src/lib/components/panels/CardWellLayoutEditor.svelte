@@ -1,7 +1,7 @@
 <script lang="ts">
   import { IconButton, Icon } from '@tableslayer/ui';
   import { IconRowInsertBottom, IconColumnInsertRight, IconX } from '@tabler/icons-svelte';
-  import type { CardWellLayout, CellId } from '$lib/types/cardWellLayout';
+  import type { CardWellLayout, CellId } from '#lib/types/cardWellLayout.js';
   import {
     addCellToColumn,
     addColumn,
@@ -9,9 +9,9 @@
     countCells,
     getAllCellIds,
     getCellPosition
-  } from '$lib/types/cardWellLayout';
-  import type { CardWellStack } from '$lib/models/cardWellTray';
-  import type { CardSize } from '$lib/types/project';
+  } from '#lib/types/cardWellLayout.js';
+  import type { CardWellStack } from '#lib/models/cardWellTray.js';
+  import type { CardSize } from '#lib/types/project.js';
   import CardWellLayoutPreview from './CardWellLayoutPreview.svelte';
 
   interface Props {

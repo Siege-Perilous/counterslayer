@@ -1,8 +1,8 @@
 <script lang="ts">
   import { IconButton, Icon, Spacer } from '@tableslayer/ui';
   import { IconLayoutAlignCenter, IconLayoutAlignMiddle, IconX } from '@tabler/icons-svelte';
-  import type { CupLayout, CupId } from '$lib/types/cupLayout';
-  import { splitCup, deleteCup, updateSplitRatioByPath, countCups, getAllCupIds } from '$lib/types/cupLayout';
+  import type { CupLayout, CupId } from '#lib/types/cupLayout.js';
+  import { splitCup, deleteCup, updateSplitRatioByPath, countCups, getAllCupIds } from '#lib/types/cupLayout.js';
   import CupLayoutPreview from './CupLayoutPreview.svelte';
 
   interface Props {

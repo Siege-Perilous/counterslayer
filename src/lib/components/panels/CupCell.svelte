@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { CupId } from '$lib/types/cupLayout';
+  import type { CupId } from '#lib/types/cupLayout.js';
 
   interface Props {
     id: CupId;

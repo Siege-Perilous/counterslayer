@@ -1,6 +1,6 @@
-import type { CardWellLayout, CellId } from '$lib/types/cardWellLayout';
-import { createDefaultCardWellLayout, getAllCellIds, getLayoutDimensions } from '$lib/types/cardWellLayout';
-import type { CardSize } from '$lib/types/project';
+import type { CardWellLayout, CellId } from '#lib/types/cardWellLayout.js';
+import { createDefaultCardWellLayout, getAllCellIds, getLayoutDimensions } from '#lib/types/cardWellLayout.js';
+import type { CardSize } from '#lib/types/project.js';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 

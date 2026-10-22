@@ -10,21 +10,21 @@ import {
   getTrayDimensionsForTray,
   validateCustomDimensions,
   type TrayPlacement
-} from '$lib/models/box';
-import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
-import { createCardDrawTray, getCardDrawPositions } from '$lib/models/cardTray';
-import { createCardWellTray, getCardWellPositions } from '$lib/models/cardWellTray';
+} from '#lib/models/box.js';
+import { createCardDividerTray, getCardDividerPositions } from '#lib/models/cardDividerTray.js';
+import { createCardDrawTray, getCardDrawPositions } from '#lib/models/cardTray.js';
+import { createCardWellTray, getCardWellPositions } from '#lib/models/cardWellTray.js';
 import {
   createCounterTray,
   getCounterPositions,
   type CounterStack,
   type CustomCardSize
-} from '$lib/models/counterTray';
-import { createCupTray } from '$lib/models/cupTray';
-import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
-import { createStandeeTray, getStandeePositions } from '$lib/models/standeeTray';
-import type { Box, CardSize, CounterShape, Layer, Standee, Tray } from '$lib/types/project';
-import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isStandeeTray } from '$lib/types/project';
+} from '#lib/models/counterTray.js';
+import { createCupTray } from '#lib/models/cupTray.js';
+import { createBoxWithLidGrooves, createLid } from '#lib/models/lid.js';
+import { createStandeeTray, getStandeePositions } from '#lib/models/standeeTray.js';
+import type { Box, CardSize, CounterShape, Layer, Standee, Tray } from '#lib/types/project.js';
+import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isStandeeTray } from '#lib/types/project.js';
 import threemfSerializer from '@jscad/3mf-serializer';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';

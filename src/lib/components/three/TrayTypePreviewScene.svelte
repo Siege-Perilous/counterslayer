@@ -2,7 +2,7 @@
   import { T, useTask, useThrelte } from '@threlte/core';
   import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
   import SceneLighting from './SceneLighting.svelte';
-  import type { TrayType } from '$lib/stores/project.svelte';
+  import type { TrayType } from '#lib/stores/project.svelte.js';
   import * as THREE from 'three';
 
   interface Props {

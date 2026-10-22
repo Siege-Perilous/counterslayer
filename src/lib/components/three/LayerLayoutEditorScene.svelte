@@ -16,11 +16,11 @@
     setSnapGuides,
     getEffectiveBoxDimensions,
     getEffectiveLooseTrayDimensions
-  } from '$lib/stores/layerLayoutEditor.svelte';
-  import { snapLayerItemPosition, type LayerItemForSnapping } from '$lib/utils/layerLayoutSnapping';
-  import type { TrayPlacement } from '$lib/models/box';
-  import type { CounterStack } from '$lib/models/counterTray';
-  import { getProject } from '$lib/stores/project.svelte';
+  } from '#lib/stores/layerLayoutEditor.svelte.js';
+  import { snapLayerItemPosition, type LayerItemForSnapping } from '#lib/utils/layerLayoutSnapping.js';
+  import type { TrayPlacement } from '#lib/models/box.js';
+  import type { CounterStack } from '#lib/models/counterTray.js';
+  import { getProject } from '#lib/stores/project.svelte.js';
 
   interactivity();
 

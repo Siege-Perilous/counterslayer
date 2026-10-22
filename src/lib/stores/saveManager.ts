@@ -3,8 +3,8 @@
  * Replaces scattered autosave() calls throughout project.svelte.ts
  */
 
-import type { Project } from '$lib/types/project';
-import { saveProject } from '$lib/utils/storage';
+import type { Project } from '#lib/types/project.js';
+import { saveProject } from '#lib/utils/storage.js';
 
 // Debounce delay in milliseconds
 const SAVE_DELAY_MS = 300;

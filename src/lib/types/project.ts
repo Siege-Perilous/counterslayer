@@ -1,9 +1,9 @@
-import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
-import type { CardDrawTrayParams } from '$lib/models/cardTray';
-import type { CardWellTrayParams } from '$lib/models/cardWellTray';
-import type { CounterTrayParams } from '$lib/models/counterTray';
-import type { CupTrayParams } from '$lib/models/cupTray';
-import type { StandeeTrayParams } from '$lib/models/standeeTray';
+import type { CardDividerTrayParams } from '#lib/models/cardDividerTray.js';
+import type { CardDrawTrayParams } from '#lib/models/cardTray.js';
+import type { CardWellTrayParams } from '#lib/models/cardWellTray.js';
+import type { CounterTrayParams } from '#lib/models/counterTray.js';
+import type { CupTrayParams } from '#lib/models/cupTray.js';
+import type { StandeeTrayParams } from '#lib/models/standeeTray.js';
 
 // Base shape types for counter shapes
 export type CounterBaseShape = 'rectangle' | 'square' | 'circle' | 'hex' | 'triangle';

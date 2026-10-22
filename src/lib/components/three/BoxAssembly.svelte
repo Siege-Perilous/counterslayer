@@ -8,9 +8,9 @@
   import type { IntersectionEvent } from '@threlte/extras';
   import * as THREE from 'three';
   import TrayInBox from './TrayInBox.svelte';
-  import type { TrayPlacement } from '$lib/models/box';
-  import type { CounterStack } from '$lib/models/counterTray';
-  import { getTrayLetter, getProject, TRAY_COLORS } from '$lib/stores/project.svelte';
+  import type { TrayPlacement } from '#lib/models/box.js';
+  import type { CounterStack } from '#lib/models/counterTray.js';
+  import { getTrayLetter, getProject, TRAY_COLORS } from '#lib/stores/project.svelte.js';
 
   interface TrayGeometryData {
     trayId: string;

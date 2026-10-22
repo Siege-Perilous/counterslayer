@@ -1,11 +1,11 @@
 <script lang="ts">
   import { Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon, Select, Text } from '@tableslayer/ui';
   import { IconX, IconPlus } from '@tabler/icons-svelte';
-  import type { Box } from '$lib/types/project';
-  import { getAllBoxes, getProject, moveBoxToLayer } from '$lib/stores/project.svelte';
-  import { calculateMinimumBoxDimensions, getLidHeight } from '$lib/models/box';
-  import { calculateLayerHeight } from '$lib/models/layer';
-  import { getCardSizes, getCounterShapes } from '$lib/stores/project.svelte';
+  import type { Box } from '#lib/types/project.js';
+  import { getAllBoxes, getProject, moveBoxToLayer } from '#lib/stores/project.svelte.js';
+  import { calculateMinimumBoxDimensions, getLidHeight } from '#lib/models/box.js';
+  import { calculateLayerHeight } from '#lib/models/layer.js';
+  import { getCardSizes, getCounterShapes } from '#lib/stores/project.svelte.js';
 
   interface Props {
     selectedBox: Box | null;

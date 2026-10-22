@@ -1,8 +1,8 @@
 <script lang="ts">
   import { Input, FormControl, Spacer, Select } from '@tableslayer/ui';
-  import type { CardDrawTray } from '$lib/types/project';
-  import { type CardDrawTrayParams, getCardDrawTrayDimensions } from '$lib/models/cardTray';
-  import { getCardSizes } from '$lib/stores/project.svelte';
+  import type { CardDrawTray } from '#lib/types/project.js';
+  import { type CardDrawTrayParams, getCardDrawTrayDimensions } from '#lib/models/cardTray.js';
+  import { getCardSizes } from '#lib/stores/project.svelte.js';
 
   interface Props {
     tray: CardDrawTray;

@@ -9,7 +9,7 @@
     getSelectedPlacement,
     getEffectiveBoxDimensions,
     getEffectiveLooseTrayDimensions
-  } from '$lib/stores/layerLayoutEditor.svelte';
+  } from '#lib/stores/layerLayoutEditor.svelte.js';
 
   interface Props {
     onEnterEdit: () => void;

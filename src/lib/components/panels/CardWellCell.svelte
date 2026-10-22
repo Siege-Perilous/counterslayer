@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { CellId } from '$lib/types/cardWellLayout';
+  import type { CellId } from '#lib/types/cardWellLayout.js';
 
   interface Props {
     id: CellId;

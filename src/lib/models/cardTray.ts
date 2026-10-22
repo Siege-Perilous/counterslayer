@@ -11,7 +11,7 @@ const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
 
 // Import types from project
-import type { CardSize } from '$lib/types/project';
+import type { CardSize } from '#lib/types/project.js';
 import { DEFAULT_CARD_SIZE_IDS } from './counterTray';
 
 // Re-export for backwards compatibility

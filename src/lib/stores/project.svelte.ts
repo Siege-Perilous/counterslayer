@@ -1,17 +1,17 @@
-import defaultProjectJson from '$lib/data/defaultProject.json';
-import { defaultCardDividerTrayParams, type CardDividerTrayParams } from '$lib/models/cardDividerTray';
-import { defaultCardDrawTrayParams, type CardDrawTrayParams } from '$lib/models/cardTray';
-import { createDefaultCardWellTrayParams, type CardWellTrayParams } from '$lib/models/cardWellTray';
+import defaultProjectJson from '#lib/data/defaultProject.json';
+import { defaultCardDividerTrayParams, type CardDividerTrayParams } from '#lib/models/cardDividerTray.js';
+import { defaultCardDrawTrayParams, type CardDrawTrayParams } from '#lib/models/cardTray.js';
+import { createDefaultCardWellTrayParams, type CardWellTrayParams } from '#lib/models/cardWellTray.js';
 import {
   DEFAULT_CARD_SIZE_IDS,
   DEFAULT_SHAPE_IDS,
   defaultParams,
   type CounterTrayParams
-} from '$lib/models/counterTray';
-import { defaultCupTrayParams, type CupTrayParams } from '$lib/models/cupTray';
-import { defaultLidParams } from '$lib/models/lid';
-import { defaultStandeeTrayParams, type StandeeTrayParams } from '$lib/models/standeeTray';
-import { saveNow, scheduleSave } from '$lib/stores/saveManager';
+} from '#lib/models/counterTray.js';
+import { defaultCupTrayParams, type CupTrayParams } from '#lib/models/cupTray.js';
+import { defaultLidParams } from '#lib/models/lid.js';
+import { defaultStandeeTrayParams, type StandeeTrayParams } from '#lib/models/standeeTray.js';
+import { saveNow, scheduleSave } from '#lib/stores/saveManager.js';
 import type {
   Box,
   CardDividerTray,
@@ -30,7 +30,7 @@ import type {
   Standee,
   StandeeTray,
   Tray
-} from '$lib/types/project';
+} from '#lib/types/project.js';
 import {
   findTrayLocation,
   isCardDividerTray,
@@ -41,8 +41,8 @@ import {
   isCupTray,
   isLooseTray,
   isStandeeTray
-} from '$lib/types/project';
-import { loadProject, migrateProjectData } from '$lib/utils/storage';
+} from '#lib/types/project.js';
+import { loadProject, migrateProjectData } from '#lib/utils/storage.js';
 
 export {
   findTrayLocation,
@@ -1536,7 +1536,7 @@ export function importProject(data: Project): void {
 }
 
 // Manual layout operations
-import type { ManualTrayPlacement } from '$lib/types/project';
+import type { ManualTrayPlacement } from '#lib/types/project.js';
 
 // Save manual tray layout for a box (box dimensions auto-calculate from tray positions)
 export function saveManualLayout(boxId: string, placements: ManualTrayPlacement[]): void {

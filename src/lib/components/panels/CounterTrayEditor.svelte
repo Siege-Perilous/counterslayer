@@ -1,11 +1,11 @@
 <script lang="ts">
   import { Input, FormControl, Spacer, Select, Link, IconButton, Icon } from '@tableslayer/ui';
   import { IconX, IconMenu } from '@tabler/icons-svelte';
-  import type { CounterTray } from '$lib/types/project';
-  import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
-  import { getTrayDimensions } from '$lib/models/box';
-  import { getCounterShapes } from '$lib/stores/project.svelte';
-  import { DEFAULT_SHAPE_IDS } from '$lib/models/counterTray';
+  import type { CounterTray } from '#lib/types/project.js';
+  import type { CounterTrayParams, EdgeOrientation } from '#lib/models/counterTray.js';
+  import { getTrayDimensions } from '#lib/models/box.js';
+  import { getCounterShapes } from '#lib/stores/project.svelte.js';
+  import { DEFAULT_SHAPE_IDS } from '#lib/models/counterTray.js';
 
   interface Props {
     tray: CounterTray;

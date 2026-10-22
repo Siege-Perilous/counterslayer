@@ -17,8 +17,8 @@
     getGameContainerDepth,
     getEffectiveDimensions,
     type EditorTrayPlacement
-  } from '$lib/stores/layoutEditor.svelte';
-  import { snapPosition, isValidPosition } from '$lib/utils/layoutSnapping';
+  } from '#lib/stores/layoutEditor.svelte.js';
+  import { snapPosition, isValidPosition } from '#lib/utils/layoutSnapping.js';
 
   // Props
   interface Props {

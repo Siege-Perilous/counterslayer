@@ -31,9 +31,9 @@
     type Layer,
     type Tray,
     type TrayType
-  } from '$lib/stores/project.svelte';
-  import { countCups } from '$lib/types/cupLayout';
-  import { countCells } from '$lib/types/cardWellLayout';
+  } from '#lib/stores/project.svelte.js';
+  import { countCups } from '#lib/types/cupLayout.js';
+  import { countCells } from '#lib/types/cardWellLayout.js';
 
   type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
 

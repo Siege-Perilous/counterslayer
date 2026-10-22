@@ -1,14 +1,14 @@
-import { arrangeTrays } from '$lib/models/box';
-import { getCardDividerPositions } from '$lib/models/cardDividerTray';
-import { getCardDrawPositions } from '$lib/models/cardTray';
+import { arrangeTrays } from '#lib/models/box.js';
+import { getCardDividerPositions } from '#lib/models/cardDividerTray.js';
+import { getCardDrawPositions } from '#lib/models/cardTray.js';
 import {
   getCounterPositions,
   type CounterStack,
   type EdgeLoadedStackDef,
   type TopLoadedStackDef
-} from '$lib/models/counterTray';
-import type { Box, CounterShape, Layer, Project } from '$lib/types/project';
-import { isCardDividerTray, isCardTray, isCounterTray } from '$lib/types/project';
+} from '#lib/models/counterTray.js';
+import type { Box, CounterShape, Layer, Project } from '#lib/types/project.js';
+import { isCardDividerTray, isCardTray, isCounterTray } from '#lib/types/project.js';
 import { jsPDF } from 'jspdf';
 
 /**

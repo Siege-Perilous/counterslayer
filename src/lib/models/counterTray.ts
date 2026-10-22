@@ -1,4 +1,4 @@
-import type { CounterBaseShape, CounterShape } from '$lib/types/project';
+import type { CounterBaseShape, CounterShape } from '#lib/types/project.js';
 import jscad from '@jscad/modeling';
 
 const { cuboid, cylinder, sphere, circle, rectangle } = jscad.primitives;
@@ -20,12 +20,12 @@ export type TopLoadedStackDef = [string, number, string?];
 export type EdgeLoadedStackDef = [string, number, EdgeOrientation?, string?];
 
 // Re-export types from project.ts for backwards compatibility
-export type { CardSize, CounterBaseShape, CounterShape } from '$lib/types/project';
+export type { CardSize, CounterBaseShape, CounterShape } from '#lib/types/project.js';
 
 // Legacy type aliases for backwards compatibility during migration
-export type CustomBaseShape = import('$lib/types/project').CounterBaseShape;
-export type CustomShape = import('$lib/types/project').CounterShape;
-export type CustomCardSize = import('$lib/types/project').CardSize;
+export type CustomBaseShape = import('#lib/types/project.js').CounterBaseShape;
+export type CustomShape = import('#lib/types/project.js').CounterShape;
+export type CustomCardSize = import('#lib/types/project.js').CardSize;
 
 export interface CounterTrayParams {
   counterThickness: number;
