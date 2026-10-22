@@ -3,10 +3,10 @@
  * Manages the state for manual box and loose tray arrangement within a layer
  */
 
-import type { BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
-import type { SnapGuide } from '$lib/types/editor';
-import { getEffectiveDimensions as getEffectiveDimsBase } from '$lib/types/editor';
-import type { ManualBoxPlacement, ManualLooseTrayPlacement } from '$lib/types/project';
+import type { BoxPlacement, LooseTrayPlacement } from '#lib/models/layer.js';
+import type { SnapGuide } from '#lib/types/editor.js';
+import { getEffectiveDimensions as getEffectiveDimsBase } from '#lib/types/editor.js';
+import type { ManualBoxPlacement, ManualLooseTrayPlacement } from '#lib/types/project.js';
 
 // Re-export SnapGuide for backwards compatibility
 export type { SnapGuide };

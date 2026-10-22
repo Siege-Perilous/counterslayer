@@ -1,14 +1,14 @@
 <script lang="ts">
   import { Input, FormControl, Spacer } from '@tableslayer/ui';
-  import type { CupTray } from '$lib/types/project';
-  import type { CupLayout } from '$lib/types/cupLayout';
-  import { countCups } from '$lib/types/cupLayout';
+  import type { CupTray } from '#lib/types/project.js';
+  import type { CupLayout } from '#lib/types/cupLayout.js';
+  import { countCups } from '#lib/types/cupLayout.js';
   import {
     type CupTrayParams,
     getCupTrayDimensions,
     validateCupTrayParams,
     DEFAULT_CUP_CAVITY_HEIGHT
-  } from '$lib/models/cupTray';
+  } from '#lib/models/cupTray.js';
   import CupLayoutEditor from './CupLayoutEditor.svelte';
 
   interface Props {

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { Input, FormControl, Spacer, Select } from '@tableslayer/ui';
-  import type { StandeeTray } from '$lib/types/project';
-  import { type StandeeTrayParams, getStandeeTrayDimensions } from '$lib/models/standeeTray';
-  import { getStandees } from '$lib/stores/project.svelte';
+  import type { StandeeTray } from '#lib/types/project.js';
+  import { type StandeeTrayParams, getStandeeTrayDimensions } from '#lib/models/standeeTray.js';
+  import { getStandees } from '#lib/stores/project.svelte.js';
 
   interface Props {
     tray: StandeeTray;

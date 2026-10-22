@@ -5,7 +5,7 @@
    * Positions are passed in tray-local scene coordinates (Y up), matching the other previews.
    */
   import { T } from '@threlte/core';
-  import { COUNTER_MATERIAL } from '$lib/three/materials';
+  import { COUNTER_MATERIAL } from '#lib/three/materials.js';
 
   interface Props {
     posX: number; // base disc centre (scene X = tray width)

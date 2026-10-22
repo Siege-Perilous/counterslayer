@@ -9,23 +9,23 @@
   import BoxAssembly from './three/BoxAssembly.svelte';
   import LayerContent from './three/LayerContent.svelte';
   import LayerLayoutEditorScene from './three/LayerLayoutEditorScene.svelte';
-  import { getAlternateColor, getSleeveColors } from '$lib/three/materials';
+  import { getAlternateColor, getSleeveColors } from '#lib/three/materials.js';
 
   // Enable interactivity for pointer events on 3D objects
   interactivity();
   import type { BufferGeometry } from 'three';
   import * as THREE from 'three';
-  import { arrangeBoxes, type TrayPlacement } from '$lib/models/box';
-  import type { BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
-  import type { CounterStack } from '$lib/models/counterTray';
-  import type { CardStack } from '$lib/models/cardTray';
-  import { captureSceneToDataUrl, type CaptureOptions } from '$lib/utils/screenshotCapture';
+  import { arrangeBoxes, type TrayPlacement } from '#lib/models/box.js';
+  import type { BoxPlacement, LooseTrayPlacement } from '#lib/models/layer.js';
+  import type { CounterStack } from '#lib/models/counterTray.js';
+  import type { CardStack } from '#lib/models/cardTray.js';
+  import { captureSceneToDataUrl, type CaptureOptions } from '#lib/utils/screenshotCapture.js';
 
   // Type guard to check if a stack is a CounterStack (has shape property)
   function isCounterStack(stack: CounterStack | CardStack): stack is CounterStack {
     return 'shape' in stack;
   }
-  import { getTrayLetter, getProject, TRAY_COLORS } from '$lib/stores/project.svelte';
+  import { getTrayLetter, getProject, TRAY_COLORS } from '#lib/stores/project.svelte.js';
   import {
     layoutEditorState,
     selectTray,
@@ -33,8 +33,8 @@
     setSnapGuides,
     clearSnapGuides,
     getEffectiveDimensions
-  } from '$lib/stores/layoutEditor.svelte';
-  import { snapPosition } from '$lib/utils/layoutSnapping';
+  } from '#lib/stores/layoutEditor.svelte.js';
+  import { snapPosition } from '#lib/utils/layoutSnapping.js';
 
   interface TrayGeometryData {
     trayId: string;

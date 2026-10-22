@@ -1,6 +1,6 @@
-import type { Box, CardSize, CounterShape, Standee, Tray } from '$lib/types/project';
-import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isStandeeTray } from '$lib/types/project';
-import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
+import type { Box, CardSize, CounterShape, Standee, Tray } from '#lib/types/project.js';
+import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isStandeeTray } from '#lib/types/project.js';
+import { packItems, stackItemsVertically, type PackingItem } from '#lib/utils/binPacking.js';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { getCardDividerTrayDimensions } from './cardDividerTray';
@@ -462,7 +462,7 @@ export function getCounterTrayDimensions(
 // Backwards compatibility alias for counter tray dimensions
 export const getTrayDimensions = getCounterTrayDimensions;
 
-import type { ManualTrayPlacement } from '$lib/types/project';
+import type { ManualTrayPlacement } from '#lib/types/project.js';
 
 // Arrange trays in a box layout with bin-packing
 // Smaller trays can share a row if their combined width fits within the max tray width

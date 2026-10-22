@@ -5,18 +5,18 @@ import {
   type CounterTrayParams,
   type EdgeLoadedStackDef,
   type TopLoadedStackDef
-} from '$lib/models/counterTray';
-import { defaultLidParams } from '$lib/models/lid';
-import { defaultStandeeTrayParams, type StandeeTrayParams } from '$lib/models/standeeTray';
+} from '#lib/models/counterTray.js';
+import { defaultLidParams } from '#lib/models/lid.js';
+import { defaultStandeeTrayParams, type StandeeTrayParams } from '#lib/models/standeeTray.js';
 import {
   DEFAULT_CARD_SIZES,
   DEFAULT_COUNTER_SHAPES,
   DEFAULT_COUNTER_THICKNESS,
   DEFAULT_STANDEES,
   TRAY_COLORS
-} from '$lib/stores/project.svelte';
-import type { CupLayout } from '$lib/types/cupLayout';
-import { gridToSplitLayout } from '$lib/types/cupLayout';
+} from '#lib/stores/project.svelte.js';
+import type { CupLayout } from '#lib/types/cupLayout.js';
+import { gridToSplitLayout } from '#lib/types/cupLayout.js';
 import type {
   Box,
   CardSize,
@@ -27,8 +27,8 @@ import type {
   Project,
   Standee,
   Tray
-} from '$lib/types/project';
-import { isLegacyProject } from '$lib/types/project';
+} from '#lib/types/project.js';
+import { isLegacyProject } from '#lib/types/project.js';
 const STORAGE_KEY = 'counter-tray-project';
 
 function generateId(): string {
@@ -672,4 +672,4 @@ export function importProjectFromJson(json: string): Project {
 }
 
 // Re-export save manager functions for unified API
-export { batchUpdates, flushPendingSave, hasPendingSave, saveNow, scheduleSave } from '$lib/stores/saveManager';
+export { batchUpdates, flushPendingSave, hasPendingSave, saveNow, scheduleSave } from '#lib/stores/saveManager.js';

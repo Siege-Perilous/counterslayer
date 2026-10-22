@@ -9,10 +9,10 @@
   import * as THREE from 'three';
   import BoxAssembly from './BoxAssembly.svelte';
   import TrayInBox from './TrayInBox.svelte';
-  import type { BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
-  import type { TrayPlacement } from '$lib/models/box';
-  import type { CounterStack } from '$lib/models/counterTray';
-  import { TRAY_COLORS, getProject } from '$lib/stores/project.svelte';
+  import type { BoxPlacement, LooseTrayPlacement } from '#lib/models/layer.js';
+  import type { TrayPlacement } from '#lib/models/box.js';
+  import type { CounterStack } from '#lib/models/counterTray.js';
+  import { TRAY_COLORS, getProject } from '#lib/stores/project.svelte.js';
 
   interface TrayGeometryData {
     trayId: string;

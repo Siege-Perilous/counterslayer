@@ -9,8 +9,8 @@
   import * as THREE from 'three';
   import CounterMesh from './CounterMesh.svelte';
   import StandeeMesh from './StandeeMesh.svelte';
-  import { getAlternateColor, getSleeveColors } from '$lib/three/materials';
-  import type { CounterStack } from '$lib/models/counterTray';
+  import { getAlternateColor, getSleeveColors } from '#lib/three/materials.js';
+  import type { CounterStack } from '#lib/models/counterTray.js';
 
   interface TrayClickInfo {
     trayId: string;

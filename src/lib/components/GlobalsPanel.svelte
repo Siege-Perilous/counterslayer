@@ -22,7 +22,7 @@
     IconCards,
     IconUser
   } from '@tabler/icons-svelte';
-  import type { CounterShape, CounterBaseShape, CardSize, Standee } from '$lib/types/project';
+  import type { CounterShape, CounterBaseShape, CardSize, Standee } from '#lib/types/project.js';
   import {
     getProject,
     isCounterTray,
@@ -42,7 +42,7 @@
     updateStandee,
     deleteStandee,
     DEFAULT_COUNTER_THICKNESS
-  } from '$lib/stores/project.svelte';
+  } from '#lib/stores/project.svelte.js';
 
   interface Props {
     globalSettings: { gameContainerWidth: number; gameContainerDepth: number };

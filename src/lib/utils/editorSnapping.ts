@@ -4,7 +4,7 @@
  * Used by both box layout editor and layer layout editor
  */
 
-import type { SnapGuide, SnapResult, SnappableItem } from '$lib/types/editor';
+import type { SnapGuide, SnapResult, SnappableItem } from '#lib/types/editor.js';
 
 // Snap thresholds
 const GRID_SIZE = 1; // 1mm grid

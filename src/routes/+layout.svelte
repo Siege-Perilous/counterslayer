@@ -1,6 +1,6 @@
 <script lang="ts">
   import './layout.css';
-  import { dev } from '$app/environment';
+  import { dev } from '$app/env';
   import { resolve } from '$app/paths';
   import { Link, IconButton, Icon, Popover, Toast } from '@tableslayer/ui';
   import { IconSun, IconMoon, IconMenu2 } from '@tabler/icons-svelte';

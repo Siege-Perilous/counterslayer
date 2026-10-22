@@ -13,7 +13,7 @@
     Popover
   } from '@tableslayer/ui';
   import { IconX, IconPlus } from '@tabler/icons-svelte';
-  import type { Box, Tray } from '$lib/types/project';
+  import type { Box, Tray } from '#lib/types/project.js';
   import {
     isCounterTray,
     isCardTray,
@@ -27,17 +27,17 @@
     type CardWellTray,
     type CupTray,
     type StandeeTray
-  } from '$lib/types/project';
-  import type { CounterTrayParams } from '$lib/models/counterTray';
-  import type { CardDrawTrayParams } from '$lib/models/cardTray';
-  import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
-  import type { CardWellTrayParams } from '$lib/models/cardWellTray';
-  import type { CupTrayParams } from '$lib/models/cupTray';
-  import type { StandeeTrayParams } from '$lib/models/standeeTray';
-  import { countCups } from '$lib/types/cupLayout';
-  import { countCells } from '$lib/types/cardWellLayout';
-  import { getTrayDimensionsForTray, arrangeTrays } from '$lib/models/box';
-  import { calculateLayerHeight } from '$lib/models/layer';
+  } from '#lib/types/project.js';
+  import type { CounterTrayParams } from '#lib/models/counterTray.js';
+  import type { CardDrawTrayParams } from '#lib/models/cardTray.js';
+  import type { CardDividerTrayParams } from '#lib/models/cardDividerTray.js';
+  import type { CardWellTrayParams } from '#lib/models/cardWellTray.js';
+  import type { CupTrayParams } from '#lib/models/cupTray.js';
+  import type { StandeeTrayParams } from '#lib/models/standeeTray.js';
+  import { countCups } from '#lib/types/cupLayout.js';
+  import { countCells } from '#lib/types/cardWellLayout.js';
+  import { getTrayDimensionsForTray, arrangeTrays } from '#lib/models/box.js';
+  import { calculateLayerHeight } from '#lib/models/layer.js';
   import {
     getProject,
     getTrayLetterById,
@@ -45,7 +45,7 @@
     moveTrayToLoose,
     getCardSizes,
     getCounterShapes
-  } from '$lib/stores/project.svelte';
+  } from '#lib/stores/project.svelte.js';
 
   // Editor components
   import CounterTrayEditor from './panels/CounterTrayEditor.svelte';

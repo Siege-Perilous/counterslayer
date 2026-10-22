@@ -38,18 +38,18 @@
     type Box,
     type Layer,
     type Tray
-  } from '$lib/stores/project.svelte';
-  import type { CounterTrayParams } from '$lib/models/counterTray';
-  import type { CardDrawTrayParams } from '$lib/models/cardTray';
-  import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
-  import type { CardWellTrayParams } from '$lib/models/cardWellTray';
-  import type { CupTrayParams } from '$lib/models/cupTray';
-  import type { StandeeTrayParams } from '$lib/models/standeeTray';
-  import { countCups } from '$lib/types/cupLayout';
-  import { countCells } from '$lib/types/cardWellLayout';
-  import { layoutEditorState } from '$lib/stores/layoutEditor.svelte';
-  import { getTrayDimensionsForTray } from '$lib/models/box';
-  import { getBoxDimensions, calculateLayerHeight } from '$lib/models/layer';
+  } from '#lib/stores/project.svelte.js';
+  import type { CounterTrayParams } from '#lib/models/counterTray.js';
+  import type { CardDrawTrayParams } from '#lib/models/cardTray.js';
+  import type { CardDividerTrayParams } from '#lib/models/cardDividerTray.js';
+  import type { CardWellTrayParams } from '#lib/models/cardWellTray.js';
+  import type { CupTrayParams } from '#lib/models/cupTray.js';
+  import type { StandeeTrayParams } from '#lib/models/standeeTray.js';
+  import { countCups } from '#lib/types/cupLayout.js';
+  import { countCells } from '#lib/types/cardWellLayout.js';
+  import { layoutEditorState } from '#lib/stores/layoutEditor.svelte.js';
+  import { getTrayDimensionsForTray } from '#lib/models/box.js';
+  import { getBoxDimensions, calculateLayerHeight } from '#lib/models/layer.js';
 
   type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
 

@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { CardWellLayout, CellId } from '$lib/types/cardWellLayout';
-  import { getAllCellIds, getLayoutDimensions } from '$lib/types/cardWellLayout';
-  import type { CardWellStack } from '$lib/models/cardWellTray';
-  import { computeLayoutSizes } from '$lib/models/cardWellTray';
-  import type { CardSize } from '$lib/types/project';
+  import type { CardWellLayout, CellId } from '#lib/types/cardWellLayout.js';
+  import { getAllCellIds, getLayoutDimensions } from '#lib/types/cardWellLayout.js';
+  import type { CardWellStack } from '#lib/models/cardWellTray.js';
+  import { computeLayoutSizes } from '#lib/models/cardWellTray.js';
+  import type { CardSize } from '#lib/types/project.js';
   import CardWellCell from './CardWellCell.svelte';
 
   interface Props {

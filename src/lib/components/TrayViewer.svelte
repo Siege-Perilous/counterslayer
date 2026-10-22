@@ -3,11 +3,11 @@
   import TrayScene from './TrayScene.svelte';
   import ViewCube from './ViewCube.svelte';
   import type { BufferGeometry } from 'three';
-  import type { TrayPlacement } from '$lib/models/box';
-  import type { BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
-  import type { CounterStack } from '$lib/models/counterTray';
-  import type { CardStack } from '$lib/models/cardTray';
-  import type { CaptureOptions } from '$lib/utils/screenshotCapture';
+  import type { TrayPlacement } from '#lib/models/box.js';
+  import type { BoxPlacement, LooseTrayPlacement } from '#lib/models/layer.js';
+  import type { CounterStack } from '#lib/models/counterTray.js';
+  import type { CardStack } from '#lib/models/cardTray.js';
+  import type { CaptureOptions } from '#lib/utils/screenshotCapture.js';
 
   // Debug marker type
   interface DebugMarker {

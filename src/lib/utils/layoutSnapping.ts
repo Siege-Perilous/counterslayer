@@ -3,9 +3,9 @@
  * Wraps the shared editorSnapping utilities with box-specific types
  */
 
-import type { EditorTrayPlacement } from '$lib/stores/layoutEditor.svelte';
-import { getEffectiveDimensions } from '$lib/stores/layoutEditor.svelte';
-import type { SnapResult, SnappableItem } from '$lib/types/editor';
+import type { EditorTrayPlacement } from '#lib/stores/layoutEditor.svelte.js';
+import { getEffectiveDimensions } from '#lib/stores/layoutEditor.svelte.js';
+import type { SnapResult, SnappableItem } from '#lib/types/editor.js';
 import {
   checkItemOverlap,
   findAllOverlaps as findAllOverlapsBase,

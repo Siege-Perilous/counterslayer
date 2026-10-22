@@ -1,7 +1,7 @@
 <script lang="ts">
   import { T } from '@threlte/core';
   import * as THREE from 'three';
-  import { COUNTER_MATERIAL, SLEEVE_MATERIAL, INNER_CARD_MATERIAL } from '$lib/three/materials';
+  import { COUNTER_MATERIAL, SLEEVE_MATERIAL, INNER_CARD_MATERIAL } from '#lib/three/materials.js';
 
   interface Props {
     // Shape type

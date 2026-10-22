@@ -4,7 +4,7 @@
    * Wraps the shared LayoutEditorToolbar with box-specific state
    */
   import LayoutEditorToolbar from './LayoutEditorToolbar.svelte';
-  import { layoutEditorState, getSelectedPlacement, getEffectiveDimensions } from '$lib/stores/layoutEditor.svelte';
+  import { layoutEditorState, getSelectedPlacement, getEffectiveDimensions } from '#lib/stores/layoutEditor.svelte.js';
 
   interface Props {
     onEnterEdit: () => void;

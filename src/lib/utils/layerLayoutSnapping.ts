@@ -3,7 +3,7 @@
  * Wraps the shared editorSnapping utilities for layer items (boxes + loose trays)
  */
 
-import type { SnapResult, SnappableItem } from '$lib/types/editor';
+import type { SnapResult, SnappableItem } from '#lib/types/editor.js';
 import {
   checkItemOverlap,
   findAllOverlaps as findAllOverlapsBase,

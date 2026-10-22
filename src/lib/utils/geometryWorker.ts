@@ -3,9 +3,9 @@
  * Provides a promise-based API for communicating with the worker
  */
 
-import type { TrayPlacement } from '$lib/models/box';
-import type { CounterStack } from '$lib/models/counterTray';
-import type { Project } from '$lib/types/project';
+import type { TrayPlacement } from '#lib/models/box.js';
+import type { CounterStack } from '#lib/models/counterTray.js';
+import type { Project } from '#lib/types/project.js';
 import * as THREE from 'three';
 
 // Geometry data received from worker
@@ -179,7 +179,7 @@ export class GeometryWorkerManager {
 
     // Dynamic import for the worker
     // Using Vite's worker import syntax
-    const WorkerModule = await import('$lib/workers/geometry.worker?worker');
+    const WorkerModule = await import('#lib/workers/geometry.worker?worker');
     this.worker = new WorkerModule.default();
 
     this.worker.onmessage = (event: MessageEvent<WorkerResult>) => {

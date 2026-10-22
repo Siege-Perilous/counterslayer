@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { PaneGroup, Pane, PaneResizer, type PaneAPI } from 'paneforge';
   import {
     Button,
@@ -15,26 +15,26 @@
     removeToast
   } from '@tableslayer/ui';
   import { IconChevronDown, IconChevronLeft, IconChevronRight, IconChevronUp } from '@tabler/icons-svelte';
-  import NavigationMenu from '$lib/components/NavigationMenu.svelte';
-  import EditorPanel from '$lib/components/EditorPanel.svelte';
-  import { createCounterTray, getCounterPositions, type CounterStack } from '$lib/models/counterTray';
-  import { createCardDrawTray, getCardDrawPositions, type CardStack } from '$lib/models/cardTray';
-  import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
-  import { arrangeTrays, calculateTraySpacers, getTrayDimensionsForTray } from '$lib/models/box';
-  import { createCupTray } from '$lib/models/cupTray';
-  import { arrangeLayerContents, type BoxPlacement, type LooseTrayPlacement } from '$lib/models/layer';
-  import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
+  import NavigationMenu from '#lib/components/NavigationMenu.svelte';
+  import EditorPanel from '#lib/components/EditorPanel.svelte';
+  import { createCounterTray, getCounterPositions, type CounterStack } from '#lib/models/counterTray.js';
+  import { createCardDrawTray, getCardDrawPositions, type CardStack } from '#lib/models/cardTray.js';
+  import { createCardDividerTray, getCardDividerPositions } from '#lib/models/cardDividerTray.js';
+  import { arrangeTrays, calculateTraySpacers, getTrayDimensionsForTray } from '#lib/models/box.js';
+  import { createCupTray } from '#lib/models/cupTray.js';
+  import { arrangeLayerContents, type BoxPlacement, type LooseTrayPlacement } from '#lib/models/layer.js';
+  import { jscadToBufferGeometry } from '#lib/utils/jscadToThree.js';
   import {
     getGeometryWorker,
     type GenerationProgress,
     type TrayGeometryData,
     type BoxGeometryData,
     type LooseTrayGeometryData
-  } from '$lib/utils/geometryWorker';
+  } from '#lib/utils/geometryWorker.js';
   import { BlobWriter, ZipWriter } from '@zip.js/zip.js';
-  import { exportPdfReference, exportPdfWithScreenshots, type TrayScreenshot } from '$lib/utils/pdfGenerator';
-  import type { CaptureOptions } from '$lib/utils/screenshotCapture';
-  import { exportProjectToJson, importProjectFromJson } from '$lib/utils/storage';
+  import { exportPdfReference, exportPdfWithScreenshots, type TrayScreenshot } from '#lib/utils/pdfGenerator.js';
+  import type { CaptureOptions } from '#lib/utils/screenshotCapture.js';
+  import { exportProjectToJson, importProjectFromJson } from '#lib/utils/storage.js';
   import {
     initProject,
     getSelectedTray,
@@ -54,12 +54,12 @@
     findTrayLocation,
     saveManualLayout,
     clearManualLayout
-  } from '$lib/stores/project.svelte';
-  import type { Project } from '$lib/types/project';
+  } from '#lib/stores/project.svelte.js';
+  import type { Project } from '#lib/types/project.js';
   import type { BufferGeometry } from 'three';
   import { onDestroy, untrack } from 'svelte';
-  import LayoutEditorOverlay from '$lib/components/LayoutEditorOverlay.svelte';
-  import LayerLayoutEditorOverlay from '$lib/components/LayerLayoutEditorOverlay.svelte';
+  import LayoutEditorOverlay from '#lib/components/LayoutEditorOverlay.svelte';
+  import LayerLayoutEditorOverlay from '#lib/components/LayerLayoutEditorOverlay.svelte';
   import {
     enterEditMode,
     exitEditMode,
@@ -69,8 +69,8 @@
     getManualPlacements,
     rotateTray,
     getSelectedTrayId
-  } from '$lib/stores/layoutEditor.svelte';
-  import { findAllOverlaps } from '$lib/utils/layoutSnapping';
+  } from '#lib/stores/layoutEditor.svelte.js';
+  import { findAllOverlaps } from '#lib/utils/layoutSnapping.js';
   import {
     enterLayerEditMode,
     exitLayerEditMode,
@@ -78,9 +78,9 @@
     layerLayoutEditorState,
     getManualLayerPlacements,
     rotateSelectedItem
-  } from '$lib/stores/layerLayoutEditor.svelte';
-  import { saveLayerLayout, clearLayerLayout, selectTray, selectBox, selectLayer } from '$lib/stores/project.svelte';
-  import { findLayerOverlaps, type LayerItemForSnapping } from '$lib/utils/layerLayoutSnapping';
+  } from '#lib/stores/layerLayoutEditor.svelte.js';
+  import { saveLayerLayout, clearLayerLayout, selectTray, selectBox, selectLayer } from '#lib/stores/project.svelte.js';
+  import { findLayerOverlaps, type LayerItemForSnapping } from '#lib/utils/layerLayoutSnapping.js';
 
   type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid' | 'layer';
   type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
@@ -1875,7 +1875,7 @@
     <Pane defaultSize={100} minSize={20}>
       <main class="mainView">
         {#if browser}
-          {#await import('$lib/components/TrayViewer.svelte') then { default: TrayViewer }}
+          {#await import('#lib/components/TrayViewer.svelte') then { default: TrayViewer }}
             <TrayViewer
               geometry={visibleGeometries.tray}
               allTrays={visibleGeometries.allTrays}
@@ -2129,7 +2129,7 @@
     <Pane defaultSize={debugParams.hideUI ? 100 : 75} minSize={30}>
       <main class="mainView">
         {#if browser}
-          {#await import('$lib/components/TrayViewer.svelte') then { default: TrayViewer }}
+          {#await import('#lib/components/TrayViewer.svelte') then { default: TrayViewer }}
             <TrayViewer
               geometry={visibleGeometries.tray}
               allTrays={visibleGeometries.allTrays}

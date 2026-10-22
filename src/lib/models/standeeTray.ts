@@ -10,7 +10,7 @@ const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
 
 // Import types from project
-import type { Standee } from '$lib/types/project';
+import type { Standee } from '#lib/types/project.js';
 
 // Angle of the slot fan, in degrees. Slots on the two inner walls tilt in
 // opposite directions by this amount so opposing standees interlock and resist

@@ -1,4 +1,3 @@
-import { json } from '@sveltejs/kit';
 import { existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
@@ -30,9 +29,9 @@ export const POST: RequestHandler = async ({ request }) => {
     };
     await writeFile(join(analysisDir, 'project.json'), JSON.stringify(projectWithLayout, null, 2));
 
-    return json({ success: true });
+    return Response.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    return json({ success: false, error: message }, { status: 500 });
+    return Response.json({ success: false, error: message }, { status: 500 });
   }
 };

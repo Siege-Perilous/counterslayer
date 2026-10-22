@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Canvas } from '@threlte/core';
   import TrayTypePreviewScene from './three/TrayTypePreviewScene.svelte';
-  import type { TrayType } from '$lib/stores/project.svelte';
+  import type { TrayType } from '#lib/stores/project.svelte.js';
 
   interface Props {
     trayType: TrayType;

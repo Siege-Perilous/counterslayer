@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { CupLayout, CupLayoutNode, CupId } from '$lib/types/cupLayout';
-  import { isCupLeaf, isCupSplit } from '$lib/types/cupLayout';
+  import type { CupLayout, CupLayoutNode, CupId } from '#lib/types/cupLayout.js';
+  import { isCupLeaf, isCupSplit } from '#lib/types/cupLayout.js';
   import CupCell from './CupCell.svelte';
   import SplitDivider from './SplitDivider.svelte';
 

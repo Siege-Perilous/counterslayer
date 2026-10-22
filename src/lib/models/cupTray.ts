@@ -1,5 +1,5 @@
-import type { CupId, CupLayout, CupLayoutNode } from '$lib/types/cupLayout';
-import { generateCupId, isCupLeaf, isCupSplit } from '$lib/types/cupLayout';
+import type { CupId, CupLayout, CupLayoutNode } from '#lib/types/cupLayout.js';
+import { generateCupId, isCupLeaf, isCupSplit } from '#lib/types/cupLayout.js';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 

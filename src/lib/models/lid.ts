@@ -1,4 +1,4 @@
-import type { Box, CardSize, CounterShape, LidParams, Standee } from '$lib/types/project';
+import type { Box, CardSize, CounterShape, LidParams, Standee } from '#lib/types/project.js';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { arrangeTrays, calculateMinimumBoxDimensions, getBoxInteriorDimensions } from './box';
