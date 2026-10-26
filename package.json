@@ -24,7 +24,7 @@
     "@tabler/icons-svelte": "^3.49.0",
     "@tableslayer/ui": "0.2.8",
     "@threlte/core": "^8.6.1",
-    "@threlte/extras": "^9.22.2",
+    "@threlte/extras": "^9.22.3",
     "@zip.js/zip.js": "^2.24.0",
     "jspdf": "^4.2.1",
     "marked": "^18.1.1",
