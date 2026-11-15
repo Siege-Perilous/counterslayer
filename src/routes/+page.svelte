@@ -1948,7 +1948,7 @@
               onCancel={handleCancelLayerLayout}
               onResetAuto={handleResetAutoLayerLayout}
               onRotate={handleRotateLayerItem}
-              canEdit={(layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 1}
+              canEdit={(layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 0}
             />
           </div>
         {/if}
@@ -2202,7 +2202,7 @@
               onCancel={handleCancelLayerLayout}
               onResetAuto={handleResetAutoLayerLayout}
               onRotate={handleRotateLayerItem}
-              canEdit={(layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 1}
+              canEdit={(layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 0}
             />
           </div>
         {/if}
