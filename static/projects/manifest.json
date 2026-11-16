@@ -17,6 +17,12 @@
       "name": "Witchcraft",
       "author": "Dave Snider",
       "file": "witchcraft.json"
+    },
+    {
+      "id": "red-dust-rebellion",
+      "name": "Red Dust Rebellion",
+      "author": "Dave Snider",
+      "file": "red-dust-rebellion.json"
     }
   ]
 }
