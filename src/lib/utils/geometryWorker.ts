@@ -35,7 +35,7 @@ interface BoxGeometryResult {
 
 interface LooseTrayGeometryResult {
   trayId: string;
-  layerId: string;
+  sectionId: string;
   name: string;
   color: string;
   geometry: GeometryData;
@@ -121,7 +121,7 @@ export interface BoxGeometryData {
 
 export interface LooseTrayGeometryData {
   trayId: string;
-  layerId: string;
+  sectionId: string;
   name: string;
   color: string;
   geometry: THREE.BufferGeometry;
@@ -294,7 +294,7 @@ export class GeometryWorkerManager {
       // Deep clone to strip Svelte 5 Proxy wrappers (can't be cloned for postMessage)
       const plainProject = JSON.parse(
         JSON.stringify({
-          layers: project.layers,
+          sections: project.sections,
           cardSizes: project.cardSizes,
           counterShapes: project.counterShapes,
           standees: project.standees

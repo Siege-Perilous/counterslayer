@@ -59,13 +59,15 @@ async function main() {
 
   const project = JSON.parse(readFileSync(projectPath, 'utf-8'));
 
-  // Support both old (project.boxes) and new (project.layers[].boxes) structure
+  // Support both old (project.boxes) and new (project.sections[].boxes) structure
   const allBoxes: Box[] = [];
   const allLooseTrays: Tray[] = [];
-  if (project.layers) {
-    for (const layer of project.layers) {
-      allBoxes.push(...(layer.boxes || []));
-      allLooseTrays.push(...(layer.looseTrays || []));
+  // Version 2 files stored sections under "layers"
+  const sections = project.sections ?? project.layers;
+  if (sections) {
+    for (const section of sections) {
+      allBoxes.push(...(section.boxes || []));
+      allLooseTrays.push(...(section.looseTrays || []));
     }
   } else if (project.boxes) {
     allBoxes.push(...project.boxes);

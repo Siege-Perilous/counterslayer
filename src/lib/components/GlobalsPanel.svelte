@@ -171,8 +171,8 @@
     const project = getProject();
     let count = 0;
 
-    for (const layer of project.layers) {
-      for (const box of layer.boxes) {
+    for (const section of project.sections) {
+      for (const box of section.boxes) {
         for (const tray of box.trays) {
           if (isCounterTray(tray)) {
             count += tray.params.topLoadedStacks.filter((stack) => stack[0] === shapeId).length;
@@ -180,7 +180,7 @@
           }
         }
       }
-      for (const tray of layer.looseTrays) {
+      for (const tray of section.looseTrays) {
         if (isCounterTray(tray)) {
           count += tray.params.topLoadedStacks.filter((stack) => stack[0] === shapeId).length;
           count += tray.params.edgeLoadedStacks.filter((stack) => stack[0] === shapeId).length;
@@ -226,8 +226,8 @@
     const project = getProject();
     let count = 0;
 
-    for (const layer of project.layers) {
-      for (const box of layer.boxes) {
+    for (const section of project.sections) {
+      for (const box of section.boxes) {
         for (const tray of box.trays) {
           if (isCardDrawTray(tray)) {
             if (tray.params.cardSizeId === cardSizeId) {
@@ -239,7 +239,7 @@
           }
         }
       }
-      for (const tray of layer.looseTrays) {
+      for (const tray of section.looseTrays) {
         if (isCardDrawTray(tray)) {
           if (tray.params.cardSizeId === cardSizeId) {
             count++;
@@ -289,13 +289,13 @@
   function countTraysUsingStandee(standeeId: string): number {
     const project = getProject();
     let count = 0;
-    for (const layer of project.layers) {
-      for (const box of layer.boxes) {
+    for (const section of project.sections) {
+      for (const box of section.boxes) {
         for (const tray of box.trays) {
           if (isStandeeTray(tray) && tray.params.standeeId === standeeId) count++;
         }
       }
-      for (const tray of layer.looseTrays) {
+      for (const tray of section.looseTrays) {
         if (isStandeeTray(tray) && tray.params.standeeId === standeeId) count++;
       }
     }

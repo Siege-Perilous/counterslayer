@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
    * Unified Layout Editor Toolbar
-   * Used by both box layout editor and layer layout editor
+   * Used by both box layout editor and section layout editor
    */
   import { Button, Icon } from '@tableslayer/ui';
   import { IconRotate, IconRefresh, IconX, IconDeviceFloppy, IconGridDots } from '@tabler/icons-svelte';

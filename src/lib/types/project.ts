@@ -158,24 +158,24 @@ export interface ManualTrayPlacement {
   rotation: 0 | 90 | 180 | 270; // Rotation in degrees
 }
 
-// Manual box placement for layer layout editor
+// Manual box placement for section layout editor
 export interface ManualBoxPlacement {
   boxId: string;
-  x: number; // Position in layer (mm)
+  x: number; // Position in section (mm)
   y: number;
   rotation: 0 | 90 | 180 | 270; // Rotation in degrees
 }
 
-// Manual loose tray placement for layer layout editor
+// Manual loose tray placement for section layout editor
 export interface ManualLooseTrayPlacement {
   trayId: string;
-  x: number; // Position in layer (mm)
+  x: number; // Position in section (mm)
   y: number;
   rotation: 0 | 90 | 180 | 270; // Rotation in degrees
 }
 
-// Layer containing boxes and/or loose trays
-export interface Layer {
+// Section containing boxes and/or loose trays
+export interface Section {
   id: string;
   name: string;
   boxes: Box[];
@@ -213,18 +213,18 @@ export interface GlobalSettings {
 }
 
 export interface Project {
-  version?: number; // For migration (2 = layers format)
-  layers: Layer[];
+  version?: number; // Written on save (3 = sections format, 2 = same data under the old "layers" key)
+  sections: Section[];
   counterShapes: CounterShape[];
   cardSizes: CardSize[];
   standees: Standee[];
-  selectedLayerId: string | null;
+  selectedSectionId: string | null;
   selectedBoxId: string | null;
   selectedTrayId: string | null;
   globalSettings?: GlobalSettings;
 }
 
-// Legacy project format (pre-layers)
+// Legacy project format (pre-sections)
 export interface LegacyProject {
   boxes: Box[];
   counterShapes: CounterShape[];
@@ -237,33 +237,39 @@ export interface LegacyProject {
 
 // Check if a tray is a loose tray (not in a box)
 export function isLooseTray(project: Project, trayId: string): boolean {
-  for (const layer of project.layers) {
-    if (layer.looseTrays.some((t) => t.id === trayId)) {
+  for (const section of project.sections) {
+    if (section.looseTrays.some((t) => t.id === trayId)) {
       return true;
     }
   }
   return false;
 }
 
-// Find where a tray is located (layer + box or loose)
-export function findTrayLocation(project: Project, trayId: string): { layerId: string; boxId: string | null } | null {
-  for (const layer of project.layers) {
+// Find where a tray is located (section + box or loose)
+export function findTrayLocation(project: Project, trayId: string): { sectionId: string; boxId: string | null } | null {
+  for (const section of project.sections) {
     // Check loose trays first
-    if (layer.looseTrays.some((t) => t.id === trayId)) {
-      return { layerId: layer.id, boxId: null };
+    if (section.looseTrays.some((t) => t.id === trayId)) {
+      return { sectionId: section.id, boxId: null };
     }
     // Check boxes
-    for (const box of layer.boxes) {
+    for (const box of section.boxes) {
       if (box.trays.some((t) => t.id === trayId)) {
-        return { layerId: layer.id, boxId: box.id };
+        return { sectionId: section.id, boxId: box.id };
       }
     }
   }
   return null;
 }
 
-// Check if project is in legacy format (has boxes[] but no layers[])
+// Check if project is in legacy format (has boxes[] but no sections[] or layers[])
 export function isLegacyProject(data: unknown): data is LegacyProject {
   const obj = data as Record<string, unknown>;
-  return Array.isArray(obj.boxes) && !Array.isArray(obj.layers);
+  return Array.isArray(obj.boxes) && !Array.isArray(obj.sections) && !Array.isArray(obj.layers);
+}
+
+// Check if project is in the version 2 format, where sections were stored as layers[]
+export function isLayersProject(data: unknown): boolean {
+  const obj = data as Record<string, unknown>;
+  return Array.isArray(obj.layers) && !Array.isArray(obj.sections);
 }

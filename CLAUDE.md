@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Counterslayer is a Svelte/JSCad application for generating 3D-printable counter tray inserts for board games. It creates STL files for trays, boxes, and lids organized into stackable layers.
+Counterslayer is a Svelte/JSCad application for generating 3D-printable counter tray inserts for board games. It creates STL files for trays, boxes, and lids organized into sections (sets of trays and boxes that share one height).
 
 ## Git Policy
 
@@ -59,18 +59,18 @@ The file contains the full project configuration plus a `computedLayout` section
 
 ```json
 {
-  "version": 2,
-  "layers": [...],
+  "version": 3,
+  "sections": [...],
   "counterShapes": [...],
   "cardSizes": [...],
   "computedLayout": {
     "timestamp": "2026-03-12T...",
     "gameContainer": { "width": 150, "depth": 200 },
-    "layers": [
+    "sections": [
       {
-        "layerId": "abc123",
-        "layerName": "Bottom layer",
-        "layerHeight": 28.4,
+        "sectionId": "abc123",
+        "sectionName": "Bottom layer",
+        "sectionHeight": 28.4,
         "boxes": [
           {
             "boxId": "box1",
@@ -95,7 +95,7 @@ The file contains the full project configuration plus a `computedLayout` section
 
 ### Understanding Positions
 
-**Game container**: The bounding area (e.g., 150mm × 200mm) that all layers fit within.
+**Game container**: The bounding area (e.g., 150mm × 200mm) that all sections fit within.
 
 **Global positions** (x, y): Where items sit within the game container.
 
@@ -110,10 +110,10 @@ The file contains the full project configuration plus a `computedLayout` section
 
 ```bash
 # Which items touch the front (y=0)?
-cat mesh-analysis/project.json | jq '.computedLayout.layers[] | {layer: .layerName, front: [.looseTrays[] | select(.y == 0) | .name]}'
+cat mesh-analysis/project.json | jq '.computedLayout.sections[] | {section: .sectionName, front: [.looseTrays[] | select(.y == 0) | .name]}'
 
 # Get all loose tray positions
-cat mesh-analysis/project.json | jq '.computedLayout.layers[].looseTrays[] | {name, x, y}'
+cat mesh-analysis/project.json | jq '.computedLayout.sections[].looseTrays[] | {name, x, y}'
 ```
 
 ## 3D Navigation for Claude
@@ -149,17 +149,20 @@ Use `--trayId` to view a specific tray in isolation (sets view mode to "tray"):
 # View a specific tray's bottom (useful for checking text emboss)
 npx tsx scripts/capture-view.ts --trayId <id> --angle bottom --zoom 2
 
+# View one section on its own (sets view mode to "section")
+npx tsx scripts/capture-view.ts --sectionId <id> --angle iso
+
 # Get tray IDs from project.json
-cat mesh-analysis/project.json | jq '.layers[].looseTrays[] | {id, name}'
-cat mesh-analysis/project.json | jq '.layers[].boxes[].trays[] | {id, name}'
+cat mesh-analysis/project.json | jq '.sections[].looseTrays[] | {id, name}'
+cat mesh-analysis/project.json | jq '.sections[].boxes[].trays[] | {id, name}'
 ```
 
 The app also supports these URL parameters directly:
 
 - `?trayId=<id>` - Select tray and switch to tray view
 - `?boxId=<id>` - Select box and switch to exploded view
-- `?layerId=<id>` - Select layer and switch to layer view
-- `?view=<mode>` - Set view mode (tray, layer, exploded, all, all-no-lid)
+- `?sectionId=<id>` - Select section and switch to section view
+- `?view=<mode>` - Set view mode (tray, section, exploded, all, all-no-lid)
 
 ### Preset Angles
 
@@ -194,7 +197,7 @@ The app includes a TinkerCAD-style ViewCube in the top-right corner:
 
 ## Project Structure
 
-- `src/lib/models/` - Geometry generation (counterTray.ts, box.ts, lid.ts, layer.ts)
+- `src/lib/models/` - Geometry generation (counterTray.ts, box.ts, lid.ts, section.ts)
 - `src/lib/stores/project.svelte.ts` - Project state management
 - `src/lib/workers/geometry.worker.ts` - Web worker for non-blocking geometry generation
 - `src/lib/components/ViewCube.svelte` - Camera navigation cube

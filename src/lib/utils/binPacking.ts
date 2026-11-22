@@ -1,6 +1,6 @@
 /**
  * Generic bin packing utility using Guillotine algorithm
- * Used by both box.ts (trays in boxes) and layer.ts (boxes/trays in layers)
+ * Used by both box.ts (trays in boxes) and section.ts (boxes/trays in sections)
  */
 
 import { GuillotineBinPack, Rect } from 'rectangle-packer';

@@ -30,6 +30,7 @@ function parseArgs() {
     view?: string;
     trayId?: string;
     boxId?: string;
+    sectionId?: string;
     counters?: boolean;
   } = {};
 
@@ -78,6 +79,10 @@ function parseArgs() {
         result.boxId = next;
         i++;
         break;
+      case '--sectionId':
+        result.sectionId = next;
+        i++;
+        break;
       case '--counters':
         result.counters = true;
         break;
@@ -101,6 +106,11 @@ Options:
   --markers <file>     JSON file with colored markers
   --out <file>         Output file (default: mesh-analysis/view.png)
   --port <number>      Dev server port (default: 5175)
+  --view <mode>        View mode: tray, section, exploded, all, all-no-lid
+  --trayId <id>        Select a tray and switch to tray view
+  --boxId <id>         Select a box and switch to exploded view
+  --sectionId <id>     Select a section and switch to section view
+  --counters           Show counters in the trays
   --debug-export       Click "Debug for Claude" button to export project.json
 
 Examples:
@@ -205,6 +215,9 @@ async function captureView() {
   }
   if (args.boxId) {
     params.set('boxId', args.boxId);
+  }
+  if (args.sectionId) {
+    params.set('sectionId', args.sectionId);
   }
   if (args.counters) {
     params.set('counters', '1');

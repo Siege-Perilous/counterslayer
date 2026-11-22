@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * LayerLayoutEditorScene - Renders the layer in edit mode with drag interaction.
+   * SectionLayoutEditorScene - Renders the section in edit mode with drag interaction.
    * Shows boxes and loose trays at their working positions with selection and snap guides.
    */
   import { T } from '@threlte/core';
@@ -8,16 +8,16 @@
   import * as THREE from 'three';
   import BoxAssembly from './BoxAssembly.svelte';
   import {
-    layerLayoutEditorState,
-    selectLayerItem,
+    sectionLayoutEditorState,
+    selectSectionItem,
     startDrag,
     updateDrag,
     endDrag,
     setSnapGuides,
     getEffectiveBoxDimensions,
     getEffectiveLooseTrayDimensions
-  } from '#lib/stores/layerLayoutEditor.svelte.js';
-  import { snapLayerItemPosition, type LayerItemForSnapping } from '#lib/utils/layerLayoutSnapping.js';
+  } from '#lib/stores/sectionLayoutEditor.svelte.js';
+  import { snapSectionItemPosition, type SectionItemForSnapping } from '#lib/utils/sectionLayoutSnapping.js';
   import type { TrayPlacement } from '#lib/models/box.js';
   import type { CounterStack } from '#lib/models/counterTray.js';
   import { getProject } from '#lib/stores/project.svelte.js';
@@ -45,7 +45,7 @@
 
   interface LooseTrayGeometryData {
     trayId: string;
-    layerId: string;
+    sectionId: string;
     name: string;
     color: string;
     geometry: THREE.BufferGeometry;
@@ -76,38 +76,38 @@
     printBedSize
   }: Props = $props();
 
-  // Reactive state from layer layout editor store
-  let workingBoxPlacements = $derived.by(() => layerLayoutEditorState.workingBoxPlacements);
-  let workingLooseTrayPlacements = $derived.by(() => layerLayoutEditorState.workingLooseTrayPlacements);
-  let selectedItemId = $derived.by(() => layerLayoutEditorState.selectedItemId);
-  let selectedItemType = $derived.by(() => layerLayoutEditorState.selectedItemType);
-  let snapGuides = $derived.by(() => layerLayoutEditorState.activeSnapGuides);
-  let dragState = $derived.by(() => layerLayoutEditorState.dragState);
+  // Reactive state from section layout editor store
+  let workingBoxPlacements = $derived.by(() => sectionLayoutEditorState.workingBoxPlacements);
+  let workingLooseTrayPlacements = $derived.by(() => sectionLayoutEditorState.workingLooseTrayPlacements);
+  let selectedItemId = $derived.by(() => sectionLayoutEditorState.selectedItemId);
+  let selectedItemType = $derived.by(() => sectionLayoutEditorState.selectedItemType);
+  let snapGuides = $derived.by(() => sectionLayoutEditorState.activeSnapGuides);
+  let dragState = $derived.by(() => sectionLayoutEditorState.dragState);
 
   // Hover state
   let hoveredItemId = $state<string | null>(null);
 
-  // Layer content offset (center on game container)
-  let layerOffsetX = $derived(-gameContainerWidth / 2);
-  let layerOffsetZ = $derived(printBedSize / 2 + gameContainerDepth / 2);
+  // Section content offset (center on game container)
+  let sectionOffsetX = $derived(-gameContainerWidth / 2);
+  let sectionOffsetZ = $derived(printBedSize / 2 + gameContainerDepth / 2);
 
   // Get live tray color from project store
   function getTrayColor(trayId: string, fallbackColor: string): string {
     const project = getProject();
-    for (const layer of project.layers) {
-      for (const box of layer.boxes) {
+    for (const section of project.sections) {
+      for (const box of section.boxes) {
         const tray = box.trays.find((t) => t.id === trayId);
         if (tray?.color) return tray.color;
       }
-      const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+      const looseTray = section.looseTrays.find((t) => t.id === trayId);
       if (looseTray?.color) return looseTray.color;
     }
     return fallbackColor;
   }
 
   // Build all items for snapping
-  function getAllItemsForSnapping(): LayerItemForSnapping[] {
-    const items: LayerItemForSnapping[] = [];
+  function getAllItemsForSnapping(): SectionItemForSnapping[] {
+    const items: SectionItemForSnapping[] = [];
 
     for (const bp of workingBoxPlacements) {
       const dims = getEffectiveBoxDimensions(bp);
@@ -141,9 +141,9 @@
     const floorPos = e.point;
     if (!floorPos) return;
 
-    // Convert 3D position back to 2D layer coordinates
-    const worldX = floorPos.x - layerOffsetX;
-    const worldY = -(floorPos.z - layerOffsetZ);
+    // Convert 3D position back to 2D section coordinates
+    const worldX = floorPos.x - sectionOffsetX;
+    const worldY = -(floorPos.z - sectionOffsetZ);
 
     const deltaX = worldX - dragState.startX;
     const deltaY = worldY - dragState.startY;
@@ -155,7 +155,7 @@
       const newY = dragState.originalItemY + deltaY;
 
       // Get moving item for snapping
-      let movingItem: LayerItemForSnapping | null = null;
+      let movingItem: SectionItemForSnapping | null = null;
 
       if (dragState.itemType === 'box') {
         const bp = workingBoxPlacements.find((p) => p.boxId === dragState.itemId);
@@ -174,7 +174,7 @@
       if (movingItem) {
         // Get all other items for snapping
         const allItems = getAllItemsForSnapping().filter((i) => i.id !== movingItem!.id);
-        const snapResult = snapLayerItemPosition(
+        const snapResult = snapSectionItemPosition(
           movingItem,
           newX,
           newY,
@@ -201,7 +201,7 @@
   function handlePlanePointerDown(_e: IntersectionEvent<PointerEvent>) {
     // Click on background (plane) deselects
     if (!dragState.isDragging) {
-      selectLayerItem('', 'box'); // Deselect
+      selectSectionItem('', 'box'); // Deselect
     }
   }
 
@@ -216,9 +216,9 @@
     e.stopPropagation();
 
     const point = e.point;
-    // Convert 3D position to 2D layer coordinates
-    const startX = point ? point.x - layerOffsetX : itemX;
-    const startY = point ? -(point.z - layerOffsetZ) : itemY;
+    // Convert 3D position to 2D section coordinates
+    const startX = point ? point.x - sectionOffsetX : itemX;
+    const startY = point ? -(point.z - sectionOffsetZ) : itemY;
 
     startDrag(itemId, itemType, startX, startY);
   }
@@ -230,8 +230,8 @@
   {@const dims = getEffectiveBoxDimensions(boxPlacement)}
   {@const isRotated = boxPlacement.rotation === 90 || boxPlacement.rotation === 270}
   {@const isSelected = selectedItemId === boxPlacement.boxId && selectedItemType === 'box'}
-  {@const baseX = layerOffsetX + boxPlacement.x + dims.width / 2}
-  {@const baseZ = layerOffsetZ - boxPlacement.y - dims.depth / 2}
+  {@const baseX = sectionOffsetX + boxPlacement.x + dims.width / 2}
+  {@const baseZ = sectionOffsetZ - boxPlacement.y - dims.depth / 2}
 
   <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
     {#if boxData}
@@ -295,8 +295,8 @@
   {@const isRotated = trayPlacement.rotation === 90 || trayPlacement.rotation === 270}
   {@const isSelected = selectedItemId === trayPlacement.trayId && selectedItemType === 'looseTray'}
   {@const isHovered = hoveredItemId === trayPlacement.trayId}
-  {@const baseX = layerOffsetX + trayPlacement.x + (isRotated ? dims.width : 0)}
-  {@const baseZ = layerOffsetZ - trayPlacement.y}
+  {@const baseX = sectionOffsetX + trayPlacement.x + (isRotated ? dims.width : 0)}
+  {@const baseZ = sectionOffsetZ - trayPlacement.y}
 
   <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
     {#if looseTrayGeom}
@@ -382,12 +382,12 @@
   {@const geometry = new THREE.BufferGeometry().setFromPoints(
     guide.type === 'vertical'
       ? [
-          new THREE.Vector3(layerOffsetX + guide.position, 0.5, layerOffsetZ - guide.start),
-          new THREE.Vector3(layerOffsetX + guide.position, 0.5, layerOffsetZ - guide.end)
+          new THREE.Vector3(sectionOffsetX + guide.position, 0.5, sectionOffsetZ - guide.start),
+          new THREE.Vector3(sectionOffsetX + guide.position, 0.5, sectionOffsetZ - guide.end)
         ]
       : [
-          new THREE.Vector3(layerOffsetX + guide.start, 0.5, layerOffsetZ - guide.position),
-          new THREE.Vector3(layerOffsetX + guide.end, 0.5, layerOffsetZ - guide.position)
+          new THREE.Vector3(sectionOffsetX + guide.start, 0.5, sectionOffsetZ - guide.position),
+          new THREE.Vector3(sectionOffsetX + guide.end, 0.5, sectionOffsetZ - guide.position)
         ]
   )}
   <T.Line args={[geometry]}>

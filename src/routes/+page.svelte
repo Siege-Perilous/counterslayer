@@ -22,7 +22,7 @@
   import { createCardDividerTray, getCardDividerPositions } from '#lib/models/cardDividerTray.js';
   import { arrangeTrays, calculateTraySpacers, getTrayDimensionsForTray } from '#lib/models/box.js';
   import { createCupTray } from '#lib/models/cupTray.js';
-  import { arrangeLayerContents, type BoxPlacement, type LooseTrayPlacement } from '#lib/models/layer.js';
+  import { arrangeSectionContents, type BoxPlacement, type LooseTrayPlacement } from '#lib/models/section.js';
   import { jscadToBufferGeometry } from '#lib/utils/jscadToThree.js';
   import {
     getGeometryWorker,
@@ -39,7 +39,7 @@
     initProject,
     getSelectedTray,
     getSelectedBox,
-    getSelectedLayer,
+    getSelectedSection,
     getProject,
     getGlobalSettings,
     importProject,
@@ -59,7 +59,7 @@
   import type { BufferGeometry } from 'three';
   import { onDestroy, untrack } from 'svelte';
   import LayoutEditorOverlay from '#lib/components/LayoutEditorOverlay.svelte';
-  import LayerLayoutEditorOverlay from '#lib/components/LayerLayoutEditorOverlay.svelte';
+  import SectionLayoutEditorOverlay from '#lib/components/SectionLayoutEditorOverlay.svelte';
   import {
     enterEditMode,
     exitEditMode,
@@ -72,18 +72,24 @@
   } from '#lib/stores/layoutEditor.svelte.js';
   import { findAllOverlaps } from '#lib/utils/layoutSnapping.js';
   import {
-    enterLayerEditMode,
-    exitLayerEditMode,
-    cancelLayerChanges,
-    layerLayoutEditorState,
-    getManualLayerPlacements,
+    enterSectionEditMode,
+    exitSectionEditMode,
+    cancelSectionChanges,
+    sectionLayoutEditorState,
+    getManualSectionPlacements,
     rotateSelectedItem
-  } from '#lib/stores/layerLayoutEditor.svelte.js';
-  import { saveLayerLayout, clearLayerLayout, selectTray, selectBox, selectLayer } from '#lib/stores/project.svelte.js';
-  import { findLayerOverlaps, type LayerItemForSnapping } from '#lib/utils/layerLayoutSnapping.js';
+  } from '#lib/stores/sectionLayoutEditor.svelte.js';
+  import {
+    saveSectionLayout,
+    clearSectionLayout,
+    selectTray,
+    selectBox,
+    selectSection
+  } from '#lib/stores/project.svelte.js';
+  import { findSectionOverlaps, type SectionItemForSnapping } from '#lib/utils/sectionLayoutSnapping.js';
 
-  type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid' | 'layer';
-  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
+  type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid' | 'section';
+  type SelectionType = 'dimensions' | 'section' | 'box' | 'tray';
 
   interface CommunityProject {
     id: string;
@@ -133,7 +139,7 @@
   let lastGeneratedHash = $state('');
   let jsonFileInput = $state<HTMLInputElement | null>(null);
   let explosionAmount = $state(50);
-  let allLayersExplosionAmount = $state(50); // Default to current behavior (20mm separation)
+  let allSectionsExplosionAmount = $state(50); // Default to current behavior (20mm separation)
   let showCounters = $state(false);
   let communityProjects = $state<CommunityProject[]>([]);
   let showReferenceLabels = $state(false);
@@ -188,7 +194,7 @@
       const viewParam = params.get('view') as ViewMode | null;
       const trayIdParam = params.get('trayId');
       const boxIdParam = params.get('boxId');
-      const layerIdParam = params.get('layerId');
+      const sectionIdParam = params.get('sectionId');
 
       // Select specific items by ID from URL params
       if (trayIdParam) {
@@ -197,10 +203,10 @@
       } else if (boxIdParam) {
         selectBox(boxIdParam);
         viewMode = 'exploded';
-      } else if (layerIdParam) {
-        selectLayer(layerIdParam);
-        viewMode = 'layer';
-      } else if (viewParam && ['tray', 'layer', 'exploded', 'all', 'all-no-lid'].includes(viewParam)) {
+      } else if (sectionIdParam) {
+        selectSection(sectionIdParam);
+        viewMode = 'section';
+      } else if (viewParam && ['tray', 'section', 'exploded', 'all', 'all-no-lid'].includes(viewParam)) {
         // Set view mode from URL parameter
         viewMode = viewParam;
       }
@@ -294,7 +300,7 @@
 
   let selectedTray = $derived(getSelectedTray());
   let selectedBox = $derived(getSelectedBox());
-  let selectedLayer = $derived(getSelectedLayer());
+  let selectedSection = $derived(getSelectedSection());
   let globalSettings = $derived(getGlobalSettings());
   let gameContainerWidth = $derived(globalSettings.gameContainerWidth);
   let gameContainerDepth = $derived(globalSettings.gameContainerDepth);
@@ -303,7 +309,7 @@
     if (captureTrayLetter) return captureTrayLetter;
     const proj = getProject();
     if (!selectedTray) return 'A';
-    return getTrayLetterById(proj.layers, selectedTray.id) || 'A';
+    return getTrayLetterById(proj.sections, selectedTray.id) || 'A';
   });
 
   // Title for the print bed based on current view
@@ -311,18 +317,18 @@
     if (viewMode === 'tray') {
       return selectedTray?.name ?? '';
     }
-    if (viewMode === 'layer') {
-      return selectedLayer?.name ?? '';
+    if (viewMode === 'section') {
+      return selectedSection?.name ?? '';
     }
     // For box views (all, exploded), show box name
     return selectedBox?.name ?? '';
   });
 
-  // Compute layer arrangement when in layer view
-  let layerArrangement = $derived.by(() => {
-    if (viewMode !== 'layer' || !selectedLayer) return null;
+  // Compute section arrangement when in section view
+  let sectionArrangement = $derived.by(() => {
+    if (viewMode !== 'section' || !selectedSection) return null;
     const project = getProject();
-    return arrangeLayerContents(selectedLayer, {
+    return arrangeSectionContents(selectedSection, {
       gameContainerWidth,
       gameContainerDepth,
       cardSizes: project.cardSizes || [],
@@ -330,13 +336,13 @@
     });
   });
 
-  // Compute arrangements for ALL layers (for stacked view in dimensions mode)
-  let allLayerArrangements = $derived.by(() => {
+  // Compute arrangements for ALL sections (for stacked view in dimensions mode)
+  let allSectionArrangements = $derived.by(() => {
     if (viewMode !== 'all-no-lid') return [];
     const project = getProject();
-    return project.layers.map((layer) => ({
-      layer: { id: layer.id, name: layer.name },
-      arrangement: arrangeLayerContents(layer, {
+    return project.sections.map((section) => ({
+      section: { id: section.id, name: section.name },
+      arrangement: arrangeSectionContents(section, {
         gameContainerWidth,
         gameContainerDepth,
         cardSizes: project.cardSizes || [],
@@ -357,17 +363,17 @@
       exploded: boolean;
       showAllTrays: boolean;
       showAllBoxes: boolean;
-      showLayerView: boolean;
-      layerBoxPlacements: BoxPlacement[];
-      layerLooseTrayPlacements: LooseTrayPlacement[];
-      // All layers stacked view
-      showAllLayers: boolean;
-      allLayerArrangements: Array<{
-        layer: { id: string; name: string };
+      showSectionView: boolean;
+      sectionBoxPlacements: BoxPlacement[];
+      sectionLooseTrayPlacements: LooseTrayPlacement[];
+      // All sections stacked view
+      showAllSections: boolean;
+      allSectionArrangements: Array<{
+        section: { id: string; name: string };
         arrangement: {
           boxes: BoxPlacement[];
           looseTrays: LooseTrayPlacement[];
-          layerHeight: number;
+          sectionHeight: number;
         };
       }>;
     } = {
@@ -380,11 +386,11 @@
       exploded: false,
       showAllTrays: false,
       showAllBoxes: false,
-      showLayerView: false,
-      layerBoxPlacements: [],
-      layerLooseTrayPlacements: [],
-      showAllLayers: false,
-      allLayerArrangements: []
+      showSectionView: false,
+      sectionBoxPlacements: [],
+      sectionLooseTrayPlacements: [],
+      showAllSections: false,
+      allSectionArrangements: []
     };
 
     // In layout edit mode, only show trays (no box/lid since layout isn't finalized)
@@ -401,9 +407,9 @@
         result.showAllTrays = true;
         break;
       case 'all-no-lid':
-        // Show all layers stacked vertically with lids (dimensions view)
-        result.showAllLayers = true;
-        result.allLayerArrangements = allLayerArrangements;
+        // Show all sections stacked vertically with lids (dimensions view)
+        result.showAllSections = true;
+        result.allSectionArrangements = allSectionArrangements;
         result.allBoxes = allBoxGeometries;
         result.allLooseTrays = allLooseTrayGeometries;
         break;
@@ -414,12 +420,12 @@
         result.exploded = !inEditMode; // Don't explode in edit mode
         result.showAllTrays = true;
         break;
-      case 'layer':
-        // Show layer view with boxes and loose trays arranged on game container
-        if (layerArrangement) {
-          result.showLayerView = true;
-          result.layerBoxPlacements = layerArrangement.boxes;
-          result.layerLooseTrayPlacements = layerArrangement.looseTrays;
+      case 'section':
+        // Show section view with boxes and loose trays arranged on game container
+        if (sectionArrangement) {
+          result.showSectionView = true;
+          result.sectionBoxPlacements = sectionArrangement.boxes;
+          result.sectionLooseTrayPlacements = sectionArrangement.looseTrays;
           // Include allBoxes and allLooseTrays so we can render actual geometry
           result.allBoxes = allBoxGeometries;
           result.allLooseTrays = allLooseTrayGeometries;
@@ -436,8 +442,8 @@
       case 'dimensions':
         viewMode = 'all-no-lid';
         break;
-      case 'layer':
-        viewMode = 'layer';
+      case 'section':
+        viewMode = 'section';
         break;
       case 'box':
         viewMode = 'exploded';
@@ -452,8 +458,8 @@
   function handleTrayDoubleClick(trayId: string) {
     // Find which box contains this tray and select both box and tray
     const project = getProject();
-    for (const layer of project.layers) {
-      for (const box of layer.boxes) {
+    for (const section of project.sections) {
+      for (const box of section.boxes) {
         const tray = box.trays.find((t) => t.id === trayId);
         if (tray) {
           // Update both selections together to avoid inconsistent state
@@ -465,7 +471,7 @@
         }
       }
       // Also check loose trays
-      const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+      const looseTray = section.looseTrays.find((t) => t.id === trayId);
       if (looseTray) {
         // Clear box selection for loose trays
         project.selectedBoxId = null;
@@ -480,8 +486,8 @@
   // Handle double-click on box to navigate to it
   function handleBoxDoubleClick(boxId: string) {
     const project = getProject();
-    for (const layer of project.layers) {
-      const box = layer.boxes.find((b) => b.id === boxId);
+    for (const section of project.sections) {
+      const box = section.boxes.find((b) => b.id === boxId);
       if (box) {
         project.selectedBoxId = boxId;
         // Select the first tray in the box if available
@@ -727,9 +733,9 @@
     try {
       const project = getProject();
 
-      // Compute layer arrangements to get global positions
-      const layerArrangements = project.layers.map((layer) =>
-        arrangeLayerContents(layer, {
+      // Compute section arrangements to get global positions
+      const sectionArrangements = project.sections.map((section) =>
+        arrangeSectionContents(section, {
           gameContainerWidth,
           gameContainerDepth,
           cardSizes: project.cardSizes || [],
@@ -740,12 +746,12 @@
       const computedLayout = {
         timestamp: new Date().toISOString(),
         gameContainer: { width: gameContainerWidth, depth: gameContainerDepth },
-        layers: project.layers.map((layer, layerIdx) => {
-          const arrangement = layerArrangements[layerIdx];
+        sections: project.sections.map((section, sectionIdx) => {
+          const arrangement = sectionArrangements[sectionIdx];
           return {
-            layerId: layer.id,
-            layerName: layer.name,
-            layerHeight: arrangement.layerHeight,
+            sectionId: section.id,
+            sectionName: section.name,
+            sectionHeight: arrangement.sectionHeight,
             boxes: arrangement.boxes.map((bp) => {
               const boxGeom = allBoxGeometries.find((bg) => bg.boxId === bp.box.id);
               return {
@@ -988,7 +994,7 @@
           const placement = placements[trayIdx];
           const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
           const spacerHeight = spacer?.floorSpacerHeight ?? 0;
-          const trayLetter = getTrayLetterById(project.layers, placement.tray.id) || 'A';
+          const trayLetter = getTrayLetterById(project.sections, placement.tray.id) || 'A';
 
           // Generate geometry for this tray based on tray type
           let jscadGeom;
@@ -1092,7 +1098,7 @@
       // Capture loose trays
       for (let looseIdx = 0; looseIdx < allLooseTrays.length; looseIdx++) {
         const looseTray = allLooseTrays[looseIdx];
-        const trayLetter = getTrayLetterById(project.layers, looseTray.id) || 'A';
+        const trayLetter = getTrayLetterById(project.sections, looseTray.id) || 'A';
         const dims = getTrayDimensionsForTray(looseTray, cardSizes, counterShapes);
         const maxHeight = dims.height;
         const spacerHeight = 0; // No spacer for loose trays
@@ -1314,9 +1320,9 @@
         stls[`tray_${trayData.trayLetter}_${trayData.name}`] = toBase64(data);
       }
 
-      // Compute layer arrangements to get global positions
-      const layerArrangements = project.layers.map((layer) =>
-        arrangeLayerContents(layer, {
+      // Compute section arrangements to get global positions
+      const sectionArrangements = project.sections.map((section) =>
+        arrangeSectionContents(section, {
           gameContainerWidth,
           gameContainerDepth,
           cardSizes: project.cardSizes || [],
@@ -1333,12 +1339,12 @@
           width: gameContainerWidth,
           depth: gameContainerDepth
         },
-        layers: project.layers.map((layer, layerIdx) => {
-          const arrangement = layerArrangements[layerIdx];
+        sections: project.sections.map((section, sectionIdx) => {
+          const arrangement = sectionArrangements[sectionIdx];
           return {
-            layerId: layer.id,
-            layerName: layer.name,
-            layerHeight: arrangement.layerHeight,
+            sectionId: section.id,
+            sectionName: section.name,
+            sectionHeight: arrangement.sectionHeight,
             boxes: arrangement.boxes.map((bp) => {
               const boxGeom = allBoxGeometries.find((bg) => bg.boxId === bp.box.id);
               const interiorWidth = bp.dimensions.width - bp.box.wallThickness * 2;
@@ -1479,9 +1485,9 @@
     const allBoxes = getAllBoxes();
     if (allBoxes.length === 0) return '';
     return JSON.stringify({
-      layers: project.layers.map((layer) => ({
-        id: layer.id,
-        boxes: layer.boxes.map((box) => ({
+      sections: project.sections.map((section) => ({
+        id: section.id,
+        boxes: section.boxes.map((box) => ({
           id: box.id,
           name: box.name,
           tolerance: box.tolerance,
@@ -1500,7 +1506,7 @@
             showStackLabels: isCardDividerTray(t) ? t.showStackLabels : undefined
           }))
         })),
-        looseTrays: layer.looseTrays.map((t) => ({
+        looseTrays: section.looseTrays.map((t) => ({
           id: t.id,
           name: t.name,
           params: t.params,
@@ -1526,14 +1532,14 @@
     });
   });
 
-  // Track true structural changes (layers/boxes/trays added, deleted, or moved)
+  // Track true structural changes (sections/boxes/trays added, deleted, or moved)
   let structureHash = $derived.by(() => {
     const project = getProject();
     return JSON.stringify({
-      layerIds: project.layers.map((l) => l.id),
-      // Include full layer->box->tray mapping to detect moves
-      layerMapping: project.layers.map((l) => ({
-        layerId: l.id,
+      sectionIds: project.sections.map((l) => l.id),
+      // Include full section->box->tray mapping to detect moves
+      sectionMapping: project.sections.map((l) => ({
+        sectionId: l.id,
         boxes: l.boxes.map((b) => ({
           boxId: b.id,
           trayIds: b.trays.map((t) => t.id)
@@ -1559,15 +1565,15 @@
       // Verify the selected tray exists in the selected box (or is a loose tray)
       let _selectedBox = null;
       let selectedTray = null;
-      for (const layer of project.layers) {
-        const box = layer.boxes.find((b) => b.id === project.selectedBoxId);
+      for (const section of project.sections) {
+        const box = section.boxes.find((b) => b.id === project.selectedBoxId);
         if (box) {
           _selectedBox = box;
           selectedTray = box.trays.find((t) => t.id === project.selectedTrayId);
           break;
         }
         // Check loose trays
-        const looseTray = layer.looseTrays.find((t) => t.id === project.selectedTrayId);
+        const looseTray = section.looseTrays.find((t) => t.id === project.selectedTrayId);
         if (looseTray) {
           selectedTray = looseTray;
           break;
@@ -1700,35 +1706,35 @@
     }
   }
 
-  // Layer Layout Editor handlers
-  let isLayerLayoutEditMode = $derived.by(() => layerLayoutEditorState.isEditMode);
+  // Section Layout Editor handlers
+  let isLayerLayoutEditMode = $derived.by(() => sectionLayoutEditorState.isEditMode);
 
-  function handleEnterLayerLayoutEdit() {
-    const layer = getSelectedLayer();
-    if (!layer) return;
+  function handleEnterSectionLayoutEdit() {
+    const section = getSelectedSection();
+    if (!section) return;
 
     const project = getProject();
     const cardSizes = project.cardSizes ?? [];
     const counterShapes = project.counterShapes ?? [];
 
-    // Get current layer arrangement
-    const arrangement = arrangeLayerContents(layer, {
+    // Get current section arrangement
+    const arrangement = arrangeSectionContents(section, {
       gameContainerWidth,
       gameContainerDepth,
       cardSizes,
       counterShapes
     });
 
-    enterLayerEditMode(arrangement.boxes, arrangement.looseTrays, gameContainerWidth, gameContainerDepth);
+    enterSectionEditMode(arrangement.boxes, arrangement.looseTrays, gameContainerWidth, gameContainerDepth);
   }
 
-  function handleSaveLayerLayout() {
-    const layer = getSelectedLayer();
-    if (!layer) return;
+  function handleSaveSectionLayout() {
+    const section = getSelectedSection();
+    if (!section) return;
 
     // Build items for overlap check
-    const items: LayerItemForSnapping[] = [];
-    for (const bp of layerLayoutEditorState.workingBoxPlacements) {
+    const items: SectionItemForSnapping[] = [];
+    for (const bp of sectionLayoutEditorState.workingBoxPlacements) {
       const isRotated = bp.rotation === 90 || bp.rotation === 270;
       items.push({
         id: bp.boxId,
@@ -1738,7 +1744,7 @@
         depth: isRotated ? bp.originalWidth : bp.originalDepth
       });
     }
-    for (const ltp of layerLayoutEditorState.workingLooseTrayPlacements) {
+    for (const ltp of sectionLayoutEditorState.workingLooseTrayPlacements) {
       const isRotated = ltp.rotation === 90 || ltp.rotation === 270;
       items.push({
         id: ltp.trayId,
@@ -1749,12 +1755,12 @@
       });
     }
 
-    const overlaps = findLayerOverlaps(items);
+    const overlaps = findSectionOverlaps(items);
 
     if (overlaps.length > 0) {
       const allPlacements = [
-        ...layerLayoutEditorState.workingBoxPlacements.map((p) => ({ id: p.boxId, name: p.name })),
-        ...layerLayoutEditorState.workingLooseTrayPlacements.map((p) => ({ id: p.trayId, name: p.name }))
+        ...sectionLayoutEditorState.workingBoxPlacements.map((p) => ({ id: p.boxId, name: p.name })),
+        ...sectionLayoutEditorState.workingLooseTrayPlacements.map((p) => ({ id: p.trayId, name: p.name }))
       ];
       const overlapNames = overlaps.map(([id1, id2]) => {
         const item1 = allPlacements.find((p) => p.id === id1);
@@ -1771,47 +1777,47 @@
       return;
     }
 
-    const placements = getManualLayerPlacements();
-    saveLayerLayout(layer.id, placements.boxes, placements.looseTrays);
-    exitLayerEditMode();
+    const placements = getManualSectionPlacements();
+    saveSectionLayout(section.id, placements.boxes, placements.looseTrays);
+    exitSectionEditMode();
     regenerate(true);
   }
 
-  function handleCancelLayerLayout() {
-    cancelLayerChanges();
-    exitLayerEditMode();
+  function handleCancelSectionLayout() {
+    cancelSectionChanges();
+    exitSectionEditMode();
   }
 
-  function handleResetAutoLayerLayout() {
-    const layer = getSelectedLayer();
-    if (!layer) return;
+  function handleResetAutoSectionLayout() {
+    const section = getSelectedSection();
+    if (!section) return;
 
-    clearLayerLayout(layer.id);
-    exitLayerEditMode();
+    clearSectionLayout(section.id);
+    exitSectionEditMode();
     regenerate(true);
   }
 
-  function handleRotateLayerItem() {
+  function handleRotateSectionItem() {
     rotateSelectedItem();
   }
 
-  // Auto-cancel layer edit mode when navigating away
-  let lastSelectedLayerId = $state<string | null>(null);
+  // Auto-cancel section edit mode when navigating away
+  let lastSelectedSectionId = $state<string | null>(null);
   $effect(() => {
-    const currentLayerId = selectedLayer?.id ?? null;
+    const currentSectionId = selectedSection?.id ?? null;
     const currentViewMode = viewMode;
 
-    if (layerLayoutEditorState.isEditMode) {
-      const layerChanged = lastSelectedLayerId !== null && currentLayerId !== lastSelectedLayerId;
-      const leftLayerView = currentViewMode !== 'layer';
+    if (sectionLayoutEditorState.isEditMode) {
+      const sectionChanged = lastSelectedSectionId !== null && currentSectionId !== lastSelectedSectionId;
+      const leftSectionView = currentViewMode !== 'section';
 
-      if (layerChanged || leftLayerView) {
-        cancelLayerChanges();
-        exitLayerEditMode();
+      if (sectionChanged || leftSectionView) {
+        cancelSectionChanges();
+        exitSectionEditMode();
       }
     }
 
-    lastSelectedLayerId = currentLayerId;
+    lastSelectedSectionId = currentSectionId;
   });
 
   // Cancel edit mode when selection changes (user navigates away)
@@ -1905,12 +1911,12 @@
               {isLayerLayoutEditMode}
               onTrayDoubleClick={handleTrayDoubleClick}
               onBoxDoubleClick={handleBoxDoubleClick}
-              showLayerView={visibleGeometries.showLayerView}
-              layerBoxPlacements={visibleGeometries.layerBoxPlacements}
-              layerLooseTrayPlacements={visibleGeometries.layerLooseTrayPlacements}
-              showAllLayers={visibleGeometries.showAllLayers}
-              allLayerArrangements={visibleGeometries.allLayerArrangements}
-              {allLayersExplosionAmount}
+              showSectionView={visibleGeometries.showSectionView}
+              sectionBoxPlacements={visibleGeometries.sectionBoxPlacements}
+              sectionLooseTrayPlacements={visibleGeometries.sectionLooseTrayPlacements}
+              showAllSections={visibleGeometries.showAllSections}
+              allSectionArrangements={visibleGeometries.allSectionArrangements}
+              {allSectionsExplosionAmount}
               {generating}
               debugMode={debugParams.debugMode}
               cameraPreset={debugParams.cameraPreset}
@@ -1940,24 +1946,24 @@
           <div data-testid="geometry-ready" style="display: none;"></div>
         {/if}
 
-        {#if viewMode === 'layer' && !generating}
+        {#if viewMode === 'section' && !generating}
           <div class="viewToolbar">
-            <LayerLayoutEditorOverlay
-              onEnterEdit={handleEnterLayerLayoutEdit}
-              onSave={handleSaveLayerLayout}
-              onCancel={handleCancelLayerLayout}
-              onResetAuto={handleResetAutoLayerLayout}
-              onRotate={handleRotateLayerItem}
-              canEdit={(layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 0}
+            <SectionLayoutEditorOverlay
+              onEnterEdit={handleEnterSectionLayoutEdit}
+              onSave={handleSaveSectionLayout}
+              onCancel={handleCancelSectionLayout}
+              onResetAuto={handleResetAutoSectionLayout}
+              onRotate={handleRotateSectionItem}
+              canEdit={(sectionArrangement?.boxes.length ?? 0) + (sectionArrangement?.looseTrays.length ?? 0) > 0}
             />
           </div>
         {/if}
 
-        {#if viewMode === 'all-no-lid' && !generating && allLayerArrangements.length > 1}
+        {#if viewMode === 'all-no-lid' && !generating && allSectionArrangements.length > 1}
           <div class="viewToolbar">
             <div class="sliderContainer">
               <span class="sliderLabel">Explode</span>
-              <InputSlider min={0} max={100} bind:value={allLayersExplosionAmount} />
+              <InputSlider min={0} max={100} bind:value={allSectionsExplosionAmount} />
             </div>
           </div>
         {/if}
@@ -2159,12 +2165,12 @@
               {isLayerLayoutEditMode}
               onTrayDoubleClick={handleTrayDoubleClick}
               onBoxDoubleClick={handleBoxDoubleClick}
-              showLayerView={visibleGeometries.showLayerView}
-              layerBoxPlacements={visibleGeometries.layerBoxPlacements}
-              layerLooseTrayPlacements={visibleGeometries.layerLooseTrayPlacements}
-              showAllLayers={visibleGeometries.showAllLayers}
-              allLayerArrangements={visibleGeometries.allLayerArrangements}
-              {allLayersExplosionAmount}
+              showSectionView={visibleGeometries.showSectionView}
+              sectionBoxPlacements={visibleGeometries.sectionBoxPlacements}
+              sectionLooseTrayPlacements={visibleGeometries.sectionLooseTrayPlacements}
+              showAllSections={visibleGeometries.showAllSections}
+              allSectionArrangements={visibleGeometries.allSectionArrangements}
+              {allSectionsExplosionAmount}
               {generating}
               debugMode={debugParams.debugMode}
               cameraPreset={debugParams.cameraPreset}
@@ -2194,15 +2200,15 @@
           <div data-testid="geometry-ready" style="display: none;"></div>
         {/if}
 
-        {#if viewMode === 'layer' && !generating && !debugParams.hideUI}
+        {#if viewMode === 'section' && !generating && !debugParams.hideUI}
           <div class="viewToolbar">
-            <LayerLayoutEditorOverlay
-              onEnterEdit={handleEnterLayerLayoutEdit}
-              onSave={handleSaveLayerLayout}
-              onCancel={handleCancelLayerLayout}
-              onResetAuto={handleResetAutoLayerLayout}
-              onRotate={handleRotateLayerItem}
-              canEdit={(layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 0}
+            <SectionLayoutEditorOverlay
+              onEnterEdit={handleEnterSectionLayoutEdit}
+              onSave={handleSaveSectionLayout}
+              onCancel={handleCancelSectionLayout}
+              onResetAuto={handleResetAutoSectionLayout}
+              onRotate={handleRotateSectionItem}
+              canEdit={(sectionArrangement?.boxes.length ?? 0) + (sectionArrangement?.looseTrays.length ?? 0) > 0}
             />
           </div>
         {/if}
@@ -2211,7 +2217,7 @@
           <div class="viewToolbar">
             <div class="sliderContainer">
               <span class="sliderLabel">Explode</span>
-              <InputSlider min={0} max={100} bind:value={allLayersExplosionAmount} />
+              <InputSlider min={0} max={100} bind:value={allSectionsExplosionAmount} />
             </div>
           </div>
         {/if}

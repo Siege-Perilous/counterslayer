@@ -37,7 +37,7 @@ interface ComputedLayout {
   }>;
   looseTrays: Array<{
     trayId: string;
-    layerId: string;
+    sectionId: string;
     name: string;
     letter: string;
     color: string;

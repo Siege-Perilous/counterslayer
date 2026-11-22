@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "layers": [
+  "version": 3,
+  "sections": [
     {
       "id": "7hvj1k8",
       "name": "Top layer",
@@ -161,7 +161,7 @@
       "id": "57qruon"
     }
   ],
-  "selectedLayerId": "7hvj1k8",
+  "selectedSectionId": "7hvj1k8",
   "selectedBoxId": null,
   "selectedTrayId": "nrme206",
   "globalSettings": {

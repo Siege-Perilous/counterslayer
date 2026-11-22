@@ -37,7 +37,7 @@
   import { countCups } from '#lib/types/cupLayout.js';
   import { countCells } from '#lib/types/cardWellLayout.js';
   import { getTrayDimensionsForTray, arrangeTrays } from '#lib/models/box.js';
-  import { calculateLayerHeight } from '#lib/models/layer.js';
+  import { calculateSectionHeight } from '#lib/models/section.js';
   import {
     getProject,
     getTrayLetterById,
@@ -87,32 +87,32 @@
     hideList = false
   }: Props = $props();
 
-  // Get the tray letter based on cumulative position across all layers
+  // Get the tray letter based on cumulative position across all sections
   let trayLetter = $derived.by(() => {
     const project = getProject();
     if (!selectedTray) return 'A';
-    return getTrayLetterById(project.layers, selectedTray.id) || 'A';
+    return getTrayLetterById(project.sections, selectedTray.id) || 'A';
   });
 
-  // Build move destination options: all boxes + loose tray options per layer
+  // Build move destination options: all boxes + loose tray options per section
   let moveDestinations = $derived.by(() => {
     const project = getProject();
     const options: { value: string; label: string; group?: string }[] = [];
 
-    for (const layer of project.layers) {
-      // Add boxes in this layer
-      for (const box of layer.boxes) {
+    for (const section of project.sections) {
+      // Add boxes in this section
+      for (const box of section.boxes) {
         options.push({
           value: `box:${box.id}`,
           label: box.name,
-          group: layer.name
+          group: section.name
         });
       }
-      // Add loose tray option for this layer
+      // Add loose tray option for this section
       options.push({
-        value: `loose:${layer.id}`,
-        label: `Loose in ${layer.name}`,
-        group: layer.name
+        value: `loose:${section.id}`,
+        label: `Loose in ${section.name}`,
+        group: section.name
       });
     }
 
@@ -127,9 +127,9 @@
     }
     // Check if it's a loose tray
     const project = getProject();
-    for (const layer of project.layers) {
-      if (layer.looseTrays.some((t) => t.id === selectedTray.id)) {
-        return `loose:${layer.id}`;
+    for (const section of project.sections) {
+      if (section.looseTrays.some((t) => t.id === selectedTray.id)) {
+        return `loose:${section.id}`;
       }
     }
     return '';
@@ -147,15 +147,15 @@
     }
   }
 
-  // Find the layer containing the selected box
-  const selectedBoxLayer = $derived.by(() => {
+  // Find the section containing the selected box
+  const selectedBoxSection = $derived.by(() => {
     if (!selectedBox) return null;
     const project = getProject();
-    return project.layers.find((layer) => layer.boxes.some((b) => b.id === selectedBox.id)) ?? null;
+    return project.sections.find((section) => section.boxes.some((b) => b.id === selectedBox.id)) ?? null;
   });
 
-  // Calculate layer-adjusted tray height
-  // Trays expand to fill the box interior, which may be taller than natural to match layer height
+  // Calculate section-adjusted tray height
+  // Trays expand to fill the box interior, which may be taller than natural to match section height
   let maxTrayHeight = $derived.by(() => {
     if (!selectedBox) return 0;
     const cardSizes = getCardSizes();
@@ -167,14 +167,14 @@
       0
     );
 
-    // If box is in a layer, calculate layer-adjusted height
-    if (selectedBoxLayer) {
-      const layerHeight = calculateLayerHeight(selectedBoxLayer, { cardSizes, counterShapes });
+    // If box is in a section, calculate section-adjusted height
+    if (selectedBoxSection) {
+      const sectionHeight = calculateSectionHeight(selectedBoxSection, { cardSizes, counterShapes });
       // Only lid thickness (flat top) sticks above box, not full lid height
       const lidThickness = selectedBox.lidParams?.thickness ?? 2;
       const floorThickness = selectedBox.floorThickness;
-      // Required tray height to fill box interior when box is adjusted to layer height
-      const requiredTrayHeight = layerHeight - lidThickness - floorThickness;
+      // Required tray height to fill box interior when box is adjusted to section height
+      const requiredTrayHeight = sectionHeight - lidThickness - floorThickness;
       return Math.max(naturalMaxHeight, requiredTrayHeight);
     }
 
@@ -326,7 +326,7 @@
       <div class="panelListItems">
         {#each selectedBox.trays as tray, _trayIdx (tray.id)}
           {@const stats = getTrayStats(tray)}
-          {@const letter = getTrayLetterById(getProject().layers, tray.id)}
+          {@const letter = getTrayLetterById(getProject().sections, tray.id)}
           <div
             class="listItem {selectedTray?.id === tray.id ? 'listItem--selected' : ''}"
             onclick={() => onSelectTray(tray)}
@@ -396,7 +396,7 @@
 
         <Spacer size="1rem" />
 
-        <!-- Move to Box/Layer -->
+        <!-- Move to Box/Section -->
         <FormControl label="Location" name="moveToLocation">
           {#snippet input({ inputProps })}
             <Select

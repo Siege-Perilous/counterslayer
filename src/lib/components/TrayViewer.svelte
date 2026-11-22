@@ -4,7 +4,7 @@
   import ViewCube from './ViewCube.svelte';
   import type { BufferGeometry } from 'three';
   import type { TrayPlacement } from '#lib/models/box.js';
-  import type { BoxPlacement, LooseTrayPlacement } from '#lib/models/layer.js';
+  import type { BoxPlacement, LooseTrayPlacement } from '#lib/models/section.js';
   import type { CounterStack } from '#lib/models/counterTray.js';
   import type { CardStack } from '#lib/models/cardTray.js';
   import type { CaptureOptions } from '#lib/utils/screenshotCapture.js';
@@ -37,7 +37,7 @@
 
   interface LooseTrayGeometryData {
     trayId: string;
-    layerId: string;
+    sectionId: string;
     name: string;
     color: string;
     geometry: BufferGeometry;
@@ -105,20 +105,20 @@
     onTrayDoubleClick?: (trayId: string) => void;
     onBoxDoubleClick?: (boxId: string) => void;
     generating?: boolean;
-    showLayerView?: boolean;
-    layerBoxPlacements?: BoxPlacement[];
-    layerLooseTrayPlacements?: LooseTrayPlacement[];
-    // All layers stacked view
-    showAllLayers?: boolean;
-    allLayerArrangements?: Array<{
-      layer: { id: string; name: string };
+    showSectionView?: boolean;
+    sectionBoxPlacements?: BoxPlacement[];
+    sectionLooseTrayPlacements?: LooseTrayPlacement[];
+    // All sections stacked view
+    showAllSections?: boolean;
+    allSectionArrangements?: Array<{
+      section: { id: string; name: string };
       arrangement: {
         boxes: BoxPlacement[];
         looseTrays: LooseTrayPlacement[];
-        layerHeight: number;
+        sectionHeight: number;
       };
     }>;
-    allLayersExplosionAmount?: number;
+    allSectionsExplosionAmount?: number;
     // Debug mode props for URL-based capture
     debugMode?: boolean;
     cameraPreset?: string;
@@ -160,12 +160,12 @@
     onTrayDoubleClick,
     onBoxDoubleClick,
     generating = false,
-    showLayerView = false,
-    layerBoxPlacements = [],
-    layerLooseTrayPlacements = [],
-    showAllLayers = false,
-    allLayerArrangements = [],
-    allLayersExplosionAmount = 50,
+    showSectionView = false,
+    sectionBoxPlacements = [],
+    sectionLooseTrayPlacements = [],
+    showAllSections = false,
+    allSectionArrangements = [],
+    allSectionsExplosionAmount = 50,
     // Debug mode props
     debugMode = false,
     cameraPreset,
@@ -252,12 +252,12 @@
       {onTrayDoubleClick}
       {onBoxDoubleClick}
       {generating}
-      {showLayerView}
-      {layerBoxPlacements}
-      {layerLooseTrayPlacements}
-      {showAllLayers}
-      {allLayerArrangements}
-      {allLayersExplosionAmount}
+      {showSectionView}
+      {sectionBoxPlacements}
+      {sectionLooseTrayPlacements}
+      {showAllSections}
+      {allSectionArrangements}
+      {allSectionsExplosionAmount}
       {debugMode}
       {cameraPreset}
       {cameraPosition}
@@ -275,8 +275,8 @@
   {/if}
 
   <!-- Tray/Box info overlay when clicked (non-edit mode only) -->
-  {#if clickedTrayInfo && !isLayoutEditMode && !isLayerLayoutEditMode && (showAllTrays || showAllBoxes || showAllLayers || showLayerView)}
-    <div class="trayInfoOverlay" class:belowToolbar={showAllTrays || showAllLayers || showLayerView}>
+  {#if clickedTrayInfo && !isLayoutEditMode && !isLayerLayoutEditMode && (showAllTrays || showAllBoxes || showAllSections || showSectionView)}
+    <div class="trayInfoOverlay" class:belowToolbar={showAllTrays || showAllSections || showSectionView}>
       {#if clickedTrayInfo.type === 'box'}
         <span class="trayLetter trayLetter--box">BOX</span>
       {:else}

@@ -51,7 +51,7 @@
     onBoxClick?: (boxId: string) => void;
     // Index offset for tray letter calculation
     trayIndexOffset?: number;
-    // When false, inner tray clicks are disabled (for layer views where only box-level clicks are allowed)
+    // When false, inner tray clicks are disabled (for section views where only box-level clicks are allowed)
     allowInnerTrayClicks?: boolean;
   }
 
@@ -105,12 +105,12 @@
   // Get live tray color from project store
   function getTrayColor(trayId: string, fallbackIndex: number): string {
     const project = getProject();
-    for (const layer of project.layers) {
-      for (const box of layer.boxes) {
+    for (const section of project.sections) {
+      for (const box of section.boxes) {
         const tray = box.trays.find((t) => t.id === trayId);
         if (tray?.color) return tray.color;
       }
-      const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+      const looseTray = section.looseTrays.find((t) => t.id === trayId);
       if (looseTray?.color) return looseTray.color;
     }
     return TRAY_COLORS[fallbackIndex % TRAY_COLORS.length];

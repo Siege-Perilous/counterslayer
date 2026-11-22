@@ -1,15 +1,15 @@
 <script lang="ts">
   /**
-   * LayerContent - Renders a layer's content: boxes and loose trays arranged on the game container footprint.
+   * SectionContent - Renders a section's content: boxes and loose trays arranged on the game container footprint.
    * Parent provides vertical position via T.Group wrapping.
-   * Internal positioning is relative to the layer's local origin.
+   * Internal positioning is relative to the section's local origin.
    */
   import { T } from '@threlte/core';
   import { Text, type IntersectionEvent } from '@threlte/extras';
   import * as THREE from 'three';
   import BoxAssembly from './BoxAssembly.svelte';
   import TrayInBox from './TrayInBox.svelte';
-  import type { BoxPlacement, LooseTrayPlacement } from '#lib/models/layer.js';
+  import type { BoxPlacement, LooseTrayPlacement } from '#lib/models/section.js';
   import type { TrayPlacement } from '#lib/models/box.js';
   import type { CounterStack } from '#lib/models/counterTray.js';
   import { TRAY_COLORS, getProject } from '#lib/stores/project.svelte.js';
@@ -35,7 +35,7 @@
 
   interface LooseTrayGeometryData {
     trayId: string;
-    layerId: string;
+    sectionId: string;
     name: string;
     color: string;
     geometry: THREE.BufferGeometry;
@@ -68,8 +68,8 @@
     floorThickness?: number;
     showCounters?: boolean;
     showLid?: boolean;
-    layerName?: string;
-    layerHeight?: number;
+    sectionName?: string;
+    sectionHeight?: number;
     showLabel?: boolean;
     labelQuaternion?: [number, number, number, number];
     monoFont?: string;
@@ -77,7 +77,7 @@
     onTrayDoubleClick?: (trayId: string) => void;
     onBoxDoubleClick?: (boxId: string) => void;
     horizontalExplosion?: number; // 0 = no explosion, 1 = full explosion
-    layerBaseOffset?: number; // Base offset for entire layer (higher layers get pushed out more)
+    sectionBaseOffset?: number; // Base offset for entire section (higher sections get pushed out more)
   }
 
   let {
@@ -93,8 +93,8 @@
     floorThickness = 2,
     showCounters = false,
     showLid = true,
-    layerName = '',
-    layerHeight = 0,
+    sectionName = '',
+    sectionHeight = 0,
     showLabel = false,
     labelQuaternion = [0, 0, 0, 1],
     monoFont = '/fonts/JetBrainsMono-Regular.ttf',
@@ -102,22 +102,22 @@
     onTrayDoubleClick,
     onBoxDoubleClick,
     horizontalExplosion = 0,
-    layerBaseOffset = 0
+    sectionBaseOffset = 0
   }: Props = $props();
 
-  // Layer content offset (center on game container)
-  let layerOffsetX = $derived(-gameContainerWidth / 2);
-  let layerOffsetZ = $derived(printBedSize / 2 + gameContainerDepth / 2);
+  // Section content offset (center on game container)
+  let sectionOffsetX = $derived(-gameContainerWidth / 2);
+  let sectionOffsetZ = $derived(printBedSize / 2 + gameContainerDepth / 2);
 
   // Get live tray color from project store
   function getTrayColor(trayId: string, fallbackColor: string): string {
     const project = getProject();
-    for (const layer of project.layers) {
-      for (const box of layer.boxes) {
+    for (const section of project.sections) {
+      for (const box of section.boxes) {
         const tray = box.trays.find((t) => t.id === trayId);
         if (tray?.color) return tray.color;
       }
-      const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+      const looseTray = section.looseTrays.find((t) => t.id === trayId);
       if (looseTray?.color) return looseTray.color;
     }
     return fallbackColor;
@@ -136,14 +136,14 @@
     containerDepth: number,
     explosionPhase: number
   ): { offsetX: number; offsetZ: number } {
-    if (explosionPhase <= 0 && layerBaseOffset <= 0) return { offsetX: 0, offsetZ: 0 };
+    if (explosionPhase <= 0 && sectionBaseOffset <= 0) return { offsetX: 0, offsetZ: 0 };
 
     // Calculate item center relative to container center
     const centerX = itemCenterX - containerWidth / 2;
     const centerZ = itemCenterZ - containerDepth / 2;
 
     // Explosion distance scales with phase (max 100mm at edges)
-    // Higher layers get a larger explosionPhase multiplier from parent
+    // Higher sections get a larger explosionPhase multiplier from parent
     const explosionDistance = 100 * explosionPhase;
 
     // Scale by distance from center (items further from center move more)
@@ -151,12 +151,12 @@
     const normalizedZ = centerZ / (containerDepth / 2);
 
     // Base offset pushes all items outward from center based on their direction
-    // This ensures higher layers always move farther out regardless of item position
+    // This ensures higher sections always move farther out regardless of item position
     const directionX = centerX === 0 ? 0 : centerX > 0 ? 1 : -1;
     const directionZ = centerZ === 0 ? 0 : centerZ > 0 ? 1 : -1;
     // If item is exactly at center, push it diagonally outward
-    const baseX = directionX === 0 && directionZ === 0 ? layerBaseOffset * 0.707 : directionX * layerBaseOffset;
-    const baseZ = directionX === 0 && directionZ === 0 ? layerBaseOffset * 0.707 : directionZ * layerBaseOffset;
+    const baseX = directionX === 0 && directionZ === 0 ? sectionBaseOffset * 0.707 : directionX * sectionBaseOffset;
+    const baseZ = directionX === 0 && directionZ === 0 ? sectionBaseOffset * 0.707 : directionZ * sectionBaseOffset;
 
     return {
       offsetX: normalizedX * explosionDistance + baseX,
@@ -179,8 +179,8 @@
     gameContainerDepth,
     horizontalExplosion
   )}
-  {@const baseX = layerOffsetX + boxPlacement.x + boxPlacement.dimensions.width / 2 + explosion.offsetX}
-  {@const baseZ = layerOffsetZ - boxPlacement.y - boxPlacement.dimensions.depth / 2 - explosion.offsetZ}
+  {@const baseX = sectionOffsetX + boxPlacement.x + boxPlacement.dimensions.width / 2 + explosion.offsetX}
+  {@const baseZ = sectionOffsetZ - boxPlacement.y - boxPlacement.dimensions.depth / 2 - explosion.offsetZ}
 
   <!-- Group for entire box assembly - rotation applied to group -->
   <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
@@ -260,8 +260,9 @@
     gameContainerDepth,
     horizontalExplosion
   )}
-  {@const baseX = layerOffsetX + trayPlacement.x + (isRotated ? trayPlacement.dimensions.width : 0) + explosion.offsetX}
-  {@const baseZ = layerOffsetZ - trayPlacement.y - explosion.offsetZ}
+  {@const baseX =
+    sectionOffsetX + trayPlacement.x + (isRotated ? trayPlacement.dimensions.width : 0) + explosion.offsetX}
+  {@const baseZ = sectionOffsetZ - trayPlacement.y - explosion.offsetZ}
 
   {#if looseTrayGeom}
     <!-- Render actual tray geometry -->
@@ -283,8 +284,8 @@
     </T.Group>
   {:else}
     <!-- Fallback: simple box geometry if actual geometry not available -->
-    {@const fallbackX = layerOffsetX + trayPlacement.x + trayPlacement.dimensions.width / 2 + explosion.offsetX}
-    {@const fallbackZ = layerOffsetZ - trayPlacement.y - trayPlacement.dimensions.depth / 2 - explosion.offsetZ}
+    {@const fallbackX = sectionOffsetX + trayPlacement.x + trayPlacement.dimensions.width / 2 + explosion.offsetX}
+    {@const fallbackZ = sectionOffsetZ - trayPlacement.y - trayPlacement.dimensions.depth / 2 - explosion.offsetZ}
     <T.Mesh
       position.x={fallbackX}
       position.y={trayHeight / 2}
@@ -298,8 +299,8 @@
 
   <!-- Tray label -->
   {#if showLabel}
-    {@const labelX = layerOffsetX + trayPlacement.x + trayPlacement.dimensions.width / 2 + explosion.offsetX}
-    {@const labelZ = layerOffsetZ - trayPlacement.y - trayPlacement.dimensions.depth / 2 - explosion.offsetZ}
+    {@const labelX = sectionOffsetX + trayPlacement.x + trayPlacement.dimensions.width / 2 + explosion.offsetX}
+    {@const labelZ = sectionOffsetZ - trayPlacement.y - trayPlacement.dimensions.depth / 2 - explosion.offsetZ}
     <Text
       text={trayPlacement.tray.name}
       font={monoFont}
@@ -313,12 +314,12 @@
   {/if}
 {/each}
 
-<!-- Layer height indicator and label (offset from bed edge, at front) -->
-{#if showLabel && layerName}
+<!-- Section height indicator and label (offset from bed edge, at front) -->
+{#if showLabel && sectionName}
   {@const indicatorExplosionOffset = 100 * horizontalExplosion}
   {@const indicatorX = -gameContainerWidth / 2 - 15 - indicatorExplosionOffset}
   {@const indicatorZ = printBedSize / 2 + gameContainerDepth / 2}
-  {@const displayHeight = layerHeight || maxBoxHeight}
+  {@const displayHeight = sectionHeight || maxBoxHeight}
   {@const lineGeometry = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(indicatorX, 0, indicatorZ),
     new THREE.Vector3(indicatorX, displayHeight, indicatorZ)
@@ -349,9 +350,9 @@
     <T.LineBasicMaterial color="#888888" />
   </T.Line>
 
-  <!-- Layer name label -->
+  <!-- Section name label -->
   <Text
-    text={layerName}
+    text={sectionName}
     font={monoFont}
     fontSize={6}
     position={[indicatorX - 5, displayHeight / 2 + 4, indicatorZ]}
@@ -361,7 +362,7 @@
     anchorY="middle"
   />
 
-  <!-- Layer height value -->
+  <!-- Section height value -->
   <Text
     text={`${displayHeight.toFixed(1)}mm`}
     font={monoFont}

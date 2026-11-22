@@ -21,15 +21,18 @@ import type {
   Box,
   CardSize,
   CounterShape,
-  Layer,
   LegacyProject,
   LidParams,
   Project,
+  Section,
   Standee,
   Tray
 } from '#lib/types/project.js';
-import { isLegacyProject } from '#lib/types/project.js';
+import { isLayersProject, isLegacyProject } from '#lib/types/project.js';
 const STORAGE_KEY = 'counter-tray-project';
+// One-time copy of the last project saved in the version 2 ("layers") format. An older cached
+// build cannot read version 3, so this keeps the original recoverable.
+const BACKUP_V2_KEY = 'counter-tray-project.backup-v2';
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 9);
@@ -453,8 +456,8 @@ function getBoxesFromProject(project: Project | LegacyProject): Box[] {
     return project.boxes;
   }
   const boxes: Box[] = [];
-  for (const layer of project.layers) {
-    boxes.push(...layer.boxes);
+  for (const section of project.sections) {
+    boxes.push(...section.boxes);
   }
   return boxes;
 }
@@ -468,15 +471,34 @@ function _getAllTraysFromProject(project: Project | LegacyProject): Tray[] {
   }
   // Include loose trays if new format
   if (!isLegacyProject(project)) {
-    for (const layer of project.layers) {
-      trays.push(...layer.looseTrays);
+    for (const section of project.sections) {
+      trays.push(...section.looseTrays);
     }
   }
   return trays;
 }
 
+// Version 2 files called sections "layers". Rename the keys so the rest of the migration only
+// has to deal with the current names. Detection is by shape, never by the version number.
+function renameLayersToSections(data: unknown): Project | LegacyProject {
+  if (!isLayersProject(data)) {
+    return data as Project | LegacyProject;
+  }
+  const { layers, selectedLayerId, ...rest } = data as unknown as Record<string, unknown> & {
+    layers: Section[];
+    selectedLayerId?: string | null;
+  };
+  return {
+    ...rest,
+    sections: layers,
+    selectedSectionId: selectedLayerId ?? null
+  } as unknown as Project;
+}
+
 // Migrate a full project to ensure all fields have valid values
-export function migrateProjectData(project: Project | LegacyProject): Project {
+export function migrateProjectData(input: Project | LegacyProject): Project {
+  const project = renameLayersToSections(input);
+
   // Check if project already has new format (counterShapes/cardSizes at project level)
   const hasCounterShapesAndCardSizes =
     Array.isArray((project as { counterShapes?: unknown }).counterShapes) &&
@@ -568,7 +590,7 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
 
   // Handle legacy vs new format
   if (isLegacyProject(project)) {
-    // Legacy format: wrap all boxes into a single layer
+    // Legacy format: wrap all boxes into a single section
     let cumulativeIndex = 0;
     const migratedBoxes = project.boxes.map((box) => {
       const migratedBox = migrateBox(box, cumulativeIndex, shapeIdMapping, cardSizeIdMapping);
@@ -576,45 +598,45 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
       return migratedBox;
     });
 
-    // Create a single layer containing all boxes
-    const layerId = generateId();
-    const layer: Layer = {
-      id: layerId,
-      name: 'Layer 1',
+    // Create a single section containing all boxes
+    const sectionId = generateId();
+    const section: Section = {
+      id: sectionId,
+      name: 'Section 1',
       boxes: migratedBoxes,
       looseTrays: []
     };
 
     return {
-      version: 2,
-      layers: [layer],
+      version: 3,
+      sections: [section],
       counterShapes,
       cardSizes,
       standees,
-      selectedLayerId: layerId,
+      selectedSectionId: sectionId,
       selectedBoxId: project.selectedBoxId,
       selectedTrayId: project.selectedTrayId,
       globalSettings
     };
   }
 
-  // New format: migrate boxes within layers and loose trays
+  // New format: migrate boxes within sections and loose trays
   let cumulativeIndex = 0;
-  const migratedLayers = project.layers.map((layer) => {
-    const migratedBoxes = layer.boxes.map((box) => {
+  const migratedSections = project.sections.map((section) => {
+    const migratedBoxes = section.boxes.map((box) => {
       const migratedBox = migrateBox(box, cumulativeIndex, shapeIdMapping, cardSizeIdMapping);
       cumulativeIndex += box.trays.length;
       return migratedBox;
     });
 
-    const migratedLooseTrays = layer.looseTrays.map((tray, idx) => {
+    const migratedLooseTrays = section.looseTrays.map((tray, idx) => {
       const migrated = migrateTray(tray, cumulativeIndex + idx, shapeIdMapping, cardSizeIdMapping);
       return migrated;
     });
-    cumulativeIndex += layer.looseTrays.length;
+    cumulativeIndex += section.looseTrays.length;
 
     return {
-      ...layer,
+      ...section,
       boxes: migratedBoxes,
       looseTrays: migratedLooseTrays
     };
@@ -622,8 +644,8 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
 
   return {
     ...project,
-    version: 2,
-    layers: migratedLayers,
+    version: 3,
+    sections: migratedSections,
     counterShapes,
     cardSizes,
     standees,
@@ -636,6 +658,9 @@ export function loadProject(): Project | null {
     const data = localStorage.getItem(STORAGE_KEY);
     if (data) {
       const project = JSON.parse(data) as Project;
+      if (isLayersProject(project) && localStorage.getItem(BACKUP_V2_KEY) === null) {
+        localStorage.setItem(BACKUP_V2_KEY, data);
+      }
       // Migrate to new format
       return migrateProjectData(project);
     }

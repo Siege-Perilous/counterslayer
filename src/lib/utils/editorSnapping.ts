@@ -1,7 +1,7 @@
 /**
  * Unified Editor Snapping Utility
  * Handles grid snapping, face-to-face snapping, and overlap detection
- * Used by both box layout editor and layer layout editor
+ * Used by both box layout editor and section layout editor
  */
 
 import type { SnapGuide, SnapResult, SnappableItem } from '#lib/types/editor.js';

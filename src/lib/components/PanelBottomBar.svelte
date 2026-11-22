@@ -2,7 +2,7 @@
   import { Button, Icon, ConfirmActionButton } from '@tableslayer/ui';
   import { IconCopy, IconTrash } from '@tabler/icons-svelte';
 
-  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
+  type SelectionType = 'dimensions' | 'section' | 'box' | 'tray';
 
   interface Props {
     selectionType: SelectionType;
@@ -15,8 +15,8 @@
 
   let deleteMessage = $derived.by(() => {
     switch (selectionType) {
-      case 'layer':
-        return 'Delete this layer and all its contents?';
+      case 'section':
+        return 'Delete this section and all its contents?';
       case 'box':
         return 'Delete this box and all its trays?';
       case 'tray':

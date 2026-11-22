@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "layers": [
+  "version": 3,
+  "sections": [
     {
       "id": "hhpu6bw",
       "name": "Wood pieces",
@@ -508,7 +508,7 @@
       "standeeThickness": 1.5
     }
   ],
-  "selectedLayerId": "r3z34z8",
+  "selectedSectionId": "r3z34z8",
   "selectedBoxId": null,
   "selectedTrayId": "bjrdvgt",
   "globalSettings": {

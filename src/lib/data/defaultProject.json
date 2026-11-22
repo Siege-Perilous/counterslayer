@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "layers": [
+  "version": 3,
+  "sections": [
     {
       "id": "x58fp4d",
       "name": "Bottom layer",
@@ -431,7 +431,7 @@
       "standeeThickness": 1.5
     }
   ],
-  "selectedLayerId": "7hvj1k8",
+  "selectedSectionId": "7hvj1k8",
   "selectedBoxId": null,
   "selectedTrayId": "nrme206",
   "globalSettings": {

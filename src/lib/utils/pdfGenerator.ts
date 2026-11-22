@@ -7,12 +7,12 @@ import {
   type EdgeLoadedStackDef,
   type TopLoadedStackDef
 } from '#lib/models/counterTray.js';
-import type { Box, CounterShape, Layer, Project } from '#lib/types/project.js';
+import type { Box, CounterShape, Project, Section } from '#lib/types/project.js';
 import { isCardDividerTray, isCardTray, isCounterTray } from '#lib/types/project.js';
 import { jsPDF } from 'jspdf';
 
 /**
- * Generate a tray letter based on cumulative index across all layers.
+ * Generate a tray letter based on cumulative index across all sections.
  * A-Z for first 26, then AA, BB, CC... for 26+
  */
 function getTrayLetter(index: number): string {
@@ -25,24 +25,24 @@ function getTrayLetter(index: number): string {
 }
 
 /**
- * Get all boxes from all layers.
+ * Get all boxes from all sections.
  */
-function getAllBoxes(layers: Layer[]): Box[] {
+function getAllBoxes(sections: Section[]): Box[] {
   const boxes: Box[] = [];
-  for (const layer of layers) {
-    boxes.push(...layer.boxes);
+  for (const section of sections) {
+    boxes.push(...section.boxes);
   }
   return boxes;
 }
 
 /**
- * Get cumulative tray index for a specific tray ID across all layers.
+ * Get cumulative tray index for a specific tray ID across all sections.
  */
-function getCumulativeTrayIndexForTray(layers: Layer[], trayId: string): number {
+function getCumulativeTrayIndexForTray(sections: Section[], trayId: string): number {
   let cumulative = 0;
-  for (const layer of layers) {
+  for (const section of sections) {
     // Count box trays
-    for (const box of layer.boxes) {
+    for (const box of section.boxes) {
       for (const tray of box.trays) {
         if (tray.id === trayId) {
           return cumulative;
@@ -51,7 +51,7 @@ function getCumulativeTrayIndexForTray(layers: Layer[], trayId: string): number 
       }
     }
     // Count loose trays
-    for (const tray of layer.looseTrays) {
+    for (const tray of section.looseTrays) {
       if (tray.id === trayId) {
         return cumulative;
       }
@@ -181,8 +181,8 @@ export function extractPdfData(project: Project): PdfData {
   const cardSizes = project.cardSizes ?? [];
   const counterShapes = project.counterShapes ?? [];
 
-  // Get all boxes from all layers
-  const allBoxes = getAllBoxes(project.layers);
+  // Get all boxes from all sections
+  const allBoxes = getAllBoxes(project.sections);
 
   for (let boxIndex = 0; boxIndex < allBoxes.length; boxIndex++) {
     const box = allBoxes[boxIndex];
@@ -210,7 +210,7 @@ export function extractPdfData(project: Project): PdfData {
     for (let trayIndex = 0; trayIndex < placements.length; trayIndex++) {
       const placement = placements[trayIndex];
       const tray = placement.tray;
-      const trayLetter = getTrayLetter(getCumulativeTrayIndexForTray(project.layers, tray.id));
+      const trayLetter = getTrayLetter(getCumulativeTrayIndexForTray(project.sections, tray.id));
 
       // Get counter positions based on tray type
       let counterPositions: CounterStack[] = [];

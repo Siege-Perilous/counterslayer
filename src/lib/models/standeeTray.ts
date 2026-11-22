@@ -133,7 +133,7 @@ function computeLayout(
   const naturalAxisZ = floorThickness + baseRadius;
   const contentTopZ = Math.max(floorThickness + baseDiameter, naturalAxisZ + standeeWidth / 2);
   const naturalTrayHeight = contentTopZ + rimHeight;
-  // Outer tray height: raise the rim to the box/layer height (targetHeight), then add any floor
+  // Outer tray height: raise the rim to the box/section height (targetHeight), then add any floor
   // spacer — same order as the counter tray so the box's height normalisation lines up.
   const trayHeightWithoutSpacer = targetHeight && targetHeight > naturalTrayHeight ? targetHeight : naturalTrayHeight;
   const trayHeight = trayHeightWithoutSpacer + spacerHeight;

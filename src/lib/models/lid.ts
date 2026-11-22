@@ -133,7 +133,7 @@ export function createBoxWithLidGrooves(
   const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes, standees);
 
   // Box exterior dimensions (use custom if set, otherwise auto)
-  // If targetExteriorHeight is provided (for layer unification), use it minus lid VISIBLE height for box height
+  // If targetExteriorHeight is provided (for section unification), use it minus lid VISIBLE height for box height
   const extWidth = box.customWidth ?? minimums.minWidth;
   const extDepth = box.customDepth ?? minimums.minDepth;
   const naturalHeight = box.customBoxHeight ?? minimums.minHeight;
@@ -141,7 +141,7 @@ export function createBoxWithLidGrooves(
   // The rails extend down INTO the box walls, so don't subtract the full lid height
   const lidThickness = box.lidParams?.thickness ?? 2;
   // Use target height if provided and valid, otherwise use natural height
-  // The target height is the layer exterior height; subtract only lid visible height (thickness) for box body
+  // The target height is the section exterior height; subtract only lid visible height (thickness) for box body
   const extHeight =
     targetExteriorHeight !== undefined && targetExteriorHeight > 0
       ? Math.max(targetExteriorHeight - lidThickness, naturalHeight)

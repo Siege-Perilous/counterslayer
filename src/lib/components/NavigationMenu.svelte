@@ -8,16 +8,16 @@
     getProject,
     getSelectedBox,
     getSelectedTray,
-    getSelectedLayer,
+    getSelectedSection,
     selectBox,
     selectTray,
-    selectLayer,
+    selectSection,
     addBox,
     deleteBox,
     addTray,
     deleteTray,
-    addLayer,
-    deleteLayer,
+    addSection,
+    deleteSection,
     addLooseTray,
     deleteLooseTray,
     getTrayLetterById,
@@ -28,14 +28,14 @@
     isCupTray,
     isStandeeTray,
     type Box,
-    type Layer,
+    type Section,
     type Tray,
     type TrayType
   } from '#lib/stores/project.svelte.js';
   import { countCups } from '#lib/types/cupLayout.js';
   import { countCells } from '#lib/types/cardWellLayout.js';
 
-  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
+  type SelectionType = 'dimensions' | 'section' | 'box' | 'tray';
 
   interface Props {
     selectionType: SelectionType;
@@ -47,7 +47,7 @@
   let { selectionType, onSelectionChange, onExpandPanel, isMobile = false }: Props = $props();
 
   let project = $derived(getProject());
-  let selectedLayer = $derived(getSelectedLayer());
+  let selectedSection = $derived(getSelectedSection());
   let selectedBox = $derived(getSelectedBox());
   let selectedTray = $derived(getSelectedTray());
 
@@ -91,9 +91,9 @@
     onExpandPanel();
   }
 
-  function handleLayerClick(layer: Layer) {
-    selectLayer(layer.id);
-    onSelectionChange('layer');
+  function handleSectionClick(section: Section) {
+    selectSection(section.id);
+    onSelectionChange('section');
     onExpandPanel();
   }
 
@@ -112,14 +112,14 @@
     onExpandPanel();
   }
 
-  function handleAddLayer() {
-    addLayer();
-    onSelectionChange('layer');
+  function handleAddSection() {
+    addSection();
+    onSelectionChange('section');
     onExpandPanel();
   }
 
-  function handleAddBox(layerId: string, trayType: TrayType) {
-    addBox(layerId, trayType);
+  function handleAddBox(sectionId: string, trayType: TrayType) {
+    addBox(sectionId, trayType);
     onSelectionChange('tray');
     onExpandPanel();
   }
@@ -130,27 +130,27 @@
     onExpandPanel();
   }
 
-  function handleAddLooseTray(layerId: string, trayType: TrayType) {
-    addLooseTray(layerId, trayType);
+  function handleAddLooseTray(sectionId: string, trayType: TrayType) {
+    addLooseTray(sectionId, trayType);
     onSelectionChange('tray');
     onExpandPanel();
   }
 
-  function handleDeleteLayer(layerId: string, layerName: string) {
-    deleteLayer(layerId);
-    addToast({ data: { title: 'Layer deleted', body: `"${layerName}" has been deleted`, type: 'success' } });
-    // If we deleted the selected layer, switch to first layer
-    if (selectedLayer?.id === layerId) {
-      onSelectionChange('layer');
+  function handleDeleteSection(sectionId: string, sectionName: string) {
+    deleteSection(sectionId);
+    addToast({ data: { title: 'Section deleted', body: `"${sectionName}" has been deleted`, type: 'success' } });
+    // If we deleted the selected section, switch to first section
+    if (selectedSection?.id === sectionId) {
+      onSelectionChange('section');
     }
   }
 
   function handleDeleteBox(boxId: string, boxName: string) {
     deleteBox(boxId);
     addToast({ data: { title: 'Box deleted', body: `"${boxName}" has been deleted`, type: 'success' } });
-    // If we deleted the selected box, switch to layer view
+    // If we deleted the selected box, switch to section view
     if (selectedBox?.id === boxId) {
-      onSelectionChange('layer');
+      onSelectionChange('section');
     }
   }
 
@@ -161,9 +161,9 @@
       deleteLooseTray(trayId);
     }
     addToast({ data: { title: 'Tray deleted', body: `"${trayName}" has been deleted`, type: 'success' } });
-    // If we deleted the selected tray, switch to layer view
+    // If we deleted the selected tray, switch to section view
     if (selectedTray?.id === trayId) {
-      onSelectionChange('layer');
+      onSelectionChange('section');
     }
   }
 
@@ -265,25 +265,25 @@
   </button>
   <Hr />
 
-  <!-- Layers, Boxes, and Trays -->
+  <!-- Sections, Boxes, and Trays -->
   <div class="navTree">
-    {#each project.layers as layer (layer.id)}
-      {@const isLayerSelected = selectedLayer?.id === layer.id && selectionType === 'layer'}
-      {@const totalItems = layer.boxes.length + layer.looseTrays.length}
+    {#each project.sections as section (section.id)}
+      {@const isLayerSelected = selectedSection?.id === section.id && selectionType === 'section'}
+      {@const totalItems = section.boxes.length + section.looseTrays.length}
 
-      <div class="navLayerGroup">
-        <!-- Layer Item -->
+      <div class="navSectionGroup">
+        <!-- Section Item -->
         <button
-          class="navItem navItem--layer {isLayerSelected ? 'navItem--selected' : ''}"
-          onclick={() => handleLayerClick(layer)}
+          class="navItem navItem--section {isLayerSelected ? 'navItem--selected' : ''}"
+          onclick={() => handleSectionClick(section)}
         >
           <span class="navItemIcon">
             <Icon Icon={IconStack2} size="1rem" />
           </span>
           <span class="navItemLabel">
-            {layer.name}
+            {section.name}
           </span>
-          {#if project.layers.length > 1}
+          {#if project.sections.length > 1}
             <span
               class="navItemDelete"
               role="none"
@@ -291,28 +291,28 @@
               onkeydown={(e) => e.stopPropagation()}
             >
               <ConfirmActionButton
-                action={() => handleDeleteLayer(layer.id, layer.name)}
-                actionButtonText="Delete layer"
+                action={() => handleDeleteSection(section.id, section.name)}
+                actionButtonText="Delete section"
                 positioning={{ placement: 'right' }}
                 portal=".appContainer"
               >
                 {#snippet trigger({ triggerProps })}
-                  <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete layer">
+                  <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete section">
                     <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
                   </IconButton>
                 {/snippet}
                 {#snippet actionMessage()}
-                  <p>Delete this layer and all its contents?</p>
+                  <p>Delete this section and all its contents?</p>
                 {/snippet}
               </ConfirmActionButton>
             </span>
           {/if}
         </button>
 
-        <!-- Content within Layer -->
-        <div class="navLayerContent">
-          <!-- Boxes within Layer -->
-          {#each layer.boxes as box (box.id)}
+        <!-- Content within Section -->
+        <div class="navSectionContent">
+          <!-- Boxes within Section -->
+          {#each section.boxes as box (box.id)}
             {@const isBoxSelected = selectedBox?.id === box.id && selectionType === 'box'}
 
             <div class="navBoxGroup">
@@ -357,7 +357,7 @@
               <div class="navTrayList">
                 {#each box.trays as tray (tray.id)}
                   {@const isTraySelected = selectedTray?.id === tray.id && selectionType === 'tray'}
-                  {@const letter = getTrayLetterById(project.layers, tray.id)}
+                  {@const letter = getTrayLetterById(project.sections, tray.id)}
                   {@const stats = getTrayStats(tray)}
 
                   <button
@@ -493,10 +493,10 @@
             </div>
           {/each}
 
-          <!-- Loose Trays within Layer -->
-          {#each layer.looseTrays as tray (tray.id)}
+          <!-- Loose Trays within Section -->
+          {#each section.looseTrays as tray (tray.id)}
             {@const isTraySelected = selectedTray?.id === tray.id && selectionType === 'tray'}
-            {@const letter = getTrayLetterById(project.layers, tray.id)}
+            {@const letter = getTrayLetterById(project.sections, tray.id)}
             {@const stats = getTrayStats(tray)}
 
             <button
@@ -556,7 +556,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddBox(layer.id, 'counter');
+                  handleAddBox(section.id, 'counter');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('counter', e.currentTarget)}
@@ -568,7 +568,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddBox(layer.id, 'cardDraw');
+                  handleAddBox(section.id, 'cardDraw');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cardDraw', e.currentTarget)}
@@ -580,7 +580,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddBox(layer.id, 'cardDivider');
+                  handleAddBox(section.id, 'cardDivider');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cardDivider', e.currentTarget)}
@@ -592,7 +592,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddBox(layer.id, 'cardWell');
+                  handleAddBox(section.id, 'cardWell');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cardWell', e.currentTarget)}
@@ -604,7 +604,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddBox(layer.id, 'cup');
+                  handleAddBox(section.id, 'cup');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cup', e.currentTarget)}
@@ -616,7 +616,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddBox(layer.id, 'standee');
+                  handleAddBox(section.id, 'standee');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('standee', e.currentTarget)}
@@ -640,7 +640,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddLooseTray(layer.id, 'counter');
+                  handleAddLooseTray(section.id, 'counter');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('counter', e.currentTarget)}
@@ -652,7 +652,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddLooseTray(layer.id, 'cardDraw');
+                  handleAddLooseTray(section.id, 'cardDraw');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cardDraw', e.currentTarget)}
@@ -664,7 +664,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddLooseTray(layer.id, 'cardDivider');
+                  handleAddLooseTray(section.id, 'cardDivider');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cardDivider', e.currentTarget)}
@@ -676,7 +676,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddLooseTray(layer.id, 'cardWell');
+                  handleAddLooseTray(section.id, 'cardWell');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cardWell', e.currentTarget)}
@@ -688,7 +688,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddLooseTray(layer.id, 'cup');
+                  handleAddLooseTray(section.id, 'cup');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cup', e.currentTarget)}
@@ -700,7 +700,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddLooseTray(layer.id, 'standee');
+                  handleAddLooseTray(section.id, 'standee');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('standee', e.currentTarget)}
@@ -716,10 +716,10 @@
       </div>
     {/each}
 
-    <!-- Add Layer Button -->
-    <button class="navItem navItem--add" onclick={handleAddLayer}>
+    <!-- Add Section Button -->
+    <button class="navItem navItem--add" onclick={handleAddSection}>
       <span class="addIcon">+</span>
-      <span class="addLabel">Add layer</span>
+      <span class="addLabel">Add section</span>
     </button>
   </div>
 </Panel>
@@ -818,12 +818,12 @@
     flex-direction: column;
   }
 
-  .navLayerGroup {
+  .navSectionGroup {
     display: flex;
     flex-direction: column;
   }
 
-  .navLayerContent {
+  .navSectionContent {
     display: flex;
     flex-direction: column;
 

@@ -8,7 +8,7 @@
     getProject,
     getSelectedBox,
     getSelectedTray,
-    getSelectedLayer,
+    getSelectedSection,
     updateBox,
     updateTray,
     updateTrayParams,
@@ -17,7 +17,7 @@
     updateCardWellTrayParams,
     updateCupTrayParams,
     updateStandeeTrayParams,
-    updateLayer,
+    updateSection,
     getTrayLetterById,
     isCounterTray,
     isCardTray,
@@ -27,16 +27,16 @@
     isStandeeTray,
     getGlobalSettings,
     updateGlobalSettings,
-    deleteLayer,
+    deleteSection,
     deleteBox,
     deleteTray,
     deleteLooseTray,
-    duplicateLayer,
+    duplicateSection,
     duplicateBox,
     duplicateTray,
     findTrayLocation,
     type Box,
-    type Layer,
+    type Section,
     type Tray
   } from '#lib/stores/project.svelte.js';
   import type { CounterTrayParams } from '#lib/models/counterTray.js';
@@ -49,9 +49,9 @@
   import { countCells } from '#lib/types/cardWellLayout.js';
   import { layoutEditorState } from '#lib/stores/layoutEditor.svelte.js';
   import { getTrayDimensionsForTray } from '#lib/models/box.js';
-  import { getBoxDimensions, calculateLayerHeight } from '#lib/models/layer.js';
+  import { getBoxDimensions, calculateSectionHeight } from '#lib/models/section.js';
 
-  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
+  type SelectionType = 'dimensions' | 'section' | 'box' | 'tray';
 
   interface Props {
     selectionType: SelectionType;
@@ -74,13 +74,13 @@
   let interiorDepth = $derived(layoutEditorState.boundsDepth);
 
   let project = $derived(getProject());
-  let selectedLayer = $derived(getSelectedLayer());
+  let selectedSection = $derived(getSelectedSection());
   let selectedBox = $derived(getSelectedBox());
   let selectedTray = $derived(getSelectedTray());
 
-  function handleLayerUpdate(updates: Partial<Omit<Layer, 'id' | 'boxes' | 'looseTrays'>>) {
-    if (selectedLayer) {
-      updateLayer(selectedLayer.id, updates);
+  function handleSectionUpdate(updates: Partial<Omit<Section, 'id' | 'boxes' | 'looseTrays'>>) {
+    if (selectedSection) {
+      updateSection(selectedSection.id, updates);
     }
   }
 
@@ -176,7 +176,7 @@
     }
 
     const project = getProject();
-    let letter = getTrayLetterById(project.layers, tray.id);
+    let letter = getTrayLetterById(project.sections, tray.id);
     if (!letter) {
       letter = 'A';
     }
@@ -185,20 +185,20 @@
 
   // Determine if delete is allowed (can't delete last item)
   let canDelete = $derived.by(() => {
-    if (selectionType === 'layer') {
-      return project.layers.length > 1;
+    if (selectionType === 'section') {
+      return project.sections.length > 1;
     }
-    if (selectionType === 'box' && selectedLayer) {
-      // Can delete if there's more than one item in the layer (boxes + loose trays)
-      return selectedLayer.boxes.length + selectedLayer.looseTrays.length > 1;
+    if (selectionType === 'box' && selectedSection) {
+      // Can delete if there's more than one item in the section (boxes + loose trays)
+      return selectedSection.boxes.length + selectedSection.looseTrays.length > 1;
     }
     if (selectionType === 'tray' && selectedTray) {
       const location = findTrayLocation(project, selectedTray.id);
       if (location) {
-        const layer = project.layers.find((l) => l.id === location.layerId);
-        if (layer) {
-          // Total items in layer
-          const totalItems = layer.boxes.length + layer.looseTrays.length;
+        const section = project.sections.find((l) => l.id === location.sectionId);
+        if (section) {
+          // Total items in section
+          const totalItems = section.boxes.length + section.looseTrays.length;
           const boxHasMultipleTrays = location.boxId !== null && selectedBox !== null && selectedBox.trays.length > 1;
           return totalItems > 1 || boxHasMultipleTrays;
         }
@@ -208,10 +208,10 @@
   });
 
   function handleDuplicate() {
-    if (selectionType === 'layer' && selectedLayer) {
-      const name = selectedLayer.name;
-      duplicateLayer(selectedLayer.id);
-      addToast({ data: { title: 'Layer duplicated', body: `"${name}" has been duplicated`, type: 'success' } });
+    if (selectionType === 'section' && selectedSection) {
+      const name = selectedSection.name;
+      duplicateSection(selectedSection.id);
+      addToast({ data: { title: 'Section duplicated', body: `"${name}" has been duplicated`, type: 'success' } });
     } else if (selectionType === 'box' && selectedBox) {
       const name = selectedBox.name;
       duplicateBox(selectedBox.id);
@@ -224,16 +224,16 @@
   }
 
   function handleDelete() {
-    if (selectionType === 'layer' && selectedLayer) {
-      const name = selectedLayer.name;
-      deleteLayer(selectedLayer.id);
-      addToast({ data: { title: 'Layer deleted', body: `"${name}" has been deleted`, type: 'success' } });
-      onSelectionChange?.('layer');
+    if (selectionType === 'section' && selectedSection) {
+      const name = selectedSection.name;
+      deleteSection(selectedSection.id);
+      addToast({ data: { title: 'Section deleted', body: `"${name}" has been deleted`, type: 'success' } });
+      onSelectionChange?.('section');
     } else if (selectionType === 'box' && selectedBox) {
       const name = selectedBox.name;
       deleteBox(selectedBox.id);
       addToast({ data: { title: 'Box deleted', body: `"${name}" has been deleted`, type: 'success' } });
-      onSelectionChange?.('layer');
+      onSelectionChange?.('section');
     } else if (selectionType === 'tray' && selectedTray) {
       const name = selectedTray.name;
       const location = findTrayLocation(project, selectedTray.id);
@@ -243,7 +243,7 @@
         deleteLooseTray(selectedTray.id);
       }
       addToast({ data: { title: 'Tray deleted', body: `"${name}" has been deleted`, type: 'success' } });
-      onSelectionChange?.('layer');
+      onSelectionChange?.('section');
     }
   }
 
@@ -251,8 +251,8 @@
     switch (selectionType) {
       case 'dimensions':
         return 'Dimensions';
-      case 'layer':
-        return selectedLayer?.name ?? 'Layer';
+      case 'section':
+        return selectedSection?.name ?? 'Section';
       case 'box':
         return selectedBox?.name ?? 'Box';
       case 'tray':
@@ -268,9 +268,9 @@
       <Title as="h2" size="sm">
         {panelTitle}
       </Title>
-      {#if selectionType === 'layer' && selectedLayer}
-        {@const boxCount = selectedLayer.boxes.length}
-        {@const looseCount = selectedLayer.looseTrays.length}
+      {#if selectionType === 'section' && selectedSection}
+        {@const boxCount = selectedSection.boxes.length}
+        {@const looseCount = selectedSection.looseTrays.length}
         <span class="headerStats">{boxCount} {boxCount === 1 ? 'box' : 'boxes'}, {looseCount} loose</span>
       {:else if selectionType === 'box' && selectedBox}
         <span class="headerStats">{selectedBox.trays.length} {selectedBox.trays.length === 1 ? 'tray' : 'trays'}</span>
@@ -307,47 +307,47 @@
         </div>
       {:else if selectionType === 'dimensions'}
         <GlobalsPanel {globalSettings} onGlobalSettingsChange={handleGlobalSettingsChange} />
-      {:else if selectionType === 'layer'}
-        {#if selectedLayer}
+      {:else if selectionType === 'section'}
+        {#if selectedSection}
           {@const cardSizes = project.cardSizes ?? []}
           {@const counterShapes = project.counterShapes ?? []}
-          {@const layerHeight = calculateLayerHeight(selectedLayer, { cardSizes, counterShapes })}
-          <div class="layerSettings">
+          {@const sectionHeight = calculateSectionHeight(selectedSection, { cardSizes, counterShapes })}
+          <div class="sectionSettings">
             <div class="panelFormSection">
-              <FormControl label="Layer name" name="layerName">
+              <FormControl label="Section name" name="sectionName">
                 {#snippet input({ inputProps })}
                   <Input
                     {...inputProps}
                     type="text"
-                    value={selectedLayer.name}
-                    onchange={(e) => handleLayerUpdate({ name: (e.target as HTMLInputElement).value })}
+                    value={selectedSection.name}
+                    onchange={(e) => handleSectionUpdate({ name: (e.target as HTMLInputElement).value })}
                   />
                 {/snippet}
               </FormControl>
               <Spacer size="1rem" />
               <Text size="0.875rem" color="fgMuted">
-                A <Text as="span" size="0.875rem" weight={600}>layer</Text>
+                A <Text as="span" size="0.875rem" weight={600}>section</Text>
                 represents a horizontal slice of your game container. When editing in the layout editor, you can drag and
-                drop boxes and trays to visualize them within a layer, but this has no impact on the print.
+                drop boxes and trays to visualize them within a section, but this has no impact on the print.
               </Text>
               <Spacer size="1rem" />
               <Text size="0.875rem" color="fgMuted">
-                All boxes and loose trays in a layer are normalized to be the same height as the tallest tray. Trays
+                All boxes and loose trays in a section are normalized to be the same height as the tallest tray. Trays
                 within a box will simlarly normalize to make sure the contents don't spill. If you are targeting
-                specific heights for a layer or box, please edit the stacks and heights individually in their child
+                specific heights for a section or box, please edit the stacks and heights individually in their child
                 trays.
               </Text>
               <Spacer size="1rem" />
-              <div class="layerContents">
-                <span class="contentsLabel">Layer content dimensions</span>
+              <div class="sectionContents">
+                <span class="contentsLabel">Section content dimensions</span>
                 <div class="contentsTree">
-                  {#each selectedLayer.boxes as box (box.id)}
+                  {#each selectedSection.boxes as box (box.id)}
                     {@const boxDims = getBoxDimensions(box, cardSizes, counterShapes)}
-                    {@const boxInteriorHeight = layerHeight - box.floorThickness}
+                    {@const boxInteriorHeight = sectionHeight - box.floorThickness}
                     <div class="treeItem treeItem--box">
                       <span class="treeItemName">{box.name}</span>
                       <span class="treeItemDims">
-                        {boxDims.width.toFixed(0)} × {boxDims.depth.toFixed(0)} × {layerHeight.toFixed(0)}
+                        {boxDims.width.toFixed(0)} × {boxDims.depth.toFixed(0)} × {sectionHeight.toFixed(0)}
                       </span>
                     </div>
                     {#each box.trays as tray (tray.id)}
@@ -360,17 +360,17 @@
                       </div>
                     {/each}
                   {/each}
-                  {#each selectedLayer.looseTrays as tray (tray.id)}
+                  {#each selectedSection.looseTrays as tray (tray.id)}
                     {@const trayDims = getTrayDimensionsForTray(tray, cardSizes, counterShapes)}
                     <div class="treeItem treeItem--looseTray">
                       <span class="treeItemName">{tray.name}</span>
                       <span class="treeItemDims">
-                        {trayDims.width.toFixed(0)} × {trayDims.depth.toFixed(0)} × {layerHeight.toFixed(0)}
+                        {trayDims.width.toFixed(0)} × {trayDims.depth.toFixed(0)} × {sectionHeight.toFixed(0)}
                       </span>
                     </div>
                   {/each}
-                  {#if selectedLayer.boxes.length === 0 && selectedLayer.looseTrays.length === 0}
-                    <div class="treeEmpty">No items in layer</div>
+                  {#if selectedSection.boxes.length === 0 && selectedSection.looseTrays.length === 0}
+                    <div class="treeEmpty">No items in section</div>
                   {/if}
                 </div>
               </div>
@@ -378,7 +378,7 @@
           </div>
         {:else}
           <div class="emptyState">
-            <p>No layer selected</p>
+            <p>No section selected</p>
           </div>
         {/if}
       {:else if selectionType === 'box'}
@@ -521,7 +521,7 @@
     color: var(--fgMuted);
   }
 
-  .layerSettings {
+  .sectionSettings {
     padding: 0.75rem 0;
   }
 
@@ -529,7 +529,7 @@
     padding: 0 0.75rem;
   }
 
-  .layerContents {
+  .sectionContents {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
