@@ -27,6 +27,7 @@
     isCardWellTray,
     isCupTray,
     isStandeeTray,
+    isReservedTray,
     type Box,
     type Section,
     type Tray,
@@ -42,9 +43,11 @@
     onSelectionChange: (type: SelectionType) => void;
     onExpandPanel: () => void;
     isMobile?: boolean;
+    // Sections with a project layout problem: section id -> worst severity
+    sectionIssues?: Record<string, 'error' | 'warning'>;
   }
 
-  let { selectionType, onSelectionChange, onExpandPanel, isMobile = false }: Props = $props();
+  let { selectionType, onSelectionChange, onExpandPanel, isMobile = false, sectionIssues = {} }: Props = $props();
 
   let project = $derived(getProject());
   let selectedSection = $derived(getSelectedSection());
@@ -167,6 +170,14 @@
     }
   }
 
+  function looseTrayStatsLabel(stats: ReturnType<typeof getTrayStats>): string {
+    if (stats.isCardTray) return `${stats.counters} cards`;
+    if (stats.isCardDivider) return `${stats.counters} cards/${stats.stacks}s`;
+    if (stats.isCardWell) return `${stats.counters} cards/${stats.stacks}c`;
+    if (stats.isCupTray) return `${stats.stacks} cups`;
+    return `${stats.counters}c in ${stats.stacks}s`;
+  }
+
   function getTrayStats(tray: Tray): {
     stacks: number;
     counters: number;
@@ -268,13 +279,13 @@
   <!-- Sections, Boxes, and Trays -->
   <div class="navTree">
     {#each project.sections as section (section.id)}
-      {@const isLayerSelected = selectedSection?.id === section.id && selectionType === 'section'}
+      {@const isSectionSelected = selectedSection?.id === section.id && selectionType === 'section'}
       {@const totalItems = section.boxes.length + section.looseTrays.length}
 
       <div class="navSectionGroup">
         <!-- Section Item -->
         <button
-          class="navItem navItem--section {isLayerSelected ? 'navItem--selected' : ''}"
+          class="navItem navItem--section {isSectionSelected ? 'navItem--selected' : ''}"
           onclick={() => handleSectionClick(section)}
         >
           <span class="navItemIcon">
@@ -282,6 +293,13 @@
           </span>
           <span class="navItemLabel">
             {section.name}
+            {#if sectionIssues[section.id]}
+              <span
+                class="navMenu__issueDot"
+                class:navMenu__issueDot--error={sectionIssues[section.id] === 'error'}
+                title="This section has a layout warning. See Project & dimensions."
+              ></span>
+            {/if}
           </span>
           {#if project.sections.length > 1}
             <span
@@ -499,23 +517,25 @@
             {@const letter = getTrayLetterById(project.sections, tray.id)}
             {@const stats = getTrayStats(tray)}
 
+            {@const reserved = isReservedTray(tray)}
+
             <button
               class="navItem navItem--looseTray {isTraySelected ? 'navItem--selected' : ''}"
               onclick={() => handleTrayClick(tray, null)}
-              title="{tray.name} (Loose {letter}: {stats.isCardTray
-                ? stats.counters + ' cards'
-                : stats.isCardDivider
-                  ? stats.counters + ' cards/' + stats.stacks + 's'
-                  : stats.isCardWell
-                    ? stats.counters + ' cards/' + stats.stacks + 'c'
-                    : stats.isCupTray
-                      ? stats.stacks + ' cups'
-                      : stats.counters + 'c in ' + stats.stacks + 's'})"
+              title={reserved
+                ? `${tray.name} (Reserved space, not printed)`
+                : `${tray.name} (Loose ${letter}: ${looseTrayStatsLabel(stats)})`}
             >
               <span class="navItemLabel">
-                <span class="trayLetter">{letter}</span>
-                {tray.name}
-                <span class="looseBadge">loose</span>
+                {#if reserved}
+                  <span class="trayLetter"></span>
+                  {tray.name}
+                  <span class="looseBadge">reserved</span>
+                {:else}
+                  <span class="trayLetter">{letter}</span>
+                  {tray.name}
+                  <span class="looseBadge">loose</span>
+                {/if}
               </span>
               {#if totalItems > 1}
                 <span
@@ -536,7 +556,7 @@
                       </IconButton>
                     {/snippet}
                     {#snippet actionMessage()}
-                      <p>Delete this loose tray?</p>
+                      <p>{reserved ? 'Delete this reserved space?' : 'Delete this loose tray?'}</p>
                     {/snippet}
                   </ConfirmActionButton>
                 </span>
@@ -711,6 +731,18 @@
               </button>
             {/snippet}
           </Popover>
+
+          <!-- Add Reserved Space Button -->
+          <button
+            class="navItem navItem--add navItem--looseTray"
+            onclick={() => handleAddLooseTray(section.id, 'reserved')}
+            onmouseenter={(e) => handleTrayTypeHover('reserved', e.currentTarget)}
+            onmouseleave={handleTrayTypeLeave}
+            title="A block for game parts you are not printing, such as boards and rulebooks"
+          >
+            <span class="addIcon">+</span>
+            <span class="addLabel">Add reserved space</span>
+          </button>
         </div>
         <Hr />
       </div>
@@ -776,6 +808,19 @@
 
   .navItem--add:hover {
     color: var(--fg);
+  }
+
+  .navMenu__issueDot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-left: 0.375rem;
+    border-radius: 50%;
+    background: #ffb020;
+  }
+
+  .navMenu__issueDot--error {
+    background: #ff3b30;
   }
 
   .navItemIcon,

@@ -21,6 +21,7 @@
   import type { TrayPlacement } from '#lib/models/box.js';
   import type { CounterStack } from '#lib/models/counterTray.js';
   import { getProject } from '#lib/stores/project.svelte.js';
+  import { getHatchMaterial } from '#lib/utils/hatchMaterial.js';
 
   interactivity();
 
@@ -103,6 +104,13 @@
       if (looseTray?.color) return looseTray.color;
     }
     return fallbackColor;
+  }
+
+  // Reserved spaces are drawn cross-hatched
+  function isReservedSpace(trayId: string): boolean {
+    return getProject().sections.some((section) =>
+      section.looseTrays.some((t) => t.id === trayId && t.type === 'reserved')
+    );
   }
 
   // Build all items for snapping
@@ -299,7 +307,14 @@
   {@const baseZ = sectionOffsetZ - trayPlacement.y}
 
   <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
-    {#if looseTrayGeom}
+    {#if looseTrayGeom && isReservedSpace(trayPlacement.trayId)}
+      <!-- Reserved space: cross-hatched, not printed -->
+      <T.Mesh
+        geometry={looseTrayGeom.geometry}
+        material={getHatchMaterial(trayPlacement.color, isSelected ? 'selected' : isHovered ? 'hover' : 'none')}
+        rotation.x={-Math.PI / 2}
+      />
+    {:else if looseTrayGeom}
       <!-- Render tray geometry directly with emissive highlighting -->
       <T.Mesh geometry={looseTrayGeom.geometry} rotation.x={-Math.PI / 2}>
         <T.MeshStandardMaterial

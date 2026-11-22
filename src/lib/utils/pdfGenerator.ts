@@ -50,12 +50,12 @@ function getCumulativeTrayIndexForTray(sections: Section[], trayId: string): num
         cumulative++;
       }
     }
-    // Count loose trays
+    // Count loose trays. Reserved spaces are not printed, so they take no letter.
     for (const tray of section.looseTrays) {
       if (tray.id === trayId) {
         return cumulative;
       }
-      cumulative++;
+      if (tray.type !== 'reserved') cumulative++;
     }
   }
   return cumulative;

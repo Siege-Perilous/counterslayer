@@ -85,7 +85,8 @@
       if (section.boxes.some((b) => b.id === selectedBox.id)) {
         return calculateSectionHeight(section, {
           cardSizes: customCardSizes,
-          counterShapes: customCounterShapes
+          counterShapes: customCounterShapes,
+          standees: project.standees ?? []
         });
       }
     }

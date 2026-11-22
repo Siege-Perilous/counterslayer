@@ -8,6 +8,11 @@
   import SceneLighting from './three/SceneLighting.svelte';
   import BoxAssembly from './three/BoxAssembly.svelte';
   import SectionContent from './three/SectionContent.svelte';
+  import GameContainerWireframe from './three/GameContainerWireframe.svelte';
+  import SectionHeightIndicator from './three/SectionHeightIndicator.svelte';
+  import ProjectLayoutEditorScene from './three/ProjectLayoutEditorScene.svelte';
+  import { projectLayoutEditorState } from '#lib/stores/projectLayoutEditor.svelte.js';
+  import type { PlacedSection, ProjectLayout } from '#lib/models/projectLayout.js';
   import SectionLayoutEditorScene from './three/SectionLayoutEditorScene.svelte';
   import { getAlternateColor, getSleeveColors } from '#lib/three/materials.js';
 
@@ -26,6 +31,7 @@
     return 'shape' in stack;
   }
   import { getTrayLetter, getProject, TRAY_COLORS } from '#lib/stores/project.svelte.js';
+  import { getHatchMaterial } from '#lib/utils/hatchMaterial.js';
   import {
     layoutEditorState,
     selectTray,
@@ -111,7 +117,7 @@
     viewTitle?: string;
     onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
     isLayoutEditMode?: boolean;
-    isLayerLayoutEditMode?: boolean;
+    isSectionLayoutEditMode?: boolean;
     onTrayClick?: (info: TrayClickInfo | null) => void;
     onTrayDoubleClick?: (trayId: string) => void;
     onBoxDoubleClick?: (boxId: string) => void;
@@ -121,15 +127,10 @@
     sectionLooseTrayPlacements?: LooseTrayPlacement[];
     // All sections stacked view
     showAllSections?: boolean;
-    allSectionArrangements?: Array<{
-      section: { id: string; name: string };
-      arrangement: {
-        boxes: BoxPlacement[];
-        looseTrays: LooseTrayPlacement[];
-        sectionHeight: number;
-      };
-    }>;
     allSectionsExplosionAmount?: number;
+    // Resolved position of every section in the game container (drives the all-sections view)
+    projectLayout?: ProjectLayout | null;
+    gameContainerHeight?: number;
     // Debug mode props for URL-based capture
     debugMode?: boolean;
     cameraPreset?: string;
@@ -170,7 +171,7 @@
     viewTitle = '',
     onCaptureReady,
     isLayoutEditMode = false,
-    isLayerLayoutEditMode = false,
+    isSectionLayoutEditMode = false,
     onTrayClick,
     onTrayDoubleClick,
     onBoxDoubleClick,
@@ -179,8 +180,9 @@
     sectionBoxPlacements = [],
     sectionLooseTrayPlacements = [],
     showAllSections = false,
-    allSectionArrangements = [],
     allSectionsExplosionAmount = 50,
+    projectLayout = null,
+    gameContainerHeight,
     // Debug mode props
     debugMode = false,
     cameraPreset,
@@ -309,6 +311,67 @@
   // For backwards compatibility with places that use printBedSize
   let printBedSize = $derived(Math.max(gameContainerWidth, gameContainerDepth));
 
+  // The selected tray is a reserved space (drawn cross-hatched in tray view)
+  let selectedTrayIsReserved = $derived(
+    getProject().sections.some((section) =>
+      section.looseTrays.some((t) => t.id === selectedTrayId && t.type === 'reserved')
+    )
+  );
+
+  // Game container coordinates (x right, y back) to scene coordinates (X right, Z toward viewer)
+  let containerOffsetX = $derived(-gameContainerWidth / 2);
+  let containerOffsetZ = $derived(printBedSize / 2 + gameContainerDepth / 2);
+
+  // While the project layout is being edited, draw the editor's live layout, to scale
+  let isProjectLayoutEditMode = $derived(projectLayoutEditorState.isEditMode);
+  let shownLayout = $derived(isProjectLayoutEditMode ? projectLayoutEditorState.layout : projectLayout);
+  let shownExplosionAmount = $derived(isProjectLayoutEditMode ? 0 : allSectionsExplosionAmount);
+
+  // Items with a layout problem, by section: item id -> worst severity
+  let layoutIssueItems = $derived.by(() => {
+    const bySection: Record<string, Record<string, 'error' | 'warning'>> = {};
+    const mark = (sectionId: string, itemIds: string[], severity: 'error' | 'warning') => {
+      const items = (bySection[sectionId] ??= {});
+      for (const id of itemIds) {
+        if (items[id] !== 'error') items[id] = severity;
+      }
+    };
+    for (const issue of shownLayout?.issues ?? []) {
+      mark(issue.sectionId, issue.itemIds, issue.severity);
+      if (issue.otherSectionId && issue.otherItemIds) {
+        mark(issue.otherSectionId, issue.otherItemIds, issue.severity);
+      }
+    }
+    return bySection;
+  });
+
+  let layoutExceedsHeight = $derived((shownLayout?.issues ?? []).some((issue) => issue.kind === 'aboveBox'));
+
+  // Push a whole placed section away from the container centre (horizontal explode)
+  function sectionExplosionOffset(placed: PlacedSection, phase: number, baseOffset: number): { x: number; y: number } {
+    if (phase <= 0 && baseOffset <= 0) return { x: 0, y: 0 };
+    const centerX = placed.world.x + placed.world.width / 2 - gameContainerWidth / 2;
+    const centerY = placed.world.y + placed.world.depth / 2 - gameContainerDepth / 2;
+    const directionX = Math.abs(centerX) < 0.5 ? 0 : Math.sign(centerX);
+    const directionY = Math.abs(centerY) < 0.5 ? 0 : Math.sign(centerY);
+    const centred = directionX === 0 && directionY === 0;
+    return {
+      x: (centerX / (gameContainerWidth / 2)) * 100 * phase + (centred ? baseOffset * 0.707 : directionX * baseOffset),
+      y: (centerY / (gameContainerDepth / 2)) * 100 * phase + (centred ? baseOffset * 0.707 : directionY * baseOffset)
+    };
+  }
+
+  // Labels inside a rotated section must cancel the section's turn to keep facing the camera
+  function sectionLabelQuaternion(
+    rotation: number,
+    quaternion: [number, number, number, number]
+  ): [number, number, number, number] {
+    if (rotation === 0) return quaternion;
+    const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (rotation * Math.PI) / 180);
+    const q = yaw.invert().multiply(new THREE.Quaternion(...quaternion));
+    return [q.x, q.y, q.z, q.w];
+  }
+
   // Get Threlte context for capture
   const { renderer, scene, camera } = useThrelte();
 
@@ -380,7 +443,7 @@
     // If mode is changing but visual hasn't caught up, show overlay immediately
     // This runs synchronously with the prop change, before effects
     if (isLayoutEditMode !== visualEditMode) return 1;
-    if (isLayerLayoutEditMode !== visualSectionEditMode) return 1;
+    if (isSectionLayoutEditMode !== visualSectionEditMode) return 1;
 
     // During fade-in phases (after camera jump), fade out the overlay
     if (transitionPhase === 'edit' && editSceneOpacity < 1) return 1 - editSceneOpacity;
@@ -554,7 +617,7 @@
 
   // Start section edit mode fade transition
   $effect(() => {
-    const currentSectionEditMode = isLayerLayoutEditMode;
+    const currentSectionEditMode = isSectionLayoutEditMode;
 
     untrack(() => {
       if (!camera.current) return;
@@ -1082,8 +1145,8 @@
     target={editTarget}
     enableDamping={!isTransitioning && !debugMode}
     enabled={!isTransitioning && !debugMode}
-    enableRotate={!anyEditMode && !isTransitioning && !debugMode}
-    enablePan={!anyEditMode && !isTransitioning && !debugMode}
+    enableRotate={!anyEditMode && !isTransitioning && !debugMode && !projectLayoutEditorState.isDragging}
+    enablePan={!anyEditMode && !isTransitioning && !debugMode && !projectLayoutEditorState.isDragging}
     enableZoom={!isTransitioning && !debugMode}
   />
   <!-- Fade overlay - positioned in front of camera, fades to black during transitions -->
@@ -1171,23 +1234,14 @@
   {/each}
 {/if}
 
-<!-- All sections stacked view: Show all sections stacked vertically with dynamic separation -->
-{#if !generating && showAllSections && allSectionArrangements.length > 0}
+<!-- All sections view: every section at its place in the game container, with dynamic separation -->
+{#if !generating && showAllSections && shownLayout && shownLayout.sections.length > 0}
   <!-- Calculate explosion phases: 0-50% = vertical separation, 50-100% = horizontal explosion -->
-  {@const verticalPhase = Math.min(allSectionsExplosionAmount / 50, 1)}
-  {@const horizontalPhase = Math.max((allSectionsExplosionAmount - 50) / 50, 0)}
+  {@const verticalPhase = Math.min(shownExplosionAmount / 50, 1)}
+  {@const horizontalPhase = Math.max((shownExplosionAmount - 50) / 50, 0)}
   {@const sectionSeparation = 20 * verticalPhase}
-  <!-- Calculate section Y offsets (stack from bottom to top) -->
-  {@const sectionYOffsets = allSectionArrangements.reduce<number[]>((acc, _entry, i) => {
-    if (i === 0) {
-      acc.push(0);
-    } else {
-      const prevOffset = acc[i - 1];
-      const prevHeight = allSectionArrangements[i - 1].arrangement.sectionHeight;
-      acc.push(prevOffset + prevHeight + sectionSeparation);
-    }
-    return acc;
-  }, [])}
+  {@const arranged = shownLayout.arranged}
+  {@const sectionCount = shownLayout.sections.length}
 
   <!-- Print bed showing game container bounds -->
   <PrintBed
@@ -1197,38 +1251,111 @@
     position={[0, 0, printBedSize / 2]}
   />
 
-  {#each allSectionArrangements as { section, arrangement }, sectionIndex (section.id)}
-    {@const yOffset = sectionYOffsets[sectionIndex]}
-    {@const sectionCount = allSectionArrangements.length}
-    {@const sectionMultiplier = sectionCount > 1 ? (sectionIndex + 1) / sectionCount : 1}
-    {@const baseOffset = horizontalPhase * sectionIndex * 40}
-    <T.Group position.y={yOffset}>
-      <SectionContent
-        boxPlacements={arrangement.boxes}
-        looseTrayPlacements={arrangement.looseTrays}
-        allBoxGeometries={allBoxes}
-        allLooseTrayGeometries={allLooseTrays}
-        {gameContainerWidth}
-        {gameContainerDepth}
-        {printBedSize}
-        wallThickness={boxWallThickness}
-        tolerance={boxTolerance}
-        floorThickness={boxFloorThickness}
-        showCounters={showCounters && !isLayoutEditMode}
-        showLid={true}
-        sectionName={section.name}
-        sectionHeight={arrangement.sectionHeight}
-        showLabel={true}
+  <!-- Game container volume (only when it has a height) -->
+  {#if gameContainerHeight}
+    <GameContainerWireframe
+      width={gameContainerWidth}
+      depth={gameContainerDepth}
+      height={gameContainerHeight}
+      position={[0, 0, printBedSize / 2]}
+      exceeded={layoutExceedsHeight}
+      dimmed={shownExplosionAmount > 0}
+      {labelQuaternion}
+      {monoFont}
+    />
+  {/if}
+
+  {#each shownLayout.sections as placed (placed.sectionId)}
+    <!-- Sections separate by stack level; with full slices the level is the section's index -->
+    {@const yOffset = placed.z + sectionSeparation * placed.level}
+    {@const sectionMultiplier = sectionCount > 1 ? (placed.level + 1) / sectionCount : 1}
+    {@const baseOffset = horizontalPhase * placed.level * 40}
+    <!-- Placed sections explode as a unit; full slices explode item by item as before -->
+    {@const push = arranged
+      ? sectionExplosionOffset(placed, horizontalPhase * sectionMultiplier, baseOffset)
+      : { x: 0, y: 0 }}
+    <T.Group
+      position.x={containerOffsetX + placed.originX + push.x}
+      position.y={yOffset}
+      position.z={containerOffsetZ - placed.originY - push.y}
+      rotation.y={(placed.rotation * Math.PI) / 180}
+    >
+      <!-- SectionContent draws in container-centred coordinates; undo that so the group above can
+           place and turn the section about its own origin -->
+      <T.Group position.x={-containerOffsetX} position.z={-containerOffsetZ}>
+        <SectionContent
+          boxPlacements={placed.arrangement.boxes}
+          looseTrayPlacements={placed.arrangement.looseTrays}
+          allBoxGeometries={allBoxes}
+          allLooseTrayGeometries={allLooseTrays}
+          {gameContainerWidth}
+          {gameContainerDepth}
+          {printBedSize}
+          wallThickness={boxWallThickness}
+          tolerance={boxTolerance}
+          floorThickness={boxFloorThickness}
+          showCounters={showCounters && !isLayoutEditMode}
+          showLid={true}
+          sectionName={arranged || isProjectLayoutEditMode ? '' : placed.name}
+          sectionHeight={placed.height}
+          showLabel={true}
+          labelQuaternion={sectionLabelQuaternion(placed.rotation, labelQuaternion)}
+          {monoFont}
+          onTrayClick={isProjectLayoutEditMode ? undefined : onTrayClick}
+          onTrayDoubleClick={isLayoutEditMode || isProjectLayoutEditMode ? undefined : onTrayDoubleClick}
+          onBoxDoubleClick={isLayoutEditMode || isProjectLayoutEditMode ? undefined : onBoxDoubleClick}
+          horizontalExplosion={arranged ? 0 : horizontalPhase * sectionMultiplier}
+          sectionBaseOffset={arranged ? 0 : baseOffset}
+        />
+      </T.Group>
+    </T.Group>
+
+    <!-- Height indicator beside the container, on the side the section is nearer -->
+    {#if (arranged || isProjectLayoutEditMode) && placed.items.length > 0}
+      {@const onLeft = placed.world.x + placed.world.width / 2 <= gameContainerWidth / 2}
+      <SectionHeightIndicator
+        position={[
+          onLeft
+            ? containerOffsetX - 15 + Math.min(push.x, 0)
+            : containerOffsetX + gameContainerWidth + 15 + Math.max(push.x, 0),
+          yOffset,
+          containerOffsetZ - placed.world.y - push.y
+        ]}
+        height={placed.height}
+        name={placed.name}
+        side={onLeft ? 'left' : 'right'}
         {labelQuaternion}
         {monoFont}
-        {onTrayClick}
-        onTrayDoubleClick={isLayoutEditMode ? undefined : onTrayDoubleClick}
-        onBoxDoubleClick={isLayoutEditMode ? undefined : onBoxDoubleClick}
-        horizontalExplosion={horizontalPhase * sectionMultiplier}
-        sectionBaseOffset={baseOffset}
       />
-    </T.Group>
+    {/if}
+
+    <!-- Tint items that overlap another section (red) or carry a layout warning (amber) -->
+    {#each placed.worldItems as item (item.id)}
+      {@const severity = layoutIssueItems[placed.sectionId]?.[item.id]}
+      {#if severity}
+        <T.Mesh
+          position.x={containerOffsetX + item.world.x + item.world.width / 2 + push.x}
+          position.y={yOffset + item.world.height / 2}
+          position.z={containerOffsetZ - item.world.y - item.world.depth / 2 - push.y}
+          raycast={() => null}
+          renderOrder={10}
+        >
+          <T.BoxGeometry args={[item.world.width + 0.6, item.world.height + 0.6, item.world.depth + 0.6]} />
+          <T.MeshBasicMaterial
+            color={severity === 'error' ? '#ff3b30' : '#ffb020'}
+            transparent
+            opacity={severity === 'error' ? 0.45 : 0.28}
+            depthWrite={false}
+          />
+        </T.Mesh>
+      {/if}
+    {/each}
   {/each}
+
+  <!-- Project layout editing: hit boxes, selection, lift handle and snap guides -->
+  {#if isProjectLayoutEditMode}
+    <ProjectLayoutEditorScene {gameContainerWidth} {gameContainerDepth} {printBedSize} />
+  {/if}
 {/if}
 
 <!-- Section view: Boxes and loose trays arranged on game container -->
@@ -1473,14 +1600,26 @@
     {/each}
   {:else if geometry && !showSectionView}
     <!-- Single selected tray -->
-    <T.Mesh {geometry} rotation.x={-Math.PI / 2} position.x={meshOffset.x} position.y={0} position.z={meshOffset.z}>
-      <T.MeshStandardMaterial
-        color={getTrayColor(selectedTrayId, 0)}
-        roughness={0.6}
-        metalness={0.1}
-        side={THREE.DoubleSide}
+    {#if selectedTrayIsReserved}
+      <!-- Reserved space: cross-hatched, not printed -->
+      <T.Mesh
+        {geometry}
+        material={getHatchMaterial(getTrayColor(selectedTrayId, 0))}
+        rotation.x={-Math.PI / 2}
+        position.x={meshOffset.x}
+        position.y={0}
+        position.z={meshOffset.z}
       />
-    </T.Mesh>
+    {:else}
+      <T.Mesh {geometry} rotation.x={-Math.PI / 2} position.x={meshOffset.x} position.y={0} position.z={meshOffset.z}>
+        <T.MeshStandardMaterial
+          color={getTrayColor(selectedTrayId, 0)}
+          roughness={0.6}
+          metalness={0.1}
+          side={THREE.DoubleSide}
+        />
+      </T.Mesh>
+    {/if}
   {/if}
 {/if}
 

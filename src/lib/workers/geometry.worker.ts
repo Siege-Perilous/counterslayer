@@ -22,15 +22,24 @@ import {
 } from '#lib/models/counterTray.js';
 import { createCupTray } from '#lib/models/cupTray.js';
 import { createBoxWithLidGrooves, createLid } from '#lib/models/lid.js';
+import { getReservedSpaceDimensions } from '#lib/models/reservedSpace.js';
 import { createStandeeTray, getStandeePositions } from '#lib/models/standeeTray.js';
 import type { Box, CardSize, CounterShape, Section, Standee, Tray } from '#lib/types/project.js';
-import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isStandeeTray } from '#lib/types/project.js';
+import {
+  isCardDividerTray,
+  isCardTray,
+  isCardWellTray,
+  isCupTray,
+  isReservedTray,
+  isStandeeTray
+} from '#lib/types/project.js';
 import threemfSerializer from '@jscad/3mf-serializer';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import stlSerializer from '@jscad/stl-serializer';
 
 const { geom3 } = jscad.geometries;
+const { cuboid } = jscad.primitives;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const generalize = (jscad.modifiers as any).generalize as (
@@ -87,12 +96,12 @@ function getCumulativeTrayIndexForTray(sections: Section[], trayId: string): num
         cumulative++;
       }
     }
-    // Count loose trays
+    // Count loose trays. Reserved spaces are not printed, so they take no letter.
     for (const tray of section.looseTrays) {
       if (tray.id === trayId) {
         return cumulative;
       }
-      cumulative++;
+      if (!isReservedTray(tray)) cumulative++;
     }
   }
   return cumulative;
@@ -316,6 +325,13 @@ function createTrayGeometry(
   standees: Standee[] = []
 ): Geom3 {
   const showEmboss = tray.showEmboss ?? true;
+  if (isReservedTray(tray)) {
+    // A reserved space has no printable geometry. This plain block is for display only and
+    // must never reach an export (callers keep it out of the export caches).
+    const dims = getReservedSpaceDimensions(tray.params);
+    const height = Math.max(maxHeight, dims.height);
+    return cuboid({ size: [dims.width, dims.depth, height], center: [dims.width / 2, dims.depth / 2, height / 2] });
+  }
   if (isCupTray(tray)) {
     return createCupTray(tray.params, tray.name, maxHeight, spacerHeight, showEmboss);
   }
@@ -355,8 +371,9 @@ function getTrayPositions(
   spacerHeight: number,
   standees: Standee[] = []
 ): CounterStack[] {
-  if (isCupTray(tray)) {
-    // Cup trays don't have counter previews - the cups themselves are the containers
+  if (isCupTray(tray) || isReservedTray(tray)) {
+    // Cup trays don't have counter previews - the cups themselves are the containers.
+    // Reserved spaces are plain blocks with nothing in them.
     return [];
   }
   if (isStandeeTray(tray)) {
@@ -729,6 +746,11 @@ function handleGenerate(msg: GenerateMessage): void {
       selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, maxHeight, spacerHeight, standees);
 
       cachedAllTrays = [{ jscadGeom: cachedSelectedTray, name: tray.name }];
+      if (isReservedTray(tray)) {
+        // Display only: leave nothing in the export caches for a reserved space
+        cachedSelectedTray = null;
+        cachedAllTrays = [];
+      }
       cachedBox = null;
       cachedLid = null;
       cachedBoxName = '';
@@ -907,11 +929,13 @@ function handleGenerate(msg: GenerateMessage): void {
         // Generate tray geometry at the section height
         const jscadGeom = createTrayGeometry(looseTray, cardSizes, counterShapes, maxHeight, spacerHeight, standees);
 
-        // Cache for STL export
-        cachedAllLooseTrays.push({
-          trayName: looseTray.name,
-          trayGeom: jscadGeom
-        });
+        // Cache for STL export (reserved spaces are not printed, so they are never exported)
+        if (!isReservedTray(looseTray)) {
+          cachedAllLooseTrays.push({
+            trayName: looseTray.name,
+            trayGeom: jscadGeom
+          });
+        }
 
         // Add to result
         allLooseTrayGeometries.push({

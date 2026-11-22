@@ -3,6 +3,7 @@ import type { CardDrawTrayParams } from '#lib/models/cardTray.js';
 import type { CardWellTrayParams } from '#lib/models/cardWellTray.js';
 import type { CounterTrayParams } from '#lib/models/counterTray.js';
 import type { CupTrayParams } from '#lib/models/cupTray.js';
+import type { ReservedSpaceParams } from '#lib/models/reservedSpace.js';
 import type { StandeeTrayParams } from '#lib/models/standeeTray.js';
 
 // Base shape types for counter shapes
@@ -87,11 +88,18 @@ export interface StandeeTray extends BaseTray {
   params: StandeeTrayParams;
 }
 
+// Reserved space: a named block for game parts that are not printed (boards, rulebooks).
+// Lives directly in a section (never in a box), has no tray letter and is never exported.
+export interface ReservedTray extends BaseTray {
+  type: 'reserved';
+  params: ReservedSpaceParams;
+}
+
 // Legacy alias for backwards compatibility
 export type CardTray = CardDrawTray;
 
 // Discriminated union of all tray types
-export type Tray = CounterTray | CardDrawTray | CardDividerTray | CupTray | CardWellTray | StandeeTray;
+export type Tray = CounterTray | CardDrawTray | CardDividerTray | CupTray | CardWellTray | StandeeTray | ReservedTray;
 
 // Type guards for tray types
 export function isCounterTray(tray: Tray): tray is CounterTray {
@@ -116,6 +124,10 @@ export function isCardWellTray(tray: Tray): tray is CardWellTray {
 
 export function isStandeeTray(tray: Tray): tray is StandeeTray {
   return tray.type === 'standee';
+}
+
+export function isReservedTray(tray: Tray): tray is ReservedTray {
+  return tray.type === 'reserved';
 }
 
 // Legacy alias - also matches old 'card' type for migration
@@ -174,6 +186,20 @@ export interface ManualLooseTrayPlacement {
   rotation: 0 | 90 | 180 | 270; // Rotation in degrees
 }
 
+// Where a whole section sits inside the game container (project layout).
+// A project with no placement on any section stacks its sections as full slices, in array order.
+export interface SectionPlacement {
+  // Front-left corner of the section's (rotated) content bounding box, in game container mm
+  x: number;
+  y: number;
+  // Height of the section's underside above the container floor. For a resting section this is
+  // only an ordering hint: the real height comes from whatever the section sits on. It is
+  // honoured exactly only when `floating` is set.
+  z: number;
+  rotation: 0 | 90 | 180 | 270; // Rotation of the whole section in degrees
+  floating?: boolean; // true = deliberately left in mid-air at exactly `z`
+}
+
 // Section containing boxes and/or loose trays
 export interface Section {
   id: string;
@@ -184,6 +210,7 @@ export interface Section {
     boxes: ManualBoxPlacement[];
     looseTrays: ManualLooseTrayPlacement[];
   };
+  placement?: SectionPlacement;
 }
 
 export interface Box {
@@ -210,6 +237,8 @@ export interface Box {
 export interface GlobalSettings {
   gameContainerWidth: number;
   gameContainerDepth: number;
+  // Interior height of the game box. Optional: when unset there is no height check.
+  gameContainerHeight?: number;
 }
 
 export interface Project {

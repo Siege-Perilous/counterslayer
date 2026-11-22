@@ -1,6 +1,8 @@
 <script lang="ts">
   import { Panel, Title, Input, FormControl, Spacer, Text, addToast } from '@tableslayer/ui';
   import GlobalsPanel from './GlobalsPanel.svelte';
+  import ProjectLayoutPanel from './ProjectLayoutPanel.svelte';
+  import { projectLayoutEditorState } from '#lib/stores/projectLayoutEditor.svelte.js';
   import BoxesPanel from './BoxesPanel.svelte';
   import TraysPanel from './TraysPanel.svelte';
   import PanelBottomBar from './PanelBottomBar.svelte';
@@ -17,6 +19,7 @@
     updateCardWellTrayParams,
     updateCupTrayParams,
     updateStandeeTrayParams,
+    updateReservedTrayParams,
     updateSection,
     getTrayLetterById,
     isCounterTray,
@@ -25,6 +28,7 @@
     isCardWellTray,
     isCupTray,
     isStandeeTray,
+    isReservedTray,
     getGlobalSettings,
     updateGlobalSettings,
     deleteSection,
@@ -37,14 +41,17 @@
     findTrayLocation,
     type Box,
     type Section,
-    type Tray
+    type Tray,
+    selectSection
   } from '#lib/stores/project.svelte.js';
+  import type { LayoutIssue } from '#lib/models/projectLayout.js';
   import type { CounterTrayParams } from '#lib/models/counterTray.js';
   import type { CardDrawTrayParams } from '#lib/models/cardTray.js';
   import type { CardDividerTrayParams } from '#lib/models/cardDividerTray.js';
   import type { CardWellTrayParams } from '#lib/models/cardWellTray.js';
   import type { CupTrayParams } from '#lib/models/cupTray.js';
   import type { StandeeTrayParams } from '#lib/models/standeeTray.js';
+  import type { ReservedSpaceParams } from '#lib/models/reservedSpace.js';
   import { countCups } from '#lib/types/cupLayout.js';
   import { countCells } from '#lib/types/cardWellLayout.js';
   import { layoutEditorState } from '#lib/stores/layoutEditor.svelte.js';
@@ -58,6 +65,7 @@
     isLayoutEditMode?: boolean;
     gameContainerWidth?: number;
     gameContainerDepth?: number;
+    layoutIssues?: LayoutIssue[];
     onSelectionChange?: (type: SelectionType) => void;
   }
 
@@ -66,8 +74,14 @@
     isLayoutEditMode = false,
     gameContainerWidth = 256,
     gameContainerDepth = 256,
+    layoutIssues = [],
     onSelectionChange
   }: Props = $props();
+
+  function handleSelectIssueSection(sectionId: string) {
+    selectSection(sectionId);
+    onSelectionChange?.('section');
+  }
 
   // Layout editor dimensions
   let interiorWidth = $derived(layoutEditorState.boundsWidth);
@@ -99,7 +113,11 @@
   // Get global settings from project store
   let globalSettings = $derived(getGlobalSettings());
 
-  function handleGlobalSettingsChange(updates: { gameContainerWidth?: number; gameContainerDepth?: number }) {
+  function handleGlobalSettingsChange(updates: {
+    gameContainerWidth?: number;
+    gameContainerDepth?: number;
+    gameContainerHeight?: number | null;
+  }) {
     updateGlobalSettings(updates);
   }
 
@@ -130,6 +148,12 @@
   function handleCardWellParamsChange(newParams: CardWellTrayParams) {
     if (selectedTray && isCardWellTray(selectedTray)) {
       updateCardWellTrayParams(selectedTray.id, newParams);
+    }
+  }
+
+  function handleReservedParamsChange(newParams: ReservedSpaceParams) {
+    if (selectedTray && isReservedTray(selectedTray)) {
+      updateReservedTrayParams(selectedTray.id, newParams);
     }
   }
 
@@ -277,15 +301,19 @@
       {:else if selectionType === 'tray' && selectedTray}
         {@const stats = getTrayStats(selectedTray)}
         <span class="headerStats">
-          {stats.isCups
-            ? `${stats.stacks} cups`
-            : `${stats.counters} ${stats.isCards ? 'cards' : 'counters'} in ${stats.stacks} stacks`}
+          {isReservedTray(selectedTray)
+            ? 'Not printed'
+            : stats.isCups
+              ? `${stats.stacks} cups`
+              : `${stats.counters} ${stats.isCards ? 'cards' : 'counters'} in ${stats.stacks} stacks`}
         </span>
       {/if}
     </div>
     <!-- Content -->
     <div class="panelContent">
-      {#if isLayoutEditMode}
+      {#if projectLayoutEditorState.isEditMode}
+        <ProjectLayoutPanel />
+      {:else if isLayoutEditMode}
         <div class="layoutEditMessage">
           <p class="hint">Drag trays to reposition. Save or cancel to continue editing.</p>
           <div class="dimensionsInfo">
@@ -306,12 +334,21 @@
           </div>
         </div>
       {:else if selectionType === 'dimensions'}
-        <GlobalsPanel {globalSettings} onGlobalSettingsChange={handleGlobalSettingsChange} />
+        <GlobalsPanel
+          {globalSettings}
+          onGlobalSettingsChange={handleGlobalSettingsChange}
+          {layoutIssues}
+          onSelectSection={handleSelectIssueSection}
+        />
       {:else if selectionType === 'section'}
         {#if selectedSection}
           {@const cardSizes = project.cardSizes ?? []}
           {@const counterShapes = project.counterShapes ?? []}
-          {@const sectionHeight = calculateSectionHeight(selectedSection, { cardSizes, counterShapes })}
+          {@const sectionHeight = calculateSectionHeight(selectedSection, {
+            cardSizes,
+            counterShapes,
+            standees: project.standees ?? []
+          })}
           <div class="sectionSettings">
             <div class="panelFormSection">
               <FormControl label="Section name" name="sectionName">
@@ -327,8 +364,9 @@
               <Spacer size="1rem" />
               <Text size="0.875rem" color="fgMuted">
                 A <Text as="span" size="0.875rem" weight={600}>section</Text>
-                represents a horizontal slice of your game container. When editing in the layout editor, you can drag and
-                drop boxes and trays to visualize them within a section, but this has no impact on the print.
+                is a set of boxes and trays that share one height. Use its layout editor to arrange the items inside it. To
+                place whole sections beside or on top of each other in your game container, use Edit layout under Project
+                &amp; dimensions. Neither layout changes what is printed.
               </Text>
               <Spacer size="1rem" />
               <Text size="0.875rem" color="fgMuted">
@@ -411,6 +449,7 @@
             onUpdateCardWellParams={handleCardWellParamsChange}
             onUpdateCupParams={handleCupParamsChange}
             onUpdateStandeeParams={handleStandeeParamsChange}
+            onUpdateReservedParams={handleReservedParamsChange}
             hideList={true}
           />
         {:else}

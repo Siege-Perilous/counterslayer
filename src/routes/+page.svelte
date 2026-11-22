@@ -23,6 +23,8 @@
   import { arrangeTrays, calculateTraySpacers, getTrayDimensionsForTray } from '#lib/models/box.js';
   import { createCupTray } from '#lib/models/cupTray.js';
   import { arrangeSectionContents, type BoxPlacement, type LooseTrayPlacement } from '#lib/models/section.js';
+  import { computeProjectLayout, prepareSections, reanchorPlacement } from '#lib/models/projectLayout.js';
+  import { buildComputedLayout } from '#lib/utils/computedLayout.js';
   import { jscadToBufferGeometry } from '#lib/utils/jscadToThree.js';
   import {
     getGeometryWorker,
@@ -60,6 +62,14 @@
   import { onDestroy, untrack } from 'svelte';
   import LayoutEditorOverlay from '#lib/components/LayoutEditorOverlay.svelte';
   import SectionLayoutEditorOverlay from '#lib/components/SectionLayoutEditorOverlay.svelte';
+  import ProjectLayoutEditorOverlay from '#lib/components/ProjectLayoutEditorOverlay.svelte';
+  import {
+    enterProjectLayoutEdit,
+    exitProjectLayoutEdit,
+    getProjectLayoutPlacements,
+    projectLayoutEditorState,
+    rotateSelectedLayoutSection
+  } from '#lib/stores/projectLayoutEditor.svelte.js';
   import {
     enterEditMode,
     exitEditMode,
@@ -82,6 +92,9 @@
   import {
     saveSectionLayout,
     clearSectionLayout,
+    saveProjectLayout,
+    clearProjectLayout,
+    setSectionPlacement,
     selectTray,
     selectBox,
     selectSection
@@ -191,6 +204,11 @@
       if (params.get('counters') === '1') {
         showCounters = true;
       }
+      // Explode amount for the all-sections view (0 = to scale, as packed in the box)
+      const explodeParam = params.get('explode');
+      if (explodeParam !== null && !isNaN(Number(explodeParam))) {
+        allSectionsExplosionAmount = Math.min(100, Math.max(0, Number(explodeParam)));
+      }
       const viewParam = params.get('view') as ViewMode | null;
       const trayIdParam = params.get('trayId');
       const boxIdParam = params.get('boxId');
@@ -278,6 +296,17 @@
         .then((res) => res.json())
         .then((data) => {
           communityProjects = data.projects ?? [];
+          // Debug: ?debug=1&project=<community id> loads that project (replacing the current one)
+          const params = new URLSearchParams(window.location.search);
+          const projectParam = params.get('project');
+          if (params.get('debug') === '1' && projectParam) {
+            const match = communityProjects.find((p) => p.id === projectParam);
+            if (match) {
+              loadCommunityProject(match);
+            } else {
+              console.warn(`Unknown community project: ${projectParam}`);
+            }
+          }
         })
         .catch((err) => {
           console.error('Failed to load community projects:', err);
@@ -304,6 +333,7 @@
   let globalSettings = $derived(getGlobalSettings());
   let gameContainerWidth = $derived(globalSettings.gameContainerWidth);
   let gameContainerDepth = $derived(globalSettings.gameContainerDepth);
+  let gameContainerHeight = $derived(globalSettings.gameContainerHeight);
   let selectedTrayLetter = $derived.by(() => {
     // Use override during PDF capture
     if (captureTrayLetter) return captureTrayLetter;
@@ -332,23 +362,34 @@
       gameContainerWidth,
       gameContainerDepth,
       cardSizes: project.cardSizes || [],
-      counterShapes: project.counterShapes || []
+      counterShapes: project.counterShapes || [],
+      standees: project.standees || []
     });
   });
 
-  // Compute arrangements for ALL sections (for stacked view in dimensions mode)
-  let allSectionArrangements = $derived.by(() => {
-    if (viewMode !== 'all-no-lid') return [];
+  // Where every section sits in the game container, plus layout warnings. Feeds the stacked
+  // view, the project layout editor, the warnings and the debug output.
+  let projectLayout = $derived.by(() => {
     const project = getProject();
-    return project.sections.map((section) => ({
-      section: { id: section.id, name: section.name },
-      arrangement: arrangeSectionContents(section, {
-        gameContainerWidth,
-        gameContainerDepth,
-        cardSizes: project.cardSizes || [],
-        counterShapes: project.counterShapes || []
-      })
-    }));
+    return computeProjectLayout(project.sections, {
+      gameContainerWidth,
+      gameContainerDepth,
+      gameContainerHeight,
+      cardSizes: project.cardSizes || [],
+      counterShapes: project.counterShapes || [],
+      standees: project.standees || []
+    });
+  });
+
+  // Sections with a layout problem (for the dots in the navigation): id -> worst severity
+  let sectionIssues = $derived.by(() => {
+    const bySection: Record<string, 'error' | 'warning'> = {};
+    for (const issue of projectLayout.issues) {
+      for (const id of [issue.sectionId, issue.otherSectionId]) {
+        if (id && bySection[id] !== 'error') bySection[id] = issue.severity;
+      }
+    }
+    return bySection;
   });
 
   // Compute which geometries to show based on view mode
@@ -368,14 +409,6 @@
       sectionLooseTrayPlacements: LooseTrayPlacement[];
       // All sections stacked view
       showAllSections: boolean;
-      allSectionArrangements: Array<{
-        section: { id: string; name: string };
-        arrangement: {
-          boxes: BoxPlacement[];
-          looseTrays: LooseTrayPlacement[];
-          sectionHeight: number;
-        };
-      }>;
     } = {
       tray: null,
       allTrays: [],
@@ -389,8 +422,7 @@
       showSectionView: false,
       sectionBoxPlacements: [],
       sectionLooseTrayPlacements: [],
-      showAllSections: false,
-      allSectionArrangements: []
+      showAllSections: false
     };
 
     // In layout edit mode, only show trays (no box/lid since layout isn't finalized)
@@ -409,7 +441,6 @@
       case 'all-no-lid':
         // Show all sections stacked vertically with lids (dimensions view)
         result.showAllSections = true;
-        result.allSectionArrangements = allSectionArrangements;
         result.allBoxes = allBoxGeometries;
         result.allLooseTrays = allLooseTrayGeometries;
         break;
@@ -733,64 +764,7 @@
     try {
       const project = getProject();
 
-      // Compute section arrangements to get global positions
-      const sectionArrangements = project.sections.map((section) =>
-        arrangeSectionContents(section, {
-          gameContainerWidth,
-          gameContainerDepth,
-          cardSizes: project.cardSizes || [],
-          counterShapes: project.counterShapes || []
-        })
-      );
-
-      const computedLayout = {
-        timestamp: new Date().toISOString(),
-        gameContainer: { width: gameContainerWidth, depth: gameContainerDepth },
-        sections: project.sections.map((section, sectionIdx) => {
-          const arrangement = sectionArrangements[sectionIdx];
-          return {
-            sectionId: section.id,
-            sectionName: section.name,
-            sectionHeight: arrangement.sectionHeight,
-            boxes: arrangement.boxes.map((bp) => {
-              const boxGeom = allBoxGeometries.find((bg) => bg.boxId === bp.box.id);
-              return {
-                boxId: bp.box.id,
-                boxName: bp.box.name,
-                x: bp.x,
-                y: bp.y,
-                width: bp.dimensions.width,
-                depth: bp.dimensions.depth,
-                height: bp.dimensions.height,
-                rotation: bp.rotation,
-                trays:
-                  boxGeom?.trayGeometries.map((t) => ({
-                    trayId: t.trayId,
-                    name: t.name,
-                    letter: t.trayLetter,
-                    x: t.placement.x,
-                    y: t.placement.y,
-                    width: t.placement.dimensions.width,
-                    depth: t.placement.dimensions.depth
-                  })) ?? []
-              };
-            }),
-            looseTrays: arrangement.looseTrays.map((ltp) => {
-              const looseGeom = allLooseTrayGeometries.find((lg) => lg.trayId === ltp.tray.id);
-              return {
-                trayId: ltp.tray.id,
-                name: ltp.tray.name,
-                letter: looseGeom?.trayLetter ?? '?',
-                x: ltp.x,
-                y: ltp.y,
-                width: ltp.dimensions.width,
-                depth: ltp.dimensions.depth,
-                rotation: ltp.rotation
-              };
-            })
-          };
-        })
-      };
+      const computedLayout = buildComputedLayout(projectLayout, allBoxGeometries, allLooseTrayGeometries);
 
       await fetch('/api/debug/save-project', {
         method: 'POST',
@@ -1320,78 +1294,11 @@
         stls[`tray_${trayData.trayLetter}_${trayData.name}`] = toBase64(data);
       }
 
-      // Compute section arrangements to get global positions
-      const sectionArrangements = project.sections.map((section) =>
-        arrangeSectionContents(section, {
-          gameContainerWidth,
-          gameContainerDepth,
-          cardSizes: project.cardSizes || [],
-          counterShapes: project.counterShapes || []
-        })
-      );
-
-      // Build computed layout with global positions for ALL items
-      const computedLayout = {
-        timestamp: new Date().toISOString(),
+      // Computed layout with game container positions for ALL items
+      const computedLayout = buildComputedLayout(projectLayout, allBoxGeometries, allLooseTrayGeometries, {
         selectedBoxId: box?.id ?? null,
-        selectedTrayId: tray.id,
-        gameContainer: {
-          width: gameContainerWidth,
-          depth: gameContainerDepth
-        },
-        sections: project.sections.map((section, sectionIdx) => {
-          const arrangement = sectionArrangements[sectionIdx];
-          return {
-            sectionId: section.id,
-            sectionName: section.name,
-            sectionHeight: arrangement.sectionHeight,
-            boxes: arrangement.boxes.map((bp) => {
-              const boxGeom = allBoxGeometries.find((bg) => bg.boxId === bp.box.id);
-              const interiorWidth = bp.dimensions.width - bp.box.wallThickness * 2;
-              const interiorDepth = bp.dimensions.depth - bp.box.wallThickness * 2;
-              return {
-                boxId: bp.box.id,
-                boxName: bp.box.name,
-                x: bp.x,
-                y: bp.y,
-                width: bp.dimensions.width,
-                depth: bp.dimensions.depth,
-                height: bp.dimensions.height,
-                rotation: bp.rotation,
-                interior: { width: interiorWidth, depth: interiorDepth },
-                trays:
-                  boxGeom?.trayGeometries.map((t) => ({
-                    trayId: t.trayId,
-                    name: t.name,
-                    letter: t.trayLetter,
-                    color: t.color,
-                    xInBox: t.placement.x,
-                    yInBox: t.placement.y,
-                    width: t.placement.dimensions.width,
-                    depth: t.placement.dimensions.depth,
-                    height: t.placement.dimensions.height,
-                    rotated: t.placement.rotated
-                  })) ?? []
-              };
-            }),
-            looseTrays: arrangement.looseTrays.map((ltp) => {
-              const looseGeom = allLooseTrayGeometries.find((lg) => lg.trayId === ltp.tray.id);
-              return {
-                trayId: ltp.tray.id,
-                name: ltp.tray.name,
-                letter: looseGeom?.trayLetter ?? '?',
-                color: ltp.tray.color,
-                x: ltp.x,
-                y: ltp.y,
-                width: ltp.dimensions.width,
-                depth: ltp.dimensions.depth,
-                height: ltp.dimensions.height,
-                rotation: ltp.rotation
-              };
-            })
-          };
-        })
-      };
+        selectedTrayId: tray.id
+      });
 
       // Capture Three.js screenshot if available (use current camera view)
       let screenshot: string | null = null;
@@ -1482,8 +1389,10 @@
   // Includes names because they are embossed on geometry
   let currentStateHash = $derived.by(() => {
     const project = getProject();
-    const allBoxes = getAllBoxes();
-    if (allBoxes.length === 0) return '';
+    // Nothing to generate at all. Projects made only of loose trays (or reserved spaces) still
+    // count: changing them changes section heights and so the generated geometry.
+    const hasContent = project.sections.some((section) => section.boxes.length > 0 || section.looseTrays.length > 0);
+    if (!hasContent) return '';
     return JSON.stringify({
       sections: project.sections.map((section) => ({
         id: section.id,
@@ -1707,7 +1616,7 @@
   }
 
   // Section Layout Editor handlers
-  let isLayerLayoutEditMode = $derived.by(() => sectionLayoutEditorState.isEditMode);
+  let isSectionLayoutEditMode = $derived.by(() => sectionLayoutEditorState.isEditMode);
 
   function handleEnterSectionLayoutEdit() {
     const section = getSelectedSection();
@@ -1722,7 +1631,8 @@
       gameContainerWidth,
       gameContainerDepth,
       cardSizes,
-      counterShapes
+      counterShapes,
+      standees: project.standees ?? []
     });
 
     enterSectionEditMode(arrangement.boxes, arrangement.looseTrays, gameContainerWidth, gameContainerDepth);
@@ -1778,9 +1688,25 @@
     }
 
     const placements = getManualSectionPlacements();
+    const before = projectLayout.sections.find((s) => s.sectionId === section.id)?.local;
     saveSectionLayout(section.id, placements.boxes, placements.looseTrays);
+
+    // If the section has a position in the game container, re-anchor it so the items that were
+    // not moved stay exactly where they were in the box.
+    if (section.placement && before) {
+      const project = getProject();
+      const [after] = prepareSections([section], {
+        gameContainerWidth,
+        gameContainerDepth,
+        cardSizes: project.cardSizes ?? [],
+        counterShapes: project.counterShapes ?? [],
+        standees: project.standees ?? []
+      });
+      setSectionPlacement(section.id, reanchorPlacement(section.placement, before, after.local));
+    }
+
+    // Layout does not change any geometry, so there is nothing to regenerate
     exitSectionEditMode();
-    regenerate(true);
   }
 
   function handleCancelSectionLayout() {
@@ -1794,12 +1720,52 @@
 
     clearSectionLayout(section.id);
     exitSectionEditMode();
-    regenerate(true);
   }
 
   function handleRotateSectionItem() {
     rotateSelectedItem();
   }
+
+  // Project layout editing: arranging whole sections inside the game container
+  let isProjectLayoutEditMode = $derived(projectLayoutEditorState.isEditMode);
+
+  function handleEnterProjectLayoutEdit() {
+    enterProjectLayoutEdit(projectLayout);
+  }
+
+  function handleSaveProjectLayout() {
+    const overlaps = (projectLayoutEditorState.layout?.issues ?? []).filter((issue) => issue.severity === 'error');
+    if (overlaps.length > 0) {
+      addToast({
+        data: {
+          title: 'Cannot save layout',
+          body: `Sections are overlapping: ${overlaps.map((issue) => issue.message).join(', ')}`,
+          type: 'danger'
+        }
+      });
+      return;
+    }
+    // Layout does not change any geometry, so there is nothing to regenerate
+    saveProjectLayout(getProjectLayoutPlacements());
+    exitProjectLayoutEdit();
+  }
+
+  function handleCancelProjectLayout() {
+    exitProjectLayoutEdit();
+  }
+
+  // Back to sections stacked as full slices, in order
+  function handleResetAutoProjectLayout() {
+    clearProjectLayout();
+    exitProjectLayoutEdit();
+  }
+
+  // Leave project layout editing when navigating away from the project view
+  $effect(() => {
+    if (projectLayoutEditorState.isEditMode && viewMode !== 'all-no-lid') {
+      exitProjectLayoutEdit();
+    }
+  });
 
   // Auto-cancel section edit mode when navigating away
   let lastSelectedSectionId = $state<string | null>(null);
@@ -1848,6 +1814,27 @@
   });
 </script>
 
+<!-- Toolbar for the project view: explode slider, or the project layout editor while arranging -->
+{#snippet projectViewToolbar()}
+  <div class="viewToolbar">
+    {#if !isProjectLayoutEditMode && projectLayout.sections.length > 1}
+      <div class="sliderContainer">
+        <span class="sliderLabel">Explode</span>
+        <InputSlider min={0} max={100} bind:value={allSectionsExplosionAmount} />
+      </div>
+    {/if}
+    <ProjectLayoutEditorOverlay
+      onEnterEdit={handleEnterProjectLayoutEdit}
+      onSave={handleSaveProjectLayout}
+      onCancel={handleCancelProjectLayout}
+      onResetAuto={handleResetAutoProjectLayout}
+      onRotate={rotateSelectedLayoutSection}
+      canEdit={projectLayout.sections.some((section) => section.items.length > 0)}
+      issues={isProjectLayoutEditMode ? (projectLayoutEditorState.layout?.issues ?? []) : projectLayout.issues}
+    />
+  </div>
+{/snippet}
+
 <svelte:head>
   <title>Counter Slayer - design inserts for your board games</title>
   <meta
@@ -1862,7 +1849,13 @@
     <!-- Mobile Nav Pane (top) -->
     <Pane defaultSize={0} minSize={0} maxSize={50} bind:this={mobileNavPane}>
       <div class="mobilePanelContent">
-        <NavigationMenu {selectionType} onSelectionChange={handleSelectionChange} onExpandPanel={() => {}} {isMobile} />
+        <NavigationMenu
+          {selectionType}
+          onSelectionChange={handleSelectionChange}
+          onExpandPanel={() => {}}
+          {isMobile}
+          {sectionIssues}
+        />
       </div>
     </Pane>
 
@@ -1908,15 +1901,16 @@
               {viewTitle}
               onCaptureReady={(fn) => (captureFunction = fn)}
               {isLayoutEditMode}
-              {isLayerLayoutEditMode}
+              {isSectionLayoutEditMode}
               onTrayDoubleClick={handleTrayDoubleClick}
               onBoxDoubleClick={handleBoxDoubleClick}
               showSectionView={visibleGeometries.showSectionView}
               sectionBoxPlacements={visibleGeometries.sectionBoxPlacements}
               sectionLooseTrayPlacements={visibleGeometries.sectionLooseTrayPlacements}
               showAllSections={visibleGeometries.showAllSections}
-              allSectionArrangements={visibleGeometries.allSectionArrangements}
               {allSectionsExplosionAmount}
+              projectLayout={visibleGeometries.showAllSections ? projectLayout : null}
+              {gameContainerHeight}
               {generating}
               debugMode={debugParams.debugMode}
               cameraPreset={debugParams.cameraPreset}
@@ -1959,13 +1953,8 @@
           </div>
         {/if}
 
-        {#if viewMode === 'all-no-lid' && !generating && allSectionArrangements.length > 1}
-          <div class="viewToolbar">
-            <div class="sliderContainer">
-              <span class="sliderLabel">Explode</span>
-              <InputSlider min={0} max={100} bind:value={allSectionsExplosionAmount} />
-            </div>
-          </div>
+        {#if viewMode === 'all-no-lid' && !generating}
+          {@render projectViewToolbar()}
         {/if}
 
         {#if (viewMode === 'exploded' || viewMode === 'all') && !generating}
@@ -1987,7 +1976,7 @@
           </div>
         {/if}
 
-        {#if !isLayoutEditMode && !isLayerLayoutEditMode}
+        {#if !isLayoutEditMode && !isSectionLayoutEditMode && !isProjectLayoutEditMode}
           <div class="bottomToolbar">
             <input
               bind:this={jsonFileInput}
@@ -2115,6 +2104,7 @@
           {isLayoutEditMode}
           {gameContainerWidth}
           {gameContainerDepth}
+          layoutIssues={projectLayout.issues}
           onSelectionChange={handleSelectionChange}
         />
       </div>
@@ -2128,6 +2118,7 @@
       onSelectionChange={handleSelectionChange}
       onExpandPanel={handleExpandPanel}
       {isMobile}
+      {sectionIssues}
     />
   {/if}
 
@@ -2162,15 +2153,16 @@
               {viewTitle}
               onCaptureReady={(fn) => (captureFunction = fn)}
               {isLayoutEditMode}
-              {isLayerLayoutEditMode}
+              {isSectionLayoutEditMode}
               onTrayDoubleClick={handleTrayDoubleClick}
               onBoxDoubleClick={handleBoxDoubleClick}
               showSectionView={visibleGeometries.showSectionView}
               sectionBoxPlacements={visibleGeometries.sectionBoxPlacements}
               sectionLooseTrayPlacements={visibleGeometries.sectionLooseTrayPlacements}
               showAllSections={visibleGeometries.showAllSections}
-              allSectionArrangements={visibleGeometries.allSectionArrangements}
               {allSectionsExplosionAmount}
+              projectLayout={visibleGeometries.showAllSections ? projectLayout : null}
+              {gameContainerHeight}
               {generating}
               debugMode={debugParams.debugMode}
               cameraPreset={debugParams.cameraPreset}
@@ -2214,12 +2206,7 @@
         {/if}
 
         {#if viewMode === 'all-no-lid' && !generating && !debugParams.hideUI}
-          <div class="viewToolbar">
-            <div class="sliderContainer">
-              <span class="sliderLabel">Explode</span>
-              <InputSlider min={0} max={100} bind:value={allSectionsExplosionAmount} />
-            </div>
-          </div>
+          {@render projectViewToolbar()}
         {/if}
 
         {#if (viewMode === 'exploded' || viewMode === 'all') && !generating && !debugParams.hideUI}
@@ -2338,7 +2325,7 @@
                 </div>
               {/snippet}
             </Popover>
-            {#if !isLayoutEditMode && !isLayerLayoutEditMode}
+            {#if !isLayoutEditMode && !isSectionLayoutEditMode}
               <div class="toolbarRight">
                 <InputCheckbox
                   checked={showCounters}
@@ -2400,6 +2387,7 @@
           {isLayoutEditMode}
           {gameContainerWidth}
           {gameContainerDepth}
+          layoutIssues={projectLayout.issues}
           onSelectionChange={handleSelectionChange}
         />
       </Pane>

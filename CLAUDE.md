@@ -55,7 +55,7 @@ This reads `mesh-analysis/project.json` and regenerates STLs with the latest cod
 
 ### project.json Structure
 
-The file contains the full project configuration plus a `computedLayout` section with global positions:
+The file contains the full project configuration plus a `computedLayout` section with positions in the game container. It is built by `src/lib/utils/computedLayout.ts` from the same project layout the 3D view uses.
 
 ```json
 {
@@ -64,28 +64,42 @@ The file contains the full project configuration plus a `computedLayout` section
   "counterShapes": [...],
   "cardSizes": [...],
   "computedLayout": {
-    "timestamp": "2026-03-12T...",
-    "gameContainer": { "width": 150, "depth": 200 },
+    "timestamp": "2026-11-22T...",
+    "gameContainer": { "width": 214, "depth": 292, "height": null },
+    "arranged": true,
+    "totalHeight": 42,
+    "issues": [],
     "sections": [
       {
         "sectionId": "abc123",
-        "sectionName": "Bottom layer",
-        "sectionHeight": 28.4,
+        "sectionName": "Counters",
+        "sectionHeight": 21,
+        "x": 0,
+        "y": 0,
+        "z": 21,
+        "width": 214,
+        "depth": 214,
+        "rotation": 0,
+        "floating": false,
+        "level": 1,
         "boxes": [
           {
             "boxId": "box1",
             "boxName": "Counter box",
             "x": 0,
             "y": 100,
+            "z": 21,
             "width": 150,
             "depth": 90,
+            "localX": 0,
+            "localY": 100,
             "trays": [
               { "trayId": "t1", "name": "Tokens", "letter": "A", "x": 0, "y": 0, "width": 143, "depth": 45 }
             ]
           }
         ],
         "looseTrays": [
-          { "trayId": "t2", "name": "Cup tray", "letter": "C", "x": 0, "y": 0, "width": 150, "depth": 100 }
+          { "trayId": "t2", "name": "Cup tray", "letter": "C", "x": 0, "y": 0, "z": 21, "width": 150, "depth": 100 }
         ]
       }
     ]
@@ -95,16 +109,25 @@ The file contains the full project configuration plus a `computedLayout` section
 
 ### Understanding Positions
 
-**Game container**: The bounding area (e.g., 150mm × 200mm) that all sections fit within.
+**Game container**: The interior of the game box (e.g., 150mm × 200mm, with an optional height) that all sections fit within.
 
-**Global positions** (x, y): Where items sit within the game container.
+**Section**: A set of boxes and loose trays that share one height and move as a unit. `section.placement` (`x`, `y`, `z`, `rotation`, optional `floating`) says where it sits in the container. A project where no section has a placement stacks its sections as full slices in order (`arranged: false`).
+
+**Container positions** (x, y, z) on sections, boxes and loose trays: where items sit within the game container, after the section's placement and rotation.
 
 - `y = 0` → front edge of container
 - `y = depth` → back edge of container
 - `x = 0` → left edge
 - `x = width` → right edge
+- `z = 0` → container floor; a resting section's `z` is the top of whatever is beneath it
 
-**Box-relative positions** (xInBox, yInBox): Where trays sit within their parent box.
+**Section-local positions** (localX, localY): Where a box or loose tray sits inside its own section, before the section is placed.
+
+**Box-relative positions** (x, y, xInBox, yInBox on trays inside a box): Where trays sit within their parent box.
+
+**issues**: layout problems (`outOfBounds`, `aboveBox`, `floating` are warnings; `overlap` is an error).
+
+**Reserved spaces** are loose trays with `"type": "reserved"`: unprinted blocks (boards, rulebooks) that count toward section height. They have no letter and are never exported.
 
 ### Quick Position Queries
 
@@ -113,7 +136,10 @@ The file contains the full project configuration plus a `computedLayout` section
 cat mesh-analysis/project.json | jq '.computedLayout.sections[] | {section: .sectionName, front: [.looseTrays[] | select(.y == 0) | .name]}'
 
 # Get all loose tray positions
-cat mesh-analysis/project.json | jq '.computedLayout.sections[].looseTrays[] | {name, x, y}'
+cat mesh-analysis/project.json | jq '.computedLayout.sections[].looseTrays[] | {name, x, y, z}'
+
+# Where each section sits, and how tall the packed contents are
+cat mesh-analysis/project.json | jq '.computedLayout | {totalHeight, issues, sections: [.sections[] | {sectionName, x, y, z, sectionHeight, rotation}]}'
 ```
 
 ## 3D Navigation for Claude
@@ -152,6 +178,9 @@ npx tsx scripts/capture-view.ts --trayId <id> --angle bottom --zoom 2
 # View one section on its own (sets view mode to "section")
 npx tsx scripts/capture-view.ts --sectionId <id> --angle iso
 
+# View a community project as packed in the box (explode 0 = to scale)
+npx tsx scripts/capture-view.ts --project red-dust-rebellion --view all-no-lid --explode 0 --angle iso
+
 # Get tray IDs from project.json
 cat mesh-analysis/project.json | jq '.sections[].looseTrays[] | {id, name}'
 cat mesh-analysis/project.json | jq '.sections[].boxes[].trays[] | {id, name}'
@@ -163,6 +192,10 @@ The app also supports these URL parameters directly:
 - `?boxId=<id>` - Select box and switch to exploded view
 - `?sectionId=<id>` - Select section and switch to section view
 - `?view=<mode>` - Set view mode (tray, section, exploded, all, all-no-lid)
+- `?explode=<0-100>` - Explode amount for the all-sections view (0 = to scale)
+- `?project=<id>` - Load a community project (omaha, burning-banners, witchcraft, red-dust-rebellion), replacing the current one
+
+These parameters only apply together with `?debug=1`.
 
 ### Preset Angles
 
@@ -198,6 +231,9 @@ The app includes a TinkerCAD-style ViewCube in the top-right corner:
 ## Project Structure
 
 - `src/lib/models/` - Geometry generation (counterTray.ts, box.ts, lid.ts, section.ts)
+- `src/lib/models/projectLayout.ts` - Where each section sits in the game container (x/y/z/rotation) plus layout issues
+- `src/lib/stores/projectLayoutEditor.svelte.ts` - Working state for the project layout editor
+- `src/lib/components/three/ProjectLayoutEditorScene.svelte` - Drag and lift interaction for arranging sections
 - `src/lib/stores/project.svelte.ts` - Project state management
 - `src/lib/workers/geometry.worker.ts` - Web worker for non-blocking geometry generation
 - `src/lib/components/ViewCube.svelte` - Camera navigation cube

@@ -9,6 +9,7 @@
   import * as THREE from 'three';
   import CounterMesh from './CounterMesh.svelte';
   import StandeeMesh from './StandeeMesh.svelte';
+  import { getHatchMaterial } from '#lib/utils/hatchMaterial.js';
   import { getAlternateColor, getSleeveColors } from '#lib/three/materials.js';
   import type { CounterStack } from '#lib/models/counterTray.js';
 
@@ -37,6 +38,8 @@
     width?: number;
     depth?: number;
     height?: number;
+    // Draw cross-hatched and see-through (reserved spaces: not printed)
+    hatched?: boolean;
   }
 
   let {
@@ -52,7 +55,8 @@
     onDoubleClick,
     width = 0,
     depth = 0,
-    height = 0
+    height = 0,
+    hatched = false
   }: Props = $props();
 
   // Create rounded triangle geometry for counter previews
@@ -129,9 +133,19 @@
 </script>
 
 <!-- Tray mesh with -90° X rotation (JSCAD to Three.js transform) -->
-<T.Mesh {geometry} rotation.x={-Math.PI / 2} onclick={handleClick} ondblclick={handleDoubleClick}>
-  <T.MeshStandardMaterial {color} roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
-</T.Mesh>
+{#if hatched}
+  <T.Mesh
+    {geometry}
+    material={getHatchMaterial(color)}
+    rotation.x={-Math.PI / 2}
+    onclick={handleClick}
+    ondblclick={handleDoubleClick}
+  />
+{:else}
+  <T.Mesh {geometry} rotation.x={-Math.PI / 2} onclick={handleClick} ondblclick={handleDoubleClick}>
+    <T.MeshStandardMaterial {color} roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
+  </T.Mesh>
+{/if}
 
 <!-- Counter previews in tray-local coordinates -->
 {#if showCounters && counterStacks.length > 0}

@@ -32,6 +32,8 @@ function parseArgs() {
     boxId?: string;
     sectionId?: string;
     counters?: boolean;
+    explode?: string;
+    project?: string;
   } = {};
 
   for (let i = 0; i < args.length; i++) {
@@ -83,6 +85,14 @@ function parseArgs() {
         result.sectionId = next;
         i++;
         break;
+      case '--explode':
+        result.explode = next;
+        i++;
+        break;
+      case '--project':
+        result.project = next;
+        i++;
+        break;
       case '--counters':
         result.counters = true;
         break;
@@ -111,6 +121,9 @@ Options:
   --boxId <id>         Select a box and switch to exploded view
   --sectionId <id>     Select a section and switch to section view
   --counters           Show counters in the trays
+  --explode <0-100>    Explode amount for the all-sections view (0 = to scale)
+  --project <id>       Load a community project first (omaha, burning-banners,
+                       witchcraft, red-dust-rebellion)
   --debug-export       Click "Debug for Claude" button to export project.json
 
 Examples:
@@ -219,6 +232,12 @@ async function captureView() {
   if (args.sectionId) {
     params.set('sectionId', args.sectionId);
   }
+  if (args.explode !== undefined) {
+    params.set('explode', args.explode);
+  }
+  if (args.project) {
+    params.set('project', args.project);
+  }
   if (args.counters) {
     params.set('counters', '1');
   }
@@ -253,6 +272,12 @@ async function captureView() {
 
     // Wait for geometry generation to complete (data-testid appears when not generating)
     await page.waitForSelector('[data-testid="geometry-ready"]', { state: 'attached', timeout: 60000 });
+
+    // A community project is fetched and generated after the first render; wait for that run
+    if (args.project) {
+      await page.waitForTimeout(1500);
+      await page.waitForSelector('[data-testid="geometry-ready"]', { state: 'attached', timeout: 60000 });
+    }
 
     // Additional wait for WebGL to fully render
     await page.waitForTimeout(1000);

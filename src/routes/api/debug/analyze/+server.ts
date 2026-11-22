@@ -1,3 +1,4 @@
+import type { buildComputedLayout } from '#lib/utils/computedLayout.js';
 import { existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
@@ -8,45 +9,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..', '..', '..', '..', '..');
 const analysisDir = join(projectRoot, 'mesh-analysis');
 
-interface ComputedLayout {
-  timestamp: string;
-  selectedBoxId: string | null;
-  selectedTrayId: string;
-  boxes: Array<{
-    boxId: string;
-    boxName: string;
-    exterior: { width: number; depth: number; height: number };
-    interior: { width: number; depth: number; height: number };
-    trays: Array<{
-      trayId: string;
-      name: string;
-      letter: string;
-      color: string;
-      x: number;
-      y: number;
-      width: number;
-      depth: number;
-      height: number;
-      rotated: boolean;
-      flushFront: boolean;
-      flushLeft: boolean;
-      flushBack: boolean;
-      flushRight: boolean;
-      stacks: unknown[];
-    }>;
-  }>;
-  looseTrays: Array<{
-    trayId: string;
-    sectionId: string;
-    name: string;
-    letter: string;
-    color: string;
-    width: number;
-    depth: number;
-    height: number;
-    stacks: unknown[];
-  }>;
-}
+// Shape built by buildComputedLayout: per-section placement plus game container positions
+type ComputedLayout = ReturnType<typeof buildComputedLayout>;
 
 interface AnalyzeRequest {
   project: Record<string, unknown>;

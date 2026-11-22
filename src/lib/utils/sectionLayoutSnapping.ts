@@ -48,7 +48,7 @@ export function findSectionOverlaps(items: SectionItemForSnapping[]): Array<[str
 /**
  * Check if a section item is within bounds
  */
-export function isLayerItemWithinBounds(
+export function isSectionItemWithinBounds(
   item: SectionItemForSnapping,
   boundsWidth: number,
   boundsDepth: number

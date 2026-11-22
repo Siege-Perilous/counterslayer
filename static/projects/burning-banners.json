@@ -4,6 +4,12 @@
     {
       "id": "skrgpjx",
       "name": "Trays layer",
+      "placement": {
+        "x": 0,
+        "y": 0,
+        "z": 0,
+        "rotation": 0
+      },
       "boxes": [],
       "looseTrays": [
         {
@@ -126,6 +132,12 @@
     {
       "id": "qlaunzl",
       "name": "Side rail layer",
+      "placement": {
+        "x": 220,
+        "y": 0,
+        "z": 0,
+        "rotation": 0
+      },
       "boxes": [],
       "looseTrays": [
         {

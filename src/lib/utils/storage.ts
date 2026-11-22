@@ -7,6 +7,7 @@ import {
   type TopLoadedStackDef
 } from '#lib/models/counterTray.js';
 import { defaultLidParams } from '#lib/models/lid.js';
+import { defaultReservedSpaceParams, type ReservedSpaceParams } from '#lib/models/reservedSpace.js';
 import { defaultStandeeTrayParams, type StandeeTrayParams } from '#lib/models/standeeTray.js';
 import {
   DEFAULT_CARD_SIZES,
@@ -425,6 +426,17 @@ function migrateTray(
     } as Tray;
   }
 
+  if (trayType === 'reserved') {
+    // Reserved space - fill in any missing dimensions with defaults
+    const params = (tray as { params?: Partial<ReservedSpaceParams> }).params ?? {};
+    return {
+      ...tray,
+      type: 'reserved',
+      color,
+      params: { ...defaultReservedSpaceParams, ...params }
+    } as Tray;
+  }
+
   // Counter tray (either explicit or migrated from old format)
   return {
     ...tray,
@@ -634,6 +646,16 @@ export function migrateProjectData(input: Project | LegacyProject): Project {
       return migrated;
     });
     cumulativeIndex += section.looseTrays.length;
+
+    // A reserved space can only sit directly in a section. If a hand-edited file has one inside
+    // a box, move it out so it is not treated as a printable tray.
+    for (const box of migratedBoxes) {
+      const reserved = box.trays.filter((tray) => tray.type === 'reserved');
+      if (reserved.length > 0) {
+        box.trays = box.trays.filter((tray) => tray.type !== 'reserved');
+        migratedLooseTrays.push(...reserved);
+      }
+    }
 
     return {
       ...section,

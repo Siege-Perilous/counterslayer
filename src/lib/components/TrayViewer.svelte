@@ -5,6 +5,7 @@
   import type { BufferGeometry } from 'three';
   import type { TrayPlacement } from '#lib/models/box.js';
   import type { BoxPlacement, LooseTrayPlacement } from '#lib/models/section.js';
+  import type { ProjectLayout } from '#lib/models/projectLayout.js';
   import type { CounterStack } from '#lib/models/counterTray.js';
   import type { CardStack } from '#lib/models/cardTray.js';
   import type { CaptureOptions } from '#lib/utils/screenshotCapture.js';
@@ -101,7 +102,7 @@
     viewTitle?: string;
     onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
     isLayoutEditMode?: boolean;
-    isLayerLayoutEditMode?: boolean;
+    isSectionLayoutEditMode?: boolean;
     onTrayDoubleClick?: (trayId: string) => void;
     onBoxDoubleClick?: (boxId: string) => void;
     generating?: boolean;
@@ -110,15 +111,9 @@
     sectionLooseTrayPlacements?: LooseTrayPlacement[];
     // All sections stacked view
     showAllSections?: boolean;
-    allSectionArrangements?: Array<{
-      section: { id: string; name: string };
-      arrangement: {
-        boxes: BoxPlacement[];
-        looseTrays: LooseTrayPlacement[];
-        sectionHeight: number;
-      };
-    }>;
     allSectionsExplosionAmount?: number;
+    projectLayout?: ProjectLayout | null;
+    gameContainerHeight?: number;
     // Debug mode props for URL-based capture
     debugMode?: boolean;
     cameraPreset?: string;
@@ -156,7 +151,7 @@
     viewTitle = '',
     onCaptureReady,
     isLayoutEditMode = false,
-    isLayerLayoutEditMode = false,
+    isSectionLayoutEditMode = false,
     onTrayDoubleClick,
     onBoxDoubleClick,
     generating = false,
@@ -164,8 +159,9 @@
     sectionBoxPlacements = [],
     sectionLooseTrayPlacements = [],
     showAllSections = false,
-    allSectionArrangements = [],
     allSectionsExplosionAmount = 50,
+    projectLayout = null,
+    gameContainerHeight,
     // Debug mode props
     debugMode = false,
     cameraPreset,
@@ -247,7 +243,7 @@
       {viewTitle}
       {onCaptureReady}
       {isLayoutEditMode}
-      {isLayerLayoutEditMode}
+      {isSectionLayoutEditMode}
       onTrayClick={handleTrayClick}
       {onTrayDoubleClick}
       {onBoxDoubleClick}
@@ -256,8 +252,9 @@
       {sectionBoxPlacements}
       {sectionLooseTrayPlacements}
       {showAllSections}
-      {allSectionArrangements}
       {allSectionsExplosionAmount}
+      {projectLayout}
+      {gameContainerHeight}
       {debugMode}
       {cameraPreset}
       {cameraPosition}
@@ -275,7 +272,7 @@
   {/if}
 
   <!-- Tray/Box info overlay when clicked (non-edit mode only) -->
-  {#if clickedTrayInfo && !isLayoutEditMode && !isLayerLayoutEditMode && (showAllTrays || showAllBoxes || showAllSections || showSectionView)}
+  {#if clickedTrayInfo && !isLayoutEditMode && !isSectionLayoutEditMode && (showAllTrays || showAllBoxes || showAllSections || showSectionView)}
     <div class="trayInfoOverlay" class:belowToolbar={showAllTrays || showAllSections || showSectionView}>
       {#if clickedTrayInfo.type === 'box'}
         <span class="trayLetter trayLetter--box">BOX</span>

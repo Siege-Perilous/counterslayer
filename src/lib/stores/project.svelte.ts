@@ -10,6 +10,7 @@ import {
 } from '#lib/models/counterTray.js';
 import { defaultCupTrayParams, type CupTrayParams } from '#lib/models/cupTray.js';
 import { defaultLidParams } from '#lib/models/lid.js';
+import { defaultReservedSpaceParams, type ReservedSpaceParams } from '#lib/models/reservedSpace.js';
 import { defaultStandeeTrayParams, type StandeeTrayParams } from '#lib/models/standeeTray.js';
 import { saveNow, scheduleSave } from '#lib/stores/saveManager.js';
 import type {
@@ -26,7 +27,9 @@ import type {
   ManualBoxPlacement,
   ManualLooseTrayPlacement,
   Project,
+  ReservedTray,
   Section,
+  SectionPlacement,
   Standee,
   StandeeTray,
   Tray
@@ -40,6 +43,7 @@ import {
   isCounterTray,
   isCupTray,
   isLooseTray,
+  isReservedTray,
   isStandeeTray
 } from '#lib/types/project.js';
 import { loadProject, migrateProjectData } from '#lib/utils/storage.js';
@@ -53,6 +57,7 @@ export {
   isCounterTray,
   isCupTray,
   isLooseTray,
+  isReservedTray,
   isStandeeTray
 };
 export type {
@@ -69,7 +74,9 @@ export type {
   ManualBoxPlacement,
   ManualLooseTrayPlacement,
   Project,
+  ReservedTray,
   Section,
+  SectionPlacement,
   Standee,
   StandeeTray,
   Tray
@@ -191,12 +198,12 @@ export function getCumulativeTrayIndexForTray(sections: Section[], trayId: strin
         cumulative++;
       }
     }
-    // Count loose trays
+    // Count loose trays. Reserved spaces are not printed, so they take no letter.
     for (const tray of section.looseTrays) {
       if (tray.id === trayId) {
         return cumulative;
       }
-      cumulative++;
+      if (tray.type !== 'reserved') cumulative++;
     }
   }
   return cumulative;
@@ -241,7 +248,7 @@ function getTotalTrayCount(sections: Section[]): number {
     for (const box of section.boxes) {
       total += box.trays.length;
     }
-    total += section.looseTrays.length;
+    total += section.looseTrays.filter((tray) => tray.type !== 'reserved').length;
   }
   return total;
 }
@@ -366,6 +373,20 @@ function createDefaultStandeeTray(name: string, color: string, standees?: Stande
     color,
     rotationOverride: 'auto',
     params: { ...defaultStandeeTrayParams, standeeId }
+  };
+}
+
+// Hatch colour for reserved spaces (they are not printed, so they sit outside the tray palette)
+export const RESERVED_SPACE_COLOR = '#8a8f98';
+
+function createDefaultReservedTray(name: string): ReservedTray {
+  return {
+    id: generateId(),
+    type: 'reserved',
+    name,
+    color: RESERVED_SPACE_COLOR,
+    rotationOverride: 'auto',
+    params: { ...defaultReservedSpaceParams }
   };
 }
 
@@ -605,7 +626,9 @@ export function updateSection(sectionId: string, updates: Partial<Omit<Section, 
 }
 
 // Box operations
-export function addBox(sectionId?: string, trayType: TrayType = 'counter'): Box {
+export function addBox(sectionId?: string, requestedTrayType: TrayType = 'counter'): Box {
+  // A box cannot hold a reserved space; start it with a counter tray instead
+  const trayType: TrayType = requestedTrayType === 'reserved' ? 'counter' : requestedTrayType;
   // Find the target section
   const targetSectionId = sectionId ?? project.selectedSectionId ?? project.sections[0]?.id;
   const section = project.sections.find((l) => l.id === targetSectionId);
@@ -729,7 +752,8 @@ function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
 }
 
 // Tray type for addTray function
-export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'cup' | 'cardWell' | 'standee' | 'card';
+// 'reserved' (a reserved space) can only be added directly to a section, never to a box.
+export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'cup' | 'cardWell' | 'standee' | 'reserved' | 'card';
 
 // Loose tray operations
 export function addLooseTray(sectionId?: string, trayType: TrayType = 'counter'): Tray | null {
@@ -752,6 +776,9 @@ export function addLooseTray(sectionId?: string, trayType: TrayType = 'counter')
     tray = createDefaultCardWellTray(`Loose Well ${trayNumber}`, color, project.cardSizes);
   } else if (trayType === 'standee') {
     tray = createDefaultStandeeTray(`Loose Standees ${trayNumber}`, color, project.standees);
+  } else if (trayType === 'reserved') {
+    const reservedNumber = section.looseTrays.filter((t) => t.type === 'reserved').length + 1;
+    tray = createDefaultReservedTray(`Reserved space ${reservedNumber}`);
   } else {
     tray = createDefaultCounterTray(`Loose Tray ${trayNumber}`, color, project.counterShapes);
     // Inherit global params (including customShapes) from existing counter trays
@@ -794,6 +821,8 @@ export function deleteLooseTray(trayId: string): void {
 
 // Tray operations (within boxes)
 export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | null {
+  // Reserved spaces live directly in a section
+  if (trayType === 'reserved') return null;
   // Find the box across all sections
   for (const section of project.sections) {
     const box = section.boxes.find((b) => b.id === boxId);
@@ -1073,12 +1102,17 @@ export const DEFAULT_GLOBAL_SETTINGS = {
 };
 
 // Global settings operations
-export function getGlobalSettings(): { gameContainerWidth: number; gameContainerDepth: number } {
+export function getGlobalSettings(): {
+  gameContainerWidth: number;
+  gameContainerDepth: number;
+  gameContainerHeight?: number;
+} {
   // If project has explicit global settings, use those
   if (project.globalSettings) {
     return {
       gameContainerWidth: project.globalSettings.gameContainerWidth,
-      gameContainerDepth: project.globalSettings.gameContainerDepth
+      gameContainerDepth: project.globalSettings.gameContainerDepth,
+      gameContainerHeight: project.globalSettings.gameContainerHeight
     };
   }
   // Otherwise, try to get from existing counter tray
@@ -1106,10 +1140,26 @@ export function getGlobalSettings(): { gameContainerWidth: number; gameContainer
   return DEFAULT_GLOBAL_SETTINGS;
 }
 
-export function updateGlobalSettings(updates: { gameContainerWidth?: number; gameContainerDepth?: number }): void {
-  // Initialize global settings if not present
+export function updateGlobalSettings(updates: {
+  gameContainerWidth?: number;
+  gameContainerDepth?: number;
+  // null clears the height (no height check)
+  gameContainerHeight?: number | null;
+}): void {
+  // Initialize global settings if not present. Start from the effective values so that setting
+  // one field does not reset the others to defaults.
   if (!project.globalSettings) {
-    project.globalSettings = { ...DEFAULT_GLOBAL_SETTINGS };
+    const current = getGlobalSettings();
+    project.globalSettings = {
+      gameContainerWidth: current.gameContainerWidth,
+      gameContainerDepth: current.gameContainerDepth
+    };
+  }
+  // The height belongs to the project only; it is not copied into counter trays.
+  if (updates.gameContainerHeight === null) {
+    delete project.globalSettings.gameContainerHeight;
+  } else if (updates.gameContainerHeight !== undefined) {
+    project.globalSettings.gameContainerHeight = updates.gameContainerHeight;
   }
   // Update project-level settings
   if (updates.gameContainerWidth !== undefined) {
@@ -1230,6 +1280,18 @@ export function updateCardWellTrayParams(trayId: string, params: CardWellTrayPar
   }
 }
 
+// Update reserved space dimensions (reserved spaces are always loose in a section)
+export function updateReservedTrayParams(trayId: string, params: ReservedSpaceParams): void {
+  for (const section of project.sections) {
+    const looseTray = section.looseTrays.find((t) => t.id === trayId);
+    if (looseTray && isReservedTray(looseTray)) {
+      looseTray.params = params;
+      autosave();
+      return;
+    }
+  }
+}
+
 // Update standee tray params
 export function updateStandeeTrayParams(trayId: string, params: StandeeTrayParams): void {
   for (const section of project.sections) {
@@ -1291,6 +1353,8 @@ export function moveTray(trayId: string, targetBoxId: string | 'new'): void {
   }
 
   if (!sourceTray || !sourceSection) return;
+  // Reserved spaces live directly in a section, never in a box
+  if (isReservedTray(sourceTray)) return;
 
   // Determine target box
   let targetBox: Box;
@@ -1400,6 +1464,8 @@ export function moveLooseTrayToBox(trayId: string, targetBoxId: string): void {
   }
 
   if (!sourceTray || !sourceSection) return;
+  // Reserved spaces live directly in a section, never in a box
+  if (isReservedTray(sourceTray)) return;
 
   // Find target box
   let targetBox: Box | null = null;
@@ -1602,6 +1668,42 @@ export function clearSectionLayout(sectionId: string): void {
   autosave();
 }
 
+// Whether any section has a position in the game container (project layout)
+export function hasProjectLayout(): boolean {
+  return project.sections.some((s) => s.placement !== undefined);
+}
+
+// Save the position of every section in the game container
+export function saveProjectLayout(placements: Record<string, SectionPlacement>): void {
+  for (const section of project.sections) {
+    const placement = placements[section.id];
+    if (placement) {
+      section.placement = { ...placement };
+    }
+  }
+  autosave();
+}
+
+// Move one section's placement (used to keep a section in place when its own layout changes)
+export function setSectionPlacement(sectionId: string, placement: SectionPlacement | undefined): void {
+  const section = project.sections.find((l) => l.id === sectionId);
+  if (!section) return;
+  if (placement) {
+    section.placement = { ...placement };
+  } else {
+    delete section.placement;
+  }
+  autosave();
+}
+
+// Clear the project layout (sections go back to stacking as full slices)
+export function clearProjectLayout(): void {
+  for (const section of project.sections) {
+    delete section.placement;
+  }
+  autosave();
+}
+
 // Get manual section layout
 export function getSectionLayout(
   sectionId: string
@@ -1724,6 +1826,15 @@ export function duplicateSection(sectionId: string): Section | null {
   newSection.id = generateId();
   newSection.name = `${originalSection.name} copy`;
   newSection.manualLayout = undefined;
+  if (originalSection.placement) {
+    // Same spot in the container, resting directly on top of the original
+    newSection.placement = {
+      x: originalSection.placement.x,
+      y: originalSection.placement.y,
+      z: originalSection.placement.z + 0.001,
+      rotation: originalSection.placement.rotation
+    };
+  }
 
   // Generate new IDs for all boxes and their trays
   for (const box of newSection.boxes) {

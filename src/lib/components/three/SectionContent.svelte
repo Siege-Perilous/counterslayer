@@ -280,6 +280,7 @@
         width={trayPlacement.dimensions.width}
         depth={trayPlacement.dimensions.depth}
         height={trayHeight}
+        hatched={trayPlacement.tray.type === 'reserved'}
       />
     </T.Group>
   {:else}
