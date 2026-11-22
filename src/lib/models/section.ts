@@ -1,15 +1,15 @@
 /**
- * Layer model - handles arrangement and height calculation for layers
- * A layer contains boxes (with trays inside) and loose trays (not in boxes)
+ * Section model - handles arrangement and height calculation for sections
+ * A section contains boxes (with trays inside) and loose trays (not in boxes)
  */
 
 import type {
   Box,
   CardSize,
   CounterShape,
-  Layer,
   ManualBoxPlacement,
   ManualLooseTrayPlacement,
+  Section,
   Standee,
   Tray
 } from '#lib/types/project.js';
@@ -38,20 +38,20 @@ export interface LooseTrayPlacement {
   rotation: 0 | 90 | 180 | 270;
 }
 
-export interface LayerArrangement {
+export interface SectionArrangement {
   boxes: BoxPlacement[];
   looseTrays: LooseTrayPlacement[];
-  layerHeight: number;
+  sectionHeight: number;
   totalWidth: number;
   totalDepth: number;
 }
 
 /**
- * Calculate the height of a layer
- * Layer height = max of all box exterior heights and all loose tray content heights
+ * Calculate the height of a section
+ * Section height = max of all box exterior heights and all loose tray content heights
  */
-export function calculateLayerHeight(
-  layer: Layer,
+export function calculateSectionHeight(
+  section: Section,
   options: {
     cardSizes: CardSize[];
     counterShapes: CounterShape[];
@@ -61,24 +61,24 @@ export function calculateLayerHeight(
   const { cardSizes, counterShapes, standees = [] } = options;
 
   // Get all box exterior heights
-  const boxHeights = layer.boxes.map((box) => {
+  const boxHeights = section.boxes.map((box) => {
     const dims = getBoxExteriorDimensions(box, cardSizes, counterShapes, standees);
     return dims.height;
   });
 
   // Get all loose tray content heights (minimum required height)
-  const looseTrayHeights = layer.looseTrays.map((tray) => {
+  const looseTrayHeights = section.looseTrays.map((tray) => {
     const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes, standees);
     return dims.height;
   });
 
-  // Layer height = max of all items
+  // Section height = max of all items
   return Math.max(...boxHeights, ...looseTrayHeights, 0);
 }
 
 /**
  * Get dimensions of a box's exterior (including walls, floor, lid)
- * This is used for layer-level arrangement
+ * This is used for section-level arrangement
  */
 export function getBoxDimensions(
   box: Box,
@@ -90,11 +90,11 @@ export function getBoxDimensions(
 }
 
 /**
- * Arrange boxes and loose trays within a layer
- * Uses bin-packing similar to arrangeTrays but at the layer level
+ * Arrange boxes and loose trays within a section
+ * Uses bin-packing similar to arrangeTrays but at the section level
  */
-export function arrangeLayerContents(
-  layer: Layer,
+export function arrangeSectionContents(
+  section: Section,
   options: {
     gameContainerWidth: number;
     gameContainerDepth: number;
@@ -103,27 +103,27 @@ export function arrangeLayerContents(
     standees?: Standee[];
     gap?: number;
   }
-): LayerArrangement {
+): SectionArrangement {
   const { cardSizes, counterShapes, standees = [] } = options;
 
-  // Calculate layer height first
-  const layerHeight = calculateLayerHeight(layer, { cardSizes, counterShapes, standees });
+  // Calculate section height first
+  const sectionHeight = calculateSectionHeight(section, { cardSizes, counterShapes, standees });
 
   // If manual layout exists, use it
-  if (layer.manualLayout) {
-    return arrangeLayerManual(layer, layerHeight, options);
+  if (section.manualLayout) {
+    return arrangeSectionManual(section, sectionHeight, options);
   }
 
   // Auto-arrange using bin packing
-  return arrangeLayerAuto(layer, layerHeight, options);
+  return arrangeSectionAuto(section, sectionHeight, options);
 }
 
 /**
- * Arrange layer contents using manual placements
+ * Arrange section contents using manual placements
  */
-function arrangeLayerManual(
-  layer: Layer,
-  layerHeight: number,
+function arrangeSectionManual(
+  section: Section,
+  sectionHeight: number,
   options: {
     gameContainerWidth: number;
     gameContainerDepth: number;
@@ -131,24 +131,24 @@ function arrangeLayerManual(
     counterShapes: CounterShape[];
     standees?: Standee[];
   }
-): LayerArrangement {
+): SectionArrangement {
   const { cardSizes, counterShapes, standees = [] } = options;
   const boxPlacements: BoxPlacement[] = [];
   const looseTrayPlacements: LooseTrayPlacement[] = [];
 
   // Place boxes from manual layout
-  if (layer.manualLayout?.boxes) {
-    for (const manual of layer.manualLayout.boxes) {
-      const box = layer.boxes.find((b) => b.id === manual.boxId);
+  if (section.manualLayout?.boxes) {
+    for (const manual of section.manualLayout.boxes) {
+      const box = section.boxes.find((b) => b.id === manual.boxId);
       if (!box) continue;
 
       const dims = getBoxDimensions(box, cardSizes, counterShapes, standees);
       // Apply rotation: 90° and 270° swap width/depth
-      // Use layerHeight for consistent layer stacking
+      // Use sectionHeight for consistent section stacking
       const swapDims = manual.rotation === 90 || manual.rotation === 270;
       const effectiveDims: BoxDimensions = swapDims
-        ? { width: dims.depth, depth: dims.width, height: layerHeight }
-        : { width: dims.width, depth: dims.depth, height: layerHeight };
+        ? { width: dims.depth, depth: dims.width, height: sectionHeight }
+        : { width: dims.width, depth: dims.depth, height: sectionHeight };
 
       boxPlacements.push({
         box,
@@ -161,17 +161,17 @@ function arrangeLayerManual(
   }
 
   // Place loose trays from manual layout
-  if (layer.manualLayout?.looseTrays) {
-    for (const manual of layer.manualLayout.looseTrays) {
-      const tray = layer.looseTrays.find((t) => t.id === manual.trayId);
+  if (section.manualLayout?.looseTrays) {
+    for (const manual of section.manualLayout.looseTrays) {
+      const tray = section.looseTrays.find((t) => t.id === manual.trayId);
       if (!tray) continue;
 
       const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes, standees);
       // Apply rotation: 90° and 270° swap width/depth
       const swapDims = manual.rotation === 90 || manual.rotation === 270;
       const effectiveDims = swapDims
-        ? { width: dims.depth, depth: dims.width, height: layerHeight }
-        : { width: dims.width, depth: dims.depth, height: layerHeight };
+        ? { width: dims.depth, depth: dims.width, height: sectionHeight }
+        : { width: dims.width, depth: dims.depth, height: sectionHeight };
 
       looseTrayPlacements.push({
         tray,
@@ -184,11 +184,11 @@ function arrangeLayerManual(
   }
 
   // Add any items not in manual layout using auto-arrangement
-  const manualBoxIds = new Set(layer.manualLayout?.boxes?.map((m) => m.boxId) || []);
-  const manualTrayIds = new Set(layer.manualLayout?.looseTrays?.map((m) => m.trayId) || []);
+  const manualBoxIds = new Set(section.manualLayout?.boxes?.map((m) => m.boxId) || []);
+  const manualTrayIds = new Set(section.manualLayout?.looseTrays?.map((m) => m.trayId) || []);
 
-  const unplacedBoxes = layer.boxes.filter((b) => !manualBoxIds.has(b.id));
-  const unplacedTrays = layer.looseTrays.filter((t) => !manualTrayIds.has(t.id));
+  const unplacedBoxes = section.boxes.filter((b) => !manualBoxIds.has(b.id));
+  const unplacedTrays = section.looseTrays.filter((t) => !manualTrayIds.has(t.id));
 
   if (unplacedBoxes.length > 0 || unplacedTrays.length > 0) {
     // Find max Y of placed items
@@ -201,13 +201,13 @@ function arrangeLayerManual(
     }
 
     // Auto-arrange remaining items
-    const tempLayer: Layer = {
-      ...layer,
+    const tempSection: Section = {
+      ...section,
       boxes: unplacedBoxes,
       looseTrays: unplacedTrays,
       manualLayout: undefined
     };
-    const autoArrangement = arrangeLayerAuto(tempLayer, layerHeight, options);
+    const autoArrangement = arrangeSectionAuto(tempSection, sectionHeight, options);
 
     // Offset and add to placements
     for (const p of autoArrangement.boxes) {
@@ -239,14 +239,14 @@ function arrangeLayerManual(
   return {
     boxes: boxPlacements,
     looseTrays: looseTrayPlacements,
-    layerHeight,
+    sectionHeight,
     totalWidth,
     totalDepth
   };
 }
 
-// Item data for layer bin packing
-interface LayerItemData {
+// Item data for section bin packing
+interface SectionItemData {
   itemType: 'box' | 'looseTray';
   item: Box | Tray;
   originalWidth: number;
@@ -254,11 +254,11 @@ interface LayerItemData {
 }
 
 /**
- * Auto-arrange layer contents using shared bin packing utility
+ * Auto-arrange section contents using shared bin packing utility
  */
-function arrangeLayerAuto(
-  layer: Layer,
-  layerHeight: number,
+function arrangeSectionAuto(
+  section: Section,
+  sectionHeight: number,
   options: {
     gameContainerWidth: number;
     gameContainerDepth: number;
@@ -266,24 +266,24 @@ function arrangeLayerAuto(
     counterShapes: CounterShape[];
     standees?: Standee[];
   }
-): LayerArrangement {
+): SectionArrangement {
   const { gameContainerWidth, gameContainerDepth, cardSizes, counterShapes, standees = [] } = options;
 
-  if (layer.boxes.length === 0 && layer.looseTrays.length === 0) {
+  if (section.boxes.length === 0 && section.looseTrays.length === 0) {
     return {
       boxes: [],
       looseTrays: [],
-      layerHeight: 0,
+      sectionHeight: 0,
       totalWidth: 0,
       totalDepth: 0
     };
   }
 
   // Collect all items with their dimensions
-  const packingItems: PackingItem<LayerItemData>[] = [];
+  const packingItems: PackingItem<SectionItemData>[] = [];
 
   // Add boxes
-  for (const box of layer.boxes) {
+  for (const box of section.boxes) {
     const dims = getBoxDimensions(box, cardSizes, counterShapes, standees);
     packingItems.push({
       data: { itemType: 'box', item: box, originalWidth: dims.width, originalDepth: dims.depth },
@@ -293,7 +293,7 @@ function arrangeLayerAuto(
   }
 
   // Add loose trays
-  for (const tray of layer.looseTrays) {
+  for (const tray of section.looseTrays) {
     const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes, standees);
     packingItems.push({
       data: { itemType: 'looseTray', item: tray, originalWidth: dims.width, originalDepth: dims.depth },
@@ -305,7 +305,7 @@ function arrangeLayerAuto(
   // Try bin packing
   const packResult = packItems(packingItems, gameContainerWidth, gameContainerDepth);
 
-  // Convert packing result to layer placements
+  // Convert packing result to section placements
   const convertToPlacement = (result: typeof packResult) => {
     if (!result) return null;
 
@@ -318,7 +318,7 @@ function arrangeLayerAuto(
       if (data.itemType === 'box') {
         boxPlacements.push({
           box: data.item as Box,
-          dimensions: { width, depth, height: layerHeight },
+          dimensions: { width, depth, height: sectionHeight },
           x,
           y,
           rotation: rotated ? 90 : 0
@@ -326,7 +326,7 @@ function arrangeLayerAuto(
       } else {
         looseTrayPlacements.push({
           tray: data.item as Tray,
-          dimensions: { width, depth, height: layerHeight },
+          dimensions: { width, depth, height: sectionHeight },
           x,
           y,
           rotation: rotated ? 90 : 0
@@ -337,7 +337,7 @@ function arrangeLayerAuto(
     return {
       boxes: boxPlacements,
       looseTrays: looseTrayPlacements,
-      layerHeight,
+      sectionHeight,
       totalWidth: result.totalWidth,
       totalDepth: result.totalDepth
     };
@@ -354,7 +354,7 @@ function arrangeLayerAuto(
     fallbackPlacement || {
       boxes: [],
       looseTrays: [],
-      layerHeight,
+      sectionHeight,
       totalWidth: 0,
       totalDepth: 0
     }
@@ -362,9 +362,9 @@ function arrangeLayerAuto(
 }
 
 /**
- * Convert layer arrangement to manual placements for saving
+ * Convert section arrangement to manual placements for saving
  */
-export function arrangementToManualPlacements(arrangement: LayerArrangement): {
+export function arrangementToManualPlacements(arrangement: SectionArrangement): {
   boxes: ManualBoxPlacement[];
   looseTrays: ManualLooseTrayPlacement[];
 } {

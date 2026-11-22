@@ -1,5 +1,12 @@
 import type { Box, CardSize, CounterShape, Standee, Tray } from '#lib/types/project.js';
-import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isStandeeTray } from '#lib/types/project.js';
+import {
+  isCardDividerTray,
+  isCardTray,
+  isCardWellTray,
+  isCupTray,
+  isReservedTray,
+  isStandeeTray
+} from '#lib/types/project.js';
 import { packItems, stackItemsVertically, type PackingItem } from '#lib/utils/binPacking.js';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -9,6 +16,7 @@ import { getCardWellTrayDimensions } from './cardWellTray';
 import type { CounterTrayParams } from './counterTray';
 import { getCupTrayDimensions } from './cupTray';
 import { createHoneycombUnion, defaultHoneycombParams } from './honeycomb';
+import { getReservedSpaceDimensions } from './reservedSpace';
 import { getStandeeTrayDimensions } from './standeeTray';
 
 const { cylinder } = jscad.primitives;
@@ -69,6 +77,9 @@ export function getTrayDimensionsForTray(
   }
   if (isStandeeTray(tray)) {
     return getStandeeTrayDimensions(tray.params, standees);
+  }
+  if (isReservedTray(tray)) {
+    return getReservedSpaceDimensions(tray.params);
   }
   // Default to counter tray
   return getCounterTrayDimensions(tray.params, counterShapes);

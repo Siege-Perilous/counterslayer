@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "layers": [
+  "version": 3,
+  "sections": [
     {
       "id": "hhpu6bw",
       "name": "Wood pieces",
@@ -123,6 +123,12 @@
             "rotation": 0
           }
         ]
+      },
+      "placement": {
+        "x": 0,
+        "y": 0,
+        "z": 33,
+        "rotation": 0
       }
     },
     {
@@ -299,6 +305,12 @@
             "rotation": 0
           }
         ]
+      },
+      "placement": {
+        "x": 0,
+        "y": 0,
+        "z": 54,
+        "rotation": 0
       }
     },
     {
@@ -349,6 +361,12 @@
             "rotation": 90
           }
         ]
+      },
+      "placement": {
+        "x": 0,
+        "y": 214,
+        "z": 33,
+        "rotation": 0
       }
     },
     {
@@ -407,6 +425,37 @@
             "rotation": 90
           }
         ]
+      },
+      "placement": {
+        "x": 0,
+        "y": 214,
+        "z": 48.5,
+        "rotation": 0
+      }
+    },
+    {
+      "id": "if7g31n",
+      "name": "Required space",
+      "boxes": [],
+      "looseTrays": [
+        {
+          "id": "z90wqzx",
+          "type": "reserved",
+          "name": "Boards and booklets",
+          "color": "#8a8f98",
+          "rotationOverride": "auto",
+          "params": {
+            "width": 214,
+            "depth": 292,
+            "height": 33
+          }
+        }
+      ],
+      "placement": {
+        "x": 0,
+        "y": 0,
+        "z": 0,
+        "rotation": 0
       }
     }
   ],
@@ -508,11 +557,12 @@
       "standeeThickness": 1.5
     }
   ],
-  "selectedLayerId": "r3z34z8",
+  "selectedSectionId": "if7g31n",
   "selectedBoxId": null,
-  "selectedTrayId": "bjrdvgt",
+  "selectedTrayId": "z90wqzx",
   "globalSettings": {
     "gameContainerWidth": 214,
-    "gameContainerDepth": 292
+    "gameContainerDepth": 292,
+    "gameContainerHeight": 75
   }
 }

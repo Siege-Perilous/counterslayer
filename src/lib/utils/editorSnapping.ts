@@ -1,7 +1,7 @@
 /**
  * Unified Editor Snapping Utility
  * Handles grid snapping, face-to-face snapping, and overlap detection
- * Used by both box layout editor and layer layout editor
+ * Used by both box layout editor and section layout editor
  */
 
 import type { SnapGuide, SnapResult, SnappableItem } from '#lib/types/editor.js';
@@ -22,7 +22,10 @@ export function snapItemPosition(
   newY: number,
   otherItems: SnappableItem[],
   boundsWidth: number,
-  boundsDepth: number
+  boundsDepth: number,
+  // false = also snap to the bounds' edges but allow positions outside them (project layout,
+  // where being outside the game container is only a warning)
+  clamp = true
 ): SnapResult {
   const guides: SnapGuide[] = [];
 
@@ -159,9 +162,23 @@ export function snapItemPosition(
     snappedY = Math.round(snappedY / GRID_SIZE) * GRID_SIZE;
   }
 
-  // Constrain to bounds
-  snappedX = Math.max(0, Math.min(snappedX, boundsWidth - movingItem.width));
-  snappedY = Math.max(0, Math.min(snappedY, boundsDepth - movingItem.depth));
+  if (clamp) {
+    // Constrain to bounds
+    snappedX = Math.max(0, Math.min(snappedX, boundsWidth - movingItem.width));
+    snappedY = Math.max(0, Math.min(snappedY, boundsDepth - movingItem.depth));
+  } else {
+    // Snap to the inside of the bounds' edges when close, without forcing the item inside
+    if (!xSnapped) {
+      if (Math.abs(snappedX) < FACE_SNAP_THRESHOLD) snappedX = 0;
+      else if (Math.abs(snappedX + movingItem.width - boundsWidth) < FACE_SNAP_THRESHOLD)
+        snappedX = boundsWidth - movingItem.width;
+    }
+    if (!ySnapped) {
+      if (Math.abs(snappedY) < FACE_SNAP_THRESHOLD) snappedY = 0;
+      else if (Math.abs(snappedY + movingItem.depth - boundsDepth) < FACE_SNAP_THRESHOLD)
+        snappedY = boundsDepth - movingItem.depth;
+    }
+  }
 
   return { x: snappedX, y: snappedY, guides };
 }

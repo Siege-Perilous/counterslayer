@@ -8,7 +8,7 @@ async function captureScreenshots() {
   const consoleLogs: string[] = [];
   page.on('console', async (msg) => {
     const text = msg.text();
-    if (text.includes('arrangeLayerAuto') || text.includes('LayerContent')) {
+    if (text.includes('arrangeSectionAuto') || text.includes('SectionContent')) {
       // Try to get full object details
       try {
         const args = msg.args();
@@ -45,7 +45,7 @@ async function captureScreenshots() {
     // Capture the default view
     await page.screenshot({ path: 'mesh-analysis/view-current.png' });
 
-    // Try to click "Dimensions" to see all layers view
+    // Try to click "Dimensions" to see all sections view
     try {
       // Look for the Dimensions tab/button
       const dimensionsBtn = page.locator('text=Dimensions').first();

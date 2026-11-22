@@ -22,15 +22,24 @@ import {
 } from '#lib/models/counterTray.js';
 import { createCupTray } from '#lib/models/cupTray.js';
 import { createBoxWithLidGrooves, createLid } from '#lib/models/lid.js';
+import { getReservedSpaceDimensions } from '#lib/models/reservedSpace.js';
 import { createStandeeTray, getStandeePositions } from '#lib/models/standeeTray.js';
-import type { Box, CardSize, CounterShape, Layer, Standee, Tray } from '#lib/types/project.js';
-import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isStandeeTray } from '#lib/types/project.js';
+import type { Box, CardSize, CounterShape, Section, Standee, Tray } from '#lib/types/project.js';
+import {
+  isCardDividerTray,
+  isCardTray,
+  isCardWellTray,
+  isCupTray,
+  isReservedTray,
+  isStandeeTray
+} from '#lib/types/project.js';
 import threemfSerializer from '@jscad/3mf-serializer';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import stlSerializer from '@jscad/stl-serializer';
 
 const { geom3 } = jscad.geometries;
+const { cuboid } = jscad.primitives;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const generalize = (jscad.modifiers as any).generalize as (
@@ -48,7 +57,7 @@ function cleanGeometryForExport(geom: Geom3): Geom3 {
 }
 
 /**
- * Generate a tray letter based on cumulative index across all layers.
+ * Generate a tray letter based on cumulative index across all sections.
  * A-Z for first 26, then AA, BB, CC... for 26+
  */
 function getTrayLetter(index: number): string {
@@ -61,25 +70,25 @@ function getTrayLetter(index: number): string {
 }
 
 /**
- * Get all boxes from all layers.
+ * Get all boxes from all sections.
  */
-function getAllBoxes(layers: Layer[]): Box[] {
+function getAllBoxes(sections: Section[]): Box[] {
   const boxes: Box[] = [];
-  for (const layer of layers) {
-    boxes.push(...layer.boxes);
+  for (const section of sections) {
+    boxes.push(...section.boxes);
   }
   return boxes;
 }
 
 /**
- * Get cumulative tray index across all layers.
- * Order: For each layer, count box trays first, then loose trays.
+ * Get cumulative tray index across all sections.
+ * Order: For each section, count box trays first, then loose trays.
  */
-function getCumulativeTrayIndexForTray(layers: Layer[], trayId: string): number {
+function getCumulativeTrayIndexForTray(sections: Section[], trayId: string): number {
   let cumulative = 0;
-  for (const layer of layers) {
+  for (const section of sections) {
     // Count box trays
-    for (const box of layer.boxes) {
+    for (const box of section.boxes) {
       for (const tray of box.trays) {
         if (tray.id === trayId) {
           return cumulative;
@@ -87,65 +96,65 @@ function getCumulativeTrayIndexForTray(layers: Layer[], trayId: string): number 
         cumulative++;
       }
     }
-    // Count loose trays
-    for (const tray of layer.looseTrays) {
+    // Count loose trays. Reserved spaces are not printed, so they take no letter.
+    for (const tray of section.looseTrays) {
       if (tray.id === trayId) {
         return cumulative;
       }
-      cumulative++;
+      if (!isReservedTray(tray)) cumulative++;
     }
   }
   return cumulative;
 }
 
 /**
- * Calculate unified layer height for a layer.
- * All items in a layer should have the same total height for proper stacking.
+ * Calculate unified section height for a section.
+ * All items in a section should have the same total height for proper stacking.
  *
- * The layer height is the maximum of:
+ * The section height is the maximum of:
  * - All box exterior heights (including floor, walls, lid groove)
  * - All loose tray content heights
  *
- * For loose trays to match box height, they are generated at the layer height.
+ * For loose trays to match box height, they are generated at the section height.
  * For boxes to match a taller loose tray, their interior trays need to grow.
  */
-function calculateUnifiedLayerHeight(
-  layer: Layer,
+function calculateUnifiedSectionHeight(
+  section: Section,
   cardSizes: CardSize[],
   counterShapes: CounterShape[],
   standees: Standee[] = []
 ): number {
   // Get all box exterior heights
-  const boxHeights = layer.boxes.map((box) => {
+  const boxHeights = section.boxes.map((box) => {
     const dims = getBoxExteriorDimensions(box, cardSizes, counterShapes, standees);
     return dims.height;
   });
 
   // Get all loose tray content heights
-  const looseTrayHeights = layer.looseTrays.map((tray) => {
+  const looseTrayHeights = section.looseTrays.map((tray) => {
     const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes, standees);
     return dims.height;
   });
 
-  // Layer height = max of all items
+  // Section height = max of all items
   return Math.max(...boxHeights, ...looseTrayHeights, 0);
 }
 
 /**
- * Calculate the required interior tray height for a box to match a target layer height.
+ * Calculate the required interior tray height for a box to match a target section height.
  * The lid slides into the box - only the flat top (lid thickness) sticks above.
- * Box body = layer height - lid thickness (visible part)
+ * Box body = section height - lid thickness (visible part)
  * Box interior = box body - floor thickness
  * Required tray height = box interior
  */
-function getRequiredTrayHeightForBox(box: Box, targetLayerHeight: number): number {
+function getRequiredTrayHeightForBox(box: Box, targetSectionHeight: number): number {
   // Only the lid thickness (flat top) sticks above the box, not the full lid height
   const lidThickness = box.lidParams?.thickness ?? 2;
   const floorThickness = box.floorThickness;
 
-  // Box body = layer height - lid visible height
+  // Box body = section height - lid visible height
   // Tray height = box interior = box body - floor
-  const requiredTrayHeight = targetLayerHeight - lidThickness - floorThickness;
+  const requiredTrayHeight = targetSectionHeight - lidThickness - floorThickness;
 
   // Return at least 0 (shouldn't happen in practice)
   return Math.max(requiredTrayHeight, 0);
@@ -156,7 +165,7 @@ interface GenerateMessage {
   type: 'generate';
   id: number;
   project: {
-    layers: Layer[];
+    sections: Section[];
     cardSizes?: CardSize[];
     counterShapes?: CounterShape[];
     standees?: Standee[];
@@ -211,7 +220,7 @@ interface BoxGeometryResult {
 
 interface LooseTrayGeometryResult {
   trayId: string;
-  layerId: string;
+  sectionId: string;
   name: string;
   color: string;
   geometry: GeometryData;
@@ -316,6 +325,13 @@ function createTrayGeometry(
   standees: Standee[] = []
 ): Geom3 {
   const showEmboss = tray.showEmboss ?? true;
+  if (isReservedTray(tray)) {
+    // A reserved space has no printable geometry. This plain block is for display only and
+    // must never reach an export (callers keep it out of the export caches).
+    const dims = getReservedSpaceDimensions(tray.params);
+    const height = Math.max(maxHeight, dims.height);
+    return cuboid({ size: [dims.width, dims.depth, height], center: [dims.width / 2, dims.depth / 2, height / 2] });
+  }
   if (isCupTray(tray)) {
     return createCupTray(tray.params, tray.name, maxHeight, spacerHeight, showEmboss);
   }
@@ -355,8 +371,9 @@ function getTrayPositions(
   spacerHeight: number,
   standees: Standee[] = []
 ): CounterStack[] {
-  if (isCupTray(tray)) {
-    // Cup trays don't have counter previews - the cups themselves are the containers
+  if (isCupTray(tray) || isReservedTray(tray)) {
+    // Cup trays don't have counter previews - the cups themselves are the containers.
+    // Reserved spaces are plain blocks with nothing in them.
     return [];
   }
   if (isStandeeTray(tray)) {
@@ -529,28 +546,28 @@ function jscadToArrays(jscadGeom: Geom3): GeometryData {
 }
 
 /**
- * Find a box by ID across all layers
+ * Find a box by ID across all sections
  */
-function findBoxById(layers: Layer[], boxId: string): Box | undefined {
-  for (const layer of layers) {
-    const box = layer.boxes.find((b) => b.id === boxId);
+function findBoxById(sections: Section[], boxId: string): Box | undefined {
+  for (const section of sections) {
+    const box = section.boxes.find((b) => b.id === boxId);
     if (box) return box;
   }
   return undefined;
 }
 
 /**
- * Find a tray by ID across all layers (boxes and loose trays)
+ * Find a tray by ID across all sections (boxes and loose trays)
  */
-function findTrayById(layers: Layer[], trayId: string): Tray | undefined {
-  for (const layer of layers) {
+function findTrayById(sections: Section[], trayId: string): Tray | undefined {
+  for (const section of sections) {
     // Check boxes
-    for (const box of layer.boxes) {
+    for (const box of section.boxes) {
       const tray = box.trays.find((t) => t.id === trayId);
       if (tray) return tray;
     }
     // Check loose trays
-    const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+    const looseTray = section.looseTrays.find((t) => t.id === trayId);
     if (looseTray) return looseTray;
   }
   return undefined;
@@ -570,8 +587,8 @@ function handleGenerate(msg: GenerateMessage): void {
   };
 
   try {
-    const box = selectedBoxId ? findBoxById(project.layers, selectedBoxId) : undefined;
-    const tray = findTrayById(project.layers, selectedTrayId);
+    const box = selectedBoxId ? findBoxById(project.sections, selectedBoxId) : undefined;
+    const tray = findTrayById(project.sections, selectedTrayId);
 
     if (!tray) {
       self.postMessage({
@@ -587,22 +604,22 @@ function handleGenerate(msg: GenerateMessage): void {
     const counterShapes = project.counterShapes ?? [];
     const standees = project.standees ?? [];
 
-    // Pre-calculate unified layer heights for all layers FIRST
-    // All items in a layer should have the same total exterior height for proper stacking
-    const layerHeights = new Map<string, number>();
-    for (const layer of project.layers) {
-      const layerHeight = calculateUnifiedLayerHeight(layer, cardSizes, counterShapes, standees);
-      layerHeights.set(layer.id, layerHeight);
+    // Pre-calculate unified section heights for all sections FIRST
+    // All items in a section should have the same total exterior height for proper stacking
+    const sectionHeights = new Map<string, number>();
+    for (const section of project.sections) {
+      const sectionHeight = calculateUnifiedSectionHeight(section, cardSizes, counterShapes, standees);
+      sectionHeights.set(section.id, sectionHeight);
     }
 
-    // Helper to find which layer contains a box
-    function findLayerForBox(boxId: string): Layer | undefined {
-      return project.layers.find((layer) => layer.boxes.some((b) => b.id === boxId));
+    // Helper to find which section contains a box
+    function findSectionForBox(boxId: string): Section | undefined {
+      return project.sections.find((section) => section.boxes.some((b) => b.id === boxId));
     }
 
-    // Helper to find which layer contains a loose tray
-    function findLayerForLooseTray(trayId: string): Layer | undefined {
-      return project.layers.find((layer) => layer.looseTrays.some((t) => t.id === trayId));
+    // Helper to find which section contains a loose tray
+    function findSectionForLooseTray(trayId: string): Section | undefined {
+      return project.sections.find((section) => section.looseTrays.some((t) => t.id === trayId));
     }
 
     // If tray is in a box, generate box-related geometry
@@ -624,12 +641,12 @@ function handleGenerate(msg: GenerateMessage): void {
         return;
       }
 
-      // Find the layer containing this box and get the unified layer height
-      const selectedBoxLayer = findLayerForBox(box.id);
-      const selectedLayerHeight = selectedBoxLayer ? (layerHeights.get(selectedBoxLayer.id) ?? 0) : 0;
+      // Find the section containing this box and get the unified section height
+      const selectedBoxSection = findSectionForBox(box.id);
+      const selectedSectionHeight = selectedBoxSection ? (sectionHeights.get(selectedBoxSection.id) ?? 0) : 0;
 
-      // Calculate the required tray height to match the layer height
-      const requiredTrayHeight = getRequiredTrayHeightForBox(box, selectedLayerHeight);
+      // Calculate the required tray height to match the section height
+      const requiredTrayHeight = getRequiredTrayHeightForBox(box, selectedSectionHeight);
 
       // Generate all trays with their placements for selected box
       const placements = arrangeTrays(box.trays, {
@@ -643,9 +660,9 @@ function handleGenerate(msg: GenerateMessage): void {
       });
 
       const spacerInfo = calculateTraySpacers(box, cardSizes, counterShapes, standees);
-      // Use the layer-adjusted tray height instead of natural height
+      // Use the section-adjusted tray height instead of natural height
       const naturalMaxHeight = Math.max(...placements.map((p) => p.dimensions.height));
-      const maxHeight = selectedLayerHeight > 0 ? requiredTrayHeight : naturalMaxHeight;
+      const maxHeight = selectedSectionHeight > 0 ? requiredTrayHeight : naturalMaxHeight;
 
       // Find spacer for selected tray
       const selectedSpacer = spacerInfo.find((s) => s.trayId === tray.id);
@@ -695,13 +712,13 @@ function handleGenerate(msg: GenerateMessage): void {
             }
           },
           counterStacks: getTrayPositions(placement.tray, cardSizes, counterShapes, maxHeight, spacerHeight, standees),
-          trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, placement.tray.id))
+          trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.sections, placement.tray.id))
         };
       });
 
-      // Generate box and lid - pass layer height so box exterior matches layer
+      // Generate box and lid - pass section height so box exterior matches section
       time(`createBoxWithLidGrooves (${box.name})`, () => {
-        cachedBox = createBoxWithLidGrooves(box, cardSizes, counterShapes, selectedLayerHeight, standees);
+        cachedBox = createBoxWithLidGrooves(box, cardSizes, counterShapes, selectedSectionHeight, standees);
       });
       time(`createLid (${box.name})`, () => {
         cachedLid = createLid(box, cardSizes, counterShapes, standees);
@@ -712,15 +729,15 @@ function handleGenerate(msg: GenerateMessage): void {
       lidGeometry = cachedLid ? jscadToArrays(cachedLid) : null;
     } else {
       // Loose tray - no box context
-      // Find the layer containing this loose tray and get the unified layer height
-      const looseTrayLayer = findLayerForLooseTray(tray.id);
-      const looseTrayLayerHeight = looseTrayLayer ? (layerHeights.get(looseTrayLayer.id) ?? 0) : 0;
+      // Find the section containing this loose tray and get the unified section height
+      const looseTraySection = findSectionForLooseTray(tray.id);
+      const looseTraySectionHeight = looseTraySection ? (sectionHeights.get(looseTraySection.id) ?? 0) : 0;
 
       // Calculate tray dimensions for proper sizing
       const trayDims = getTrayDimensionsForTray(tray, cardSizes, counterShapes, standees);
       const naturalHeight = trayDims.height;
-      // Use layer height if available, otherwise use natural height
-      const maxHeight = looseTrayLayerHeight > 0 ? looseTrayLayerHeight : naturalHeight;
+      // Use section height if available, otherwise use natural height
+      const maxHeight = looseTraySectionHeight > 0 ? looseTraySectionHeight : naturalHeight;
       const spacerHeight = 0; // No spacer for loose trays
 
       // Generate standalone tray
@@ -729,6 +746,11 @@ function handleGenerate(msg: GenerateMessage): void {
       selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, maxHeight, spacerHeight, standees);
 
       cachedAllTrays = [{ jscadGeom: cachedSelectedTray, name: tray.name }];
+      if (isReservedTray(tray)) {
+        // Display only: leave nothing in the export caches for a reserved space
+        cachedSelectedTray = null;
+        cachedAllTrays = [];
+      }
       cachedBox = null;
       cachedLid = null;
       cachedBoxName = '';
@@ -748,16 +770,16 @@ function handleGenerate(msg: GenerateMessage): void {
             dimensions: { width: trayDims.width, depth: trayDims.depth, height: maxHeight }
           },
           counterStacks: selectedTrayCounters,
-          trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, tray.id))
+          trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.sections, tray.id))
         }
       ];
     }
 
-    // Get all boxes from all layers
-    const allBoxes = getAllBoxes(project.layers);
+    // Get all boxes from all sections
+    const allBoxes = getAllBoxes(project.sections);
 
     // Count all loose trays for progress tracking
-    const allLooseTrays = project.layers.flatMap((layer) => layer.looseTrays);
+    const allLooseTrays = project.sections.flatMap((section) => section.looseTrays);
     const totalOperations = allBoxes.length + allLooseTrays.length;
     let currentOperation = 0;
 
@@ -780,22 +802,22 @@ function handleGenerate(msg: GenerateMessage): void {
         console.warn(`Box "${projectBox.name}" validation failed:`, boxValidation.errors);
       }
 
-      // Find this box's layer and get the unified layer height
-      const boxLayer = findLayerForBox(projectBox.id);
-      const layerHeight = boxLayer ? (layerHeights.get(boxLayer.id) ?? 0) : 0;
+      // Find this box's section and get the unified section height
+      const boxSection = findSectionForBox(projectBox.id);
+      const sectionHeight = boxSection ? (sectionHeights.get(boxSection.id) ?? 0) : 0;
 
-      // Calculate the required tray height to match the layer height
-      // This ensures all boxes in a layer have the same exterior height
-      const requiredTrayHeight = getRequiredTrayHeightForBox(projectBox, layerHeight);
+      // Calculate the required tray height to match the section height
+      // This ensures all boxes in a section have the same exterior height
+      const requiredTrayHeight = getRequiredTrayHeightForBox(projectBox, sectionHeight);
 
-      // Generate box and lid - pass target height for box to match layer height
+      // Generate box and lid - pass target height for box to match section height
       let boxJscad: Geom3 | null = null;
       let lidJscad: Geom3 | null = null;
       time(`createBoxWithLidGrooves (${projectBox.name})`, () => {
-        boxJscad = createBoxWithLidGrooves(projectBox, cardSizes, counterShapes, layerHeight, standees);
+        boxJscad = createBoxWithLidGrooves(projectBox, cardSizes, counterShapes, sectionHeight, standees);
       });
       const boxBufferGeom = boxJscad ? jscadToArrays(boxJscad) : null;
-      // Lid dimensions are fixed (2x wall thickness) and don't depend on layer height
+      // Lid dimensions are fixed (2x wall thickness) and don't depend on section height
       time(`createLid (${projectBox.name})`, () => {
         lidJscad = createLid(projectBox, cardSizes, counterShapes, standees);
       });
@@ -813,7 +835,7 @@ function handleGenerate(msg: GenerateMessage): void {
       });
 
       const boxSpacerInfo = calculateTraySpacers(projectBox, cardSizes, counterShapes, standees);
-      // Use the required tray height from layer calculation, not just the box's natural height
+      // Use the required tray height from section calculation, not just the box's natural height
       const naturalTrayHeights = boxPlacements.map((p) => p.dimensions.height);
       const maxNaturalTrayHeight = Math.max(...naturalTrayHeights, 0);
       const boxMaxHeight = Math.max(requiredTrayHeight, maxNaturalTrayHeight);
@@ -856,7 +878,7 @@ function handleGenerate(msg: GenerateMessage): void {
             spacerHeight,
             standees
           ),
-          trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, placement.tray.id))
+          trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.sections, placement.tray.id))
         };
       });
 
@@ -868,26 +890,26 @@ function handleGenerate(msg: GenerateMessage): void {
         trays: cachedTraysForBox
       });
 
-      // Add box dimensions using the layer height (so all boxes in layer report same height)
+      // Add box dimensions using the section height (so all boxes in section report same height)
       allBoxGeometries.push({
         boxId: projectBox.id,
         boxName: projectBox.name,
         boxGeometry: boxBufferGeom,
         lidGeometry: lidBufferGeom,
         trayGeometries: trayGeoms,
-        boxDimensions: { width: projectBox.customWidth ?? 0, depth: projectBox.customDepth ?? 0, height: layerHeight }
+        boxDimensions: { width: projectBox.customWidth ?? 0, depth: projectBox.customDepth ?? 0, height: sectionHeight }
       });
     }
 
-    // Generate geometries for all loose trays across all layers
+    // Generate geometries for all loose trays across all sections
     cachedAllLooseTrays = [];
     const allLooseTrayGeometries: LooseTrayGeometryResult[] = [];
 
-    for (const layer of project.layers) {
-      // Get the unified layer height - loose trays match box exterior height
-      const layerHeight = layerHeights.get(layer.id) ?? 0;
+    for (const section of project.sections) {
+      // Get the unified section height - loose trays match box exterior height
+      const sectionHeight = sectionHeights.get(section.id) ?? 0;
 
-      for (const looseTray of layer.looseTrays) {
+      for (const looseTray of section.looseTrays) {
         // Send progress update
         currentOperation++;
         self.postMessage({
@@ -900,29 +922,31 @@ function handleGenerate(msg: GenerateMessage): void {
 
         // Calculate tray dimensions for width/depth
         const trayDims = getTrayDimensionsForTray(looseTray, cardSizes, counterShapes, standees);
-        // Use layer height for the tray height so loose trays match box exterior height
-        const maxHeight = layerHeight > 0 ? layerHeight : trayDims.height;
+        // Use section height for the tray height so loose trays match box exterior height
+        const maxHeight = sectionHeight > 0 ? sectionHeight : trayDims.height;
         const spacerHeight = 0; // No spacer for loose trays
 
-        // Generate tray geometry at the layer height
+        // Generate tray geometry at the section height
         const jscadGeom = createTrayGeometry(looseTray, cardSizes, counterShapes, maxHeight, spacerHeight, standees);
 
-        // Cache for STL export
-        cachedAllLooseTrays.push({
-          trayName: looseTray.name,
-          trayGeom: jscadGeom
-        });
+        // Cache for STL export (reserved spaces are not printed, so they are never exported)
+        if (!isReservedTray(looseTray)) {
+          cachedAllLooseTrays.push({
+            trayName: looseTray.name,
+            trayGeom: jscadGeom
+          });
+        }
 
         // Add to result
         allLooseTrayGeometries.push({
           trayId: looseTray.id,
-          layerId: layer.id,
+          sectionId: section.id,
           name: looseTray.name,
           color: looseTray.color,
           geometry: jscadToArrays(jscadGeom),
           dimensions: { width: trayDims.width, depth: trayDims.depth, height: maxHeight },
           counterStacks: getTrayPositions(looseTray, cardSizes, counterShapes, maxHeight, spacerHeight, standees),
-          trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, looseTray.id))
+          trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.sections, looseTray.id))
         });
       }
     }

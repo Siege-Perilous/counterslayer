@@ -8,16 +8,16 @@
     getProject,
     getSelectedBox,
     getSelectedTray,
-    getSelectedLayer,
+    getSelectedSection,
     selectBox,
     selectTray,
-    selectLayer,
+    selectSection,
     addBox,
     deleteBox,
     addTray,
     deleteTray,
-    addLayer,
-    deleteLayer,
+    addSection,
+    deleteSection,
     addLooseTray,
     deleteLooseTray,
     getTrayLetterById,
@@ -27,27 +27,30 @@
     isCardWellTray,
     isCupTray,
     isStandeeTray,
+    isReservedTray,
     type Box,
-    type Layer,
+    type Section,
     type Tray,
     type TrayType
   } from '#lib/stores/project.svelte.js';
   import { countCups } from '#lib/types/cupLayout.js';
   import { countCells } from '#lib/types/cardWellLayout.js';
 
-  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
+  type SelectionType = 'dimensions' | 'section' | 'box' | 'tray';
 
   interface Props {
     selectionType: SelectionType;
     onSelectionChange: (type: SelectionType) => void;
     onExpandPanel: () => void;
     isMobile?: boolean;
+    // Sections with a project layout problem: section id -> worst severity
+    sectionIssues?: Record<string, 'error' | 'warning'>;
   }
 
-  let { selectionType, onSelectionChange, onExpandPanel, isMobile = false }: Props = $props();
+  let { selectionType, onSelectionChange, onExpandPanel, isMobile = false, sectionIssues = {} }: Props = $props();
 
   let project = $derived(getProject());
-  let selectedLayer = $derived(getSelectedLayer());
+  let selectedSection = $derived(getSelectedSection());
   let selectedBox = $derived(getSelectedBox());
   let selectedTray = $derived(getSelectedTray());
 
@@ -91,9 +94,9 @@
     onExpandPanel();
   }
 
-  function handleLayerClick(layer: Layer) {
-    selectLayer(layer.id);
-    onSelectionChange('layer');
+  function handleSectionClick(section: Section) {
+    selectSection(section.id);
+    onSelectionChange('section');
     onExpandPanel();
   }
 
@@ -112,14 +115,14 @@
     onExpandPanel();
   }
 
-  function handleAddLayer() {
-    addLayer();
-    onSelectionChange('layer');
+  function handleAddSection() {
+    addSection();
+    onSelectionChange('section');
     onExpandPanel();
   }
 
-  function handleAddBox(layerId: string, trayType: TrayType) {
-    addBox(layerId, trayType);
+  function handleAddBox(sectionId: string, trayType: TrayType) {
+    addBox(sectionId, trayType);
     onSelectionChange('tray');
     onExpandPanel();
   }
@@ -130,27 +133,27 @@
     onExpandPanel();
   }
 
-  function handleAddLooseTray(layerId: string, trayType: TrayType) {
-    addLooseTray(layerId, trayType);
+  function handleAddLooseTray(sectionId: string, trayType: TrayType) {
+    addLooseTray(sectionId, trayType);
     onSelectionChange('tray');
     onExpandPanel();
   }
 
-  function handleDeleteLayer(layerId: string, layerName: string) {
-    deleteLayer(layerId);
-    addToast({ data: { title: 'Layer deleted', body: `"${layerName}" has been deleted`, type: 'success' } });
-    // If we deleted the selected layer, switch to first layer
-    if (selectedLayer?.id === layerId) {
-      onSelectionChange('layer');
+  function handleDeleteSection(sectionId: string, sectionName: string) {
+    deleteSection(sectionId);
+    addToast({ data: { title: 'Section deleted', body: `"${sectionName}" has been deleted`, type: 'success' } });
+    // If we deleted the selected section, switch to first section
+    if (selectedSection?.id === sectionId) {
+      onSelectionChange('section');
     }
   }
 
   function handleDeleteBox(boxId: string, boxName: string) {
     deleteBox(boxId);
     addToast({ data: { title: 'Box deleted', body: `"${boxName}" has been deleted`, type: 'success' } });
-    // If we deleted the selected box, switch to layer view
+    // If we deleted the selected box, switch to section view
     if (selectedBox?.id === boxId) {
-      onSelectionChange('layer');
+      onSelectionChange('section');
     }
   }
 
@@ -161,10 +164,18 @@
       deleteLooseTray(trayId);
     }
     addToast({ data: { title: 'Tray deleted', body: `"${trayName}" has been deleted`, type: 'success' } });
-    // If we deleted the selected tray, switch to layer view
+    // If we deleted the selected tray, switch to section view
     if (selectedTray?.id === trayId) {
-      onSelectionChange('layer');
+      onSelectionChange('section');
     }
+  }
+
+  function looseTrayStatsLabel(stats: ReturnType<typeof getTrayStats>): string {
+    if (stats.isCardTray) return `${stats.counters} cards`;
+    if (stats.isCardDivider) return `${stats.counters} cards/${stats.stacks}s`;
+    if (stats.isCardWell) return `${stats.counters} cards/${stats.stacks}c`;
+    if (stats.isCupTray) return `${stats.stacks} cups`;
+    return `${stats.counters}c in ${stats.stacks}s`;
   }
 
   function getTrayStats(tray: Tray): {
@@ -265,25 +276,32 @@
   </button>
   <Hr />
 
-  <!-- Layers, Boxes, and Trays -->
+  <!-- Sections, Boxes, and Trays -->
   <div class="navTree">
-    {#each project.layers as layer (layer.id)}
-      {@const isLayerSelected = selectedLayer?.id === layer.id && selectionType === 'layer'}
-      {@const totalItems = layer.boxes.length + layer.looseTrays.length}
+    {#each project.sections as section (section.id)}
+      {@const isSectionSelected = selectedSection?.id === section.id && selectionType === 'section'}
+      {@const totalItems = section.boxes.length + section.looseTrays.length}
 
-      <div class="navLayerGroup">
-        <!-- Layer Item -->
+      <div class="navSectionGroup">
+        <!-- Section Item -->
         <button
-          class="navItem navItem--layer {isLayerSelected ? 'navItem--selected' : ''}"
-          onclick={() => handleLayerClick(layer)}
+          class="navItem navItem--section {isSectionSelected ? 'navItem--selected' : ''}"
+          onclick={() => handleSectionClick(section)}
         >
           <span class="navItemIcon">
             <Icon Icon={IconStack2} size="1rem" />
           </span>
           <span class="navItemLabel">
-            {layer.name}
+            {section.name}
+            {#if sectionIssues[section.id]}
+              <span
+                class="navMenu__issueDot"
+                class:navMenu__issueDot--error={sectionIssues[section.id] === 'error'}
+                title="This section has a layout warning. See Project & dimensions."
+              ></span>
+            {/if}
           </span>
-          {#if project.layers.length > 1}
+          {#if project.sections.length > 1}
             <span
               class="navItemDelete"
               role="none"
@@ -291,28 +309,28 @@
               onkeydown={(e) => e.stopPropagation()}
             >
               <ConfirmActionButton
-                action={() => handleDeleteLayer(layer.id, layer.name)}
-                actionButtonText="Delete layer"
+                action={() => handleDeleteSection(section.id, section.name)}
+                actionButtonText="Delete section"
                 positioning={{ placement: 'right' }}
                 portal=".appContainer"
               >
                 {#snippet trigger({ triggerProps })}
-                  <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete layer">
+                  <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete section">
                     <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
                   </IconButton>
                 {/snippet}
                 {#snippet actionMessage()}
-                  <p>Delete this layer and all its contents?</p>
+                  <p>Delete this section and all its contents?</p>
                 {/snippet}
               </ConfirmActionButton>
             </span>
           {/if}
         </button>
 
-        <!-- Content within Layer -->
-        <div class="navLayerContent">
-          <!-- Boxes within Layer -->
-          {#each layer.boxes as box (box.id)}
+        <!-- Content within Section -->
+        <div class="navSectionContent">
+          <!-- Boxes within Section -->
+          {#each section.boxes as box (box.id)}
             {@const isBoxSelected = selectedBox?.id === box.id && selectionType === 'box'}
 
             <div class="navBoxGroup">
@@ -357,7 +375,7 @@
               <div class="navTrayList">
                 {#each box.trays as tray (tray.id)}
                   {@const isTraySelected = selectedTray?.id === tray.id && selectionType === 'tray'}
-                  {@const letter = getTrayLetterById(project.layers, tray.id)}
+                  {@const letter = getTrayLetterById(project.sections, tray.id)}
                   {@const stats = getTrayStats(tray)}
 
                   <button
@@ -493,29 +511,31 @@
             </div>
           {/each}
 
-          <!-- Loose Trays within Layer -->
-          {#each layer.looseTrays as tray (tray.id)}
+          <!-- Loose Trays within Section -->
+          {#each section.looseTrays as tray (tray.id)}
             {@const isTraySelected = selectedTray?.id === tray.id && selectionType === 'tray'}
-            {@const letter = getTrayLetterById(project.layers, tray.id)}
+            {@const letter = getTrayLetterById(project.sections, tray.id)}
             {@const stats = getTrayStats(tray)}
+
+            {@const reserved = isReservedTray(tray)}
 
             <button
               class="navItem navItem--looseTray {isTraySelected ? 'navItem--selected' : ''}"
               onclick={() => handleTrayClick(tray, null)}
-              title="{tray.name} (Loose {letter}: {stats.isCardTray
-                ? stats.counters + ' cards'
-                : stats.isCardDivider
-                  ? stats.counters + ' cards/' + stats.stacks + 's'
-                  : stats.isCardWell
-                    ? stats.counters + ' cards/' + stats.stacks + 'c'
-                    : stats.isCupTray
-                      ? stats.stacks + ' cups'
-                      : stats.counters + 'c in ' + stats.stacks + 's'})"
+              title={reserved
+                ? `${tray.name} (Reserved space, not printed)`
+                : `${tray.name} (Loose ${letter}: ${looseTrayStatsLabel(stats)})`}
             >
               <span class="navItemLabel">
-                <span class="trayLetter">{letter}</span>
-                {tray.name}
-                <span class="looseBadge">loose</span>
+                {#if reserved}
+                  <span class="trayLetter"></span>
+                  {tray.name}
+                  <span class="looseBadge">reserved</span>
+                {:else}
+                  <span class="trayLetter">{letter}</span>
+                  {tray.name}
+                  <span class="looseBadge">loose</span>
+                {/if}
               </span>
               {#if totalItems > 1}
                 <span
@@ -536,7 +556,7 @@
                       </IconButton>
                     {/snippet}
                     {#snippet actionMessage()}
-                      <p>Delete this loose tray?</p>
+                      <p>{reserved ? 'Delete this reserved space?' : 'Delete this loose tray?'}</p>
                     {/snippet}
                   </ConfirmActionButton>
                 </span>
@@ -556,7 +576,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddBox(layer.id, 'counter');
+                  handleAddBox(section.id, 'counter');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('counter', e.currentTarget)}
@@ -568,7 +588,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddBox(layer.id, 'cardDraw');
+                  handleAddBox(section.id, 'cardDraw');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cardDraw', e.currentTarget)}
@@ -580,7 +600,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddBox(layer.id, 'cardDivider');
+                  handleAddBox(section.id, 'cardDivider');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cardDivider', e.currentTarget)}
@@ -592,7 +612,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddBox(layer.id, 'cardWell');
+                  handleAddBox(section.id, 'cardWell');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cardWell', e.currentTarget)}
@@ -604,7 +624,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddBox(layer.id, 'cup');
+                  handleAddBox(section.id, 'cup');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cup', e.currentTarget)}
@@ -616,7 +636,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddBox(layer.id, 'standee');
+                  handleAddBox(section.id, 'standee');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('standee', e.currentTarget)}
@@ -640,7 +660,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddLooseTray(layer.id, 'counter');
+                  handleAddLooseTray(section.id, 'counter');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('counter', e.currentTarget)}
@@ -652,7 +672,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddLooseTray(layer.id, 'cardDraw');
+                  handleAddLooseTray(section.id, 'cardDraw');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cardDraw', e.currentTarget)}
@@ -664,7 +684,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddLooseTray(layer.id, 'cardDivider');
+                  handleAddLooseTray(section.id, 'cardDivider');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cardDivider', e.currentTarget)}
@@ -676,7 +696,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddLooseTray(layer.id, 'cardWell');
+                  handleAddLooseTray(section.id, 'cardWell');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cardWell', e.currentTarget)}
@@ -688,7 +708,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddLooseTray(layer.id, 'cup');
+                  handleAddLooseTray(section.id, 'cup');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('cup', e.currentTarget)}
@@ -700,7 +720,7 @@
               <button
                 class="trayTypeOption"
                 onclick={() => {
-                  handleAddLooseTray(layer.id, 'standee');
+                  handleAddLooseTray(section.id, 'standee');
                   contentProps.close();
                 }}
                 onmouseenter={(e) => handleTrayTypeHover('standee', e.currentTarget)}
@@ -711,15 +731,27 @@
               </button>
             {/snippet}
           </Popover>
+
+          <!-- Add Reserved Space Button -->
+          <button
+            class="navItem navItem--add navItem--looseTray"
+            onclick={() => handleAddLooseTray(section.id, 'reserved')}
+            onmouseenter={(e) => handleTrayTypeHover('reserved', e.currentTarget)}
+            onmouseleave={handleTrayTypeLeave}
+            title="A block for game parts you are not printing, such as boards and rulebooks"
+          >
+            <span class="addIcon">+</span>
+            <span class="addLabel">Add reserved space</span>
+          </button>
         </div>
         <Hr />
       </div>
     {/each}
 
-    <!-- Add Layer Button -->
-    <button class="navItem navItem--add" onclick={handleAddLayer}>
+    <!-- Add Section Button -->
+    <button class="navItem navItem--add" onclick={handleAddSection}>
       <span class="addIcon">+</span>
-      <span class="addLabel">Add layer</span>
+      <span class="addLabel">Add section</span>
     </button>
   </div>
 </Panel>
@@ -778,6 +810,19 @@
     color: var(--fg);
   }
 
+  .navMenu__issueDot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-left: 0.375rem;
+    border-radius: 50%;
+    background: #ffb020;
+  }
+
+  .navMenu__issueDot--error {
+    background: #ff3b30;
+  }
+
   .navItemIcon,
   .trayLetter,
   .addIcon {
@@ -818,12 +863,12 @@
     flex-direction: column;
   }
 
-  .navLayerGroup {
+  .navSectionGroup {
     display: flex;
     flex-direction: column;
   }
 
-  .navLayerContent {
+  .navSectionContent {
     display: flex;
     flex-direction: column;
 

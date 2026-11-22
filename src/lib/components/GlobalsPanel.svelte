@@ -44,12 +44,27 @@
     DEFAULT_COUNTER_THICKNESS
   } from '#lib/stores/project.svelte.js';
 
+  import type { LayoutIssue } from '#lib/models/projectLayout.js';
+
   interface Props {
-    globalSettings: { gameContainerWidth: number; gameContainerDepth: number };
-    onGlobalSettingsChange: (updates: { gameContainerWidth?: number; gameContainerDepth?: number }) => void;
+    globalSettings: { gameContainerWidth: number; gameContainerDepth: number; gameContainerHeight?: number };
+    onGlobalSettingsChange: (updates: {
+      gameContainerWidth?: number;
+      gameContainerDepth?: number;
+      gameContainerHeight?: number | null;
+    }) => void;
+    // Problems found in the project layout (overlaps, out of bounds, above the box, floating)
+    layoutIssues?: LayoutIssue[];
+    onSelectSection?: (sectionId: string) => void;
   }
 
-  let { globalSettings, onGlobalSettingsChange }: Props = $props();
+  let { globalSettings, onGlobalSettingsChange, layoutIssues = [], onSelectSection }: Props = $props();
+
+  // Blank clears the height (no height check); anything else must be a positive number
+  function handleHeightChange(value: string) {
+    const parsed = parseFloat(value);
+    onGlobalSettingsChange({ gameContainerHeight: value.trim() === '' || !(parsed > 0) ? null : parsed });
+  }
 
   // Track which counter is expanded (null = none)
   let expandedIndex: number | null = $state(null);
@@ -171,8 +186,8 @@
     const project = getProject();
     let count = 0;
 
-    for (const layer of project.layers) {
-      for (const box of layer.boxes) {
+    for (const section of project.sections) {
+      for (const box of section.boxes) {
         for (const tray of box.trays) {
           if (isCounterTray(tray)) {
             count += tray.params.topLoadedStacks.filter((stack) => stack[0] === shapeId).length;
@@ -180,7 +195,7 @@
           }
         }
       }
-      for (const tray of layer.looseTrays) {
+      for (const tray of section.looseTrays) {
         if (isCounterTray(tray)) {
           count += tray.params.topLoadedStacks.filter((stack) => stack[0] === shapeId).length;
           count += tray.params.edgeLoadedStacks.filter((stack) => stack[0] === shapeId).length;
@@ -226,8 +241,8 @@
     const project = getProject();
     let count = 0;
 
-    for (const layer of project.layers) {
-      for (const box of layer.boxes) {
+    for (const section of project.sections) {
+      for (const box of section.boxes) {
         for (const tray of box.trays) {
           if (isCardDrawTray(tray)) {
             if (tray.params.cardSizeId === cardSizeId) {
@@ -239,7 +254,7 @@
           }
         }
       }
-      for (const tray of layer.looseTrays) {
+      for (const tray of section.looseTrays) {
         if (isCardDrawTray(tray)) {
           if (tray.params.cardSizeId === cardSizeId) {
             count++;
@@ -289,13 +304,13 @@
   function countTraysUsingStandee(standeeId: string): number {
     const project = getProject();
     let count = 0;
-    for (const layer of project.layers) {
-      for (const box of layer.boxes) {
+    for (const section of project.sections) {
+      for (const box of section.boxes) {
         for (const tray of box.trays) {
           if (isStandeeTray(tray) && tray.params.standeeId === standeeId) count++;
         }
       }
-      for (const tray of layer.looseTrays) {
+      for (const tray of section.looseTrays) {
         if (isStandeeTray(tray) && tray.params.standeeId === standeeId) count++;
       }
     }
@@ -338,12 +353,48 @@
         {/snippet}
         {#snippet end()}mm{/snippet}
       </FormControl>
+      <FormControl label="Height" name="gameContainerHeight">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            step="1"
+            min="1"
+            placeholder="Not set"
+            value={globalSettings.gameContainerHeight ?? ''}
+            onchange={(e) => handleHeightChange(e.currentTarget.value)}
+          />
+        {/snippet}
+        {#snippet end()}mm{/snippet}
+      </FormControl>
     </div>
     <Spacer size="0.5rem" />
     <Text size="0.875rem" color="var(--fgMuted)">
-      Set to the inner dimensions of the actual cardboard box your game uses. It provides the bounding area for layout
-      calculations.
+      Set to the inner dimensions of the actual cardboard box your game uses. Width and depth provide the bounding area
+      for layout calculations. Height is optional: when set, the box is drawn in 3D and anything rising above it is
+      flagged.
     </Text>
+    {#if layoutIssues.length > 0}
+      <Spacer size="0.75rem" />
+      <div class="globalsPanel__layoutCheck">
+        <span class="globalsPanel__layoutCheckTitle">Layout check</span>
+        <ul class="globalsPanel__issueList">
+          {#each layoutIssues as issue, index (index)}
+            <li>
+              <button
+                type="button"
+                class="globalsPanel__issue"
+                class:globalsPanel__issue--error={issue.severity === 'error'}
+                onclick={() => onSelectSection?.(issue.sectionId)}
+              >
+                <span class="globalsPanel__issueDot"></span>
+                {issue.message}
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
   </section>
 
   <Hr />
@@ -828,8 +879,56 @@
 
   .gameContainerInputs {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 0.75rem;
+  }
+
+  .globalsPanel__layoutCheckTitle {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fgMuted);
+  }
+
+  .globalsPanel__issueList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 0.375rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .globalsPanel__issue {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.25rem 0;
+    border: none;
+    background: none;
+    color: var(--fg);
+    font: inherit;
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .globalsPanel__issue:hover {
+    text-decoration: underline;
+  }
+
+  .globalsPanel__issueDot {
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: #ffb020;
+  }
+
+  .globalsPanel__issue--error .globalsPanel__issueDot {
+    background: #ff3b30;
   }
 
   .sectionTitle {

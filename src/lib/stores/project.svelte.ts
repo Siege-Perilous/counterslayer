@@ -10,6 +10,7 @@ import {
 } from '#lib/models/counterTray.js';
 import { defaultCupTrayParams, type CupTrayParams } from '#lib/models/cupTray.js';
 import { defaultLidParams } from '#lib/models/lid.js';
+import { defaultReservedSpaceParams, type ReservedSpaceParams } from '#lib/models/reservedSpace.js';
 import { defaultStandeeTrayParams, type StandeeTrayParams } from '#lib/models/standeeTray.js';
 import { saveNow, scheduleSave } from '#lib/stores/saveManager.js';
 import type {
@@ -22,11 +23,13 @@ import type {
   CounterShape,
   CounterTray,
   CupTray,
-  Layer,
   LidParams,
   ManualBoxPlacement,
   ManualLooseTrayPlacement,
   Project,
+  ReservedTray,
+  Section,
+  SectionPlacement,
   Standee,
   StandeeTray,
   Tray
@@ -40,6 +43,7 @@ import {
   isCounterTray,
   isCupTray,
   isLooseTray,
+  isReservedTray,
   isStandeeTray
 } from '#lib/types/project.js';
 import { loadProject, migrateProjectData } from '#lib/utils/storage.js';
@@ -53,6 +57,7 @@ export {
   isCounterTray,
   isCupTray,
   isLooseTray,
+  isReservedTray,
   isStandeeTray
 };
 export type {
@@ -65,11 +70,13 @@ export type {
   CounterShape,
   CounterTray,
   CupTray,
-  Layer,
   LidParams,
   ManualBoxPlacement,
   ManualLooseTrayPlacement,
   Project,
+  ReservedTray,
+  Section,
+  SectionPlacement,
   Standee,
   StandeeTray,
   Tray
@@ -162,7 +169,7 @@ function generateId(): string {
 }
 
 /**
- * Generate a tray letter based on cumulative index across all layers.
+ * Generate a tray letter based on cumulative index across all sections.
  * A-Z for first 26, then AA, BB, CC... for 26+
  */
 export function getTrayLetter(index: number): string {
@@ -176,14 +183,14 @@ export function getTrayLetter(index: number): string {
 }
 
 /**
- * Get cumulative tray index across all layers.
- * Order: For each layer, count box trays first, then loose trays.
+ * Get cumulative tray index across all sections.
+ * Order: For each section, count box trays first, then loose trays.
  */
-export function getCumulativeTrayIndexForTray(layers: Layer[], trayId: string): number {
+export function getCumulativeTrayIndexForTray(sections: Section[], trayId: string): number {
   let cumulative = 0;
-  for (const layer of layers) {
+  for (const section of sections) {
     // Count box trays
-    for (const box of layer.boxes) {
+    for (const box of section.boxes) {
       for (const tray of box.trays) {
         if (tray.id === trayId) {
           return cumulative;
@@ -191,12 +198,12 @@ export function getCumulativeTrayIndexForTray(layers: Layer[], trayId: string): 
         cumulative++;
       }
     }
-    // Count loose trays
-    for (const tray of layer.looseTrays) {
+    // Count loose trays. Reserved spaces are not printed, so they take no letter.
+    for (const tray of section.looseTrays) {
       if (tray.id === trayId) {
         return cumulative;
       }
-      cumulative++;
+      if (tray.type !== 'reserved') cumulative++;
     }
   }
   return cumulative;
@@ -215,10 +222,10 @@ export function getCumulativeTrayIndex(boxes: Box[], boxIndex: number, trayIndex
 }
 
 /**
- * Get tray letter for a specific tray by ID, cumulative across all layers.
+ * Get tray letter for a specific tray by ID, cumulative across all sections.
  */
-export function getTrayLetterById(layers: Layer[], trayId: string): string {
-  return getTrayLetter(getCumulativeTrayIndexForTray(layers, trayId));
+export function getTrayLetterById(sections: Section[], trayId: string): string {
+  return getTrayLetter(getCumulativeTrayIndexForTray(sections, trayId));
 }
 
 /**
@@ -233,24 +240,24 @@ export function getCumulativeTrayLetter(boxes: Box[], boxIndex: number, trayInde
 export const TRAY_COLORS = ['#c9503c', '#3d7a6a', '#d4956a', '#7c5c4a', '#a36b5a', '#5a7c6a'];
 
 /**
- * Get total tray count across all layers (boxes + loose trays).
+ * Get total tray count across all sections (boxes + loose trays).
  */
-function getTotalTrayCount(layers: Layer[]): number {
+function getTotalTrayCount(sections: Section[]): number {
   let total = 0;
-  for (const layer of layers) {
-    for (const box of layer.boxes) {
+  for (const section of sections) {
+    for (const box of section.boxes) {
       total += box.trays.length;
     }
-    total += layer.looseTrays.length;
+    total += section.looseTrays.filter((tray) => tray.type !== 'reserved').length;
   }
   return total;
 }
 
 /**
- * Get the next color for a new tray based on total tray count across all layers.
+ * Get the next color for a new tray based on total tray count across all sections.
  */
-function getNextTrayColor(layers: Layer[]): string {
-  const totalTrays = getTotalTrayCount(layers);
+function getNextTrayColor(sections: Section[]): string {
+  const totalTrays = getTotalTrayCount(sections);
   return TRAY_COLORS[totalTrays % TRAY_COLORS.length];
 }
 
@@ -369,6 +376,20 @@ function createDefaultStandeeTray(name: string, color: string, standees?: Stande
   };
 }
 
+// Hatch colour for reserved spaces (they are not printed, so they sit outside the tray palette)
+export const RESERVED_SPACE_COLOR = '#8a8f98';
+
+function createDefaultReservedTray(name: string): ReservedTray {
+  return {
+    id: generateId(),
+    type: 'reserved',
+    name,
+    color: RESERVED_SPACE_COLOR,
+    rotationOverride: 'auto',
+    params: { ...defaultReservedSpaceParams }
+  };
+}
+
 // Legacy alias for backwards compatibility
 function _createDefaultCardTray(name: string, color: string): CardDrawTray {
   return createDefaultCardDrawTray(name, color);
@@ -386,7 +407,7 @@ function createDefaultBox(name: string): Box {
   };
 }
 
-function createDefaultLayer(name: string): Layer {
+function createDefaultSection(name: string): Section {
   return {
     id: generateId(),
     name,
@@ -426,33 +447,33 @@ export function getProject(): Project {
   return project;
 }
 
-export function getLayers(): Layer[] {
-  return project.layers;
+export function getSections(): Section[] {
+  return project.sections;
 }
 
-export function getSelectedLayer(): Layer | null {
-  if (!project.selectedLayerId) return null;
-  return project.layers.find((l) => l.id === project.selectedLayerId) ?? null;
+export function getSelectedSection(): Section | null {
+  if (!project.selectedSectionId) return null;
+  return project.sections.find((l) => l.id === project.selectedSectionId) ?? null;
 }
 
 /**
- * Get all boxes from all layers.
+ * Get all boxes from all sections.
  */
 export function getAllBoxes(): Box[] {
   const boxes: Box[] = [];
-  for (const layer of project.layers) {
-    boxes.push(...layer.boxes);
+  for (const section of project.sections) {
+    boxes.push(...section.boxes);
   }
   return boxes;
 }
 
 /**
- * Get all loose trays from all layers.
+ * Get all loose trays from all sections.
  */
 export function getAllLooseTrays(): Tray[] {
   const looseTrays: Tray[] = [];
-  for (const layer of project.layers) {
-    looseTrays.push(...layer.looseTrays);
+  for (const section of project.sections) {
+    looseTrays.push(...section.looseTrays);
   }
   return looseTrays;
 }
@@ -467,9 +488,9 @@ export function getBoxes(): Box[] {
 
 export function getSelectedBox(): Box | null {
   if (!project.selectedBoxId) return null;
-  // Search across all layers
-  for (const layer of project.layers) {
-    const box = layer.boxes.find((b) => b.id === project.selectedBoxId);
+  // Search across all sections
+  for (const section of project.sections) {
+    const box = section.boxes.find((b) => b.id === project.selectedBoxId);
     if (box) return box;
   }
   return null;
@@ -485,15 +506,15 @@ export function getSelectedTray(): Tray | null {
     if (tray) return tray;
   }
 
-  // Check loose trays across all layers
-  for (const layer of project.layers) {
-    const looseTray = layer.looseTrays.find((t) => t.id === project.selectedTrayId);
+  // Check loose trays across all sections
+  for (const section of project.sections) {
+    const looseTray = section.looseTrays.find((t) => t.id === project.selectedTrayId);
     if (looseTray) return looseTray;
   }
 
   // Check all box trays
-  for (const layer of project.layers) {
-    for (const box of layer.boxes) {
+  for (const section of project.sections) {
+    for (const box of section.boxes) {
       const tray = box.trays.find((t) => t.id === project.selectedTrayId);
       if (tray) return tray;
     }
@@ -503,21 +524,21 @@ export function getSelectedTray(): Tray | null {
 }
 
 // Selection
-export function selectLayer(layerId: string): void {
-  project.selectedLayerId = layerId;
-  const layer = project.layers.find((l) => l.id === layerId);
-  if (layer) {
+export function selectSection(sectionId: string): void {
+  project.selectedSectionId = sectionId;
+  const section = project.sections.find((l) => l.id === sectionId);
+  if (section) {
     // Select first box if available, otherwise first loose tray
-    if (layer.boxes.length > 0) {
-      project.selectedBoxId = layer.boxes[0].id;
-      if (layer.boxes[0].trays.length > 0) {
-        project.selectedTrayId = layer.boxes[0].trays[0].id;
+    if (section.boxes.length > 0) {
+      project.selectedBoxId = section.boxes[0].id;
+      if (section.boxes[0].trays.length > 0) {
+        project.selectedTrayId = section.boxes[0].trays[0].id;
       } else {
         project.selectedTrayId = null;
       }
-    } else if (layer.looseTrays.length > 0) {
+    } else if (section.looseTrays.length > 0) {
       project.selectedBoxId = null;
-      project.selectedTrayId = layer.looseTrays[0].id;
+      project.selectedTrayId = section.looseTrays[0].id;
     } else {
       project.selectedBoxId = null;
       project.selectedTrayId = null;
@@ -528,11 +549,11 @@ export function selectLayer(layerId: string): void {
 
 export function selectBox(boxId: string): void {
   project.selectedBoxId = boxId;
-  // Find the layer containing this box
-  for (const layer of project.layers) {
-    const box = layer.boxes.find((b) => b.id === boxId);
+  // Find the section containing this box
+  for (const section of project.sections) {
+    const box = section.boxes.find((b) => b.id === boxId);
     if (box) {
-      project.selectedLayerId = layer.id;
+      project.selectedSectionId = section.id;
       if (box.trays.length > 0) {
         project.selectedTrayId = box.trays[0].id;
       } else {
@@ -546,48 +567,48 @@ export function selectBox(boxId: string): void {
 
 export function selectTray(trayId: string): void {
   project.selectedTrayId = trayId;
-  // Find and update selected layer and box based on tray location
+  // Find and update selected section and box based on tray location
   const location = findTrayLocation(project, trayId);
   if (location) {
-    project.selectedLayerId = location.layerId;
+    project.selectedSectionId = location.sectionId;
     project.selectedBoxId = location.boxId;
   }
   autosave();
 }
 
-// Layer operations
-export function addLayer(): Layer {
-  const layerNumber = project.layers.length + 1;
-  const layer = createDefaultLayer(`Layer ${layerNumber}`);
-  project.layers.push(layer);
-  project.selectedLayerId = layer.id;
+// Section operations
+export function addSection(): Section {
+  const sectionNumber = project.sections.length + 1;
+  const section = createDefaultSection(`Section ${sectionNumber}`);
+  project.sections.push(section);
+  project.selectedSectionId = section.id;
   project.selectedBoxId = null;
   project.selectedTrayId = null;
   autosave();
-  return layer;
+  return section;
 }
 
-export function deleteLayer(layerId: string): void {
-  // Don't allow deleting the last layer
-  if (project.layers.length <= 1) return;
+export function deleteSection(sectionId: string): void {
+  // Don't allow deleting the last section
+  if (project.sections.length <= 1) return;
 
-  const index = project.layers.findIndex((l) => l.id === layerId);
+  const index = project.sections.findIndex((l) => l.id === sectionId);
   if (index === -1) return;
 
-  project.layers.splice(index, 1);
+  project.sections.splice(index, 1);
 
   // Update selection
-  if (project.selectedLayerId === layerId) {
-    const newIndex = Math.min(index, project.layers.length - 1);
-    const newLayer = project.layers[newIndex];
-    project.selectedLayerId = newLayer.id;
-    // Select first box or loose tray in the new layer
-    if (newLayer.boxes.length > 0) {
-      project.selectedBoxId = newLayer.boxes[0].id;
-      project.selectedTrayId = newLayer.boxes[0].trays[0]?.id ?? null;
-    } else if (newLayer.looseTrays.length > 0) {
+  if (project.selectedSectionId === sectionId) {
+    const newIndex = Math.min(index, project.sections.length - 1);
+    const newSection = project.sections[newIndex];
+    project.selectedSectionId = newSection.id;
+    // Select first box or loose tray in the new section
+    if (newSection.boxes.length > 0) {
+      project.selectedBoxId = newSection.boxes[0].id;
+      project.selectedTrayId = newSection.boxes[0].trays[0]?.id ?? null;
+    } else if (newSection.looseTrays.length > 0) {
       project.selectedBoxId = null;
-      project.selectedTrayId = newLayer.looseTrays[0].id;
+      project.selectedTrayId = newSection.looseTrays[0].id;
     } else {
       project.selectedBoxId = null;
       project.selectedTrayId = null;
@@ -596,29 +617,31 @@ export function deleteLayer(layerId: string): void {
   autosave();
 }
 
-export function updateLayer(layerId: string, updates: Partial<Omit<Layer, 'id' | 'boxes' | 'looseTrays'>>): void {
-  const layer = project.layers.find((l) => l.id === layerId);
-  if (layer) {
-    Object.assign(layer, updates);
+export function updateSection(sectionId: string, updates: Partial<Omit<Section, 'id' | 'boxes' | 'looseTrays'>>): void {
+  const section = project.sections.find((l) => l.id === sectionId);
+  if (section) {
+    Object.assign(section, updates);
     autosave();
   }
 }
 
 // Box operations
-export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
-  // Find the target layer
-  const targetLayerId = layerId ?? project.selectedLayerId ?? project.layers[0]?.id;
-  const layer = project.layers.find((l) => l.id === targetLayerId);
-  if (!layer) {
-    // Create a layer if none exists
-    const newLayer = createDefaultLayer('Layer 1');
-    project.layers.push(newLayer);
-    return addBox(newLayer.id, trayType);
+export function addBox(sectionId?: string, requestedTrayType: TrayType = 'counter'): Box {
+  // A box cannot hold a reserved space; start it with a counter tray instead
+  const trayType: TrayType = requestedTrayType === 'reserved' ? 'counter' : requestedTrayType;
+  // Find the target section
+  const targetSectionId = sectionId ?? project.selectedSectionId ?? project.sections[0]?.id;
+  const section = project.sections.find((l) => l.id === targetSectionId);
+  if (!section) {
+    // Create a section if none exists
+    const newSection = createDefaultSection('Section 1');
+    project.sections.push(newSection);
+    return addBox(newSection.id, trayType);
   }
 
   const boxNumber = getAllBoxes().length + 1;
   const box = createDefaultBox(`Box ${boxNumber}`);
-  const color = getNextTrayColor(project.layers);
+  const color = getNextTrayColor(project.sections);
 
   let tray: Tray;
   if (trayType === 'cardDraw' || trayType === 'card') {
@@ -639,8 +662,8 @@ export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
   }
 
   box.trays.push(tray);
-  layer.boxes.push(box);
-  project.selectedLayerId = layer.id;
+  section.boxes.push(box);
+  project.selectedSectionId = section.id;
   project.selectedBoxId = box.id;
   project.selectedTrayId = tray.id;
   autosave();
@@ -648,21 +671,21 @@ export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
 }
 
 export function deleteBox(boxId: string): void {
-  // Find the box across all layers
-  for (const layer of project.layers) {
-    const index = layer.boxes.findIndex((b) => b.id === boxId);
+  // Find the box across all sections
+  for (const section of project.sections) {
+    const index = section.boxes.findIndex((b) => b.id === boxId);
     if (index !== -1) {
-      layer.boxes.splice(index, 1);
+      section.boxes.splice(index, 1);
 
       // Update selection
       if (project.selectedBoxId === boxId) {
-        if (layer.boxes.length > 0) {
-          const newIndex = Math.min(index, layer.boxes.length - 1);
-          project.selectedBoxId = layer.boxes[newIndex].id;
-          project.selectedTrayId = layer.boxes[newIndex].trays[0]?.id ?? null;
-        } else if (layer.looseTrays.length > 0) {
+        if (section.boxes.length > 0) {
+          const newIndex = Math.min(index, section.boxes.length - 1);
+          project.selectedBoxId = section.boxes[newIndex].id;
+          project.selectedTrayId = section.boxes[newIndex].trays[0]?.id ?? null;
+        } else if (section.looseTrays.length > 0) {
           project.selectedBoxId = null;
-          project.selectedTrayId = layer.looseTrays[0].id;
+          project.selectedTrayId = section.looseTrays[0].id;
         } else {
           project.selectedBoxId = null;
           project.selectedTrayId = null;
@@ -675,8 +698,8 @@ export function deleteBox(boxId: string): void {
 }
 
 export function updateBox(boxId: string, updates: Partial<Omit<Box, 'id' | 'trays'>>): void {
-  for (const layer of project.layers) {
-    const box = layer.boxes.find((b) => b.id === boxId);
+  for (const section of project.sections) {
+    const box = section.boxes.find((b) => b.id === boxId);
     if (box) {
       Object.assign(box, updates);
       autosave();
@@ -699,9 +722,9 @@ const GLOBAL_PARAM_KEYS: (keyof CounterTrayParams)[] = [
 
 // Get current global params from any existing counter tray
 function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
-  for (const layer of project.layers) {
+  for (const section of project.sections) {
     // Check box trays
-    for (const box of layer.boxes) {
+    for (const box of section.boxes) {
       for (const tray of box.trays) {
         if (isCounterTray(tray)) {
           const existingParams = tray.params;
@@ -714,7 +737,7 @@ function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
       }
     }
     // Check loose trays
-    for (const tray of layer.looseTrays) {
+    for (const tray of section.looseTrays) {
       if (isCounterTray(tray)) {
         const existingParams = tray.params;
         const globalParams: Partial<CounterTrayParams> = {};
@@ -729,17 +752,18 @@ function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
 }
 
 // Tray type for addTray function
-export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'cup' | 'cardWell' | 'standee' | 'card';
+// 'reserved' (a reserved space) can only be added directly to a section, never to a box.
+export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'cup' | 'cardWell' | 'standee' | 'reserved' | 'card';
 
 // Loose tray operations
-export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): Tray | null {
-  // Find the target layer
-  const targetLayerId = layerId ?? project.selectedLayerId ?? project.layers[0]?.id;
-  const layer = project.layers.find((l) => l.id === targetLayerId);
-  if (!layer) return null;
+export function addLooseTray(sectionId?: string, trayType: TrayType = 'counter'): Tray | null {
+  // Find the target section
+  const targetSectionId = sectionId ?? project.selectedSectionId ?? project.sections[0]?.id;
+  const section = project.sections.find((l) => l.id === targetSectionId);
+  if (!section) return null;
 
-  const trayNumber = layer.looseTrays.length + 1;
-  const color = getNextTrayColor(project.layers);
+  const trayNumber = section.looseTrays.length + 1;
+  const color = getNextTrayColor(project.sections);
 
   let tray: Tray;
   if (trayType === 'cardDraw' || trayType === 'card') {
@@ -752,6 +776,9 @@ export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): 
     tray = createDefaultCardWellTray(`Loose Well ${trayNumber}`, color, project.cardSizes);
   } else if (trayType === 'standee') {
     tray = createDefaultStandeeTray(`Loose Standees ${trayNumber}`, color, project.standees);
+  } else if (trayType === 'reserved') {
+    const reservedNumber = section.looseTrays.filter((t) => t.type === 'reserved').length + 1;
+    tray = createDefaultReservedTray(`Reserved space ${reservedNumber}`);
   } else {
     tray = createDefaultCounterTray(`Loose Tray ${trayNumber}`, color, project.counterShapes);
     // Inherit global params (including customShapes) from existing counter trays
@@ -759,8 +786,8 @@ export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): 
     tray.params = { ...tray.params, ...globalParams };
   }
 
-  layer.looseTrays.push(tray);
-  project.selectedLayerId = layer.id;
+  section.looseTrays.push(tray);
+  project.selectedSectionId = section.id;
   project.selectedBoxId = null;
   project.selectedTrayId = tray.id;
 
@@ -769,19 +796,19 @@ export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): 
 }
 
 export function deleteLooseTray(trayId: string): void {
-  for (const layer of project.layers) {
-    const index = layer.looseTrays.findIndex((t) => t.id === trayId);
+  for (const section of project.sections) {
+    const index = section.looseTrays.findIndex((t) => t.id === trayId);
     if (index !== -1) {
-      layer.looseTrays.splice(index, 1);
+      section.looseTrays.splice(index, 1);
 
       // Update selection
       if (project.selectedTrayId === trayId) {
-        if (layer.looseTrays.length > 0) {
-          const newIndex = Math.min(index, layer.looseTrays.length - 1);
-          project.selectedTrayId = layer.looseTrays[newIndex].id;
-        } else if (layer.boxes.length > 0) {
-          project.selectedBoxId = layer.boxes[0].id;
-          project.selectedTrayId = layer.boxes[0].trays[0]?.id ?? null;
+        if (section.looseTrays.length > 0) {
+          const newIndex = Math.min(index, section.looseTrays.length - 1);
+          project.selectedTrayId = section.looseTrays[newIndex].id;
+        } else if (section.boxes.length > 0) {
+          project.selectedBoxId = section.boxes[0].id;
+          project.selectedTrayId = section.boxes[0].trays[0]?.id ?? null;
         } else {
           project.selectedTrayId = null;
         }
@@ -794,12 +821,14 @@ export function deleteLooseTray(trayId: string): void {
 
 // Tray operations (within boxes)
 export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | null {
-  // Find the box across all layers
-  for (const layer of project.layers) {
-    const box = layer.boxes.find((b) => b.id === boxId);
+  // Reserved spaces live directly in a section
+  if (trayType === 'reserved') return null;
+  // Find the box across all sections
+  for (const section of project.sections) {
+    const box = section.boxes.find((b) => b.id === boxId);
     if (box) {
       const trayNumber = box.trays.length + 1;
-      const color = getNextTrayColor(project.layers);
+      const color = getNextTrayColor(project.sections);
 
       let tray: Tray;
       if (trayType === 'cardDraw' || trayType === 'card') {
@@ -820,7 +849,7 @@ export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | n
       }
 
       box.trays.push(tray);
-      project.selectedLayerId = layer.id;
+      project.selectedSectionId = section.id;
       project.selectedBoxId = boxId;
       project.selectedTrayId = tray.id;
 
@@ -844,9 +873,9 @@ export function deleteTray(boxId: string, trayId: string): void {
     return;
   }
 
-  // Find the box across all layers
-  for (const layer of project.layers) {
-    const box = layer.boxes.find((b) => b.id === boxId);
+  // Find the box across all sections
+  for (const section of project.sections) {
+    const box = section.boxes.find((b) => b.id === boxId);
     if (box) {
       const index = box.trays.findIndex((t) => t.id === trayId);
       if (index === -1) return;
@@ -875,8 +904,8 @@ export function deleteTray(boxId: string, trayId: string): void {
 
 export function updateTray(trayId: string, updates: Partial<Omit<Tray, 'id'>>): void {
   // Check box trays
-  for (const layer of project.layers) {
-    for (const box of layer.boxes) {
+  for (const section of project.sections) {
+    for (const box of section.boxes) {
       const tray = box.trays.find((t) => t.id === trayId);
       if (tray) {
         Object.assign(tray, updates);
@@ -885,7 +914,7 @@ export function updateTray(trayId: string, updates: Partial<Omit<Tray, 'id'>>): 
       }
     }
     // Check loose trays
-    const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+    const looseTray = section.looseTrays.find((t) => t.id === trayId);
     if (looseTray) {
       Object.assign(looseTray, updates);
       autosave();
@@ -896,9 +925,9 @@ export function updateTray(trayId: string, updates: Partial<Omit<Tray, 'id'>>): 
 
 // Set tray rotation override ('auto' | 0 | 90)
 export function setTrayRotation(trayId: string, rotation: 'auto' | 0 | 90): void {
-  for (const layer of project.layers) {
+  for (const section of project.sections) {
     // Check box trays
-    for (const box of layer.boxes) {
+    for (const box of section.boxes) {
       const tray = box.trays.find((t) => t.id === trayId);
       if (tray) {
         tray.rotationOverride = rotation;
@@ -907,7 +936,7 @@ export function setTrayRotation(trayId: string, rotation: 'auto' | 0 | 90): void
       }
     }
     // Check loose trays
-    const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+    const looseTray = section.looseTrays.find((t) => t.id === trayId);
     if (looseTray) {
       looseTray.rotationOverride = rotation;
       autosave();
@@ -918,9 +947,9 @@ export function setTrayRotation(trayId: string, rotation: 'auto' | 0 | 90): void
 
 // Update counter tray params
 export function updateTrayParams(trayId: string, params: CounterTrayParams): void {
-  for (const layer of project.layers) {
+  for (const section of project.sections) {
     // Check box trays
-    for (const box of layer.boxes) {
+    for (const box of section.boxes) {
       const tray = box.trays.find((t) => t.id === trayId);
       if (tray && isCounterTray(tray)) {
         tray.params = params;
@@ -929,7 +958,7 @@ export function updateTrayParams(trayId: string, params: CounterTrayParams): voi
       }
     }
     // Check loose trays
-    const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+    const looseTray = section.looseTrays.find((t) => t.id === trayId);
     if (looseTray && isCounterTray(looseTray)) {
       looseTray.params = params;
       autosave();
@@ -967,8 +996,8 @@ export function deleteCounterShape(id: string): void {
   if (index >= 0) {
     project.counterShapes.splice(index, 1);
     // Remove stacks referencing this shape from all counter trays (boxes and loose)
-    for (const layer of project.layers) {
-      for (const box of layer.boxes) {
+    for (const section of project.sections) {
+      for (const box of section.boxes) {
         for (const tray of box.trays) {
           if (isCounterTray(tray)) {
             tray.params.topLoadedStacks = tray.params.topLoadedStacks.filter(([shapeId]) => shapeId !== id);
@@ -976,7 +1005,7 @@ export function deleteCounterShape(id: string): void {
           }
         }
       }
-      for (const tray of layer.looseTrays) {
+      for (const tray of section.looseTrays) {
         if (isCounterTray(tray)) {
           tray.params.topLoadedStacks = tray.params.topLoadedStacks.filter(([shapeId]) => shapeId !== id);
           tray.params.edgeLoadedStacks = tray.params.edgeLoadedStacks.filter(([shapeId]) => shapeId !== id);
@@ -1057,11 +1086,11 @@ export function deleteStandee(id: string): void {
       tray.params.standeeId = fallbackId;
     }
   };
-  for (const layer of project.layers) {
-    for (const box of layer.boxes) {
+  for (const section of project.sections) {
+    for (const box of section.boxes) {
       for (const tray of box.trays) repoint(tray);
     }
-    for (const tray of layer.looseTrays) repoint(tray);
+    for (const tray of section.looseTrays) repoint(tray);
   }
   autosave();
 }
@@ -1073,17 +1102,22 @@ export const DEFAULT_GLOBAL_SETTINGS = {
 };
 
 // Global settings operations
-export function getGlobalSettings(): { gameContainerWidth: number; gameContainerDepth: number } {
+export function getGlobalSettings(): {
+  gameContainerWidth: number;
+  gameContainerDepth: number;
+  gameContainerHeight?: number;
+} {
   // If project has explicit global settings, use those
   if (project.globalSettings) {
     return {
       gameContainerWidth: project.globalSettings.gameContainerWidth,
-      gameContainerDepth: project.globalSettings.gameContainerDepth
+      gameContainerDepth: project.globalSettings.gameContainerDepth,
+      gameContainerHeight: project.globalSettings.gameContainerHeight
     };
   }
   // Otherwise, try to get from existing counter tray
-  for (const layer of project.layers) {
-    for (const box of layer.boxes) {
+  for (const section of project.sections) {
+    for (const box of section.boxes) {
       for (const tray of box.trays) {
         if (isCounterTray(tray)) {
           return {
@@ -1093,7 +1127,7 @@ export function getGlobalSettings(): { gameContainerWidth: number; gameContainer
         }
       }
     }
-    for (const tray of layer.looseTrays) {
+    for (const tray of section.looseTrays) {
       if (isCounterTray(tray)) {
         return {
           gameContainerWidth: tray.params.gameContainerWidth,
@@ -1106,10 +1140,26 @@ export function getGlobalSettings(): { gameContainerWidth: number; gameContainer
   return DEFAULT_GLOBAL_SETTINGS;
 }
 
-export function updateGlobalSettings(updates: { gameContainerWidth?: number; gameContainerDepth?: number }): void {
-  // Initialize global settings if not present
+export function updateGlobalSettings(updates: {
+  gameContainerWidth?: number;
+  gameContainerDepth?: number;
+  // null clears the height (no height check)
+  gameContainerHeight?: number | null;
+}): void {
+  // Initialize global settings if not present. Start from the effective values so that setting
+  // one field does not reset the others to defaults.
   if (!project.globalSettings) {
-    project.globalSettings = { ...DEFAULT_GLOBAL_SETTINGS };
+    const current = getGlobalSettings();
+    project.globalSettings = {
+      gameContainerWidth: current.gameContainerWidth,
+      gameContainerDepth: current.gameContainerDepth
+    };
+  }
+  // The height belongs to the project only; it is not copied into counter trays.
+  if (updates.gameContainerHeight === null) {
+    delete project.globalSettings.gameContainerHeight;
+  } else if (updates.gameContainerHeight !== undefined) {
+    project.globalSettings.gameContainerHeight = updates.gameContainerHeight;
   }
   // Update project-level settings
   if (updates.gameContainerWidth !== undefined) {
@@ -1120,8 +1170,8 @@ export function updateGlobalSettings(updates: { gameContainerWidth?: number; gam
   }
 
   // Propagate to all counter trays (these are "global" params)
-  for (const layer of project.layers) {
-    for (const box of layer.boxes) {
+  for (const section of project.sections) {
+    for (const box of section.boxes) {
       for (const tray of box.trays) {
         if (isCounterTray(tray)) {
           if (updates.gameContainerWidth !== undefined) {
@@ -1133,7 +1183,7 @@ export function updateGlobalSettings(updates: { gameContainerWidth?: number; gam
         }
       }
     }
-    for (const tray of layer.looseTrays) {
+    for (const tray of section.looseTrays) {
       if (isCounterTray(tray)) {
         if (updates.gameContainerWidth !== undefined) {
           tray.params.gameContainerWidth = updates.gameContainerWidth;
@@ -1149,8 +1199,8 @@ export function updateGlobalSettings(updates: { gameContainerWidth?: number; gam
 
 // Update card draw tray params
 export function updateCardDrawTrayParams(trayId: string, params: CardDrawTrayParams): void {
-  for (const layer of project.layers) {
-    for (const box of layer.boxes) {
+  for (const section of project.sections) {
+    for (const box of section.boxes) {
       const tray = box.trays.find((t) => t.id === trayId);
       if (tray && isCardDrawTray(tray)) {
         tray.params = params;
@@ -1158,7 +1208,7 @@ export function updateCardDrawTrayParams(trayId: string, params: CardDrawTrayPar
         return;
       }
     }
-    const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+    const looseTray = section.looseTrays.find((t) => t.id === trayId);
     if (looseTray && isCardDrawTray(looseTray)) {
       looseTray.params = params;
       autosave();
@@ -1172,8 +1222,8 @@ export const updateCardTrayParams = updateCardDrawTrayParams;
 
 // Update card divider tray params
 export function updateCardDividerTrayParams(trayId: string, params: CardDividerTrayParams): void {
-  for (const layer of project.layers) {
-    for (const box of layer.boxes) {
+  for (const section of project.sections) {
+    for (const box of section.boxes) {
       const tray = box.trays.find((t) => t.id === trayId);
       if (tray && isCardDividerTray(tray)) {
         tray.params = params;
@@ -1181,7 +1231,7 @@ export function updateCardDividerTrayParams(trayId: string, params: CardDividerT
         return;
       }
     }
-    const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+    const looseTray = section.looseTrays.find((t) => t.id === trayId);
     if (looseTray && isCardDividerTray(looseTray)) {
       looseTray.params = params;
       autosave();
@@ -1192,8 +1242,8 @@ export function updateCardDividerTrayParams(trayId: string, params: CardDividerT
 
 // Update cup tray params
 export function updateCupTrayParams(trayId: string, params: CupTrayParams): void {
-  for (const layer of project.layers) {
-    for (const box of layer.boxes) {
+  for (const section of project.sections) {
+    for (const box of section.boxes) {
       const tray = box.trays.find((t) => t.id === trayId);
       if (tray && isCupTray(tray)) {
         tray.params = params;
@@ -1201,7 +1251,7 @@ export function updateCupTrayParams(trayId: string, params: CupTrayParams): void
         return;
       }
     }
-    const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+    const looseTray = section.looseTrays.find((t) => t.id === trayId);
     if (looseTray && isCupTray(looseTray)) {
       looseTray.params = params;
       autosave();
@@ -1212,8 +1262,8 @@ export function updateCupTrayParams(trayId: string, params: CupTrayParams): void
 
 // Update card well tray params
 export function updateCardWellTrayParams(trayId: string, params: CardWellTrayParams): void {
-  for (const layer of project.layers) {
-    for (const box of layer.boxes) {
+  for (const section of project.sections) {
+    for (const box of section.boxes) {
       const tray = box.trays.find((t) => t.id === trayId);
       if (tray && isCardWellTray(tray)) {
         tray.params = params;
@@ -1221,8 +1271,20 @@ export function updateCardWellTrayParams(trayId: string, params: CardWellTrayPar
         return;
       }
     }
-    const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+    const looseTray = section.looseTrays.find((t) => t.id === trayId);
     if (looseTray && isCardWellTray(looseTray)) {
+      looseTray.params = params;
+      autosave();
+      return;
+    }
+  }
+}
+
+// Update reserved space dimensions (reserved spaces are always loose in a section)
+export function updateReservedTrayParams(trayId: string, params: ReservedSpaceParams): void {
+  for (const section of project.sections) {
+    const looseTray = section.looseTrays.find((t) => t.id === trayId);
+    if (looseTray && isReservedTray(looseTray)) {
       looseTray.params = params;
       autosave();
       return;
@@ -1232,8 +1294,8 @@ export function updateCardWellTrayParams(trayId: string, params: CardWellTrayPar
 
 // Update standee tray params
 export function updateStandeeTrayParams(trayId: string, params: StandeeTrayParams): void {
-  for (const layer of project.layers) {
-    for (const box of layer.boxes) {
+  for (const section of project.sections) {
+    for (const box of section.boxes) {
       const tray = box.trays.find((t) => t.id === trayId);
       if (tray && isStandeeTray(tray)) {
         tray.params = params;
@@ -1241,7 +1303,7 @@ export function updateStandeeTrayParams(trayId: string, params: StandeeTrayParam
         return;
       }
     }
-    const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+    const looseTray = section.looseTrays.find((t) => t.id === trayId);
     if (looseTray && isStandeeTray(looseTray)) {
       looseTray.params = params;
       autosave();
@@ -1256,23 +1318,23 @@ export function resetProject(): void {
   autosave();
 }
 
-// Move a tray to a different box (or create a new box in the same layer)
+// Move a tray to a different box (or create a new box in the same section)
 export function moveTray(trayId: string, targetBoxId: string | 'new'): void {
   // Find the tray and its current location
   let sourceTray: Tray | null = null;
   let sourceBox: Box | null = null;
-  let sourceLayer: Layer | null = null;
+  let sourceSection: Section | null = null;
   let sourceIndex = -1;
   let isLoose = false;
 
-  for (const layer of project.layers) {
+  for (const section of project.sections) {
     // Check boxes
-    for (const box of layer.boxes) {
+    for (const box of section.boxes) {
       const trayIndex = box.trays.findIndex((t) => t.id === trayId);
       if (trayIndex !== -1) {
         sourceTray = box.trays[trayIndex];
         sourceBox = box;
-        sourceLayer = layer;
+        sourceSection = section;
         sourceIndex = trayIndex;
         break;
       }
@@ -1280,22 +1342,24 @@ export function moveTray(trayId: string, targetBoxId: string | 'new'): void {
     if (sourceTray) break;
 
     // Check loose trays
-    const looseTrayIndex = layer.looseTrays.findIndex((t) => t.id === trayId);
+    const looseTrayIndex = section.looseTrays.findIndex((t) => t.id === trayId);
     if (looseTrayIndex !== -1) {
-      sourceTray = layer.looseTrays[looseTrayIndex];
-      sourceLayer = layer;
+      sourceTray = section.looseTrays[looseTrayIndex];
+      sourceSection = section;
       sourceIndex = looseTrayIndex;
       isLoose = true;
       break;
     }
   }
 
-  if (!sourceTray || !sourceLayer) return;
+  if (!sourceTray || !sourceSection) return;
+  // Reserved spaces live directly in a section, never in a box
+  if (isReservedTray(sourceTray)) return;
 
   // Determine target box
   let targetBox: Box;
   if (targetBoxId === 'new') {
-    // Create a new box in the same layer
+    // Create a new box in the same section
     const boxNumber = getAllBoxes().length + 1;
     targetBox = {
       id: generateId(),
@@ -1307,12 +1371,12 @@ export function moveTray(trayId: string, targetBoxId: string | 'new'): void {
       fillSolidEmpty: true,
       lidParams: sourceBox ? { ...sourceBox.lidParams } : { ...defaultLidParams }
     };
-    sourceLayer.boxes.push(targetBox);
+    sourceSection.boxes.push(targetBox);
   } else {
-    // Find target box across all layers
+    // Find target box across all sections
     let found: Box | null = null;
-    for (const layer of project.layers) {
-      const box = layer.boxes.find((b) => b.id === targetBoxId);
+    for (const section of project.sections) {
+      const box = section.boxes.find((b) => b.id === targetBoxId);
       if (box) {
         found = box;
         break;
@@ -1324,7 +1388,7 @@ export function moveTray(trayId: string, targetBoxId: string | 'new'): void {
 
   // Remove from source
   if (isLoose) {
-    sourceLayer.looseTrays.splice(sourceIndex, 1);
+    sourceSection.looseTrays.splice(sourceIndex, 1);
   } else if (sourceBox) {
     sourceBox.trays.splice(sourceIndex, 1);
   }
@@ -1339,45 +1403,45 @@ export function moveTray(trayId: string, targetBoxId: string | 'new'): void {
   autosave();
 }
 
-// Move a box to a different layer (or create a new layer)
-export function moveBoxToLayer(boxId: string, targetLayerId: string | 'new'): void {
+// Move a box to a different section (or create a new section)
+export function moveBoxToSection(boxId: string, targetSectionId: string | 'new'): void {
   let sourceBox: Box | null = null;
-  let sourceLayer: Layer | null = null;
+  let sourceSection: Section | null = null;
   let sourceIndex = -1;
 
-  for (const layer of project.layers) {
-    const boxIndex = layer.boxes.findIndex((b) => b.id === boxId);
+  for (const section of project.sections) {
+    const boxIndex = section.boxes.findIndex((b) => b.id === boxId);
     if (boxIndex !== -1) {
-      sourceBox = layer.boxes[boxIndex];
-      sourceLayer = layer;
+      sourceBox = section.boxes[boxIndex];
+      sourceSection = section;
       sourceIndex = boxIndex;
       break;
     }
   }
 
-  if (!sourceBox || !sourceLayer) return;
+  if (!sourceBox || !sourceSection) return;
 
-  // Determine target layer
-  let targetLayer: Layer;
-  if (targetLayerId === 'new') {
-    // Create a new layer
-    const layerNumber = project.layers.length + 1;
-    targetLayer = createDefaultLayer(`Layer ${layerNumber}`);
-    project.layers.push(targetLayer);
+  // Determine target section
+  let targetSection: Section;
+  if (targetSectionId === 'new') {
+    // Create a new section
+    const sectionNumber = project.sections.length + 1;
+    targetSection = createDefaultSection(`Section ${sectionNumber}`);
+    project.sections.push(targetSection);
   } else {
-    const found = project.layers.find((l) => l.id === targetLayerId);
-    if (!found || found.id === sourceLayer.id) return;
-    targetLayer = found;
+    const found = project.sections.find((l) => l.id === targetSectionId);
+    if (!found || found.id === sourceSection.id) return;
+    targetSection = found;
   }
 
-  // Remove from source layer
-  sourceLayer.boxes.splice(sourceIndex, 1);
+  // Remove from source section
+  sourceSection.boxes.splice(sourceIndex, 1);
 
-  // Add to target layer
-  targetLayer.boxes.push(sourceBox);
+  // Add to target section
+  targetSection.boxes.push(sourceBox);
 
   // Update selection
-  project.selectedLayerId = targetLayer.id;
+  project.selectedSectionId = targetSection.id;
   project.selectedBoxId = sourceBox.id;
 
   autosave();
@@ -1386,25 +1450,27 @@ export function moveBoxToLayer(boxId: string, targetLayerId: string | 'new'): vo
 // Move a loose tray into a box
 export function moveLooseTrayToBox(trayId: string, targetBoxId: string): void {
   let sourceTray: Tray | null = null;
-  let sourceLayer: Layer | null = null;
+  let sourceSection: Section | null = null;
   let sourceIndex = -1;
 
-  for (const layer of project.layers) {
-    const trayIndex = layer.looseTrays.findIndex((t) => t.id === trayId);
+  for (const section of project.sections) {
+    const trayIndex = section.looseTrays.findIndex((t) => t.id === trayId);
     if (trayIndex !== -1) {
-      sourceTray = layer.looseTrays[trayIndex];
-      sourceLayer = layer;
+      sourceTray = section.looseTrays[trayIndex];
+      sourceSection = section;
       sourceIndex = trayIndex;
       break;
     }
   }
 
-  if (!sourceTray || !sourceLayer) return;
+  if (!sourceTray || !sourceSection) return;
+  // Reserved spaces live directly in a section, never in a box
+  if (isReservedTray(sourceTray)) return;
 
   // Find target box
   let targetBox: Box | null = null;
-  for (const layer of project.layers) {
-    const box = layer.boxes.find((b) => b.id === targetBoxId);
+  for (const section of project.sections) {
+    const box = section.boxes.find((b) => b.id === targetBoxId);
     if (box) {
       targetBox = box;
       break;
@@ -1414,7 +1480,7 @@ export function moveLooseTrayToBox(trayId: string, targetBoxId: string): void {
   if (!targetBox) return;
 
   // Remove from loose trays
-  sourceLayer.looseTrays.splice(sourceIndex, 1);
+  sourceSection.looseTrays.splice(sourceIndex, 1);
 
   // Add to target box
   targetBox.trays.push(sourceTray);
@@ -1426,22 +1492,22 @@ export function moveLooseTrayToBox(trayId: string, targetBoxId: string): void {
   autosave();
 }
 
-// Move a tray from a box to loose, or move a loose tray to a different layer
-export function moveTrayToLoose(trayId: string, targetLayerId?: string): void {
+// Move a tray from a box to loose, or move a loose tray to a different section
+export function moveTrayToLoose(trayId: string, targetSectionId?: string): void {
   let sourceTray: Tray | null = null;
   let sourceBox: Box | null = null;
-  let sourceLayer: Layer | null = null;
+  let sourceSection: Section | null = null;
   let sourceIndex = -1;
   let isLooseTray = false;
 
   // First, check if tray is in a box
-  for (const layer of project.layers) {
-    for (const box of layer.boxes) {
+  for (const section of project.sections) {
+    for (const box of section.boxes) {
       const trayIndex = box.trays.findIndex((t) => t.id === trayId);
       if (trayIndex !== -1) {
         sourceTray = box.trays[trayIndex];
         sourceBox = box;
-        sourceLayer = layer;
+        sourceSection = section;
         sourceIndex = trayIndex;
         break;
       }
@@ -1451,11 +1517,11 @@ export function moveTrayToLoose(trayId: string, targetLayerId?: string): void {
 
   // If not found in a box, check loose trays
   if (!sourceTray) {
-    for (const layer of project.layers) {
-      const looseIndex = layer.looseTrays.findIndex((t) => t.id === trayId);
+    for (const section of project.sections) {
+      const looseIndex = section.looseTrays.findIndex((t) => t.id === trayId);
       if (looseIndex !== -1) {
-        sourceTray = layer.looseTrays[looseIndex];
-        sourceLayer = layer;
+        sourceTray = section.looseTrays[looseIndex];
+        sourceSection = section;
         sourceIndex = looseIndex;
         isLooseTray = true;
         break;
@@ -1463,25 +1529,27 @@ export function moveTrayToLoose(trayId: string, targetLayerId?: string): void {
     }
   }
 
-  if (!sourceTray || !sourceLayer) return;
+  if (!sourceTray || !sourceSection) return;
 
-  const targetLayer = targetLayerId ? (project.layers.find((l) => l.id === targetLayerId) ?? sourceLayer) : sourceLayer;
+  const targetSection = targetSectionId
+    ? (project.sections.find((l) => l.id === targetSectionId) ?? sourceSection)
+    : sourceSection;
 
-  // If already loose and moving to same layer, nothing to do
-  if (isLooseTray && targetLayer.id === sourceLayer.id) return;
+  // If already loose and moving to same section, nothing to do
+  if (isLooseTray && targetSection.id === sourceSection.id) return;
 
   // Remove from source
   if (isLooseTray) {
-    sourceLayer.looseTrays.splice(sourceIndex, 1);
+    sourceSection.looseTrays.splice(sourceIndex, 1);
   } else if (sourceBox) {
     sourceBox.trays.splice(sourceIndex, 1);
   }
 
-  // Add to target layer's loose trays
-  targetLayer.looseTrays.push(sourceTray);
+  // Add to target section's loose trays
+  targetSection.looseTrays.push(sourceTray);
 
   // Update selection
-  project.selectedLayerId = targetLayer.id;
+  project.selectedSectionId = targetSection.id;
   project.selectedBoxId = null;
   project.selectedTrayId = sourceTray.id;
 
@@ -1493,20 +1561,20 @@ export function importProject(data: Project): void {
   // Run migrations to ensure all fields have proper defaults (handles older exported files)
   project = migrateProjectData(data);
   // Ensure selection is valid
-  if (project.layers.length > 0) {
-    // Ensure selectedLayerId is valid
-    const selectedLayer = project.layers.find((l) => l.id === project.selectedLayerId);
-    if (!selectedLayer) {
-      project.selectedLayerId = project.layers[0].id;
+  if (project.sections.length > 0) {
+    // Ensure selectedSectionId is valid
+    const selectedSection = project.sections.find((l) => l.id === project.selectedSectionId);
+    if (!selectedSection) {
+      project.selectedSectionId = project.sections[0].id;
     }
-    const layer = project.layers.find((l) => l.id === project.selectedLayerId);
-    if (layer) {
+    const section = project.sections.find((l) => l.id === project.selectedSectionId);
+    if (section) {
       // Ensure selectedBoxId is valid
       if (project.selectedBoxId) {
-        const selectedBox = layer.boxes.find((b) => b.id === project.selectedBoxId);
+        const selectedBox = section.boxes.find((b) => b.id === project.selectedBoxId);
         if (!selectedBox) {
-          if (layer.boxes.length > 0) {
-            project.selectedBoxId = layer.boxes[0].id;
+          if (section.boxes.length > 0) {
+            project.selectedBoxId = section.boxes[0].id;
           } else {
             project.selectedBoxId = null;
           }
@@ -1516,19 +1584,19 @@ export function importProject(data: Project): void {
       const needsTraySelection = !project.selectedTrayId || !findTrayLocation(project, project.selectedTrayId);
       if (needsTraySelection) {
         // Find first available tray
-        if (layer.boxes.length > 0 && layer.boxes[0].trays.length > 0) {
-          project.selectedBoxId = layer.boxes[0].id;
-          project.selectedTrayId = layer.boxes[0].trays[0].id;
-        } else if (layer.looseTrays.length > 0) {
+        if (section.boxes.length > 0 && section.boxes[0].trays.length > 0) {
+          project.selectedBoxId = section.boxes[0].id;
+          project.selectedTrayId = section.boxes[0].trays[0].id;
+        } else if (section.looseTrays.length > 0) {
           project.selectedBoxId = null;
-          project.selectedTrayId = layer.looseTrays[0].id;
+          project.selectedTrayId = section.looseTrays[0].id;
         } else {
           project.selectedTrayId = null;
         }
       }
     }
   } else {
-    project.selectedLayerId = null;
+    project.selectedSectionId = null;
     project.selectedBoxId = null;
     project.selectedTrayId = null;
   }
@@ -1540,8 +1608,8 @@ import type { ManualTrayPlacement } from '#lib/types/project.js';
 
 // Save manual tray layout for a box (box dimensions auto-calculate from tray positions)
 export function saveManualLayout(boxId: string, placements: ManualTrayPlacement[]): void {
-  for (const layer of project.layers) {
-    const box = layer.boxes.find((b) => b.id === boxId);
+  for (const section of project.sections) {
+    const box = section.boxes.find((b) => b.id === boxId);
     if (box) {
       box.manualLayout = placements;
       autosave();
@@ -1552,8 +1620,8 @@ export function saveManualLayout(boxId: string, placements: ManualTrayPlacement[
 
 // Clear manual layout for a box (reverts to auto bin-packing)
 export function clearManualLayout(boxId: string): void {
-  for (const layer of project.layers) {
-    const box = layer.boxes.find((b) => b.id === boxId);
+  for (const section of project.sections) {
+    const box = section.boxes.find((b) => b.id === boxId);
     if (box) {
       box.manualLayout = undefined;
       // Optionally clear custom dimensions to let auto-sizing take over
@@ -1567,23 +1635,23 @@ export function clearManualLayout(boxId: string): void {
 
 // Get manual layout for a box
 export function getManualLayout(boxId: string): ManualTrayPlacement[] | undefined {
-  for (const layer of project.layers) {
-    const box = layer.boxes.find((b) => b.id === boxId);
+  for (const section of project.sections) {
+    const box = section.boxes.find((b) => b.id === boxId);
     if (box) return box.manualLayout;
   }
   return undefined;
 }
 
-// Save manual layer layout (box and loose tray positions)
-export function saveLayerLayout(
-  layerId: string,
+// Save manual section layout (box and loose tray positions)
+export function saveSectionLayout(
+  sectionId: string,
   boxPlacements: ManualBoxPlacement[],
   looseTrayPlacements: ManualLooseTrayPlacement[]
 ): void {
-  const layer = project.layers.find((l) => l.id === layerId);
-  if (!layer) return;
+  const section = project.sections.find((l) => l.id === sectionId);
+  if (!section) return;
 
-  layer.manualLayout = {
+  section.manualLayout = {
     boxes: boxPlacements,
     looseTrays: looseTrayPlacements
   };
@@ -1591,21 +1659,57 @@ export function saveLayerLayout(
   autosave();
 }
 
-// Clear manual layer layout (reverts to auto arrangement)
-export function clearLayerLayout(layerId: string): void {
-  const layer = project.layers.find((l) => l.id === layerId);
-  if (!layer) return;
+// Clear manual section layout (reverts to auto arrangement)
+export function clearSectionLayout(sectionId: string): void {
+  const section = project.sections.find((l) => l.id === sectionId);
+  if (!section) return;
 
-  layer.manualLayout = undefined;
+  section.manualLayout = undefined;
   autosave();
 }
 
-// Get manual layer layout
-export function getLayerLayout(
-  layerId: string
+// Whether any section has a position in the game container (project layout)
+export function hasProjectLayout(): boolean {
+  return project.sections.some((s) => s.placement !== undefined);
+}
+
+// Save the position of every section in the game container
+export function saveProjectLayout(placements: Record<string, SectionPlacement>): void {
+  for (const section of project.sections) {
+    const placement = placements[section.id];
+    if (placement) {
+      section.placement = { ...placement };
+    }
+  }
+  autosave();
+}
+
+// Move one section's placement (used to keep a section in place when its own layout changes)
+export function setSectionPlacement(sectionId: string, placement: SectionPlacement | undefined): void {
+  const section = project.sections.find((l) => l.id === sectionId);
+  if (!section) return;
+  if (placement) {
+    section.placement = { ...placement };
+  } else {
+    delete section.placement;
+  }
+  autosave();
+}
+
+// Clear the project layout (sections go back to stacking as full slices)
+export function clearProjectLayout(): void {
+  for (const section of project.sections) {
+    delete section.placement;
+  }
+  autosave();
+}
+
+// Get manual section layout
+export function getSectionLayout(
+  sectionId: string
 ): { boxes: ManualBoxPlacement[]; looseTrays: ManualLooseTrayPlacement[] } | undefined {
-  const layer = project.layers.find((l) => l.id === layerId);
-  return layer?.manualLayout;
+  const section = project.sections.find((l) => l.id === sectionId);
+  return section?.manualLayout;
 }
 
 // Deep clone helper for duplicating objects
@@ -1616,16 +1720,16 @@ function deepClone<T>(obj: T): T {
 // Duplicate a tray (works for both box trays and loose trays)
 export function duplicateTray(trayId: string): Tray | null {
   // Find the tray and its location
-  for (const layer of project.layers) {
+  for (const section of project.sections) {
     // Check box trays
-    for (const box of layer.boxes) {
+    for (const box of section.boxes) {
       const trayIndex = box.trays.findIndex((t) => t.id === trayId);
       if (trayIndex !== -1) {
         const originalTray = box.trays[trayIndex];
         const newTray: Tray = deepClone(originalTray);
         newTray.id = generateId();
         newTray.name = `${originalTray.name} copy`;
-        newTray.color = getNextTrayColor(project.layers);
+        newTray.color = getNextTrayColor(project.sections);
 
         // Insert after the original tray
         box.trays.splice(trayIndex + 1, 0, newTray);
@@ -1636,7 +1740,7 @@ export function duplicateTray(trayId: string): Tray | null {
         box.customDepth = undefined;
 
         // Select the new tray
-        project.selectedLayerId = layer.id;
+        project.selectedSectionId = section.id;
         project.selectedBoxId = box.id;
         project.selectedTrayId = newTray.id;
 
@@ -1646,19 +1750,19 @@ export function duplicateTray(trayId: string): Tray | null {
     }
 
     // Check loose trays
-    const looseTrayIndex = layer.looseTrays.findIndex((t) => t.id === trayId);
+    const looseTrayIndex = section.looseTrays.findIndex((t) => t.id === trayId);
     if (looseTrayIndex !== -1) {
-      const originalTray = layer.looseTrays[looseTrayIndex];
+      const originalTray = section.looseTrays[looseTrayIndex];
       const newTray: Tray = deepClone(originalTray);
       newTray.id = generateId();
       newTray.name = `${originalTray.name} copy`;
-      newTray.color = getNextTrayColor(project.layers);
+      newTray.color = getNextTrayColor(project.sections);
 
       // Insert after the original tray
-      layer.looseTrays.splice(looseTrayIndex + 1, 0, newTray);
+      section.looseTrays.splice(looseTrayIndex + 1, 0, newTray);
 
       // Select the new tray
-      project.selectedLayerId = layer.id;
+      project.selectedSectionId = section.id;
       project.selectedBoxId = null;
       project.selectedTrayId = newTray.id;
 
@@ -1672,10 +1776,10 @@ export function duplicateTray(trayId: string): Tray | null {
 
 // Duplicate a box (including all its trays)
 export function duplicateBox(boxId: string): Box | null {
-  for (const layer of project.layers) {
-    const boxIndex = layer.boxes.findIndex((b) => b.id === boxId);
+  for (const section of project.sections) {
+    const boxIndex = section.boxes.findIndex((b) => b.id === boxId);
     if (boxIndex !== -1) {
-      const originalBox = layer.boxes[boxIndex];
+      const originalBox = section.boxes[boxIndex];
       const newBox: Box = deepClone(originalBox);
 
       // Generate new IDs for box and all trays
@@ -1688,17 +1792,17 @@ export function duplicateBox(boxId: string): Box | null {
       // Generate new IDs and colors for all trays
       for (const tray of newBox.trays) {
         tray.id = generateId();
-        tray.color = getNextTrayColor(project.layers);
+        tray.color = getNextTrayColor(project.sections);
       }
 
       // Insert after the original box
-      layer.boxes.splice(boxIndex + 1, 0, newBox);
+      section.boxes.splice(boxIndex + 1, 0, newBox);
 
-      // Clear layer manual layout since we added a box
-      layer.manualLayout = undefined;
+      // Clear section manual layout since we added a box
+      section.manualLayout = undefined;
 
       // Select the new box
-      project.selectedLayerId = layer.id;
+      project.selectedSectionId = section.id;
       project.selectedBoxId = newBox.id;
       project.selectedTrayId = newBox.trays[0]?.id ?? null;
 
@@ -1710,45 +1814,54 @@ export function duplicateBox(boxId: string): Box | null {
   return null;
 }
 
-// Duplicate a layer (including all boxes and loose trays)
-export function duplicateLayer(layerId: string): Layer | null {
-  const layerIndex = project.layers.findIndex((l) => l.id === layerId);
-  if (layerIndex === -1) return null;
+// Duplicate a section (including all boxes and loose trays)
+export function duplicateSection(sectionId: string): Section | null {
+  const sectionIndex = project.sections.findIndex((l) => l.id === sectionId);
+  if (sectionIndex === -1) return null;
 
-  const originalLayer = project.layers[layerIndex];
-  const newLayer: Layer = deepClone(originalLayer);
+  const originalSection = project.sections[sectionIndex];
+  const newSection: Section = deepClone(originalSection);
 
   // Generate new IDs
-  newLayer.id = generateId();
-  newLayer.name = `${originalLayer.name} copy`;
-  newLayer.manualLayout = undefined;
+  newSection.id = generateId();
+  newSection.name = `${originalSection.name} copy`;
+  newSection.manualLayout = undefined;
+  if (originalSection.placement) {
+    // Same spot in the container, resting directly on top of the original
+    newSection.placement = {
+      x: originalSection.placement.x,
+      y: originalSection.placement.y,
+      z: originalSection.placement.z + 0.001,
+      rotation: originalSection.placement.rotation
+    };
+  }
 
   // Generate new IDs for all boxes and their trays
-  for (const box of newLayer.boxes) {
+  for (const box of newSection.boxes) {
     box.id = generateId();
     box.manualLayout = undefined;
     box.customWidth = undefined;
     box.customDepth = undefined;
     for (const tray of box.trays) {
       tray.id = generateId();
-      tray.color = getNextTrayColor(project.layers);
+      tray.color = getNextTrayColor(project.sections);
     }
   }
 
   // Generate new IDs for all loose trays
-  for (const tray of newLayer.looseTrays) {
+  for (const tray of newSection.looseTrays) {
     tray.id = generateId();
-    tray.color = getNextTrayColor(project.layers);
+    tray.color = getNextTrayColor(project.sections);
   }
 
-  // Insert after the original layer
-  project.layers.splice(layerIndex + 1, 0, newLayer);
+  // Insert after the original section
+  project.sections.splice(sectionIndex + 1, 0, newSection);
 
-  // Select the new layer
-  project.selectedLayerId = newLayer.id;
-  project.selectedBoxId = newLayer.boxes[0]?.id ?? null;
-  project.selectedTrayId = newLayer.boxes[0]?.trays[0]?.id ?? newLayer.looseTrays[0]?.id ?? null;
+  // Select the new section
+  project.selectedSectionId = newSection.id;
+  project.selectedBoxId = newSection.boxes[0]?.id ?? null;
+  project.selectedTrayId = newSection.boxes[0]?.trays[0]?.id ?? newSection.looseTrays[0]?.id ?? null;
 
   autosave();
-  return newLayer;
+  return newSection;
 }

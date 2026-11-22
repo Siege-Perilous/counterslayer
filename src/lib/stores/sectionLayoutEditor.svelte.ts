@@ -1,9 +1,9 @@
 /**
- * Layer Layout Editor State Store
- * Manages the state for manual box and loose tray arrangement within a layer
+ * Section Layout Editor State Store
+ * Manages the state for manual box and loose tray arrangement within a section
  */
 
-import type { BoxPlacement, LooseTrayPlacement } from '#lib/models/layer.js';
+import type { BoxPlacement, LooseTrayPlacement } from '#lib/models/section.js';
 import type { SnapGuide } from '#lib/types/editor.js';
 import { getEffectiveDimensions as getEffectiveDimsBase } from '#lib/types/editor.js';
 import type { ManualBoxPlacement, ManualLooseTrayPlacement } from '#lib/types/project.js';
@@ -90,7 +90,7 @@ let dragState = $state<DragState>({
 });
 
 // Reactive state object
-export const layerLayoutEditorState = {
+export const sectionLayoutEditorState = {
   get isEditMode() {
     return isEditMode;
   },
@@ -134,9 +134,9 @@ export function getSelectedItemType(): 'box' | 'looseTray' | null {
 }
 
 /**
- * Enter layer layout edit mode
+ * Enter section layout edit mode
  */
-export function enterLayerEditMode(
+export function enterSectionEditMode(
   boxPlacements: BoxPlacement[],
   looseTrayPlacements: LooseTrayPlacement[],
   containerWidth: number,
@@ -184,9 +184,9 @@ export function enterLayerEditMode(
 }
 
 /**
- * Exit layer layout edit mode
+ * Exit section layout edit mode
  */
-export function exitLayerEditMode(): void {
+export function exitSectionEditMode(): void {
   isEditMode = false;
   selectedItemId = null;
   selectedItemType = null;
@@ -210,7 +210,7 @@ export function exitLayerEditMode(): void {
 /**
  * Cancel changes and restore original placements
  */
-export function cancelLayerChanges(): void {
+export function cancelSectionChanges(): void {
   workingBoxPlacements = JSON.parse(JSON.stringify(originalBoxPlacements));
   workingLooseTrayPlacements = JSON.parse(JSON.stringify(originalLooseTrayPlacements));
   selectedItemId = null;
@@ -221,7 +221,7 @@ export function cancelLayerChanges(): void {
 /**
  * Select an item
  */
-export function selectLayerItem(itemId: string, itemType: 'box' | 'looseTray'): void {
+export function selectSectionItem(itemId: string, itemType: 'box' | 'looseTray'): void {
   selectedItemId = itemId;
   selectedItemType = itemType;
 }
@@ -229,7 +229,7 @@ export function selectLayerItem(itemId: string, itemType: 'box' | 'looseTray'): 
 /**
  * Deselect any selected item
  */
-export function deselectLayerItem(): void {
+export function deselectSectionItem(): void {
   selectedItemId = null;
   selectedItemType = null;
 }
@@ -294,7 +294,7 @@ export function rotateSelectedItem(): void {
 /**
  * Get manual placements for saving to project
  */
-export function getManualLayerPlacements(): {
+export function getManualSectionPlacements(): {
   boxes: ManualBoxPlacement[];
   looseTrays: ManualLooseTrayPlacement[];
 } {
@@ -361,7 +361,7 @@ export function startDrag(itemId: string, itemType: 'box' | 'looseTray', startX:
     originalItemY: originalY
   };
 
-  selectLayerItem(itemId, itemType);
+  selectSectionItem(itemId, itemType);
 }
 
 /**

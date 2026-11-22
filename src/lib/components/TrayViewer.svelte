@@ -4,7 +4,8 @@
   import ViewCube from './ViewCube.svelte';
   import type { BufferGeometry } from 'three';
   import type { TrayPlacement } from '#lib/models/box.js';
-  import type { BoxPlacement, LooseTrayPlacement } from '#lib/models/layer.js';
+  import type { BoxPlacement, LooseTrayPlacement } from '#lib/models/section.js';
+  import type { ProjectLayout } from '#lib/models/projectLayout.js';
   import type { CounterStack } from '#lib/models/counterTray.js';
   import type { CardStack } from '#lib/models/cardTray.js';
   import type { CaptureOptions } from '#lib/utils/screenshotCapture.js';
@@ -37,7 +38,7 @@
 
   interface LooseTrayGeometryData {
     trayId: string;
-    layerId: string;
+    sectionId: string;
     name: string;
     color: string;
     geometry: BufferGeometry;
@@ -101,24 +102,18 @@
     viewTitle?: string;
     onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
     isLayoutEditMode?: boolean;
-    isLayerLayoutEditMode?: boolean;
+    isSectionLayoutEditMode?: boolean;
     onTrayDoubleClick?: (trayId: string) => void;
     onBoxDoubleClick?: (boxId: string) => void;
     generating?: boolean;
-    showLayerView?: boolean;
-    layerBoxPlacements?: BoxPlacement[];
-    layerLooseTrayPlacements?: LooseTrayPlacement[];
-    // All layers stacked view
-    showAllLayers?: boolean;
-    allLayerArrangements?: Array<{
-      layer: { id: string; name: string };
-      arrangement: {
-        boxes: BoxPlacement[];
-        looseTrays: LooseTrayPlacement[];
-        layerHeight: number;
-      };
-    }>;
-    allLayersExplosionAmount?: number;
+    showSectionView?: boolean;
+    sectionBoxPlacements?: BoxPlacement[];
+    sectionLooseTrayPlacements?: LooseTrayPlacement[];
+    // All sections stacked view
+    showAllSections?: boolean;
+    allSectionsExplosionAmount?: number;
+    projectLayout?: ProjectLayout | null;
+    gameContainerHeight?: number;
     // Debug mode props for URL-based capture
     debugMode?: boolean;
     cameraPreset?: string;
@@ -156,16 +151,17 @@
     viewTitle = '',
     onCaptureReady,
     isLayoutEditMode = false,
-    isLayerLayoutEditMode = false,
+    isSectionLayoutEditMode = false,
     onTrayDoubleClick,
     onBoxDoubleClick,
     generating = false,
-    showLayerView = false,
-    layerBoxPlacements = [],
-    layerLooseTrayPlacements = [],
-    showAllLayers = false,
-    allLayerArrangements = [],
-    allLayersExplosionAmount = 50,
+    showSectionView = false,
+    sectionBoxPlacements = [],
+    sectionLooseTrayPlacements = [],
+    showAllSections = false,
+    allSectionsExplosionAmount = 50,
+    projectLayout = null,
+    gameContainerHeight,
     // Debug mode props
     debugMode = false,
     cameraPreset,
@@ -247,17 +243,18 @@
       {viewTitle}
       {onCaptureReady}
       {isLayoutEditMode}
-      {isLayerLayoutEditMode}
+      {isSectionLayoutEditMode}
       onTrayClick={handleTrayClick}
       {onTrayDoubleClick}
       {onBoxDoubleClick}
       {generating}
-      {showLayerView}
-      {layerBoxPlacements}
-      {layerLooseTrayPlacements}
-      {showAllLayers}
-      {allLayerArrangements}
-      {allLayersExplosionAmount}
+      {showSectionView}
+      {sectionBoxPlacements}
+      {sectionLooseTrayPlacements}
+      {showAllSections}
+      {allSectionsExplosionAmount}
+      {projectLayout}
+      {gameContainerHeight}
       {debugMode}
       {cameraPreset}
       {cameraPosition}
@@ -275,8 +272,8 @@
   {/if}
 
   <!-- Tray/Box info overlay when clicked (non-edit mode only) -->
-  {#if clickedTrayInfo && !isLayoutEditMode && !isLayerLayoutEditMode && (showAllTrays || showAllBoxes || showAllLayers || showLayerView)}
-    <div class="trayInfoOverlay" class:belowToolbar={showAllTrays || showAllLayers || showLayerView}>
+  {#if clickedTrayInfo && !isLayoutEditMode && !isSectionLayoutEditMode && (showAllTrays || showAllBoxes || showAllSections || showSectionView)}
+    <div class="trayInfoOverlay" class:belowToolbar={showAllTrays || showAllSections || showSectionView}>
       {#if clickedTrayInfo.type === 'box'}
         <span class="trayLetter trayLetter--box">BOX</span>
       {:else}

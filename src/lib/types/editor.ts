@@ -1,5 +1,5 @@
 /**
- * Shared types for layout editors (box and layer)
+ * Shared types for layout editors (box and section)
  */
 
 // Snap guide for visual feedback during drag

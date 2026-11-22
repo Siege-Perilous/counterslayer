@@ -3,6 +3,7 @@ import type { CardDrawTrayParams } from '#lib/models/cardTray.js';
 import type { CardWellTrayParams } from '#lib/models/cardWellTray.js';
 import type { CounterTrayParams } from '#lib/models/counterTray.js';
 import type { CupTrayParams } from '#lib/models/cupTray.js';
+import type { ReservedSpaceParams } from '#lib/models/reservedSpace.js';
 import type { StandeeTrayParams } from '#lib/models/standeeTray.js';
 
 // Base shape types for counter shapes
@@ -87,11 +88,18 @@ export interface StandeeTray extends BaseTray {
   params: StandeeTrayParams;
 }
 
+// Reserved space: a named block for game parts that are not printed (boards, rulebooks).
+// Lives directly in a section (never in a box), has no tray letter and is never exported.
+export interface ReservedTray extends BaseTray {
+  type: 'reserved';
+  params: ReservedSpaceParams;
+}
+
 // Legacy alias for backwards compatibility
 export type CardTray = CardDrawTray;
 
 // Discriminated union of all tray types
-export type Tray = CounterTray | CardDrawTray | CardDividerTray | CupTray | CardWellTray | StandeeTray;
+export type Tray = CounterTray | CardDrawTray | CardDividerTray | CupTray | CardWellTray | StandeeTray | ReservedTray;
 
 // Type guards for tray types
 export function isCounterTray(tray: Tray): tray is CounterTray {
@@ -116,6 +124,10 @@ export function isCardWellTray(tray: Tray): tray is CardWellTray {
 
 export function isStandeeTray(tray: Tray): tray is StandeeTray {
   return tray.type === 'standee';
+}
+
+export function isReservedTray(tray: Tray): tray is ReservedTray {
+  return tray.type === 'reserved';
 }
 
 // Legacy alias - also matches old 'card' type for migration
@@ -158,24 +170,38 @@ export interface ManualTrayPlacement {
   rotation: 0 | 90 | 180 | 270; // Rotation in degrees
 }
 
-// Manual box placement for layer layout editor
+// Manual box placement for section layout editor
 export interface ManualBoxPlacement {
   boxId: string;
-  x: number; // Position in layer (mm)
+  x: number; // Position in section (mm)
   y: number;
   rotation: 0 | 90 | 180 | 270; // Rotation in degrees
 }
 
-// Manual loose tray placement for layer layout editor
+// Manual loose tray placement for section layout editor
 export interface ManualLooseTrayPlacement {
   trayId: string;
-  x: number; // Position in layer (mm)
+  x: number; // Position in section (mm)
   y: number;
   rotation: 0 | 90 | 180 | 270; // Rotation in degrees
 }
 
-// Layer containing boxes and/or loose trays
-export interface Layer {
+// Where a whole section sits inside the game container (project layout).
+// A project with no placement on any section stacks its sections as full slices, in array order.
+export interface SectionPlacement {
+  // Front-left corner of the section's (rotated) content bounding box, in game container mm
+  x: number;
+  y: number;
+  // Height of the section's underside above the container floor. For a resting section this is
+  // only an ordering hint: the real height comes from whatever the section sits on. It is
+  // honoured exactly only when `floating` is set.
+  z: number;
+  rotation: 0 | 90 | 180 | 270; // Rotation of the whole section in degrees
+  floating?: boolean; // true = deliberately left in mid-air at exactly `z`
+}
+
+// Section containing boxes and/or loose trays
+export interface Section {
   id: string;
   name: string;
   boxes: Box[];
@@ -184,6 +210,7 @@ export interface Layer {
     boxes: ManualBoxPlacement[];
     looseTrays: ManualLooseTrayPlacement[];
   };
+  placement?: SectionPlacement;
 }
 
 export interface Box {
@@ -210,21 +237,23 @@ export interface Box {
 export interface GlobalSettings {
   gameContainerWidth: number;
   gameContainerDepth: number;
+  // Interior height of the game box. Optional: when unset there is no height check.
+  gameContainerHeight?: number;
 }
 
 export interface Project {
-  version?: number; // For migration (2 = layers format)
-  layers: Layer[];
+  version?: number; // Written on save (3 = sections format, 2 = same data under the old "layers" key)
+  sections: Section[];
   counterShapes: CounterShape[];
   cardSizes: CardSize[];
   standees: Standee[];
-  selectedLayerId: string | null;
+  selectedSectionId: string | null;
   selectedBoxId: string | null;
   selectedTrayId: string | null;
   globalSettings?: GlobalSettings;
 }
 
-// Legacy project format (pre-layers)
+// Legacy project format (pre-sections)
 export interface LegacyProject {
   boxes: Box[];
   counterShapes: CounterShape[];
@@ -237,33 +266,39 @@ export interface LegacyProject {
 
 // Check if a tray is a loose tray (not in a box)
 export function isLooseTray(project: Project, trayId: string): boolean {
-  for (const layer of project.layers) {
-    if (layer.looseTrays.some((t) => t.id === trayId)) {
+  for (const section of project.sections) {
+    if (section.looseTrays.some((t) => t.id === trayId)) {
       return true;
     }
   }
   return false;
 }
 
-// Find where a tray is located (layer + box or loose)
-export function findTrayLocation(project: Project, trayId: string): { layerId: string; boxId: string | null } | null {
-  for (const layer of project.layers) {
+// Find where a tray is located (section + box or loose)
+export function findTrayLocation(project: Project, trayId: string): { sectionId: string; boxId: string | null } | null {
+  for (const section of project.sections) {
     // Check loose trays first
-    if (layer.looseTrays.some((t) => t.id === trayId)) {
-      return { layerId: layer.id, boxId: null };
+    if (section.looseTrays.some((t) => t.id === trayId)) {
+      return { sectionId: section.id, boxId: null };
     }
     // Check boxes
-    for (const box of layer.boxes) {
+    for (const box of section.boxes) {
       if (box.trays.some((t) => t.id === trayId)) {
-        return { layerId: layer.id, boxId: box.id };
+        return { sectionId: section.id, boxId: box.id };
       }
     }
   }
   return null;
 }
 
-// Check if project is in legacy format (has boxes[] but no layers[])
+// Check if project is in legacy format (has boxes[] but no sections[] or layers[])
 export function isLegacyProject(data: unknown): data is LegacyProject {
   const obj = data as Record<string, unknown>;
-  return Array.isArray(obj.boxes) && !Array.isArray(obj.layers);
+  return Array.isArray(obj.boxes) && !Array.isArray(obj.sections) && !Array.isArray(obj.layers);
+}
+
+// Check if project is in the version 2 format, where sections were stored as layers[]
+export function isLayersProject(data: unknown): boolean {
+  const obj = data as Record<string, unknown>;
+  return Array.isArray(obj.layers) && !Array.isArray(obj.sections);
 }

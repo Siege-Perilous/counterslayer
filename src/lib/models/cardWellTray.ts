@@ -402,7 +402,7 @@ export function createCardWellTray(
   const fingerHoleCuts: Geom3[] = [];
   const wallCutouts: Geom3[] = [];
 
-  // When tray height is increased (e.g., to match layer height), raise the floor
+  // When tray height is increased (e.g., to match section height), raise the floor
   // so cards remain at the proper level relative to the top of the tray
   const heightIncrease = targetHeight && targetHeight > dims.height ? targetHeight - dims.height : 0;
   const baseFloorZ = floorThickness + spacerHeight + heightIncrease;

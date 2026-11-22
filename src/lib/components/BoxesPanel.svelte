@@ -2,9 +2,9 @@
   import { Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon, Select, Text } from '@tableslayer/ui';
   import { IconX, IconPlus } from '@tabler/icons-svelte';
   import type { Box } from '#lib/types/project.js';
-  import { getAllBoxes, getProject, moveBoxToLayer } from '#lib/stores/project.svelte.js';
+  import { getAllBoxes, getProject, moveBoxToSection } from '#lib/stores/project.svelte.js';
   import { calculateMinimumBoxDimensions, getLidHeight } from '#lib/models/box.js';
-  import { calculateLayerHeight } from '#lib/models/layer.js';
+  import { calculateSectionHeight } from '#lib/models/section.js';
   import { getCardSizes, getCounterShapes } from '#lib/stores/project.svelte.js';
 
   interface Props {
@@ -18,42 +18,42 @@
 
   let { selectedBox, onSelectBox, onAddBox, onDeleteBox, onUpdateBox, hideList = false }: Props = $props();
 
-  // Get all boxes from all layers
+  // Get all boxes from all sections
   const allBoxes = $derived(getAllBoxes());
 
-  // Get layer options for move dropdown (includes "New Layer" option)
-  const layerOptions = $derived.by(() => {
+  // Get section options for move dropdown (includes "New Section" option)
+  const sectionOptions = $derived.by(() => {
     const project = getProject();
-    const options = project.layers.map((layer) => ({
-      value: layer.id,
-      label: layer.name
+    const options = project.sections.map((section) => ({
+      value: section.id,
+      label: section.name
     }));
-    // Always add "New Layer" option
+    // Always add "New Section" option
     options.push({
       value: 'new',
-      label: '+ New Layer'
+      label: '+ New Section'
     });
     return options;
   });
 
-  // Get current layer for the selected box
-  const currentLayerId = $derived.by(() => {
+  // Get current section for the selected box
+  const currentSectionId = $derived.by(() => {
     if (!selectedBox) return '';
     const project = getProject();
-    for (const layer of project.layers) {
-      if (layer.boxes.some((b) => b.id === selectedBox.id)) {
-        return layer.id;
+    for (const section of project.sections) {
+      if (section.boxes.some((b) => b.id === selectedBox.id)) {
+        return section.id;
       }
     }
     return '';
   });
 
-  // Handle layer change (can be existing layer ID or 'new')
-  function handleLayerChange(layerId: string) {
+  // Handle section change (can be existing section ID or 'new')
+  function handleSectionChange(sectionId: string) {
     if (!selectedBox) return;
-    // Allow 'new' or a different layer
-    if (layerId !== 'new' && layerId === currentLayerId) return;
-    moveBoxToLayer(selectedBox.id, layerId);
+    // Allow 'new' or a different section
+    if (sectionId !== 'new' && sectionId === currentSectionId) return;
+    moveBoxToSection(selectedBox.id, sectionId);
   }
 
   // Get global card sizes and counter shapes (shared across all boxes)
@@ -77,32 +77,33 @@
     selectedBox?.customBoxHeight !== undefined ? selectedBox.customBoxHeight + lidHeight : undefined
   );
 
-  // Get the layer height for the selected box's layer
-  const layerHeight = $derived.by(() => {
+  // Get the section height for the selected box's section
+  const sectionHeight = $derived.by(() => {
     if (!selectedBox) return 0;
     const project = getProject();
-    for (const layer of project.layers) {
-      if (layer.boxes.some((b) => b.id === selectedBox.id)) {
-        return calculateLayerHeight(layer, {
+    for (const section of project.sections) {
+      if (section.boxes.some((b) => b.id === selectedBox.id)) {
+        return calculateSectionHeight(section, {
           cardSizes: customCardSizes,
-          counterShapes: customCounterShapes
+          counterShapes: customCounterShapes,
+          standees: project.standees ?? []
         });
       }
     }
     return 0;
   });
 
-  // Natural box height (without layer adjustment)
+  // Natural box height (without section adjustment)
   const naturalBoxHeight = $derived(selectedBox ? (selectedBox.customBoxHeight ?? minimums.minHeight) + lidHeight : 0);
 
   // Actual box dimensions (custom or auto-calculated)
-  // Height is adjusted to match layer height when box is in a layer with taller items
+  // Height is adjusted to match section height when box is in a section with taller items
   const boxDimensions = $derived(
     selectedBox
       ? {
           width: selectedBox.customWidth ?? minimums.minWidth,
           depth: selectedBox.customDepth ?? minimums.minDepth,
-          height: layerHeight > 0 ? Math.max(naturalBoxHeight, layerHeight) : naturalBoxHeight
+          height: sectionHeight > 0 ? Math.max(naturalBoxHeight, sectionHeight) : naturalBoxHeight
         }
       : null
   );
@@ -164,16 +165,16 @@
 
         <Spacer size="0.75rem" />
 
-        <!-- Move to Layer -->
-        <FormControl label="Layer" name="moveToLayer">
+        <!-- Move to Section -->
+        <FormControl label="Section" name="moveToSection">
           {#snippet input({ inputProps })}
             <Select
               {...inputProps}
-              selected={currentLayerId ? [currentLayerId] : []}
-              options={layerOptions}
+              selected={currentSectionId ? [currentSectionId] : []}
+              options={sectionOptions}
               onSelectedChange={(selected) => {
                 if (selected[0]) {
-                  handleLayerChange(selected[0]);
+                  handleSectionChange(selected[0]);
                 }
               }}
             />

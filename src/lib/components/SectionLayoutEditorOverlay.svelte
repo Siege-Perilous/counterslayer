@@ -1,15 +1,15 @@
 <script lang="ts">
   /**
-   * Layer Layout Editor Overlay
-   * Wraps the shared LayoutEditorToolbar with layer-specific state
+   * Section Layout Editor Overlay
+   * Wraps the shared LayoutEditorToolbar with section-specific state
    */
   import LayoutEditorToolbar from './LayoutEditorToolbar.svelte';
   import {
-    layerLayoutEditorState,
+    sectionLayoutEditorState,
     getSelectedPlacement,
     getEffectiveBoxDimensions,
     getEffectiveLooseTrayDimensions
-  } from '#lib/stores/layerLayoutEditor.svelte.js';
+  } from '#lib/stores/sectionLayoutEditor.svelte.js';
 
   interface Props {
     onEnterEdit: () => void;
@@ -22,9 +22,9 @@
 
   let { onEnterEdit, onSave, onCancel, onResetAuto, onRotate, canEdit = true }: Props = $props();
 
-  let isEditMode = $derived.by(() => layerLayoutEditorState.isEditMode);
+  let isEditMode = $derived.by(() => sectionLayoutEditorState.isEditMode);
   let selectedPlacement = $derived.by(() => getSelectedPlacement());
-  let selectedItemType = $derived.by(() => layerLayoutEditorState.selectedItemType);
+  let selectedItemType = $derived.by(() => sectionLayoutEditorState.selectedItemType);
 
   let selectedDims = $derived.by(() => {
     if (!selectedPlacement) return null;

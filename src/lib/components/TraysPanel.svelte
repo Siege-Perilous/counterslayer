@@ -20,12 +20,14 @@
     isCardDividerTray,
     isCardWellTray,
     isCupTray,
+    isReservedTray,
     isStandeeTray,
     type CounterTray,
     type CardDrawTray,
     type CardDividerTray,
     type CardWellTray,
     type CupTray,
+    type ReservedTray,
     type StandeeTray
   } from '#lib/types/project.js';
   import type { CounterTrayParams } from '#lib/models/counterTray.js';
@@ -33,11 +35,12 @@
   import type { CardDividerTrayParams } from '#lib/models/cardDividerTray.js';
   import type { CardWellTrayParams } from '#lib/models/cardWellTray.js';
   import type { CupTrayParams } from '#lib/models/cupTray.js';
+  import type { ReservedSpaceParams } from '#lib/models/reservedSpace.js';
   import type { StandeeTrayParams } from '#lib/models/standeeTray.js';
   import { countCups } from '#lib/types/cupLayout.js';
   import { countCells } from '#lib/types/cardWellLayout.js';
   import { getTrayDimensionsForTray, arrangeTrays } from '#lib/models/box.js';
-  import { calculateLayerHeight } from '#lib/models/layer.js';
+  import { calculateSectionHeight } from '#lib/models/section.js';
   import {
     getProject,
     getTrayLetterById,
@@ -53,6 +56,7 @@
   import CardDividerTrayEditor from './panels/CardDividerTrayEditor.svelte';
   import CardWellTrayEditor from './panels/CardWellTrayEditor.svelte';
   import CupTrayEditor from './panels/CupTrayEditor.svelte';
+  import ReservedSpaceEditor from './panels/ReservedSpaceEditor.svelte';
   import StandeeTrayEditor from './panels/StandeeTrayEditor.svelte';
 
   interface Props {
@@ -68,6 +72,7 @@
     onUpdateCardWellParams?: (params: CardWellTrayParams) => void;
     onUpdateCupParams?: (params: CupTrayParams) => void;
     onUpdateStandeeParams?: (params: StandeeTrayParams) => void;
+    onUpdateReservedParams?: (params: ReservedSpaceParams) => void;
     hideList?: boolean;
   }
 
@@ -84,35 +89,43 @@
     onUpdateCardWellParams,
     onUpdateCupParams,
     onUpdateStandeeParams,
+    onUpdateReservedParams,
     hideList = false
   }: Props = $props();
 
-  // Get the tray letter based on cumulative position across all layers
+  // Get the tray letter based on cumulative position across all sections
   let trayLetter = $derived.by(() => {
     const project = getProject();
     if (!selectedTray) return 'A';
-    return getTrayLetterById(project.layers, selectedTray.id) || 'A';
+    return getTrayLetterById(project.sections, selectedTray.id) || 'A';
   });
 
-  // Build move destination options: all boxes + loose tray options per layer
+  // Build move destination options: all boxes + loose tray options per section
   let moveDestinations = $derived.by(() => {
     const project = getProject();
     const options: { value: string; label: string; group?: string }[] = [];
 
-    for (const layer of project.layers) {
-      // Add boxes in this layer
-      for (const box of layer.boxes) {
+    // A reserved space sits directly in a section, never in a box
+    const reserved = selectedTray !== null && isReservedTray(selectedTray);
+
+    for (const section of project.sections) {
+      if (reserved) {
+        options.push({ value: `loose:${section.id}`, label: section.name });
+        continue;
+      }
+      // Add boxes in this section
+      for (const box of section.boxes) {
         options.push({
           value: `box:${box.id}`,
           label: box.name,
-          group: layer.name
+          group: section.name
         });
       }
-      // Add loose tray option for this layer
+      // Add loose tray option for this section
       options.push({
-        value: `loose:${layer.id}`,
-        label: `Loose in ${layer.name}`,
-        group: layer.name
+        value: `loose:${section.id}`,
+        label: `Loose in ${section.name}`,
+        group: section.name
       });
     }
 
@@ -127,12 +140,25 @@
     }
     // Check if it's a loose tray
     const project = getProject();
-    for (const layer of project.layers) {
-      if (layer.looseTrays.some((t) => t.id === selectedTray.id)) {
-        return `loose:${layer.id}`;
+    for (const section of project.sections) {
+      if (section.looseTrays.some((t) => t.id === selectedTray.id)) {
+        return `loose:${section.id}`;
       }
     }
     return '';
+  });
+
+  // Height of the section holding the selected reserved space (it is drawn at that height)
+  let reservedSectionHeight = $derived.by(() => {
+    if (!selectedTray || !isReservedTray(selectedTray)) return undefined;
+    const project = getProject();
+    const section = project.sections.find((s) => s.looseTrays.some((t) => t.id === selectedTray.id));
+    if (!section) return undefined;
+    return calculateSectionHeight(section, {
+      cardSizes: getCardSizes(),
+      counterShapes: getCounterShapes(),
+      standees: project.standees ?? []
+    });
   });
 
   // Handle move destination change
@@ -147,15 +173,15 @@
     }
   }
 
-  // Find the layer containing the selected box
-  const selectedBoxLayer = $derived.by(() => {
+  // Find the section containing the selected box
+  const selectedBoxSection = $derived.by(() => {
     if (!selectedBox) return null;
     const project = getProject();
-    return project.layers.find((layer) => layer.boxes.some((b) => b.id === selectedBox.id)) ?? null;
+    return project.sections.find((section) => section.boxes.some((b) => b.id === selectedBox.id)) ?? null;
   });
 
-  // Calculate layer-adjusted tray height
-  // Trays expand to fill the box interior, which may be taller than natural to match layer height
+  // Calculate section-adjusted tray height
+  // Trays expand to fill the box interior, which may be taller than natural to match section height
   let maxTrayHeight = $derived.by(() => {
     if (!selectedBox) return 0;
     const cardSizes = getCardSizes();
@@ -167,14 +193,18 @@
       0
     );
 
-    // If box is in a layer, calculate layer-adjusted height
-    if (selectedBoxLayer) {
-      const layerHeight = calculateLayerHeight(selectedBoxLayer, { cardSizes, counterShapes });
+    // If box is in a section, calculate section-adjusted height
+    if (selectedBoxSection) {
+      const sectionHeight = calculateSectionHeight(selectedBoxSection, {
+        cardSizes,
+        counterShapes,
+        standees: getProject().standees ?? []
+      });
       // Only lid thickness (flat top) sticks above box, not full lid height
       const lidThickness = selectedBox.lidParams?.thickness ?? 2;
       const floorThickness = selectedBox.floorThickness;
-      // Required tray height to fill box interior when box is adjusted to layer height
-      const requiredTrayHeight = layerHeight - lidThickness - floorThickness;
+      // Required tray height to fill box interior when box is adjusted to section height
+      const requiredTrayHeight = sectionHeight - lidThickness - floorThickness;
       return Math.max(naturalMaxHeight, requiredTrayHeight);
     }
 
@@ -326,7 +356,7 @@
       <div class="panelListItems">
         {#each selectedBox.trays as tray, _trayIdx (tray.id)}
           {@const stats = getTrayStats(tray)}
-          {@const letter = getTrayLetterById(getProject().layers, tray.id)}
+          {@const letter = getTrayLetterById(getProject().sections, tray.id)}
           <div
             class="listItem {selectedTray?.id === tray.id ? 'listItem--selected' : ''}"
             onclick={() => onSelectTray(tray)}
@@ -396,7 +426,7 @@
 
         <Spacer size="1rem" />
 
-        <!-- Move to Box/Layer -->
+        <!-- Move to Box/Section -->
         <FormControl label="Location" name="moveToLocation">
           {#snippet input({ inputProps })}
             <Select
@@ -414,39 +444,41 @@
 
         <Spacer size="1rem" />
 
-        <!-- Color -->
-        <FormControl label="Color" name="trayColor">
-          {#snippet start()}
-            <Popover>
-              {#snippet trigger()}
-                <ColorPickerSwatch color={selectedTray.color} />
-              {/snippet}
-              {#snippet content()}
-                <ColorPicker
-                  showOpacity={false}
-                  hex={selectedTray.color}
-                  onUpdate={(colorData) => handleColorUpdate(colorData.hex)}
-                />
-              {/snippet}
-            </Popover>
-          {/snippet}
-          {#snippet input({ inputProps })}
-            <Input
-              {...inputProps}
-              value={selectedTray.color}
-              oninput={(e) => handleColorUpdate(e.currentTarget.value)}
-            />
-          {/snippet}
-        </FormControl>
+        {#if !isReservedTray(selectedTray)}
+          <!-- Color -->
+          <FormControl label="Color" name="trayColor">
+            {#snippet start()}
+              <Popover>
+                {#snippet trigger()}
+                  <ColorPickerSwatch color={selectedTray.color} />
+                {/snippet}
+                {#snippet content()}
+                  <ColorPicker
+                    showOpacity={false}
+                    hex={selectedTray.color}
+                    onUpdate={(colorData) => handleColorUpdate(colorData.hex)}
+                  />
+                {/snippet}
+              </Popover>
+            {/snippet}
+            {#snippet input({ inputProps })}
+              <Input
+                {...inputProps}
+                value={selectedTray.color}
+                oninput={(e) => handleColorUpdate(e.currentTarget.value)}
+              />
+            {/snippet}
+          </FormControl>
 
-        <Spacer size="1rem" />
+          <Spacer size="1rem" />
 
-        <!-- Emboss Name -->
-        <InputCheckbox
-          label="Emboss name on tray bottom"
-          checked={selectedTray.showEmboss ?? true}
-          onchange={(e) => onUpdateTray({ showEmboss: e.currentTarget.checked })}
-        />
+          <!-- Emboss Name -->
+          <InputCheckbox
+            label="Emboss name on tray bottom"
+            checked={selectedTray.showEmboss ?? true}
+            onchange={(e) => onUpdateTray({ showEmboss: e.currentTarget.checked })}
+          />
+        {/if}
       </div>
 
       <Hr />
@@ -489,6 +521,12 @@
           onUpdateParams={onUpdateCupParams}
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
+        />
+      {:else if isReservedTray(selectedTray) && onUpdateReservedParams}
+        <ReservedSpaceEditor
+          tray={selectedTray as ReservedTray}
+          onUpdateParams={onUpdateReservedParams}
+          sectionHeight={reservedSectionHeight}
         />
       {:else if isStandeeTray(selectedTray) && onUpdateStandeeParams}
         <StandeeTrayEditor
