@@ -127,7 +127,6 @@ export function createBoxWithLidGrooves(
   const wall = box.wallThickness;
   const floor = box.floorThickness;
   const tolerance = box.tolerance;
-  const recessDepth = wall; // How deep the lid lip goes
 
   // Calculate minimum (auto) dimensions
   const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes, standees);
@@ -153,9 +152,6 @@ export function createBoxWithLidGrooves(
 
   // Whether to fill gaps with solid material
   const fillSolid = box.fillSolidEmpty ?? false;
-
-  // Inner wall dimensions (thinner wall that goes full height)
-  const innerWallThickness = wall / 2;
 
   // 1. Create full box with thick walls
   const outerBox = cuboid({
@@ -439,6 +435,151 @@ export function createBoxWithLidGrooves(
     }
   }
 
+  // 3. Cut recess on outside of walls at top (leaves the inner wall for the lid to grip)
+  const lidFit: LidFitDimensions = { extWidth, extDepth, extHeight, wall, lidParams: box.lidParams };
+  const recess = createLidRecess(lidFit);
+
+  // When fillSolid is true, don't subtract fillCells - leave them as solid material
+  let result = fillSolid
+    ? subtract(outerBox, ...trayCavities, recess)
+    : subtract(outerBox, ...trayCavities, ...fillCells, recess);
+
+  // Add gap fills (solid pieces for custom box dimensions)
+  if (gapFills.length > 0) {
+    result = union(result, ...gapFills);
+  }
+
+  // Add back walls for shorter trays in mixed-depth rows
+  if (backWalls.length > 0) {
+    result = union(result, ...backWalls);
+  }
+
+  // 4. Add the grooves, lock and grip lines the lid needs
+  result = addLidFittings(result, lidFit);
+
+  // 5. Add poke holes at the center of each tray position for easy removal
+  // Also add tray name labels to the left of each hole
+  const POKE_HOLE_DIAMETER = 20;
+  const labelTextDepth = 0.6;
+  const labelStrokeWidth = 1.0;
+  const labelTextHeight = 5;
+
+  for (const p of placements) {
+    // Calculate center of tray in box coordinates
+    const centerX = wall + tolerance + p.x + p.dimensions.width / 2;
+    const centerY = wall + tolerance + p.y + p.dimensions.depth / 2;
+
+    const hole = translate(
+      [centerX, centerY, floor / 2],
+      cylinder({
+        radius: POKE_HOLE_DIAMETER / 2,
+        height: floor + 1,
+        segments: 32
+      })
+    );
+    result = subtract(result, hole);
+
+    // Add tray name label to the left of the hole
+    if (p.tray.name && p.tray.name.trim().length > 0) {
+      const textSegments = vectorText({ height: labelTextHeight, align: 'center' }, p.tray.name.trim().toUpperCase());
+
+      if (textSegments.length > 0) {
+        const textShapes: Geom3[] = [];
+        for (const segment of textSegments) {
+          if (segment.length >= 2) {
+            const pathObj = path2.fromPoints({ closed: false }, segment);
+            const expanded = expand({ delta: labelStrokeWidth / 2, corners: 'round', segments: 32 }, pathObj);
+            const extruded = extrudeLinear({ height: labelTextDepth + 0.1 }, expanded);
+            textShapes.push(extruded);
+          }
+        }
+
+        if (textShapes.length > 0) {
+          let minX = Infinity,
+            maxX = -Infinity;
+          let minY = Infinity,
+            maxY = -Infinity;
+          for (const segment of textSegments) {
+            for (const point of segment) {
+              minX = Math.min(minX, point[0]);
+              maxX = Math.max(maxX, point[0]);
+              minY = Math.min(minY, point[1]);
+              maxY = Math.max(maxY, point[1]);
+            }
+          }
+          const textWidthCalc = maxX - minX + labelStrokeWidth;
+          const textHeightY = maxY - minY + labelStrokeWidth;
+
+          // Available space to the left of the hole
+          const holeLeftEdge = centerX - POKE_HOLE_DIAMETER / 2;
+          const trayLeftEdge = wall + tolerance + p.x;
+          const availableWidth = holeLeftEdge - trayLeftEdge - wall;
+
+          if (availableWidth > 10) {
+            // Scale text to fit
+            const textScale = Math.min(
+              1,
+              Math.min(availableWidth / textWidthCalc, (p.dimensions.depth - wall * 2) / textHeightY)
+            );
+            const textCenterX = (minX + maxX) / 2;
+            const textCenterY = (minY + maxY) / 2;
+
+            // Position text centered in the space left of the hole
+            const labelX = trayLeftEdge + availableWidth / 2;
+            const labelY = centerY;
+
+            const combinedText: Geom3 = union(...textShapes);
+
+            // Position on inner floor surface (Z = floor), cutting down into the floor
+            const positionedText = translate(
+              [labelX - textCenterX * textScale, labelY - textCenterY * textScale, floor - labelTextDepth],
+              scale([textScale, textScale, 1], combinedText)
+            );
+            result = subtract(result, positionedText);
+          }
+        }
+      }
+    }
+  }
+
+  // Honeycomb pattern on box floor (uses same toggle as lid honeycomb)
+  const honeycombEnabled = box.lidParams?.honeycombEnabled ?? false;
+  if (honeycombEnabled) {
+    // Create exclusion zones around poke holes
+    const pokeHoleExclusions: HoneycombExclusion[] = placements.map((p) => ({
+      x: wall + tolerance + p.x + p.dimensions.width / 2,
+      y: wall + tolerance + p.y + p.dimensions.depth / 2,
+      radius: POKE_HOLE_DIAMETER / 2
+    }));
+
+    const honeycombUnion = createHoneycombUnion(extWidth, extDepth, floor, defaultHoneycombParams, pokeHoleExclusions);
+
+    if (honeycombUnion) {
+      result = subtract(result, honeycombUnion);
+    }
+  }
+
+  return result;
+}
+
+/** A body the sliding lid attaches to: exterior footprint, body height and wall thickness. */
+export interface LidFitDimensions {
+  extWidth: number;
+  extDepth: number;
+  extHeight: number;
+  wall: number;
+  lidParams?: Partial<LidParams>;
+}
+
+/**
+ * The recess cut around the top outside of a body so the lid lip can drop over the inner wall.
+ * Subtract the result from the body.
+ */
+export function createLidRecess(dims: LidFitDimensions): Geom3 {
+  const { extWidth, extDepth, extHeight, wall, lidParams } = dims;
+  const recessDepth = wall; // How deep the lid lip goes
+  const innerWallThickness = wall / 2;
+
   // 3. Cut recess on outside of walls at top
   // This removes the outer portion of the wall, leaving inner portion
   const recessWidth = extWidth + 1;
@@ -467,7 +608,7 @@ export function createBoxWithLidGrooves(
 
   // For sliding lid, extend the entry wall to full height (no recess on entry side)
   // Lid slides along the LONGEST dimension for better ergonomics
-  const snapEnabled = box.lidParams?.snapEnabled ?? true;
+  const snapEnabled = lidParams?.snapEnabled ?? true;
   const slidesAlongX = extWidth > extDepth; // true if box is longer in X
 
   let recess;
@@ -488,34 +629,35 @@ export function createBoxWithLidGrooves(
     recess = subtract(outerRecess, innerWallKeep);
   }
 
-  // When fillSolid is true, don't subtract fillCells - leave them as solid material
-  let result = fillSolid
-    ? subtract(outerBox, ...trayCavities, recess)
-    : subtract(outerBox, ...trayCavities, ...fillCells, recess);
+  return recess;
+}
 
-  // Add gap fills (solid pieces for custom box dimensions)
-  if (gapFills.length > 0) {
-    result = union(result, ...gapFills);
-  }
-
-  // Add back walls for shorter trays in mixed-depth rows
-  if (backWalls.length > 0) {
-    result = union(result, ...backWalls);
-  }
+/**
+ * Adds everything a recessed body needs to hold the sliding lid: rail grooves with printable
+ * supports, the ramp lock or detent, and grip lines. Call after subtracting createLidRecess.
+ */
+export function addLidFittings(body: Geom3, dims: LidFitDimensions): Geom3 {
+  const { extWidth, extDepth, extHeight, wall, lidParams } = dims;
+  const innerWallThickness = wall / 2;
+  const snapEnabled = lidParams?.snapEnabled ?? true;
+  const slidesAlongX = extWidth > extDepth;
+  const actualInteriorWidth = extWidth - wall * 2;
+  const actualInteriorDepth = extDepth - wall * 2;
+  let result = body;
 
   // 4. Add snap grooves if enabled
   // These are grooves cut into the outer surface of the inner wall
   // where the lid's rails slide into
   // Using simple rectangular grooves - the small overhang (~0.8mm) is acceptable
-  const snapBumpHeight = box.lidParams?.snapBumpHeight ?? 0.4;
-  const snapBumpWidth = box.lidParams?.snapBumpWidth ?? 4.0;
-  const railEngagement = box.lidParams?.railEngagement ?? 0.5;
+  const snapBumpHeight = lidParams?.snapBumpHeight ?? 0.4;
+  const snapBumpWidth = lidParams?.snapBumpWidth ?? 4.0;
+  const railEngagement = lidParams?.railEngagement ?? 0.5;
 
   // Ramp lock parameters
-  const rampLockEnabled = box.lidParams?.rampLockEnabled ?? true;
-  const rampHeight = box.lidParams?.rampHeight ?? 0.5;
-  const rampLengthIn = box.lidParams?.rampLengthIn ?? 4.0;
-  const rampLengthOut = box.lidParams?.rampLengthOut ?? 1.5;
+  const rampLockEnabled = lidParams?.rampLockEnabled ?? true;
+  const rampHeight = lidParams?.rampHeight ?? 0.5;
+  const rampLengthIn = lidParams?.rampLengthIn ?? 4.0;
+  const rampLengthOut = lidParams?.rampLengthOut ?? 1.5;
 
   if (snapEnabled && snapBumpHeight > 0) {
     // Groove depth must accommodate the rail which bridges clearance gap + extends into groove
@@ -856,108 +998,6 @@ export function createBoxWithLidGrooves(
     }
   }
 
-  // 5. Add poke holes at the center of each tray position for easy removal
-  // Also add tray name labels to the left of each hole
-  const POKE_HOLE_DIAMETER = 20;
-  const labelTextDepth = 0.6;
-  const labelStrokeWidth = 1.0;
-  const labelTextHeight = 5;
-
-  for (const p of placements) {
-    // Calculate center of tray in box coordinates
-    const centerX = wall + tolerance + p.x + p.dimensions.width / 2;
-    const centerY = wall + tolerance + p.y + p.dimensions.depth / 2;
-
-    const hole = translate(
-      [centerX, centerY, floor / 2],
-      cylinder({
-        radius: POKE_HOLE_DIAMETER / 2,
-        height: floor + 1,
-        segments: 32
-      })
-    );
-    result = subtract(result, hole);
-
-    // Add tray name label to the left of the hole
-    if (p.tray.name && p.tray.name.trim().length > 0) {
-      const textSegments = vectorText({ height: labelTextHeight, align: 'center' }, p.tray.name.trim().toUpperCase());
-
-      if (textSegments.length > 0) {
-        const textShapes: Geom3[] = [];
-        for (const segment of textSegments) {
-          if (segment.length >= 2) {
-            const pathObj = path2.fromPoints({ closed: false }, segment);
-            const expanded = expand({ delta: labelStrokeWidth / 2, corners: 'round', segments: 32 }, pathObj);
-            const extruded = extrudeLinear({ height: labelTextDepth + 0.1 }, expanded);
-            textShapes.push(extruded);
-          }
-        }
-
-        if (textShapes.length > 0) {
-          let minX = Infinity,
-            maxX = -Infinity;
-          let minY = Infinity,
-            maxY = -Infinity;
-          for (const segment of textSegments) {
-            for (const point of segment) {
-              minX = Math.min(minX, point[0]);
-              maxX = Math.max(maxX, point[0]);
-              minY = Math.min(minY, point[1]);
-              maxY = Math.max(maxY, point[1]);
-            }
-          }
-          const textWidthCalc = maxX - minX + labelStrokeWidth;
-          const textHeightY = maxY - minY + labelStrokeWidth;
-
-          // Available space to the left of the hole
-          const holeLeftEdge = centerX - POKE_HOLE_DIAMETER / 2;
-          const trayLeftEdge = wall + tolerance + p.x;
-          const availableWidth = holeLeftEdge - trayLeftEdge - wall;
-
-          if (availableWidth > 10) {
-            // Scale text to fit
-            const textScale = Math.min(
-              1,
-              Math.min(availableWidth / textWidthCalc, (p.dimensions.depth - wall * 2) / textHeightY)
-            );
-            const textCenterX = (minX + maxX) / 2;
-            const textCenterY = (minY + maxY) / 2;
-
-            // Position text centered in the space left of the hole
-            const labelX = trayLeftEdge + availableWidth / 2;
-            const labelY = centerY;
-
-            const combinedText: Geom3 = union(...textShapes);
-
-            // Position on inner floor surface (Z = floor), cutting down into the floor
-            const positionedText = translate(
-              [labelX - textCenterX * textScale, labelY - textCenterY * textScale, floor - labelTextDepth],
-              scale([textScale, textScale, 1], combinedText)
-            );
-            result = subtract(result, positionedText);
-          }
-        }
-      }
-    }
-  }
-
-  // Honeycomb pattern on box floor (uses same toggle as lid honeycomb)
-  const honeycombEnabled = box.lidParams?.honeycombEnabled ?? false;
-  if (honeycombEnabled) {
-    // Create exclusion zones around poke holes
-    const pokeHoleExclusions: HoneycombExclusion[] = placements.map((p) => ({
-      x: wall + tolerance + p.x + p.dimensions.width / 2,
-      y: wall + tolerance + p.y + p.dimensions.depth / 2,
-      radius: POKE_HOLE_DIAMETER / 2
-    }));
-
-    const honeycombUnion = createHoneycombUnion(extWidth, extDepth, floor, defaultHoneycombParams, pokeHoleExclusions);
-
-    if (honeycombUnion) {
-      result = subtract(result, honeycombUnion);
-    }
-  }
-
   return result;
 }
 
@@ -996,28 +1036,44 @@ export function createLid(
     throw new Error(`Lid for "${box.name}": Invalid dimensions.`);
   }
 
-  const wall = box.wallThickness;
+  // Lid exterior matches box exterior (uses custom dimensions if set)
+  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes, standees);
+  return createLidForDimensions({
+    extWidth: box.customWidth ?? minimums.minWidth,
+    extDepth: box.customDepth ?? minimums.minDepth,
+    wall: box.wallThickness,
+    lidParams: box.lidParams,
+    name: box.name
+  });
+}
+
+/** A lid described by its exterior footprint and the wall thickness of the body it fits. */
+export interface LidDimensions {
+  extWidth: number;
+  extDepth: number;
+  wall: number;
+  lidParams?: Partial<LidParams>;
+  /** Engraved on the lid top unless honeycomb is on or lidParams.showName is false */
+  name?: string;
+}
+
+/** Builds the sliding lid for any body with the given footprint (see createLid). */
+export function createLidForDimensions(dims: LidDimensions): Geom3 {
+  const { extWidth, extDepth, wall, lidParams, name = '' } = dims;
   const clearance = 0.3;
   const innerWallThickness = wall / 2;
 
   // Snap-lock parameters (with defaults for backwards compatibility)
-  const snapEnabled = box.lidParams?.snapEnabled ?? true;
-  const snapBumpHeight = box.lidParams?.snapBumpHeight ?? 0.4;
-  const snapBumpWidth = box.lidParams?.snapBumpWidth ?? 4.0;
-  const railEngagement = box.lidParams?.railEngagement ?? 0.5;
+  const snapEnabled = lidParams?.snapEnabled ?? true;
+  const snapBumpHeight = lidParams?.snapBumpHeight ?? 0.4;
+  const snapBumpWidth = lidParams?.snapBumpWidth ?? 4.0;
+  const railEngagement = lidParams?.railEngagement ?? 0.5;
 
   // Ramp lock parameters
-  const rampLockEnabled = box.lidParams?.rampLockEnabled ?? true;
-  const rampHeight = box.lidParams?.rampHeight ?? 0.5;
-  const rampLengthIn = box.lidParams?.rampLengthIn ?? 4.0;
-  const rampLengthOut = box.lidParams?.rampLengthOut ?? 1.5;
-
-  // Calculate minimum (auto) dimensions
-  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes, standees);
-
-  // Lid exterior matches box exterior (uses custom dimensions if set)
-  const extWidth = box.customWidth ?? minimums.minWidth;
-  const extDepth = box.customDepth ?? minimums.minDepth;
+  const rampLockEnabled = lidParams?.rampLockEnabled ?? true;
+  const rampHeight = lidParams?.rampHeight ?? 0.5;
+  const rampLengthIn = lidParams?.rampLengthIn ?? 4.0;
+  const rampLengthOut = lidParams?.rampLengthOut ?? 1.5;
 
   // Total lid height = 2× wall thickness
   const lidHeight = wall * 2;
@@ -1051,11 +1107,11 @@ export function createLid(
 
   // Honeycomb pattern on top plate only (if enabled)
   // The "top plate" is the flat printing surface at Z=0 to Z=wall
-  const honeycombEnabled = box.lidParams?.honeycombEnabled ?? false;
+  const honeycombEnabled = lidParams?.honeycombEnabled ?? false;
   if (honeycombEnabled) {
-    const hexSize = box.lidParams?.honeycombHexSize ?? 5;
-    const honeycombWall = box.lidParams?.honeycombWallThickness ?? 1.2;
-    const borderOffset = box.lidParams?.honeycombBorderOffset ?? 3;
+    const hexSize = lidParams?.honeycombHexSize ?? 5;
+    const honeycombWall = lidParams?.honeycombWallThickness ?? 1.2;
+    const borderOffset = lidParams?.honeycombBorderOffset ?? 3;
     const plateThickness = wall; // Top plate is 1x wall thickness
 
     const honeycombUnion = createHoneycombUnion(extWidth, extDepth, plateThickness, {
@@ -1577,8 +1633,8 @@ export function createLid(
   }
 
   // 4. Emboss box name on lid top if enabled (disabled when honeycomb is enabled)
-  const showName = box.lidParams?.showName ?? true;
-  if (showName && !honeycombEnabled && box.name && box.name.trim().length > 0) {
+  const showName = lidParams?.showName ?? true;
+  if (showName && !honeycombEnabled && name && name.trim().length > 0) {
     const textDepth = 0.6; // How deep the text is recessed
     const strokeWidth = 1.4; // Width of the text strokes (thicker = bolder)
     const textHeight = 8; // Font height in mm
@@ -1588,7 +1644,7 @@ export function createLid(
     const rotateText = extDepth > extWidth;
 
     // Get text outlines (uppercase renders better with vector font)
-    const textSegments = vectorText({ height: textHeight, align: 'center' }, box.name.trim().toUpperCase());
+    const textSegments = vectorText({ height: textHeight, align: 'center' }, name.trim().toUpperCase());
 
     if (textSegments.length > 0) {
       // Convert segments to path2, expand to give stroke width, and extrude

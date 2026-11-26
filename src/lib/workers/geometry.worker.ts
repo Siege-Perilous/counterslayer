@@ -20,7 +20,7 @@ import {
   type CounterStack,
   type CustomCardSize
 } from '#lib/models/counterTray.js';
-import { createCupTray } from '#lib/models/cupTray.js';
+import { createCupTray, createCupTrayLid } from '#lib/models/cupTray.js';
 import { createBoxWithLidGrooves, createLid } from '#lib/models/lid.js';
 import { getReservedSpaceDimensions } from '#lib/models/reservedSpace.js';
 import { createStandeeTray, getStandeePositions } from '#lib/models/standeeTray.js';
@@ -204,6 +204,8 @@ interface TrayGeometryResult {
   name: string;
   color: string;
   geometry: GeometryData;
+  // The tray's own lid (cup trays with a lid), in print orientation
+  lidGeometry?: GeometryData | null;
   placement: TrayPlacement;
   counterStacks: CounterStack[];
   trayLetter: string;
@@ -224,6 +226,8 @@ interface LooseTrayGeometryResult {
   name: string;
   color: string;
   geometry: GeometryData;
+  // The tray's own lid (cup trays with a lid), in print orientation
+  lidGeometry?: GeometryData | null;
   dimensions: { width: number; depth: number; height: number };
   counterStacks: CounterStack[];
   trayLetter: string;
@@ -358,6 +362,22 @@ function createTrayGeometry(
   }
   // Default to counter tray
   return createCounterTray(tray.params, counterShapes, tray.name, maxHeight, spacerHeight, showEmboss);
+}
+
+/**
+ * The tray's own lid, for tray types that can have one (cup trays), or null.
+ * The lid does not depend on the tray's height.
+ */
+function createTrayLidGeometry(tray: Tray): Geom3 | null {
+  if (isCupTray(tray)) {
+    return createCupTrayLid(tray.params, tray.name);
+  }
+  return null;
+}
+
+/** Export name for a tray's own lid */
+function trayLidName(trayName: string): string {
+  return `${trayName}-lid`;
 }
 
 /**
@@ -698,12 +718,14 @@ function handleGenerate(msg: GenerateMessage): void {
         });
 
         cachedAllTrays.push({ jscadGeom, name: placement.tray.name });
+        const trayLid = createTrayLidGeometry(placement.tray);
 
         return {
           trayId: placement.tray.id,
           name: placement.tray.name,
           color: placement.tray.color,
           geometry: jscadToArrays(jscadGeom),
+          lidGeometry: trayLid ? jscadToArrays(trayLid) : null,
           placement: {
             ...placement,
             dimensions: {
@@ -754,6 +776,7 @@ function handleGenerate(msg: GenerateMessage): void {
       cachedBox = null;
       cachedLid = null;
       cachedBoxName = '';
+      const selectedTrayLid = createTrayLidGeometry(tray);
 
       // Add the loose tray to allTrayGeometries with proper dimensions
       allTrayGeometries = [
@@ -762,6 +785,7 @@ function handleGenerate(msg: GenerateMessage): void {
           name: tray.name,
           color: tray.color,
           geometry: selectedTrayGeometry,
+          lidGeometry: selectedTrayLid ? jscadToArrays(selectedTrayLid) : null,
           placement: {
             tray,
             x: 0,
@@ -857,12 +881,17 @@ function handleGenerate(msg: GenerateMessage): void {
 
         // Cache for STL export
         cachedTraysForBox.push({ jscadGeom, name: placement.tray.name });
+        const trayLid = createTrayLidGeometry(placement.tray);
+        if (trayLid) {
+          cachedTraysForBox.push({ jscadGeom: trayLid, name: trayLidName(placement.tray.name) });
+        }
 
         return {
           trayId: placement.tray.id,
           name: placement.tray.name,
           color: placement.tray.color,
           geometry: jscadToArrays(jscadGeom),
+          lidGeometry: trayLid ? jscadToArrays(trayLid) : null,
           placement: {
             ...placement,
             dimensions: {
@@ -930,11 +959,15 @@ function handleGenerate(msg: GenerateMessage): void {
         const jscadGeom = createTrayGeometry(looseTray, cardSizes, counterShapes, maxHeight, spacerHeight, standees);
 
         // Cache for STL export (reserved spaces are not printed, so they are never exported)
+        const trayLid = createTrayLidGeometry(looseTray);
         if (!isReservedTray(looseTray)) {
           cachedAllLooseTrays.push({
             trayName: looseTray.name,
             trayGeom: jscadGeom
           });
+          if (trayLid) {
+            cachedAllLooseTrays.push({ trayName: trayLidName(looseTray.name), trayGeom: trayLid });
+          }
         }
 
         // Add to result
@@ -944,6 +977,7 @@ function handleGenerate(msg: GenerateMessage): void {
           name: looseTray.name,
           color: looseTray.color,
           geometry: jscadToArrays(jscadGeom),
+          lidGeometry: trayLid ? jscadToArrays(trayLid) : null,
           dimensions: { width: trayDims.width, depth: trayDims.depth, height: maxHeight },
           counterStacks: getTrayPositions(looseTray, cardSizes, counterShapes, maxHeight, spacerHeight, standees),
           trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.sections, looseTray.id))
@@ -957,9 +991,16 @@ function handleGenerate(msg: GenerateMessage): void {
     transferableSet.add(selectedTrayGeometry.positions.buffer as ArrayBuffer);
     transferableSet.add(selectedTrayGeometry.normals.buffer as ArrayBuffer);
 
+    const addTrayLid = (lid: GeometryData | null | undefined) => {
+      if (!lid) return;
+      transferableSet.add(lid.positions.buffer as ArrayBuffer);
+      transferableSet.add(lid.normals.buffer as ArrayBuffer);
+    };
+
     for (const tray of allTrayGeometries) {
       transferableSet.add(tray.geometry.positions.buffer as ArrayBuffer);
       transferableSet.add(tray.geometry.normals.buffer as ArrayBuffer);
+      addTrayLid(tray.lidGeometry);
     }
 
     if (boxGeometry) {
@@ -984,6 +1025,7 @@ function handleGenerate(msg: GenerateMessage): void {
       for (const tray of boxData.trayGeometries) {
         transferableSet.add(tray.geometry.positions.buffer as ArrayBuffer);
         transferableSet.add(tray.geometry.normals.buffer as ArrayBuffer);
+        addTrayLid(tray.lidGeometry);
       }
     }
 
@@ -991,6 +1033,7 @@ function handleGenerate(msg: GenerateMessage): void {
     for (const looseTray of allLooseTrayGeometries) {
       transferableSet.add(looseTray.geometry.positions.buffer as ArrayBuffer);
       transferableSet.add(looseTray.geometry.normals.buffer as ArrayBuffer);
+      addTrayLid(looseTray.lidGeometry);
     }
 
     const transferables: Transferable[] = Array.from(transferableSet);

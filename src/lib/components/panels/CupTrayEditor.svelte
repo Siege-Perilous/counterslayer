@@ -6,7 +6,8 @@
   import {
     type CupTrayParams,
     getCupTrayDimensions,
-    computeCupPositions,
+    getCupTrayLidRise,
+    computeCupTrayCups,
     validateCupTrayParams,
     DEFAULT_CUP_CAVITY_HEIGHT
   } from '#lib/models/cupTray.js';
@@ -27,7 +28,8 @@
   // Compute auto cup cavity height (used when cupCavityHeight is null)
   let autoCupCavityHeight = $derived.by(() => {
     if (actualHeight) {
-      return actualHeight - tray.params.floorThickness;
+      // A lid's top plate takes its share of the height
+      return actualHeight - tray.params.floorThickness - getCupTrayLidRise(tray.params);
     }
     return DEFAULT_CUP_CAVITY_HEIGHT;
   });
@@ -52,8 +54,7 @@
   let selectedCupId = $state<CupId | null>(null);
   let selectedCup = $derived.by(() => {
     if (!selectedCupId) return null;
-    const { layout, trayWidth, trayDepth, wallThickness } = tray.params;
-    return computeCupPositions(layout, trayWidth, trayDepth, wallThickness).find((c) => c.id === selectedCupId) ?? null;
+    return computeCupTrayCups(tray.params).find((c) => c.id === selectedCupId) ?? null;
   });
 
   // Compute validation warnings

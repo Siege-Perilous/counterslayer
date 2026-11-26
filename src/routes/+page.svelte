@@ -393,6 +393,12 @@
   });
 
   // Compute which geometries to show based on view mode
+  // The selected tray's own lid (cup trays with a lid), shown beside it in the single-tray view
+  let selectedTrayLidGeometry = $derived.by(() => {
+    if (viewMode !== 'tray' || !selectedTray) return null;
+    return allTrayGeometries.find((t) => t.trayId === selectedTray.id)?.lidGeometry ?? null;
+  });
+
   let visibleGeometries = $derived.by(() => {
     const result: {
       tray: BufferGeometry | null;
@@ -621,6 +627,7 @@
               name: cachedLooseTray.name,
               color: cachedLooseTray.color,
               geometry: cachedLooseTray.geometry,
+              lidGeometry: cachedLooseTray.lidGeometry,
               placement: {
                 tray,
                 x: 0,
@@ -1882,6 +1889,7 @@
               allLooseTrays={visibleGeometries.allLooseTrays}
               boxGeometry={visibleGeometries.box}
               lidGeometry={visibleGeometries.lid}
+              trayLidGeometry={selectedTrayLidGeometry}
               {gameContainerWidth}
               {gameContainerDepth}
               exploded={visibleGeometries.exploded}
@@ -2134,6 +2142,7 @@
               allLooseTrays={visibleGeometries.allLooseTrays}
               boxGeometry={visibleGeometries.box}
               lidGeometry={visibleGeometries.lid}
+              trayLidGeometry={selectedTrayLidGeometry}
               {gameContainerWidth}
               {gameContainerDepth}
               exploded={visibleGeometries.exploded}

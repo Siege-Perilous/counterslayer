@@ -17,6 +17,7 @@
     name: string;
     color: string;
     geometry: THREE.BufferGeometry;
+    lidGeometry?: THREE.BufferGeometry | null;
     placement: TrayPlacement;
     counterStacks: CounterStack[];
     trayLetter?: string;
@@ -202,6 +203,7 @@
   <T.Group position.x={trayX} position.y={floorThickness} position.z={trayZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
     <TrayInBox
       geometry={trayData.geometry}
+      lidGeometry={trayData.lidGeometry}
       color={getTrayColor(trayData.trayId, trayIndex)}
       counterStacks={trayData.counterStacks}
       {showCounters}

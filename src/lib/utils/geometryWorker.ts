@@ -19,6 +19,7 @@ interface TrayGeometryResult {
   name: string;
   color: string;
   geometry: GeometryData;
+  lidGeometry?: GeometryData | null;
   placement: TrayPlacement;
   counterStacks: CounterStack[];
   trayLetter: string;
@@ -39,6 +40,7 @@ interface LooseTrayGeometryResult {
   name: string;
   color: string;
   geometry: GeometryData;
+  lidGeometry?: GeometryData | null;
   dimensions: { width: number; depth: number; height: number };
   counterStacks: CounterStack[];
   trayLetter: string;
@@ -105,6 +107,8 @@ export interface TrayGeometryData {
   name: string;
   color: string;
   geometry: THREE.BufferGeometry;
+  /** The tray's own lid (cup trays with a lid), in print orientation */
+  lidGeometry?: THREE.BufferGeometry | null;
   placement: TrayPlacement;
   counterStacks: CounterStack[];
   trayLetter: string;
@@ -125,6 +129,8 @@ export interface LooseTrayGeometryData {
   name: string;
   color: string;
   geometry: THREE.BufferGeometry;
+  /** The tray's own lid (cup trays with a lid), in print orientation */
+  lidGeometry?: THREE.BufferGeometry | null;
   dimensions: { width: number; depth: number; height: number };
   counterStacks: CounterStack[];
   trayLetter: string;
@@ -256,7 +262,8 @@ export class GeometryWorkerManager {
 
           const allTrayGeometries: TrayGeometryData[] = r.allTrayGeometries.map((t) => ({
             ...t,
-            geometry: arrayToBufferGeometry(t.geometry)
+            geometry: arrayToBufferGeometry(t.geometry),
+            lidGeometry: t.lidGeometry ? arrayToBufferGeometry(t.lidGeometry) : null
           }));
 
           const boxGeometry = r.boxGeometry ? arrayToBufferGeometry(r.boxGeometry) : null;
@@ -269,13 +276,15 @@ export class GeometryWorkerManager {
             lidGeometry: b.lidGeometry ? arrayToBufferGeometry(b.lidGeometry) : null,
             trayGeometries: b.trayGeometries.map((t) => ({
               ...t,
-              geometry: arrayToBufferGeometry(t.geometry)
+              geometry: arrayToBufferGeometry(t.geometry),
+              lidGeometry: t.lidGeometry ? arrayToBufferGeometry(t.lidGeometry) : null
             }))
           }));
 
           const allLooseTrayGeometries: LooseTrayGeometryData[] = (r.allLooseTrayGeometries || []).map((lt) => ({
             ...lt,
-            geometry: arrayToBufferGeometry(lt.geometry)
+            geometry: arrayToBufferGeometry(lt.geometry),
+            lidGeometry: lt.lidGeometry ? arrayToBufferGeometry(lt.lidGeometry) : null
           }));
 
           resolve({
