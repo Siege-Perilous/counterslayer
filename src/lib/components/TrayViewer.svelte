@@ -286,7 +286,7 @@
       {/if}
       <span class="trayName">{clickedTrayInfo.name}</span>
       <span class="trayDims">
-        {clickedTrayInfo.width.toFixed(0)} × {clickedTrayInfo.depth.toFixed(0)} × {clickedTrayInfo.height.toFixed(0)}mm
+        {clickedTrayInfo.width.toFixed(1)} × {clickedTrayInfo.depth.toFixed(1)} × {clickedTrayInfo.height.toFixed(1)}mm
       </span>
     </div>
   {/if}

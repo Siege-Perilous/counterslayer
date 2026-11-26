@@ -82,7 +82,7 @@
         <span class="selectionType">{itemTypeLabel}</span>
       {/if}
       <span class="selectionDims">
-        {selectedDims.width.toFixed(0)} × {selectedDims.depth.toFixed(0)}mm
+        {selectedDims.width.toFixed(1)} × {selectedDims.depth.toFixed(1)}mm
       </span>
       <span class="selectionRotation">{selectedItem.rotation}°</span>
       <Button size="sm" class="rotateButton" variant="link" onclick={onRotate} title="Rotate 90°">
