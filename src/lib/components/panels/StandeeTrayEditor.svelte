@@ -38,6 +38,23 @@
     onUpdateParams({ ...tray.params, [key]: value });
   }
 
+  // Whole-number inputs (count, rows): ignore blank/invalid entries and never go below 1
+  function updateCount(key: 'count' | 'rows', raw: string) {
+    const parsed = parseInt(raw);
+    if (!Number.isNaN(parsed)) updateParam(key, Math.max(1, parsed));
+  }
+
+  // Describes how the standees are dealt across the rows, mirroring the tray's layout
+  let rowSummary = $derived.by(() => {
+    const count = Math.max(0, Math.floor(tray.params.count));
+    const rows = Math.max(1, Math.min(Math.floor(tray.params.rows) || 1, count));
+    const walls = 'split across two opposing slotted walls';
+    if (rows === 1) return `One row, ${walls}.`;
+    const perRow = Math.floor(count / rows);
+    const size = count % rows === 0 ? `${perRow}` : `${perRow}–${perRow + 1}`;
+    return `${rows} rows of ${size}, each ${walls}. Neighbouring rows share one wall.`;
+  });
+
   // Width/depth overrides: blank = auto, otherwise the value (clamped to the auto minimum at generation)
   function updateSizeOverride(key: 'trayWidthOverride' | 'trayDepthOverride', raw: string) {
     const trimmed = raw.trim();
@@ -82,20 +99,34 @@
   <section class="section">
     <h3 class="sectionTitle">Standee Count</h3>
     <Spacer size="0.5rem" />
-    <FormControl label="Number of standees" name="count">
-      {#snippet input({ inputProps })}
-        <Input
-          {...inputProps}
-          type="number"
-          step="1"
-          min="1"
-          value={tray.params.count}
-          onchange={(e) => updateParam('count', parseInt(e.currentTarget.value))}
-        />
-      {/snippet}
-    </FormControl>
+    <div class="formGrid">
+      <FormControl label="Number of standees" name="count">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            step="1"
+            min="1"
+            value={tray.params.count}
+            onchange={(e) => updateCount('count', e.currentTarget.value)}
+          />
+        {/snippet}
+      </FormControl>
+      <FormControl label="Rows" name="rows">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            step="1"
+            min="1"
+            value={tray.params.rows}
+            onchange={(e) => updateCount('rows', e.currentTarget.value)}
+          />
+        {/snippet}
+      </FormControl>
+    </div>
     <Spacer size="0.25rem" />
-    <p class="standeeInfo">Split evenly across two opposing slotted walls.</p>
+    <p class="standeeInfo">{rowSummary}</p>
   </section>
 
   <Spacer size="0.5rem" />

@@ -329,7 +329,7 @@
             {/if}
             <div class="dimensionRow highlight">
               <span class="dimensionLabel">Interior cavity max</span>
-              <span class="dimensionValue">{interiorWidth.toFixed(0)} × {interiorDepth.toFixed(0)}mm</span>
+              <span class="dimensionValue">{interiorWidth.toFixed(1)} × {interiorDepth.toFixed(1)}mm</span>
             </div>
           </div>
         </div>
@@ -385,7 +385,7 @@
                     <div class="treeItem treeItem--box">
                       <span class="treeItemName">{box.name}</span>
                       <span class="treeItemDims">
-                        {boxDims.width.toFixed(0)} × {boxDims.depth.toFixed(0)} × {sectionHeight.toFixed(0)}
+                        {boxDims.width.toFixed(1)} × {boxDims.depth.toFixed(1)} × {sectionHeight.toFixed(1)}
                       </span>
                     </div>
                     {#each box.trays as tray (tray.id)}
@@ -393,7 +393,7 @@
                       <div class="treeItem treeItem--tray treeItem--nested">
                         <span class="treeItemName">{tray.name}</span>
                         <span class="treeItemDims">
-                          {trayDims.width.toFixed(0)} × {trayDims.depth.toFixed(0)} × {boxInteriorHeight.toFixed(0)}
+                          {trayDims.width.toFixed(1)} × {trayDims.depth.toFixed(1)} × {boxInteriorHeight.toFixed(1)}
                         </span>
                       </div>
                     {/each}
@@ -403,7 +403,7 @@
                     <div class="treeItem treeItem--looseTray">
                       <span class="treeItemName">{tray.name}</span>
                       <span class="treeItemDims">
-                        {trayDims.width.toFixed(0)} × {trayDims.depth.toFixed(0)} × {sectionHeight.toFixed(0)}
+                        {trayDims.width.toFixed(1)} × {trayDims.depth.toFixed(1)} × {sectionHeight.toFixed(1)}
                       </span>
                     </div>
                   {/each}

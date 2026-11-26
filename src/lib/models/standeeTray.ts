@@ -24,7 +24,10 @@ const STANDEE_GAP = 2;
 
 export interface StandeeTrayParams {
   standeeId: string; // Reference to a Standee by ID
-  count: number; // Total number of standees stored (split across the two walls)
+  count: number; // Total number of standees stored (split evenly across the rows)
+  // Number of side-by-side rows. Each row is a full pair of opposing slotted walls; neighbouring rows
+  // share a single dividing wall that both rows' bases sit against.
+  rows: number;
   wallThickness: number; // Outer wall + floor wall thickness
   innerWallThickness: number; // Thickness of the two slotted inner walls
   floorThickness: number;
@@ -37,6 +40,7 @@ export interface StandeeTrayParams {
 export const defaultStandeeTrayParams: StandeeTrayParams = {
   standeeId: '', // Filled in with the first available standee at creation time
   count: 12,
+  rows: 1,
   wallThickness: 2.0,
   innerWallThickness: 2.0,
   floorThickness: 2.0,
@@ -74,6 +78,18 @@ export function getStandee(standeeId: string, standees: Standee[]): Standee {
   };
 }
 
+// One row of the tray: a pair of opposing slotted inner walls with a base cavity on either side.
+interface StandeeRowLayout {
+  leftBoundX: number; // inner face of the wall the left bases sit against (outer wall or divider)
+  rightBoundX: number; // inner face of the wall the right bases sit against
+  // X positions (front face of each inner wall). Each is anchored to its own side of the row, so a
+  // custom width grows the middle cavity between them.
+  leftWallX: number;
+  rightWallX: number;
+  leftCount: number; // standees slotted into the left inner wall
+  rightCount: number; // standees slotted into the right inner wall
+}
+
 // Shared layout math so dimensions and geometry stay in sync.
 interface StandeeLayout {
   trayWidth: number;
@@ -81,14 +97,9 @@ interface StandeeLayout {
   trayHeight: number;
   floorRefZ: number; // top of the (raised) solid floor the standees rest on
   innerWallTopZ: number; // top of the inner walls/slots (the rim); the walls run up from floorRefZ
-  // X positions (front face of each inner wall). The left wall is anchored to the left outer wall and
-  // the right wall to the right outer wall, so a custom width grows the middle cavity between them.
-  leftWallX: number;
-  rightWallX: number;
+  rows: StandeeRowLayout[];
+  dividerXs: number[]; // front face X of each dividing wall between neighbouring rows
   innerWallThickness: number;
-  // Slot rows
-  leftRowCount: number;
-  rightRowCount: number;
   firstSlotY: number; // Y of the first slot center
   slotPitch: number;
   staggerY: number; // Y offset applied to the right wall's slots
@@ -116,10 +127,17 @@ function computeLayout(
   const baseDiameter = baseRadius * 2;
   const slotWidth = standee.standeeThickness + 1;
 
-  // Slots split across the two walls (left gets the extra one for odd counts).
-  const leftRowCount = Math.ceil(count / 2);
-  const rightRowCount = Math.floor(count / 2);
-  const maxRowCount = Math.max(leftRowCount, rightRowCount, 1);
+  // Standees are dealt out as evenly as possible across the rows (earlier rows take the remainder),
+  // which keeps the fullest row — the one that sets the tray depth — as short as it can be. Never
+  // more rows than standees: an empty row would only waste width.
+  const rowCount = Math.max(1, Math.min(Math.floor(params.rows) || 1, count));
+  const perRow = Math.floor(count / rowCount);
+  const remainder = count % rowCount;
+  // Within a row the slots split across the two walls (left gets the extra one for odd counts).
+  const rowCounts = Array.from({ length: rowCount }, (_, i) => {
+    const n = perRow + (i < remainder ? 1 : 0);
+    return { leftCount: Math.ceil(n / 2), rightCount: Math.floor(n / 2) };
+  });
 
   // --- Height (Z) ---
   // The base lies on its side as a vertical disc (baseDiameter tall) and the figure (standeeWidth
@@ -178,7 +196,16 @@ function computeLayout(
   const endSweep = Math.max(topSweep, botSweep);
   const endMargin = wallThickness + clearance + baseRadius + endSweep;
   const naturalFirstSlotY = endMargin;
-  const lastSlotY = endMargin + (maxRowCount - 1) * slotPitch + staggerY;
+  // The last slot is whichever wall's final slot reaches furthest: the left wall's sit on whole
+  // pitches, the right wall's half a pitch later. Measuring the slots that actually exist (rather
+  // than assuming a full right wall) means an odd count doesn't reserve room for a missing standee.
+  const slotSpan = Math.max(
+    0,
+    ...rowCounts.map((r) =>
+      Math.max((r.leftCount - 1) * slotPitch, r.rightCount > 0 ? (r.rightCount - 1) * slotPitch + staggerY : 0)
+    )
+  );
+  const lastSlotY = endMargin + slotSpan;
   const autoDepth = lastSlotY + baseRadius + endSweep + clearance + wallThickness;
 
   // --- Width (X) ---
@@ -190,20 +217,31 @@ function computeLayout(
   const outerCavityWidth = standee.baseThickness + 5;
   const middleCavityWidth = Math.max(standeeLength + clearance - outerCavityWidth, outerCavityWidth);
 
-  const leftWallX = wallThickness + outerCavityWidth;
-  const naturalRightWallX = leftWallX + innerWallThickness + middleCavityWidth;
-  const autoWidth = naturalRightWallX + innerWallThickness + outerCavityWidth + wallThickness;
+  // Rows repeat that unit across the width, separated by a single dividing wall (as thick as an outer
+  // wall) that the bases on both sides sit against — one wall where separate trays would need two.
+  const rowUnitWidth = outerCavityWidth * 2 + innerWallThickness * 2 + middleCavityWidth;
+  const autoWidth = wallThickness * 2 + rowCount * rowUnitWidth + (rowCount - 1) * wallThickness;
 
   // --- Custom width / length override ---
   // Each override is a minimum; values below the auto size are ignored. Widening keeps the outer
-  // walls and the outer cavities (where the bases sit) exactly where auto fit put them — only the
-  // MIDDLE cavity grows, so the two opposing rows spread apart. Lengthening centres the slot row
-  // along the depth. The outer-wall thickness never changes.
+  // walls and the outer cavities (where the bases sit) the size auto fit made them — only the MIDDLE
+  // cavities grow (the extra is shared equally between the rows), so opposing standees spread apart.
+  // Lengthening centres the slots along the depth. The outer-wall thickness never changes.
   const trayWidth = params.trayWidthOverride != null ? Math.max(params.trayWidthOverride, autoWidth) : autoWidth;
   const trayDepth = params.trayDepthOverride != null ? Math.max(params.trayDepthOverride, autoDepth) : autoDepth;
-  // Left inner wall stays put; the right inner wall is anchored to the right outer wall so the middle
-  // cavity absorbs the extra width.
-  const rightWallX = trayWidth - wallThickness - outerCavityWidth - innerWallThickness;
+  const rowWidth = rowUnitWidth + (trayWidth - autoWidth) / rowCount;
+  const rows: StandeeRowLayout[] = rowCounts.map((counts, i) => {
+    const leftBoundX = wallThickness + i * (rowWidth + wallThickness);
+    const rightBoundX = leftBoundX + rowWidth;
+    return {
+      ...counts,
+      leftBoundX,
+      rightBoundX,
+      leftWallX: leftBoundX + outerCavityWidth,
+      rightWallX: rightBoundX - outerCavityWidth - innerWallThickness
+    };
+  });
+  const dividerXs = rows.slice(0, -1).map((r) => r.rightBoundX);
   // Centre the slot row along the (possibly longer) depth.
   const firstSlotY = naturalFirstSlotY + (trayDepth - autoDepth) / 2;
 
@@ -213,11 +251,9 @@ function computeLayout(
     trayHeight,
     floorRefZ,
     innerWallTopZ,
-    leftWallX,
-    rightWallX,
+    rows,
+    dividerXs,
     innerWallThickness,
-    leftRowCount,
-    rightRowCount,
     firstSlotY,
     slotPitch,
     staggerY,
@@ -269,13 +305,7 @@ export function getStandeePositions(
 ): StandeePosition[] {
   const standee = getStandee(params.standeeId, standees);
   const layout = computeLayout(params, standee, targetHeight, floorSpacerHeight);
-  const { wallThickness } = params;
   const { baseRadius, baseThickness, standeeWidth, standeeHeight, standeeThickness } = standee;
-
-  // Base disc sits flush against the side outer wall in its outer cavity (unchanged by a custom
-  // width — only the middle cavity between the rows grows).
-  const leftX = wallThickness + baseThickness / 2;
-  const rightX = layout.trayWidth - wallThickness - baseThickness / 2;
 
   const common = {
     z: layout.axisZ,
@@ -287,23 +317,28 @@ export function getStandeePositions(
   };
 
   const positions: StandeePosition[] = [];
-  for (let i = 0; i < layout.leftRowCount; i++) {
-    positions.push({
-      ...common,
-      x: leftX,
-      y: layout.firstSlotY + i * layout.slotPitch,
-      figureDir: 1,
-      tilt: SLOT_ANGLE
-    });
-  }
-  for (let i = 0; i < layout.rightRowCount; i++) {
-    positions.push({
-      ...common,
-      x: rightX,
-      y: layout.firstSlotY + layout.staggerY + i * layout.slotPitch,
-      figureDir: -1,
-      tilt: SLOT_ANGLE // same slant as the left row (figureDir still points inward from the right wall)
-    });
+  for (const row of layout.rows) {
+    // Base disc sits flush against the wall bounding its side of the row (an outer wall or a divider).
+    const leftX = row.leftBoundX + baseThickness / 2;
+    const rightX = row.rightBoundX - baseThickness / 2;
+    for (let i = 0; i < row.leftCount; i++) {
+      positions.push({
+        ...common,
+        x: leftX,
+        y: layout.firstSlotY + i * layout.slotPitch,
+        figureDir: 1,
+        tilt: SLOT_ANGLE
+      });
+    }
+    for (let i = 0; i < row.rightCount; i++) {
+      positions.push({
+        ...common,
+        x: rightX,
+        y: layout.firstSlotY + layout.staggerY + i * layout.slotPitch,
+        figureDir: -1,
+        tilt: SLOT_ANGLE // same slant as the left wall (figureDir still points inward from the right)
+      });
+    }
   }
   return positions;
 }
@@ -320,7 +355,7 @@ export function createStandeeTray(
   const standee = getStandee(params.standeeId, standees);
   const layout = computeLayout(params, standee, targetHeight, floorSpacerHeight);
 
-  const { trayWidth, trayDepth, trayHeight, floorRefZ, innerWallTopZ, leftWallX, rightWallX } = layout;
+  const { trayWidth, trayDepth, trayHeight, floorRefZ, innerWallTopZ } = layout;
   // The cavity (and the inner walls) start at floorRefZ, which is raised above the real floor when
   // the tray is stretched taller — leaving a solid spacer below so the standees sit near the rim.
   const cavityHeight = trayHeight - floorRefZ;
@@ -340,7 +375,7 @@ export function createStandeeTray(
   );
   let tray = subtract(outerBox, innerCavity);
 
-  // === TWO INNER WALLS spanning the depth ===
+  // === TWO INNER WALLS PER ROW spanning the depth ===
   const makeInnerWall = (frontFaceX: number): Geom3 =>
     translate(
       [frontFaceX + innerWallThickness / 2, trayDepth / 2, floorRefZ + innerWallHeight / 2],
@@ -390,9 +425,21 @@ export function createStandeeTray(
 
   // Both walls tilt the same way (SLOT_ANGLE), so the standees all slant in one direction; the right
   // row is just nudged by staggerY so its figures interleave with the left row's in the middle.
-  const leftWall = buildWall(leftWallX, layout.leftRowCount, SLOT_ANGLE, 0);
-  const rightWall = buildWall(rightWallX, layout.rightRowCount, SLOT_ANGLE, layout.staggerY);
-  tray = union(tray, leftWall, rightWall);
+  const walls: Geom3[] = [];
+  for (const row of layout.rows) {
+    walls.push(buildWall(row.leftWallX, row.leftCount, SLOT_ANGLE, 0));
+    walls.push(buildWall(row.rightWallX, row.rightCount, SLOT_ANGLE, layout.staggerY));
+  }
+  // Solid dividing walls between neighbouring rows, full height like the outer walls.
+  for (const dividerX of layout.dividerXs) {
+    walls.push(
+      translate(
+        [dividerX + wallThickness / 2, trayDepth / 2, floorRefZ + cavityHeight / 2],
+        cuboid({ size: [wallThickness, innerCavityDepth, cavityHeight] })
+      )
+    );
+  }
+  tray = union(tray, ...walls);
 
   // === EMBOSS TRAY NAME ON BOTTOM ===
   if (showEmboss && trayName && trayName.trim().length > 0) {
