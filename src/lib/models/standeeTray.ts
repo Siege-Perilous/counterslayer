@@ -251,11 +251,17 @@ function computeLayout(
   // --- Width (X) ---
   // The base is a thin vertical disc against the side wall, so the outer cavity only needs the base
   // thickness plus a little room (the tray's base gap). The figure points inward across the inner
-  // wall into the middle cavity. A lying standee's full length is baseThickness + standeeHeight, and
-  // it must fit across its outer cavity plus the middle cavity (opposing rows interleave there).
+  // wall into the middle cavity, where opposing figures pass each other. A lying standee's full
+  // length is baseThickness + standeeHeight; measured from the wall its base sits against it spans
+  // its outer cavity, its own slotted wall and then the middle cavity, and its tip only has to stop
+  // `clearance` short of the far slotted wall. So the middle cavity is that length less the outer
+  // cavity and the one slotted wall the figure has already passed through.
   const standeeLength = standee.baseThickness + standeeHeight;
   const outerCavityWidth = standee.baseThickness + getBaseGap(params);
-  const middleCavityWidth = Math.max(standeeLength + clearance - outerCavityWidth, outerCavityWidth);
+  const middleCavityWidth = Math.max(
+    standeeLength + clearance - outerCavityWidth - innerWallThickness,
+    outerCavityWidth
+  );
 
   // Rows repeat that unit across the width, separated by a single dividing wall (as thick as an outer
   // wall) that the bases on both sides sit against — one wall where separate trays would need two.
