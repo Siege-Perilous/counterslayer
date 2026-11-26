@@ -3,15 +3,13 @@ import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { arrangeTrays, calculateMinimumBoxDimensions, getBoxInteriorDimensions } from './box';
 import { createHoneycombUnion, defaultHoneycombParams, type HoneycombExclusion } from './honeycomb';
+import { createStrokedText } from './strokedText';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
 const { hull } = jscad.hulls;
 const { translate, rotateX, rotateY, rotateZ, scale, mirrorY } = jscad.transforms;
 const { vectorText } = jscad.text;
-const { path2 } = jscad.geometries;
-const { expand } = jscad.expansions;
-const { extrudeLinear } = jscad.extrusions;
 
 /**
  * Creates an asymmetric ramp wedge for the slide lock mechanism.
@@ -484,15 +482,7 @@ export function createBoxWithLidGrooves(
       const textSegments = vectorText({ height: labelTextHeight, align: 'center' }, p.tray.name.trim().toUpperCase());
 
       if (textSegments.length > 0) {
-        const textShapes: Geom3[] = [];
-        for (const segment of textSegments) {
-          if (segment.length >= 2) {
-            const pathObj = path2.fromPoints({ closed: false }, segment);
-            const expanded = expand({ delta: labelStrokeWidth / 2, corners: 'round', segments: 32 }, pathObj);
-            const extruded = extrudeLinear({ height: labelTextDepth + 0.1 }, expanded);
-            textShapes.push(extruded);
-          }
-        }
+        const textShapes = createStrokedText(textSegments, labelStrokeWidth, labelTextDepth + 0.1);
 
         if (textShapes.length > 0) {
           let minX = Infinity,
@@ -1648,15 +1638,7 @@ export function createLidForDimensions(dims: LidDimensions): Geom3 {
 
     if (textSegments.length > 0) {
       // Convert segments to path2, expand to give stroke width, and extrude
-      const textShapes: Geom3[] = [];
-      for (const segment of textSegments) {
-        if (segment.length >= 2) {
-          const pathObj = path2.fromPoints({ closed: false }, segment);
-          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 64 }, pathObj);
-          const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
-          textShapes.push(extruded);
-        }
-      }
+      const textShapes = createStrokedText(textSegments, strokeWidth, textDepth + 0.1);
 
       if (textShapes.length > 0) {
         // Calculate text bounds to center it

@@ -30,6 +30,7 @@ import {
   isCupTray,
   isStandeeTray
 } from '../src/lib/types/project.js';
+import { repairTJunctions } from '../src/lib/utils/meshRepair.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const generalize = (jscad.modifiers as any).generalize as (
@@ -40,10 +41,11 @@ const generalize = (jscad.modifiers as any).generalize as (
 /**
  * Clean geometry before STL export to reduce non-manifold edges.
  * Applies snap and simplify (merge coplanar polygons).
- * Note: triangulate is omitted here since the STL serializer handles it.
+ * Then closes T-junctions so slicers do not report non-manifold edges (output is triangles).
  */
 function cleanGeometryForExport(geom: Geom3): Geom3 {
-  return generalize({ snap: true, simplify: true }, geom);
+  // generalize() does not close the T-junctions booleans leave behind; repairTJunctions does
+  return repairTJunctions(generalize({ snap: true, simplify: true }, geom));
 }
 
 const MESH_ANALYSIS_DIR = join(import.meta.dirname, '..', 'mesh-analysis');

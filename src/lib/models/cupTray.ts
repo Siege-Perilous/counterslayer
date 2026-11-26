@@ -4,13 +4,12 @@ import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { createHoneycombUnion, defaultHoneycombParams } from './honeycomb';
 import { addLidFittings, createLidForDimensions, createLidRecess, defaultLidParams } from './lid';
+import { createStrokedText } from './strokedText';
 
 const { cuboid, roundedCuboid, roundedRectangle } = jscad.primitives;
 const { intersect, subtract, union } = jscad.booleans;
 const { translate, mirrorY, scale } = jscad.transforms;
 const { vectorText } = jscad.text;
-const { path2 } = jscad.geometries;
-const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
 
 // Cup tray parameters
@@ -419,15 +418,7 @@ export function createCupTray(
     const textSegments = vectorText({ height: textHeightParam, align: 'center' }, trayName.trim().toUpperCase());
 
     if (textSegments.length > 0) {
-      const textShapes: ReturnType<typeof extrudeLinear>[] = [];
-      for (const segment of textSegments) {
-        if (segment.length >= 2) {
-          const pathObj = path2.fromPoints({ closed: false }, segment);
-          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 32 }, pathObj);
-          const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
-          textShapes.push(extruded);
-        }
-      }
+      const textShapes = createStrokedText(textSegments, strokeWidth, textDepth + 0.1);
 
       if (textShapes.length > 0) {
         let minX = Infinity,

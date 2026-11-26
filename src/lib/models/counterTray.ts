@@ -1,13 +1,12 @@
 import type { CounterBaseShape, CounterShape } from '#lib/types/project.js';
 import jscad from '@jscad/modeling';
+import { createStrokedText } from './strokedText';
 
 const { cuboid, cylinder, sphere, circle, rectangle } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
 const { translate, rotateX, rotateY, rotateZ, scale, mirrorY } = jscad.transforms;
 const { hull } = jscad.hulls;
 const { vectorText } = jscad.text;
-const { path2 } = jscad.geometries;
-const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
 
 // Edge-loaded stack orientation
@@ -1584,15 +1583,7 @@ export function createCounterTray(
     const textSegments = vectorText({ height: textHeightParam, align: 'center' }, trayName.trim().toUpperCase());
 
     if (textSegments.length > 0) {
-      const textShapes: ReturnType<typeof extrudeLinear>[] = [];
-      for (const segment of textSegments) {
-        if (segment.length >= 2) {
-          const pathObj = path2.fromPoints({ closed: false }, segment);
-          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 32 }, pathObj);
-          const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
-          textShapes.push(extruded);
-        }
-      }
+      const textShapes = createStrokedText(textSegments, strokeWidth, textDepth + 0.1);
 
       if (textShapes.length > 0) {
         let minX = Infinity,

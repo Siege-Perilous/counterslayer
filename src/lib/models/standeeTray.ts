@@ -5,12 +5,10 @@ const { cuboid } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
 const { translate, rotateX, scale, mirrorY } = jscad.transforms;
 const { vectorText } = jscad.text;
-const { path2 } = jscad.geometries;
-const { expand } = jscad.expansions;
-const { extrudeLinear } = jscad.extrusions;
 
 // Import types from project
 import type { Standee } from '#lib/types/project.js';
+import { createStrokedText } from './strokedText';
 
 // Slot angle limits, in degrees. The slots on both inner walls lean by the tray's slotAngle so the
 // standees resist being jostled out. A steeper lean lowers a figure that is wider than its base (so
@@ -498,15 +496,7 @@ export function createStandeeTray(
     const textSegments = vectorText({ height: textHeightParam, align: 'center' }, trayName.trim().toUpperCase());
 
     if (textSegments.length > 0) {
-      const textShapes: ReturnType<typeof extrudeLinear>[] = [];
-      for (const segment of textSegments) {
-        if (segment.length >= 2) {
-          const pathObj = path2.fromPoints({ closed: false }, segment);
-          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 32 }, pathObj);
-          const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
-          textShapes.push(extruded);
-        }
-      }
+      const textShapes = createStrokedText(textSegments, strokeWidth, textDepth + 0.1);
 
       if (textShapes.length > 0) {
         let minX = Infinity,

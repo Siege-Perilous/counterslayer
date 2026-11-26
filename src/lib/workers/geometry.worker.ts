@@ -34,6 +34,7 @@ import {
   isReservedTray,
   isStandeeTray
 } from '#lib/types/project.js';
+import { repairTJunctions } from '#lib/utils/meshRepair.js';
 import threemfSerializer from '@jscad/3mf-serializer';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -51,10 +52,11 @@ const generalize = (jscad.modifiers as any).generalize as (
 /**
  * Clean geometry before STL export to reduce non-manifold edges.
  * Applies snap and simplify (merge coplanar polygons).
- * Note: triangulate is omitted here since the STL serializer handles it.
+ * Then closes T-junctions so slicers do not report non-manifold edges (output is triangles).
  */
 function cleanGeometryForExport(geom: Geom3): Geom3 {
-  return generalize({ snap: true, simplify: true }, geom);
+  // generalize() does not close the T-junctions booleans leave behind; repairTJunctions does
+  return repairTJunctions(generalize({ snap: true, simplify: true }, geom));
 }
 
 /**

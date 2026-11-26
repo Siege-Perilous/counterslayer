@@ -6,13 +6,11 @@ const { subtract, union } = jscad.booleans;
 const { translate, rotateY, scale, mirrorY } = jscad.transforms;
 const { hull } = jscad.hulls;
 const { vectorText } = jscad.text;
-const { path2 } = jscad.geometries;
-const { expand } = jscad.expansions;
-const { extrudeLinear } = jscad.extrusions;
 
 // Import types from project
 import type { CardSize } from '#lib/types/project.js';
 import { DEFAULT_CARD_SIZE_IDS } from './counterTray';
+import { createStrokedText } from './strokedText';
 
 // Re-export for backwards compatibility
 export type CustomCardSize = CardSize;
@@ -376,15 +374,7 @@ export function createCardDrawTray(
     const textSegments = vectorText({ height: textHeightParam, align: 'center' }, _trayName.trim().toUpperCase());
 
     if (textSegments.length > 0) {
-      const textShapes: ReturnType<typeof extrudeLinear>[] = [];
-      for (const segment of textSegments) {
-        if (segment.length >= 2) {
-          const pathObj = path2.fromPoints({ closed: false }, segment);
-          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 32 }, pathObj);
-          const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
-          textShapes.push(extruded);
-        }
-      }
+      const textShapes = createStrokedText(textSegments, strokeWidth, textDepth + 0.1);
 
       if (textShapes.length > 0) {
         let minX = Infinity,
