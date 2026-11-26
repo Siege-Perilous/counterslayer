@@ -20,23 +20,19 @@ export const DEFAULT_SLOT_ANGLE_DEG = 20;
 export const MIN_SLOT_ANGLE_DEG = 0;
 export const MAX_SLOT_ANGLE_DEG = 45;
 
+// Gap (mm) between a base and the slotted inner wall next to it; the base sits against the far wall. Trays saved before this
+// was a setting were built with LEGACY_BASE_GAP, so a tray without the param keeps that size.
+export const DEFAULT_BASE_GAP = 1;
+export const LEGACY_BASE_GAP = 5;
+
+function getBaseGap(params: StandeeTrayParams): number {
+  return Number.isFinite(params.baseGap) ? Math.max(0, params.baseGap) : LEGACY_BASE_GAP;
+}
+
 // The tray's slot angle in radians, clamped to the supported range (older trays have no slotAngle).
 function getSlotAngle(params: StandeeTrayParams): number {
   const deg = Number.isFinite(params.slotAngle) ? params.slotAngle : DEFAULT_SLOT_ANGLE_DEG;
   return (Math.min(MAX_SLOT_ANGLE_DEG, Math.max(MIN_SLOT_ANGLE_DEG, deg)) * Math.PI) / 180;
-}
-
-// The slot angle (degrees) at which a standee's leaning figure comes down level with its base. Leaning
-// further makes the tray longer without making it any shallower. Returns 0 when the figure is already
-// no taller than the base, so the angle never affects the tray height.
-export function getStandeeLevelAngle(standee: Standee): number {
-  const { baseRadius, standeeWidth, standeeThickness } = standee;
-  const baseDiameter = baseRadius * 2;
-  if (standeeWidth <= baseDiameter) return 0;
-  // Solve standeeWidth * cos(a) + standeeThickness * sin(a) = baseDiameter.
-  const reach = Math.hypot(standeeWidth, standeeThickness);
-  const angle = Math.atan2(standeeThickness, standeeWidth) + Math.acos(Math.min(1, baseDiameter / reach));
-  return (angle * 180) / Math.PI;
 }
 
 // Clearance (mm) kept between opposing standees in the depth direction, on top of the geometric
@@ -54,6 +50,7 @@ export interface StandeeTrayParams {
   floorThickness: number;
   clearance: number; // Tolerance around standees
   rimHeight: number; // Extra height above the tallest content
+  baseGap: number; // Gap between each base and the slotted inner wall next to it
   slotAngle: number; // Lean of the slots, in degrees (clamped to MIN/MAX_SLOT_ANGLE_DEG)
   trayWidthOverride: number | null; // null = auto from standees; acts as a minimum, content is centred
   trayDepthOverride: number | null; // null = auto from standees; acts as a minimum, content is centred
@@ -68,6 +65,7 @@ export const defaultStandeeTrayParams: StandeeTrayParams = {
   floorThickness: 2.0,
   clearance: 0.5,
   rimHeight: 2.0,
+  baseGap: DEFAULT_BASE_GAP,
   slotAngle: DEFAULT_SLOT_ANGLE_DEG,
   trayWidthOverride: null,
   trayDepthOverride: null
@@ -211,26 +209,36 @@ function computeLayout(
   // Both inner walls tilt their slots the SAME direction, so the standees on the two walls run
   // parallel rather than converging like a herringbone — which lets the row pitch be set by the base
   // discs (the widest part) instead of the slot's sideways sweep, packing the tray much shorter than
-  // opposed slots would. The right row is then offset by HALF a pitch so its standees sit centred
-  // between the left row's, so each reads clearly from above instead of hiding behind its neighbour.
-  // The pitch is floored at twice the parallel-figure clearance so that half-pitch offset always
-  // keeps opposing figures apart. topSweep/botSweep (the slot's sideways sweep above/below the figure
-  // axis) are still used for the end margins below.
-  const topSweep = (innerWallTopZ - axisZ) * Math.tan(slotAngle);
-  const botSweep = (axisZ - floorRefZ) * Math.tan(slotAngle);
-  const figureClearance = slotWidth + STANDEE_GAP; // min offset for opposing parallel figures to clear
-  // (that clearance is across the leaning figures, so it takes more room along the wall as they lean)
-  const slotPitch = Math.max(baseDiameter + 1, (2 * figureClearance) / Math.cos(slotAngle));
-  const staggerY = slotPitch / 2; // half-pitch so the right row centres between the left row's standees
+  // opposed slots would. The right wall's slots are then offset from the left wall's by only as much
+  // as opposing figures need to pass each other (they overlap in the middle cavity), not by half a
+  // pitch: whatever the offset is, the right wall's last slot overhangs the left wall's by that much,
+  // so a smaller offset is a shorter tray. The figures end up in uneven pairs rather than evenly
+  // interleaved. The pitch is floored at twice that offset so a figure also clears the opposing
+  // figure on its other side.
+  const figureClearance = slotWidth + STANDEE_GAP; // min gap between opposing parallel figures' centres
+  // That clearance is across the leaning figures, so it takes more room along the wall as they lean.
+  const minFigureOffset = figureClearance / Math.cos(slotAngle);
+  const slotPitch = Math.max(baseDiameter + 1, 2 * minFigureOffset);
+  const staggerY = minFigureOffset;
 
-  // End margin so the end standees still slide in past the end walls. The base disc needs
-  // baseRadius, and because the standee enters from the (tilted) top of the slot its base swings
-  // toward the end by the slot's sweep before seating — so add that sweep on top of the radius.
-  const endSweep = Math.max(topSweep, botSweep);
-  const endMargin = wallThickness + clearance + baseRadius + endSweep;
-  const naturalFirstSlotY = endMargin;
+  // End margins so the end standees still slide in past the end walls. Every slot leans the same
+  // way — its top toward the front (y = 0) — so a standee always travels down its slot from the front
+  // side of where it ends up seated. The two ends therefore need different room:
+  //  - FRONT: as the base comes down over the rim it is still offset toward the front. The slot's
+  //    sideways travel between the figure axis and the rim (topSweep) puts the disc centre that far
+  //    forward, and the part of the disc dipping below the rim at that moment reaches a further
+  //    baseRadius / cos(angle) — more than the bare radius, because the disc is still partly above
+  //    the rim at its furthest point.
+  //  - BACK: nothing approaches from that side, so the seated standee just has to fit — the base
+  //    radius, or the leaning figure's own reach along the wall if that is larger.
+  const figureReachY = (standeeWidth / 2) * Math.sin(slotAngle) + (standee.standeeThickness / 2) * Math.cos(slotAngle);
+  const topSweep = (innerWallTopZ - axisZ) * Math.tan(slotAngle);
+  const entryReach = topSweep + baseRadius / Math.cos(slotAngle);
+  const frontMargin = wallThickness + clearance + Math.max(entryReach, figureReachY);
+  const backMargin = wallThickness + clearance + Math.max(baseRadius, figureReachY);
+  const naturalFirstSlotY = frontMargin;
   // The last slot is whichever wall's final slot reaches furthest: the left wall's sit on whole
-  // pitches, the right wall's half a pitch later. Measuring the slots that actually exist (rather
+  // pitches, the right wall's the stagger later. Measuring the slots that actually exist (rather
   // than assuming a full right wall) means an odd count doesn't reserve room for a missing standee.
   const slotSpan = Math.max(
     0,
@@ -238,16 +246,15 @@ function computeLayout(
       Math.max((r.leftCount - 1) * slotPitch, r.rightCount > 0 ? (r.rightCount - 1) * slotPitch + staggerY : 0)
     )
   );
-  const lastSlotY = endMargin + slotSpan;
-  const autoDepth = lastSlotY + baseRadius + endSweep + clearance + wallThickness;
+  const autoDepth = frontMargin + slotSpan + backMargin;
 
   // --- Width (X) ---
   // The base is a thin vertical disc against the side wall, so the outer cavity only needs the base
-  // thickness plus a little room (baseThickness + 5mm). The figure points inward across the inner
+  // thickness plus a little room (the tray's base gap). The figure points inward across the inner
   // wall into the middle cavity. A lying standee's full length is baseThickness + standeeHeight, and
   // it must fit across its outer cavity plus the middle cavity (opposing rows interleave there).
   const standeeLength = standee.baseThickness + standeeHeight;
-  const outerCavityWidth = standee.baseThickness + 5;
+  const outerCavityWidth = standee.baseThickness + getBaseGap(params);
   const middleCavityWidth = Math.max(standeeLength + clearance - outerCavityWidth, outerCavityWidth);
 
   // Rows repeat that unit across the width, separated by a single dividing wall (as thick as an outer

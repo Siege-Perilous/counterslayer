@@ -8,7 +8,7 @@ import {
 } from '#lib/models/counterTray.js';
 import { defaultLidParams } from '#lib/models/lid.js';
 import { defaultReservedSpaceParams, type ReservedSpaceParams } from '#lib/models/reservedSpace.js';
-import { defaultStandeeTrayParams, type StandeeTrayParams } from '#lib/models/standeeTray.js';
+import { defaultStandeeTrayParams, LEGACY_BASE_GAP, type StandeeTrayParams } from '#lib/models/standeeTray.js';
 import {
   DEFAULT_CARD_SIZES,
   DEFAULT_COUNTER_SHAPES,
@@ -422,7 +422,13 @@ function migrateTray(
       ...tray,
       type: 'standee',
       color,
-      params: { ...defaultStandeeTrayParams, ...params }
+      params: {
+        ...defaultStandeeTrayParams,
+        // Trays saved before base gap was a setting were built with the old, roomier base cavity.
+        // Keep that so loading an old project doesn't resize its trays; new trays get the default.
+        baseGap: LEGACY_BASE_GAP,
+        ...params
+      }
     } as Tray;
   }
 

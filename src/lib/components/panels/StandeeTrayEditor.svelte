@@ -4,8 +4,8 @@
   import {
     type StandeeTrayParams,
     getStandeeTrayDimensions,
-    getStandeeLevelAngle,
     DEFAULT_SLOT_ANGLE_DEG,
+    LEGACY_BASE_GAP,
     MIN_SLOT_ANGLE_DEG,
     MAX_SLOT_ANGLE_DEG
   } from '#lib/models/standeeTray.js';
@@ -62,23 +62,18 @@
     return `${rows} rows of ${size}, each ${walls}. Neighbouring rows share one wall.`;
   });
 
+  // Base gap: the gap between each base and its slotted wall. Ignore blank/invalid entries, never negative
+  function updateBaseGap(raw: string) {
+    const parsed = parseFloat(raw);
+    if (!Number.isNaN(parsed)) updateParam('baseGap', Math.max(0, parsed));
+  }
+
   // Slot angle: blank/invalid resets to the default, otherwise clamp to the supported range
   function updateSlotAngle(raw: string) {
     const parsed = parseFloat(raw);
     const angle = Number.isNaN(parsed) ? DEFAULT_SLOT_ANGLE_DEG : parsed;
     updateParam('slotAngle', Math.min(MAX_SLOT_ANGLE_DEG, Math.max(MIN_SLOT_ANGLE_DEG, angle)));
   }
-
-  // Explains what the slot angle trades off for the selected standee
-  let slotAngleHint = $derived.by(() => {
-    if (!selectedStandee) return '';
-    const levelAngle = getStandeeLevelAngle(selectedStandee);
-    if (levelAngle <= 0) {
-      return 'This figure is no taller than its base, so a steeper slot angle only makes the tray longer.';
-    }
-    const limit = Math.min(Math.ceil(levelAngle), MAX_SLOT_ANGLE_DEG);
-    return `A steeper slot angle makes the tray shallower but longer. Past ${limit}° it stops getting shallower.`;
-  });
 
   // Width/depth overrides: blank = auto, otherwise the value (clamped to the auto minimum at generation)
   function updateSizeOverride(key: 'trayWidthOverride' | 'trayDepthOverride', raw: string) {
@@ -144,7 +139,7 @@
             type="number"
             step="1"
             min="1"
-            value={tray.params.rows}
+            value={tray.params.rows ?? 1}
             onchange={(e) => updateCount('rows', e.currentTarget.value)}
           />
         {/snippet}
@@ -179,18 +174,6 @@
         {/snippet}
         {#snippet end()}mm{/snippet}
       </FormControl>
-      <FormControl label="Inner wall" name="innerWallThickness">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            value={tray.params.innerWallThickness}
-            onchange={(e) => updateParam('innerWallThickness', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
       <FormControl label="Floor" name="floorThickness">
         {#snippet input({ inputProps })}
           <Input
@@ -199,6 +182,18 @@
             step="0.1"
             value={tray.params.floorThickness}
             onchange={(e) => updateParam('floorThickness', parseFloat(e.currentTarget.value))}
+          />
+        {/snippet}
+        {#snippet end()}mm{/snippet}
+      </FormControl>
+      <FormControl label="Slot wall" name="innerWallThickness">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            step="0.1"
+            value={tray.params.innerWallThickness}
+            onchange={(e) => updateParam('innerWallThickness', parseFloat(e.currentTarget.value))}
           />
         {/snippet}
         {#snippet end()}mm{/snippet}
@@ -227,19 +222,18 @@
         {/snippet}
         {#snippet end()}mm{/snippet}
       </FormControl>
-      <FormControl label="Slot angle" name="slotAngle">
+      <FormControl label="Slot wall base gap" name="baseGap">
         {#snippet input({ inputProps })}
           <Input
             {...inputProps}
             type="number"
-            step="1"
-            min={MIN_SLOT_ANGLE_DEG}
-            max={MAX_SLOT_ANGLE_DEG}
-            value={tray.params.slotAngle ?? DEFAULT_SLOT_ANGLE_DEG}
-            onchange={(e) => updateSlotAngle(e.currentTarget.value)}
+            step="0.1"
+            min="0"
+            value={tray.params.baseGap ?? LEGACY_BASE_GAP}
+            onchange={(e) => updateBaseGap(e.currentTarget.value)}
           />
         {/snippet}
-        {#snippet end()}°{/snippet}
+        {#snippet end()}mm{/snippet}
       </FormControl>
       <FormControl label="Width" name="trayWidthOverride">
         {#snippet input({ inputProps })}
@@ -267,11 +261,21 @@
         {/snippet}
         {#snippet end()}mm{/snippet}
       </FormControl>
+      <FormControl label="Slot angle" name="slotAngle">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            step="1"
+            min={MIN_SLOT_ANGLE_DEG}
+            max={MAX_SLOT_ANGLE_DEG}
+            value={tray.params.slotAngle ?? DEFAULT_SLOT_ANGLE_DEG}
+            onchange={(e) => updateSlotAngle(e.currentTarget.value)}
+          />
+        {/snippet}
+        {#snippet end()}°{/snippet}
+      </FormControl>
     </div>
-    {#if slotAngleHint}
-      <Spacer size="0.5rem" />
-      <p class="standeeInfo">{slotAngleHint}</p>
-    {/if}
   </section>
 </div>
 
