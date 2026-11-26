@@ -1,7 +1,14 @@
 <script lang="ts">
   import { Input, FormControl, Spacer, Select } from '@tableslayer/ui';
   import type { StandeeTray } from '#lib/types/project.js';
-  import { type StandeeTrayParams, getStandeeTrayDimensions } from '#lib/models/standeeTray.js';
+  import {
+    type StandeeTrayParams,
+    getStandeeTrayDimensions,
+    getStandeeLevelAngle,
+    DEFAULT_SLOT_ANGLE_DEG,
+    MIN_SLOT_ANGLE_DEG,
+    MAX_SLOT_ANGLE_DEG
+  } from '#lib/models/standeeTray.js';
   import { getStandees } from '#lib/stores/project.svelte.js';
 
   interface Props {
@@ -53,6 +60,24 @@
     const perRow = Math.floor(count / rows);
     const size = count % rows === 0 ? `${perRow}` : `${perRow}–${perRow + 1}`;
     return `${rows} rows of ${size}, each ${walls}. Neighbouring rows share one wall.`;
+  });
+
+  // Slot angle: blank/invalid resets to the default, otherwise clamp to the supported range
+  function updateSlotAngle(raw: string) {
+    const parsed = parseFloat(raw);
+    const angle = Number.isNaN(parsed) ? DEFAULT_SLOT_ANGLE_DEG : parsed;
+    updateParam('slotAngle', Math.min(MAX_SLOT_ANGLE_DEG, Math.max(MIN_SLOT_ANGLE_DEG, angle)));
+  }
+
+  // Explains what the slot angle trades off for the selected standee
+  let slotAngleHint = $derived.by(() => {
+    if (!selectedStandee) return '';
+    const levelAngle = getStandeeLevelAngle(selectedStandee);
+    if (levelAngle <= 0) {
+      return 'This figure is no taller than its base, so a steeper slot angle only makes the tray longer.';
+    }
+    const limit = Math.min(Math.ceil(levelAngle), MAX_SLOT_ANGLE_DEG);
+    return `A steeper slot angle makes the tray shallower but longer. Past ${limit}° it stops getting shallower.`;
   });
 
   // Width/depth overrides: blank = auto, otherwise the value (clamped to the auto minimum at generation)
@@ -202,6 +227,20 @@
         {/snippet}
         {#snippet end()}mm{/snippet}
       </FormControl>
+      <FormControl label="Slot angle" name="slotAngle">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            step="1"
+            min={MIN_SLOT_ANGLE_DEG}
+            max={MAX_SLOT_ANGLE_DEG}
+            value={tray.params.slotAngle ?? DEFAULT_SLOT_ANGLE_DEG}
+            onchange={(e) => updateSlotAngle(e.currentTarget.value)}
+          />
+        {/snippet}
+        {#snippet end()}°{/snippet}
+      </FormControl>
       <FormControl label="Width" name="trayWidthOverride">
         {#snippet input({ inputProps })}
           <Input
@@ -229,6 +268,10 @@
         {#snippet end()}mm{/snippet}
       </FormControl>
     </div>
+    {#if slotAngleHint}
+      <Spacer size="0.5rem" />
+      <p class="standeeInfo">{slotAngleHint}</p>
+    {/if}
   </section>
 </div>
 

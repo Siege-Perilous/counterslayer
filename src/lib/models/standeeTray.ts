@@ -12,11 +12,32 @@ const { extrudeLinear } = jscad.extrusions;
 // Import types from project
 import type { Standee } from '#lib/types/project.js';
 
-// Angle of the slot fan, in degrees. Slots on the two inner walls tilt in
-// opposite directions by this amount so opposing standees interlock and resist
-// being jostled out.
-const SLOT_ANGLE_DEG = 20;
-const SLOT_ANGLE = (SLOT_ANGLE_DEG * Math.PI) / 180;
+// Slot angle limits, in degrees. The slots on both inner walls lean by the tray's slotAngle so the
+// standees resist being jostled out. A steeper lean lowers a figure that is wider than its base (so
+// the tray can be shallower) at the cost of length; past 45 degrees the slots become a hard overhang
+// to print and awkward to slide a standee into.
+export const DEFAULT_SLOT_ANGLE_DEG = 20;
+export const MIN_SLOT_ANGLE_DEG = 0;
+export const MAX_SLOT_ANGLE_DEG = 45;
+
+// The tray's slot angle in radians, clamped to the supported range (older trays have no slotAngle).
+function getSlotAngle(params: StandeeTrayParams): number {
+  const deg = Number.isFinite(params.slotAngle) ? params.slotAngle : DEFAULT_SLOT_ANGLE_DEG;
+  return (Math.min(MAX_SLOT_ANGLE_DEG, Math.max(MIN_SLOT_ANGLE_DEG, deg)) * Math.PI) / 180;
+}
+
+// The slot angle (degrees) at which a standee's leaning figure comes down level with its base. Leaning
+// further makes the tray longer without making it any shallower. Returns 0 when the figure is already
+// no taller than the base, so the angle never affects the tray height.
+export function getStandeeLevelAngle(standee: Standee): number {
+  const { baseRadius, standeeWidth, standeeThickness } = standee;
+  const baseDiameter = baseRadius * 2;
+  if (standeeWidth <= baseDiameter) return 0;
+  // Solve standeeWidth * cos(a) + standeeThickness * sin(a) = baseDiameter.
+  const reach = Math.hypot(standeeWidth, standeeThickness);
+  const angle = Math.atan2(standeeThickness, standeeWidth) + Math.acos(Math.min(1, baseDiameter / reach));
+  return (angle * 180) / Math.PI;
+}
 
 // Clearance (mm) kept between opposing standees in the depth direction, on top of the geometric
 // minimum, so staggered rows never touch.
@@ -33,6 +54,7 @@ export interface StandeeTrayParams {
   floorThickness: number;
   clearance: number; // Tolerance around standees
   rimHeight: number; // Extra height above the tallest content
+  slotAngle: number; // Lean of the slots, in degrees (clamped to MIN/MAX_SLOT_ANGLE_DEG)
   trayWidthOverride: number | null; // null = auto from standees; acts as a minimum, content is centred
   trayDepthOverride: number | null; // null = auto from standees; acts as a minimum, content is centred
 }
@@ -46,6 +68,7 @@ export const defaultStandeeTrayParams: StandeeTrayParams = {
   floorThickness: 2.0,
   clearance: 0.5,
   rimHeight: 2.0,
+  slotAngle: DEFAULT_SLOT_ANGLE_DEG,
   trayWidthOverride: null,
   trayDepthOverride: null
 };
@@ -112,6 +135,7 @@ interface StandeeLayout {
   middleCavityWidth: number;
   baseRadius: number;
   baseDiameter: number;
+  slotAngle: number; // lean of the slots and standees, in radians
 }
 
 function computeLayout(
@@ -122,6 +146,7 @@ function computeLayout(
 ): StandeeLayout {
   const { wallThickness, innerWallThickness, floorThickness, clearance, rimHeight } = params;
   const count = Math.max(0, Math.floor(params.count));
+  const slotAngle = getSlotAngle(params);
 
   const { baseRadius, standeeHeight, standeeWidth } = standee;
   const baseDiameter = baseRadius * 2;
@@ -140,16 +165,21 @@ function computeLayout(
   });
 
   // --- Height (Z) ---
-  // The base lies on its side as a vertical disc (baseDiameter tall) and the figure (standeeWidth
-  // tall) is centred on the disc centre. The figure axis sits a base-radius above whatever floor the
-  // standees rest on.
+  // The base lies on its side as a vertical disc (baseDiameter tall) with the figure centred on the
+  // disc centre. The figure leans by the slot angle, so it stands shorter than its full width:
+  // standeeWidth * cos(angle), plus the little its thickness adds once tilted. The standee rests on
+  // whichever reaches lower — the disc, or (when the figure is the taller of the two) the figure's
+  // bottom edge, which then holds the disc up off the floor. Either way the figure axis sits that
+  // half-height above the floor and the content tops out the same half-height above the axis.
+  const figureHalfHeight = (standeeWidth * Math.cos(slotAngle) + standee.standeeThickness * Math.sin(slotAngle)) / 2;
+  const contentHalfHeight = Math.max(baseRadius, figureHalfHeight);
   const spacerHeight = floorSpacerHeight ?? 0;
   // Natural height the standee + rim need on their own (measured from a floor at floorThickness). The
   // inner walls, slots and the standee spacing below are all sized from this so they never change
   // when the box stretches the tray taller — otherwise the slot sweep (and therefore the tray depth)
   // would grow with the box height and overflow the footprint the packer reserved.
-  const naturalAxisZ = floorThickness + baseRadius;
-  const contentTopZ = Math.max(floorThickness + baseDiameter, naturalAxisZ + standeeWidth / 2);
+  const naturalAxisZ = floorThickness + contentHalfHeight;
+  const contentTopZ = naturalAxisZ + contentHalfHeight;
   const naturalTrayHeight = contentTopZ + rimHeight;
   // Outer tray height: raise the rim to the box/section height (targetHeight), then add any floor
   // spacer — same order as the counter tray so the box's height normalisation lines up.
@@ -166,14 +196,16 @@ function computeLayout(
 
   // --- Slot vertical extent (Z) ---
   // The slot holds the figure (centred on the axis) and stays open at the top of the inner wall so
-  // the standee drops in. It plunges only as deep as the figure reaches: if the figure bottom is at
-  // or below the (raised) floor the standee is as wide as / wider than the base, so it cuts all the
-  // way through — extended a few mm below the floor so the angled cut leaves no sliver; otherwise it
-  // stops at the figure bottom.
-  const figureBottomZ = axisZ - standeeWidth / 2;
-  const cutsThrough = figureBottomZ <= floorRefZ;
+  // the standee drops in. It plunges only as deep as the (tilted) figure reaches, plus a little so
+  // the figure never bottoms out in the slot and rides high: if that reaches the (raised) floor the
+  // figure is resting on it, so the slot cuts all the way through — extended a few mm below the floor
+  // so the angled cut leaves no sliver; otherwise it stops just under the figure bottom.
+  const slotBottomClearance = 0.5;
+  const figureBottomZ = axisZ - figureHalfHeight - slotBottomClearance;
+  const cutsThrough = figureBottomZ <= floorRefZ + 1e-6;
   const slotBottomZ = cutsThrough ? floorRefZ - 4 : figureBottomZ;
-  const slotTopZ = innerWallTopZ + 1;
+  // The slot's end is square to its lean, so overshoot the rim by enough that its low corner clears.
+  const slotTopZ = innerWallTopZ + 1 + slotWidth;
 
   // --- Depth (Y): one slot per standee ---
   // Both inner walls tilt their slots the SAME direction, so the standees on the two walls run
@@ -184,10 +216,11 @@ function computeLayout(
   // The pitch is floored at twice the parallel-figure clearance so that half-pitch offset always
   // keeps opposing figures apart. topSweep/botSweep (the slot's sideways sweep above/below the figure
   // axis) are still used for the end margins below.
-  const topSweep = (innerWallTopZ - axisZ) * Math.tan(SLOT_ANGLE);
-  const botSweep = (axisZ - floorRefZ) * Math.tan(SLOT_ANGLE);
+  const topSweep = (innerWallTopZ - axisZ) * Math.tan(slotAngle);
+  const botSweep = (axisZ - floorRefZ) * Math.tan(slotAngle);
   const figureClearance = slotWidth + STANDEE_GAP; // min offset for opposing parallel figures to clear
-  const slotPitch = Math.max(baseDiameter + 1, 2 * figureClearance);
+  // (that clearance is across the leaning figures, so it takes more room along the wall as they lean)
+  const slotPitch = Math.max(baseDiameter + 1, (2 * figureClearance) / Math.cos(slotAngle));
   const staggerY = slotPitch / 2; // half-pitch so the right row centres between the left row's standees
 
   // End margin so the end standees still slide in past the end walls. The base disc needs
@@ -264,7 +297,8 @@ function computeLayout(
     outerCavityWidth,
     middleCavityWidth,
     baseRadius,
-    baseDiameter
+    baseDiameter,
+    slotAngle
   };
 }
 
@@ -327,7 +361,7 @@ export function getStandeePositions(
         x: leftX,
         y: layout.firstSlotY + i * layout.slotPitch,
         figureDir: 1,
-        tilt: SLOT_ANGLE
+        tilt: layout.slotAngle
       });
     }
     for (let i = 0; i < row.rightCount; i++) {
@@ -336,7 +370,7 @@ export function getStandeePositions(
         x: rightX,
         y: layout.firstSlotY + layout.staggerY + i * layout.slotPitch,
         figureDir: -1,
-        tilt: SLOT_ANGLE // same slant as the left wall (figureDir still points inward from the right)
+        tilt: layout.slotAngle // same slant as the left wall (figureDir still points inward from the right)
       });
     }
   }
@@ -384,20 +418,20 @@ export function createStandeeTray(
 
   // === ANGLED SLOTS ===
   // Slot: a channel that pierces the wall across its thickness (X) so the standee figure can pass
-  // through, narrow along the wall (Y = figure thickness + clearance). It is rotated SLOT_ANGLE
+  // through, narrow along the wall (Y = figure thickness + clearance). It is rotated by the slot angle
   // about the X axis so it runs diagonally on the wall's face — from lower on the wall up to the
   // top while moving along the wall's length (Y). This tilts the standee toward an end wall so it
   // resists falling out, while its base still sits flush at the side. The two walls tilt in
   // opposite directions and the rows are staggered so opposing standees interleave.
   //
-  // The tilt PIVOTS ABOUT THE FIGURE AXIS (Z = floor + baseRadius), so the slot stays centred on
+  // The tilt PIVOTS ABOUT THE FIGURE AXIS (axisZ), so the slot stays centred on
   // the standee's nominal Y at the figure's centre height — the cut reaches the right depth there
   // and the base stays aligned. The slot runs from slotBottomZ (the figure bottom, or below the
   // floor when it cuts all the way through) up to slotTopZ (above the rim, open for insertion).
   // Slots are cut from the walls ALONE and the walls are then unioned onto the box, so a full-depth
   // cut never touches the floor.
   const { axisZ, slotBottomZ, slotTopZ } = layout;
-  const cos = Math.cos(SLOT_ANGLE);
+  const cos = Math.cos(layout.slotAngle);
   const lengthBelowAxis = (axisZ - slotBottomZ) / cos; // along the tilted bar, below the pivot
   const lengthAboveAxis = (slotTopZ - axisZ) / cos; // above the pivot
   const barLen = lengthBelowAxis + lengthAboveAxis;
@@ -423,12 +457,12 @@ export function createStandeeTray(
     return wall;
   };
 
-  // Both walls tilt the same way (SLOT_ANGLE), so the standees all slant in one direction; the right
+  // Both walls tilt the same way, so the standees all slant in one direction; the right
   // row is just nudged by staggerY so its figures interleave with the left row's in the middle.
   const walls: Geom3[] = [];
   for (const row of layout.rows) {
-    walls.push(buildWall(row.leftWallX, row.leftCount, SLOT_ANGLE, 0));
-    walls.push(buildWall(row.rightWallX, row.rightCount, SLOT_ANGLE, layout.staggerY));
+    walls.push(buildWall(row.leftWallX, row.leftCount, layout.slotAngle, 0));
+    walls.push(buildWall(row.rightWallX, row.rightCount, layout.slotAngle, layout.staggerY));
   }
   // Solid dividing walls between neighbouring rows, full height like the outer walls.
   for (const dividerX of layout.dividerXs) {
