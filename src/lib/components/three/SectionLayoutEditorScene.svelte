@@ -30,6 +30,7 @@
     name: string;
     color: string;
     geometry: THREE.BufferGeometry;
+    lidGeometry?: THREE.BufferGeometry | null;
     placement: TrayPlacement;
     counterStacks: CounterStack[];
     trayLetter?: string;
@@ -50,6 +51,7 @@
     name: string;
     color: string;
     geometry: THREE.BufferGeometry;
+    lidGeometry?: THREE.BufferGeometry | null;
     dimensions: { width: number; depth: number; height: number };
     counterStacks: CounterStack[];
     trayLetter: string;

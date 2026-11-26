@@ -105,6 +105,11 @@ interface LegacyCupTrayParams {
   wallThickness?: number;
   floorThickness?: number;
   cornerRadius?: number;
+  scoops?: boolean;
+  lidEnabled?: boolean;
+  honeycombBottom?: boolean;
+  honeycombLid?: boolean;
+  lidEmboss?: boolean;
 }
 
 // Legacy card divider stack
@@ -285,10 +290,23 @@ function migrateCupTrayParams(params: LegacyCupTrayParams): {
   wallThickness: number;
   floorThickness: number;
   cornerRadius: number;
+  scoops: boolean;
+  lidEnabled: boolean;
+  honeycombBottom: boolean;
+  honeycombLid: boolean;
+  lidEmboss: boolean;
 } {
   const wallThickness = params.wallThickness ?? 2.0;
   const floorThickness = params.floorThickness ?? 2.0;
   const cornerRadius = params.cornerRadius ?? 6;
+  // Options added later: older files have none of them, which is a plain scooped tray
+  const options = {
+    scoops: params.scoops ?? true,
+    lidEnabled: params.lidEnabled ?? false,
+    honeycombBottom: params.honeycombBottom ?? false,
+    honeycombLid: params.honeycombLid ?? false,
+    lidEmboss: params.lidEmboss ?? true
+  };
 
   // Check if already has layout (new format)
   if (params.layout) {
@@ -299,7 +317,8 @@ function migrateCupTrayParams(params: LegacyCupTrayParams): {
       cupCavityHeight: params.cupCavityHeight ?? null,
       wallThickness,
       floorThickness,
-      cornerRadius
+      cornerRadius,
+      ...options
     };
   }
 
@@ -314,7 +333,8 @@ function migrateCupTrayParams(params: LegacyCupTrayParams): {
       cupCavityHeight: params.cupCavityHeight ?? null,
       wallThickness,
       floorThickness,
-      cornerRadius
+      cornerRadius,
+      ...options
     };
   }
 
@@ -337,7 +357,8 @@ function migrateCupTrayParams(params: LegacyCupTrayParams): {
     cupCavityHeight: cupHeight, // Preserve explicit height from old format
     wallThickness,
     floorThickness,
-    cornerRadius
+    cornerRadius,
+    ...options
   };
 }
 

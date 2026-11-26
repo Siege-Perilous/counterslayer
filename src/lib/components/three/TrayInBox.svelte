@@ -9,6 +9,7 @@
   import * as THREE from 'three';
   import CounterMesh from './CounterMesh.svelte';
   import StandeeMesh from './StandeeMesh.svelte';
+  import TrayLidMesh from './TrayLidMesh.svelte';
   import { getHatchMaterial } from '#lib/utils/hatchMaterial.js';
   import { getAlternateColor, getSleeveColors } from '#lib/three/materials.js';
   import type { CounterStack } from '#lib/models/counterTray.js';
@@ -25,6 +26,8 @@
 
   interface Props {
     geometry: THREE.BufferGeometry;
+    // The tray's own lid (cup trays with a lid), drawn seated on the tray
+    lidGeometry?: THREE.BufferGeometry | null;
     color: string;
     counterStacks?: CounterStack[];
     showCounters?: boolean;
@@ -44,6 +47,7 @@
 
   let {
     geometry,
+    lidGeometry = null,
     color,
     counterStacks = [],
     showCounters = false,
@@ -145,6 +149,10 @@
   <T.Mesh {geometry} rotation.x={-Math.PI / 2} onclick={handleClick} ondblclick={handleDoubleClick}>
     <T.MeshStandardMaterial {color} roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
   </T.Mesh>
+{/if}
+
+{#if lidGeometry && !hatched}
+  <TrayLidMesh {lidGeometry} trayGeometry={geometry} {color} onclick={handleClick} ondblclick={handleDoubleClick} />
 {/if}
 
 <!-- Counter previews in tray-local coordinates -->

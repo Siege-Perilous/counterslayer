@@ -2,9 +2,11 @@ import type { CupId, CupLayout, CupLayoutNode } from '#lib/types/cupLayout.js';
 import { generateCupId, isCupLeaf, isCupSplit } from '#lib/types/cupLayout.js';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
+import { createHoneycombUnion, defaultHoneycombParams } from './honeycomb';
+import { addLidFittings, createLidForDimensions, createLidRecess, defaultLidParams } from './lid';
 
-const { cuboid, roundedCuboid } = jscad.primitives;
-const { subtract, union } = jscad.booleans;
+const { cuboid, roundedCuboid, roundedRectangle } = jscad.primitives;
+const { intersect, subtract, union } = jscad.booleans;
 const { translate, mirrorY, scale } = jscad.transforms;
 const { vectorText } = jscad.text;
 const { path2 } = jscad.geometries;
@@ -20,6 +22,50 @@ export interface CupTrayParams {
   wallThickness: number; // Wall thickness in mm (default: 2.0)
   floorThickness: number; // Floor thickness in mm (default: 2.0)
   cornerRadius: number; // Corner radius in mm (default: 6)
+  scoops?: boolean; // Rounded floor-to-wall transition (default: true). Off = flat floor, 90° walls
+  lidEnabled?: boolean; // Tray has its own sliding lid, same design as a box lid (default: false)
+  honeycombBottom?: boolean; // Honeycomb floor (default: false). Forces scoops off, no bottom emboss
+  honeycombLid?: boolean; // Honeycomb lid top (default: false). No name on the lid
+  lidEmboss?: boolean; // Engrave the tray name on the lid top (default: true)
+}
+
+// Outer wall thickness a lidded tray needs for the lid's recess and rails (same as a new box)
+export const LID_OUTER_WALL = 3;
+
+// Outer wall thickness. wallThickness always sets the dividers between cups; it also sets the
+// outer wall unless the tray has a lid, which needs at least LID_OUTER_WALL.
+export function getCupTrayOuterWall(params: CupTrayParams): number {
+  return params.lidEnabled ? Math.max(params.wallThickness, LID_OUTER_WALL) : params.wallThickness;
+}
+
+// How far the lid's top plate sits above the tray body (0 without a lid)
+export function getCupTrayLidRise(params: CupTrayParams): number {
+  return params.lidEnabled ? getCupTrayOuterWall(params) : 0;
+}
+
+// Scoops are not possible on a honeycomb floor
+export function cupTrayHasScoops(params: CupTrayParams): boolean {
+  return (params.scoops ?? true) && !params.honeycombBottom;
+}
+
+// Cup cavity height: the explicit value, or (auto) whatever is left of targetHeight once the
+// floor and lid are taken out, or the default when there is no height to fit
+export function resolveCupCavityHeight(params: CupTrayParams, targetHeight?: number): number {
+  return (
+    params.cupCavityHeight ??
+    (targetHeight ? targetHeight - params.floorThickness - getCupTrayLidRise(params) : DEFAULT_CUP_CAVITY_HEIGHT)
+  );
+}
+
+// Cups for a tray's own params (see computeCupPositions)
+export function computeCupTrayCups(params: CupTrayParams): ComputedCup[] {
+  return computeCupPositions(
+    params.layout,
+    params.trayWidth,
+    params.trayDepth,
+    params.wallThickness,
+    getCupTrayOuterWall(params)
+  );
 }
 
 // Minimum cup size warning threshold (reduced from 30mm since custom layouts may intentionally have smaller cups)
@@ -55,7 +101,12 @@ export const defaultCupTrayParams: CupTrayParams = {
   cupCavityHeight: null, // Auto by default
   wallThickness: 2.0,
   floorThickness: 2.0,
-  cornerRadius: 6
+  cornerRadius: 6,
+  scoops: true,
+  lidEnabled: false,
+  honeycombBottom: false,
+  honeycombLid: false,
+  lidEmboss: true
 };
 
 // Cup position data for visualization
@@ -84,15 +135,16 @@ export function computeCupPositions(
   layout: CupLayout,
   trayWidth: number,
   trayDepth: number,
-  wallThickness: number
+  wallThickness: number,
+  outerWallThickness: number = wallThickness
 ): ComputedCup[] {
   const cups: ComputedCup[] = [];
 
   // Interior bounds (inside outer walls)
-  const interiorX = wallThickness;
-  const interiorY = wallThickness;
-  const interiorWidth = trayWidth - 2 * wallThickness;
-  const interiorDepth = trayDepth - 2 * wallThickness;
+  const interiorX = outerWallThickness;
+  const interiorY = outerWallThickness;
+  const interiorWidth = trayWidth - 2 * outerWallThickness;
+  const interiorDepth = trayDepth - 2 * outerWallThickness;
 
   function traverseNode(node: CupLayoutNode, x: number, y: number, width: number, depth: number): void {
     if (isCupLeaf(node)) {
@@ -136,7 +188,7 @@ export function getMinCupDimensions(params: CupTrayParams): {
   minWidth: number;
   minDepth: number;
 } {
-  const cups = computeCupPositions(params.layout, params.trayWidth, params.trayDepth, params.wallThickness);
+  const cups = computeCupTrayCups(params);
 
   if (cups.length === 0) {
     return { minWidth: 0, minDepth: 0 };
@@ -172,8 +224,9 @@ export function getCupTrayDimensions(
   // Height calculation:
   // - If cupCavityHeight is a number, use it
   // - If null (auto), use resolvedCupCavityHeight or default to DEFAULT_CUP_CAVITY_HEIGHT
+  // A lid's top plate sits above the body and counts toward the height
   const effectiveCupHeight = cupCavityHeight ?? resolvedCupCavityHeight ?? DEFAULT_CUP_CAVITY_HEIGHT;
-  const height = floorThickness + effectiveCupHeight;
+  const height = floorThickness + effectiveCupHeight + getCupTrayLidRise(params);
 
   return { width, depth, height };
 }
@@ -184,22 +237,19 @@ export function getCupPositions(
   targetHeight?: number,
   floorSpacerHeight?: number
 ): CupPosition[] {
-  const { wallThickness, cornerRadius, floorThickness, cupCavityHeight } = params;
+  const { cornerRadius } = params;
   const spacerOffset = floorSpacerHeight ?? 0;
 
-  // Resolve cup cavity height:
-  // - If explicit value, use it
-  // - If auto (null) and targetHeight provided, use targetHeight - floorThickness
-  // - Otherwise default to DEFAULT_CUP_CAVITY_HEIGHT
-  const effectiveCupHeight =
-    cupCavityHeight ?? (targetHeight ? targetHeight - floorThickness : DEFAULT_CUP_CAVITY_HEIGHT);
+  const effectiveCupHeight = resolveCupCavityHeight(params, targetHeight);
 
-  const dims = getCupTrayDimensions(params, effectiveCupHeight);
-  const baseTrayHeight = dims.height;
-  const trayHeight = targetHeight && targetHeight > baseTrayHeight ? targetHeight : baseTrayHeight;
+  // Height of the tray body (without the lid's top plate)
+  const lidRise = getCupTrayLidRise(params);
+  const baseTrayHeight = getCupTrayDimensions(params, effectiveCupHeight).height - lidRise;
+  const bodyTarget = targetHeight ? targetHeight - lidRise : 0;
+  const trayHeight = bodyTarget > baseTrayHeight ? bodyTarget : baseTrayHeight;
 
   // Get computed cup positions from layout tree
-  const computedCups = computeCupPositions(params.layout, params.trayWidth, params.trayDepth, wallThickness);
+  const computedCups = computeCupTrayCups(params);
 
   // Convert to CupPosition format (with center coordinates)
   return computedCups.map((cup) => ({
@@ -222,12 +272,16 @@ export function createCupTray(
   floorSpacerHeight?: number,
   showEmboss: boolean = true
 ): Geom3 {
-  const { wallThickness, cornerRadius, floorThickness, cupCavityHeight } = params;
+  const { wallThickness, cornerRadius } = params;
+  const outerWall = getCupTrayOuterWall(params);
+  const lidRise = getCupTrayLidRise(params);
+  const scoops = cupTrayHasScoops(params);
+  const honeycombBottom = params.honeycombBottom ?? false;
 
   const nameLabel = trayName ? `Tray "${trayName}"` : 'Tray';
 
   // Get computed cup positions from layout tree
-  const computedCups = computeCupPositions(params.layout, params.trayWidth, params.trayDepth, wallThickness);
+  const computedCups = computeCupTrayCups(params);
 
   // Validate that we have at least one cup
   if (computedCups.length === 0) {
@@ -243,20 +297,18 @@ export function createCupTray(
     }
   }
 
-  // Resolve cup cavity height:
-  // - If explicit value, use it
-  // - If auto (null) and targetHeight provided, use targetHeight - floorThickness
-  // - Otherwise default to DEFAULT_CUP_CAVITY_HEIGHT
-  const cupHeight = cupCavityHeight ?? (targetHeight ? targetHeight - floorThickness : DEFAULT_CUP_CAVITY_HEIGHT);
+  const cupHeight = resolveCupCavityHeight(params, targetHeight);
 
   if (cupHeight <= 0) {
     throw new Error(`${nameLabel}: Cup cavity height must be greater than zero.`);
   }
 
+  // trayHeight is the body only: a lid's top plate sits lidRise above it, inside targetHeight
   const dims = getCupTrayDimensions(params, cupHeight);
-  const baseTrayHeight = dims.height;
+  const baseTrayHeight = dims.height - lidRise;
+  const bodyTarget = targetHeight ? targetHeight - lidRise : 0;
   const spacerHeight = floorSpacerHeight ?? 0;
-  const trayHeight = (targetHeight && targetHeight > baseTrayHeight ? targetHeight : baseTrayHeight) + spacerHeight;
+  const trayHeight = (bodyTarget > baseTrayHeight ? bodyTarget : baseTrayHeight) + spacerHeight;
 
   const trayWidth = dims.width;
   const trayDepth = dims.depth;
@@ -280,6 +332,27 @@ export function createCupTray(
     const maxRadius = Math.min(cup.width, cup.depth) / 2;
     const effectiveCornerRadius = Math.min(cornerRadius, maxRadius);
 
+    if (!scoops) {
+      // Flat floor meeting the walls at 90°; the corner radius only rounds the upright corners
+      const cavityHeight = cupHeight + 1;
+      const uprightRadius = Math.min(effectiveCornerRadius, maxRadius - 0.01);
+      const cupCavity =
+        uprightRadius > 0.01
+          ? translate(
+              [cupCenterX, cupCenterY, cupFloorZ],
+              extrudeLinear(
+                { height: cavityHeight },
+                roundedRectangle({ size: [cup.width, cup.depth], roundRadius: uprightRadius, segments: 32 })
+              )
+            )
+          : cuboid({
+              size: [cup.width, cup.depth, cavityHeight],
+              center: [cupCenterX, cupCenterY, cupFloorZ + cavityHeight / 2]
+            });
+      cupCuts.push(cupCavity);
+      continue;
+    }
+
     // Cup cavity height - extend above tray top by cornerRadius*2 so the
     // rounded top edge is completely outside the tray (only bottom rounds inside)
     const cavityHeight = cupHeight + effectiveCornerRadius * 2 + 1;
@@ -301,8 +374,43 @@ export function createCupTray(
 
   let result = subtract(trayBody, ...cupCuts);
 
-  // Emboss tray name on bottom (Z=0 face)
-  if (showEmboss && trayName && trayName.trim().length > 0) {
+  // Sliding lid: recess the outer wall and add the rail grooves, lock and grip lines
+  if (params.lidEnabled) {
+    const lidFit = {
+      extWidth: trayWidth,
+      extDepth: trayDepth,
+      extHeight: trayHeight,
+      wall: outerWall,
+      lidParams: defaultLidParams
+    };
+    result = addLidFittings(subtract(result, createLidRecess(lidFit)), lidFit);
+  }
+
+  // Honeycomb floor: hexes through the solid floor, kept inside each cup so every wall
+  // stands on a solid strip
+  if (honeycombBottom) {
+    const honeycomb = createHoneycombUnion(trayWidth, trayDepth, cupFloorZ, {
+      ...defaultHoneycombParams,
+      borderOffset: outerWall
+    });
+    if (honeycomb) {
+      const ledge = 1;
+      const cupFloors = computedCups
+        .filter((cup) => cup.width > ledge * 2 && cup.depth > ledge * 2)
+        .map((cup) =>
+          cuboid({
+            size: [cup.width - ledge * 2, cup.depth - ledge * 2, cupFloorZ + 4],
+            center: [cup.x + cup.width / 2, cup.y + cup.depth / 2, cupFloorZ / 2]
+          })
+        );
+      if (cupFloors.length > 0) {
+        result = subtract(result, intersect(honeycomb, union(...cupFloors)));
+      }
+    }
+  }
+
+  // Emboss tray name on bottom (Z=0 face); a honeycomb floor leaves nowhere to put it
+  if (showEmboss && !honeycombBottom && trayName && trayName.trim().length > 0) {
     const textDepth = 0.6;
     const strokeWidth = 1.2;
     const textHeightParam = 6;
@@ -363,6 +471,21 @@ export function createCupTray(
   }
 
   return result;
+}
+
+// Create the tray's sliding lid (null when the tray has no lid). Printed top-face down, like a
+// box lid. The name goes on the lid top (lidEmboss) unless the lid is honeycomb.
+export function createCupTrayLid(params: CupTrayParams, trayName?: string): Geom3 | null {
+  if (!params.lidEnabled) return null;
+  const honeycombLid = params.honeycombLid ?? false;
+  const showEmboss = params.lidEmboss ?? true;
+  return createLidForDimensions({
+    extWidth: params.trayWidth,
+    extDepth: params.trayDepth,
+    wall: getCupTrayOuterWall(params),
+    lidParams: { ...defaultLidParams, honeycombEnabled: honeycombLid, showName: showEmboss && !honeycombLid },
+    name: trayName
+  });
 }
 
 // Validate cup tray parameters and return warnings

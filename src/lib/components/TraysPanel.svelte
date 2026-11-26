@@ -10,7 +10,8 @@
     Icon,
     ColorPicker,
     ColorPickerSwatch,
-    Popover
+    Popover,
+    Text
   } from '@tableslayer/ui';
   import { IconX, IconPlus } from '@tabler/icons-svelte';
   import type { Box, Tray } from '#lib/types/project.js';
@@ -34,7 +35,7 @@
   import type { CardDrawTrayParams } from '#lib/models/cardTray.js';
   import type { CardDividerTrayParams } from '#lib/models/cardDividerTray.js';
   import type { CardWellTrayParams } from '#lib/models/cardWellTray.js';
-  import type { CupTrayParams } from '#lib/models/cupTray.js';
+  import { cupTrayHasScoops, getCupTrayOuterWall, type CupTrayParams } from '#lib/models/cupTray.js';
   import type { ReservedSpaceParams } from '#lib/models/reservedSpace.js';
   import type { StandeeTrayParams } from '#lib/models/standeeTray.js';
   import { countCups } from '#lib/types/cupLayout.js';
@@ -181,6 +182,9 @@
   });
 
   // Calculate section-adjusted tray height
+  // The selected tray when it is a cup tray, for its scoop / honeycomb / lid options
+  let cupOptions = $derived(selectedTray && isCupTray(selectedTray) ? selectedTray : null);
+
   // Trays expand to fill the box interior, which may be taller than natural to match section height
   let maxTrayHeight = $derived.by(() => {
     if (!selectedBox) return 0;
@@ -473,11 +477,74 @@
           <Spacer size="1rem" />
 
           <!-- Emboss Name -->
-          <InputCheckbox
-            label="Emboss name on tray bottom"
-            checked={selectedTray.showEmboss ?? true}
-            onchange={(e) => onUpdateTray({ showEmboss: e.currentTarget.checked })}
-          />
+          {#if cupOptions && onUpdateCupParams}
+            {@const cup = cupOptions}
+            {@const updateCup = onUpdateCupParams}
+            {@const honeycombBottom = cup.params.honeycombBottom ?? false}
+            {@const lidEnabled = cup.params.lidEnabled ?? false}
+            {@const honeycombLid = lidEnabled && (cup.params.honeycombLid ?? false)}
+            <!-- Cup tray: bottom options, then lid options -->
+            <InputCheckbox
+              label="Honeycomb bottom"
+              checked={honeycombBottom}
+              onchange={(e) => updateCup({ ...cup.params, honeycombBottom: e.currentTarget.checked })}
+            />
+            <Spacer size="0.5rem" />
+            <span class={honeycombBottom ? 'disabledOption' : ''}>
+              <InputCheckbox
+                label="Scooped bottoms"
+                checked={cupTrayHasScoops(cup.params)}
+                disabled={honeycombBottom}
+                onchange={(e) => updateCup({ ...cup.params, scoops: e.currentTarget.checked })}
+              />
+            </span>
+            <Spacer size="0.5rem" />
+            <span class={honeycombBottom ? 'disabledOption' : ''}>
+              <InputCheckbox
+                label="Emboss name on tray bottom"
+                checked={!honeycombBottom && (selectedTray.showEmboss ?? true)}
+                disabled={honeycombBottom}
+                onchange={(e) => onUpdateTray({ showEmboss: e.currentTarget.checked })}
+              />
+            </span>
+            <Spacer size="0.5rem" />
+            <InputCheckbox
+              label="Lid"
+              checked={lidEnabled}
+              onchange={(e) => updateCup({ ...cup.params, lidEnabled: e.currentTarget.checked })}
+            />
+            <Spacer size="0.5rem" />
+            <span class={lidEnabled ? '' : 'disabledOption'}>
+              <InputCheckbox
+                label="Honeycomb lid"
+                checked={honeycombLid}
+                disabled={!lidEnabled}
+                onchange={(e) => updateCup({ ...cup.params, honeycombLid: e.currentTarget.checked })}
+              />
+            </span>
+            <Spacer size="0.5rem" />
+            <span class={lidEnabled && !honeycombLid ? '' : 'disabledOption'}>
+              <InputCheckbox
+                label="Emboss name on tray lid"
+                checked={lidEnabled && !honeycombLid && (cup.params.lidEmboss ?? true)}
+                disabled={!lidEnabled || honeycombLid}
+                onchange={(e) => updateCup({ ...cup.params, lidEmboss: e.currentTarget.checked })}
+              />
+            </span>
+            {#if lidEnabled && getCupTrayOuterWall(cup.params) > cup.params.wallThickness}
+              <Spacer size="0.5rem" />
+              <Text color="var(--fgMuted)" size="0.875rem">
+                The lid's rails need a {getCupTrayOuterWall(cup.params)} mm outer wall. The wall setting still applies between
+                cups.
+              </Text>
+            {/if}
+          {:else}
+            <InputCheckbox
+              label="Emboss name on tray bottom"
+              checked={selectedTray.showEmboss ?? true}
+              onchange={(e) => onUpdateTray({ showEmboss: e.currentTarget.checked })}
+            />
+          {/if}
         {/if}
       </div>
 
@@ -631,5 +698,10 @@
     font-family: var(--font-mono);
     font-size: 0.75rem;
     color: var(--fgMuted);
+  }
+
+  .disabledOption {
+    text-decoration: line-through;
+    opacity: 0.6;
   }
 </style>

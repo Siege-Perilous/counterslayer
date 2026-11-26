@@ -31,6 +31,7 @@
     return 'shape' in stack;
   }
   import { getTrayLetter, getProject, TRAY_COLORS } from '#lib/stores/project.svelte.js';
+  import TrayLidMesh from './three/TrayLidMesh.svelte';
   import { getHatchMaterial } from '#lib/utils/hatchMaterial.js';
   import {
     layoutEditorState,
@@ -47,6 +48,7 @@
     name: string;
     color: string;
     geometry: BufferGeometry;
+    lidGeometry?: BufferGeometry | null;
     placement: TrayPlacement;
     counterStacks: CounterStack[];
     trayLetter?: string;
@@ -67,6 +69,7 @@
     name: string;
     color: string;
     geometry: BufferGeometry;
+    lidGeometry?: BufferGeometry | null;
     dimensions: { width: number; depth: number; height: number };
     counterStacks: CounterStack[];
     trayLetter: string;
@@ -97,6 +100,8 @@
     allLooseTrays?: LooseTrayGeometryData[];
     boxGeometry?: BufferGeometry | null;
     lidGeometry?: BufferGeometry | null;
+    // Lid of the selected tray (cup trays with a lid), shown beside it in the single-tray view
+    trayLidGeometry?: BufferGeometry | null;
     printBedSize?: number; // Legacy (deprecated) - use gameContainerWidth/gameContainerDepth
     gameContainerWidth?: number;
     gameContainerDepth?: number;
@@ -151,6 +156,7 @@
     allLooseTrays = [],
     boxGeometry = null,
     lidGeometry = null,
+    trayLidGeometry = null,
     printBedSize: legacyPrintBedSize,
     gameContainerWidth: propContainerWidth,
     gameContainerDepth: propContainerDepth,
@@ -925,9 +931,28 @@
   // Individual geometry bounds
   let boxBounds = $derived(getGeomBounds(boxGeometry));
   let lidBounds = $derived(getGeomBounds(lidGeometry));
+  let geometryBounds = $derived(getGeomBounds(geometry));
+  let trayLidBounds = $derived(getGeomBounds(trayLidGeometry));
 
   // Gap between objects in side-by-side view
   const sideGap = 20;
+
+  // Single-tray view: a tray with its own lid shows the lid next to it. The two sit along the
+  // tray's shorter side (smallest footprint, so they fit the game container area) and the pair is
+  // centred. Offsets are in scene units: x to the right, z toward the front.
+  let trayLidLayout = $derived.by(() => {
+    if (!trayLidBounds || !geometryBounds) return { trayX: 0, trayZ: 0, lidX: 0, lidZ: 0 };
+    const trayWidth = geometryBounds.max.x - geometryBounds.min.x;
+    const trayDepth = geometryBounds.max.y - geometryBounds.min.y;
+    if (trayWidth > trayDepth) {
+      // Long in X: lid goes behind the tray
+      const shift = (trayLidBounds.max.y - trayLidBounds.min.y + sideGap) / 2;
+      return { trayX: 0, trayZ: shift, lidX: 0, lidZ: shift - trayDepth - sideGap };
+    }
+    // Long in depth (or square): lid goes to the right of the tray
+    const shift = (trayLidBounds.max.x - trayLidBounds.min.x + sideGap) / 2;
+    return { trayX: -shift, trayZ: 0, lidX: -shift + trayWidth + sideGap, lidZ: 0 };
+  });
 
   // Calculate total depth of trays group (accounting for bin-packing)
   let traysGroupDepth = $derived.by(() => {
@@ -1596,6 +1621,13 @@
             side={THREE.DoubleSide}
           />
         </T.Mesh>
+        {#if trayData.lidGeometry}
+          <TrayLidMesh
+            lidGeometry={trayData.lidGeometry}
+            trayGeometry={trayData.geometry}
+            color={getTrayColor(trayData.trayId, i)}
+          />
+        {/if}
       </T.Group>
     {/each}
   {:else if geometry && !showSectionView}
@@ -1611,7 +1643,13 @@
         position.z={meshOffset.z}
       />
     {:else}
-      <T.Mesh {geometry} rotation.x={-Math.PI / 2} position.x={meshOffset.x} position.y={0} position.z={meshOffset.z}>
+      <T.Mesh
+        {geometry}
+        rotation.x={-Math.PI / 2}
+        position.x={meshOffset.x + trayLidLayout.trayX}
+        position.y={0}
+        position.z={meshOffset.z + trayLidLayout.trayZ}
+      >
         <T.MeshStandardMaterial
           color={getTrayColor(selectedTrayId, 0)}
           roughness={0.6}
@@ -1619,6 +1657,23 @@
           side={THREE.DoubleSide}
         />
       </T.Mesh>
+      {#if trayLidGeometry}
+        <!-- The tray's own lid, beside it as printed (top face down) so the cups stay visible -->
+        <T.Mesh
+          geometry={trayLidGeometry}
+          rotation.x={-Math.PI / 2}
+          position.x={meshOffset.x + trayLidLayout.lidX}
+          position.y={0}
+          position.z={meshOffset.z + trayLidLayout.lidZ}
+        >
+          <T.MeshStandardMaterial
+            color={getTrayColor(selectedTrayId, 0)}
+            roughness={0.6}
+            metalness={0.1}
+            side={THREE.DoubleSide}
+          />
+        </T.Mesh>
+      {/if}
     {/if}
   {/if}
 {/if}

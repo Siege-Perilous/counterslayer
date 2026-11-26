@@ -22,6 +22,7 @@
     name: string;
     color: string;
     geometry: BufferGeometry;
+    lidGeometry?: BufferGeometry | null;
     placement: TrayPlacement;
     counterStacks: CounterStack[];
     trayLetter?: string;
@@ -42,6 +43,7 @@
     name: string;
     color: string;
     geometry: BufferGeometry;
+    lidGeometry?: BufferGeometry | null;
     dimensions: { width: number; depth: number; height: number };
     counterStacks: CounterStack[];
     trayLetter: string;
@@ -82,6 +84,8 @@
     allLooseTrays?: LooseTrayGeometryData[];
     boxGeometry?: BufferGeometry | null;
     lidGeometry?: BufferGeometry | null;
+    // Lid of the selected tray (cup trays with a lid), shown beside it in the single-tray view
+    trayLidGeometry?: BufferGeometry | null;
     printBedSize?: number; // Legacy (deprecated) - use gameContainerWidth/gameContainerDepth
     gameContainerWidth?: number;
     gameContainerDepth?: number;
@@ -131,6 +135,7 @@
     allLooseTrays = [],
     boxGeometry = null,
     lidGeometry = null,
+    trayLidGeometry = null,
     printBedSize: legacyPrintBedSize,
     gameContainerWidth: propContainerWidth,
     gameContainerDepth: propContainerDepth,
@@ -224,6 +229,7 @@
       {allLooseTrays}
       {boxGeometry}
       {lidGeometry}
+      {trayLidGeometry}
       {gameContainerWidth}
       {gameContainerDepth}
       {exploded}

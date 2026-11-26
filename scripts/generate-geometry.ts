@@ -18,7 +18,7 @@ import { createCardDividerTray } from '../src/lib/models/cardDividerTray.js';
 import { createCardDrawTray } from '../src/lib/models/cardTray.js';
 import { createCardWellTray } from '../src/lib/models/cardWellTray.js';
 import { createCounterTray } from '../src/lib/models/counterTray.js';
-import { createCupTray } from '../src/lib/models/cupTray.js';
+import { createCupTray, createCupTrayLid } from '../src/lib/models/cupTray.js';
 import { createBoxWithLidGrooves, createLid } from '../src/lib/models/lid.js';
 import { createStandeeTray } from '../src/lib/models/standeeTray.js';
 import type { Box, Tray } from '../src/lib/types/project.js';
@@ -47,6 +47,20 @@ function cleanGeometryForExport(geom: Geom3): Geom3 {
 }
 
 const MESH_ANALYSIS_DIR = join(import.meta.dirname, '..', 'mesh-analysis');
+
+/** Write a cup tray's own lid next to the tray STL (no-op for trays without a lid). */
+function writeTrayLid(tray: Tray, trayFilename: string): void {
+  if (!isCupTray(tray)) return;
+  const lidGeom = createCupTrayLid(tray.params, tray.name);
+  if (!lidGeom) return;
+  const lidFilename = trayFilename.replace(/\.stl$/, '_lid.stl');
+  const lidStl = stlSerializer.serialize({ binary: true }, cleanGeometryForExport(lidGeom));
+  writeFileSync(
+    join(MESH_ANALYSIS_DIR, lidFilename),
+    Buffer.concat(lidStl.map((b: BlobPart) => Buffer.from(b as ArrayBuffer)))
+  );
+  console.log(`  Written: ${lidFilename}`);
+}
 
 async function main() {
   // Load project.json
@@ -90,7 +104,7 @@ async function main() {
     try {
       let trayGeom: Geom3 | null = null;
       if (isCupTray(looseTray)) {
-        trayGeom = createCupTray(looseTray.params, looseTray.name, maxHeight, 0);
+        trayGeom = createCupTray(looseTray.params, looseTray.name, maxHeight, 0, looseTray.showEmboss ?? true);
       } else if (isStandeeTray(looseTray)) {
         trayGeom = createStandeeTray(looseTray.params, project.standees ?? [], looseTray.name, maxHeight, 0);
       } else if (isCardWellTray(looseTray)) {
@@ -109,6 +123,7 @@ async function main() {
         const trayPath = join(MESH_ANALYSIS_DIR, filename);
         writeFileSync(trayPath, Buffer.concat(trayStl.map((b: BlobPart) => Buffer.from(b as ArrayBuffer))));
         console.log(`  Written: ${filename}`);
+        writeTrayLid(looseTray, filename);
       }
     } catch (e) {
       console.error(`  Error generating loose tray:`, e);
@@ -191,7 +206,7 @@ async function main() {
       // Dispatch to appropriate geometry generator based on tray type
       let trayGeom: Geom3 | null = null;
       if (isCupTray(tray)) {
-        trayGeom = createCupTray(tray.params, tray.name, maxHeight, 0);
+        trayGeom = createCupTray(tray.params, tray.name, maxHeight, 0, tray.showEmboss ?? true);
       } else if (isStandeeTray(tray)) {
         trayGeom = createStandeeTray(tray.params, project.standees ?? [], tray.name, maxHeight, 0);
       } else if (isCardWellTray(tray)) {
@@ -219,6 +234,7 @@ async function main() {
         const trayPath = join(MESH_ANALYSIS_DIR, filename);
         writeFileSync(trayPath, Buffer.concat(trayStl.map((b: BlobPart) => Buffer.from(b as ArrayBuffer))));
         console.log(`  Written: ${filename}`);
+        writeTrayLid(tray, filename);
       } else {
         console.log(`  Warning: Tray "${tray.name}" geometry is null/empty`);
       }
