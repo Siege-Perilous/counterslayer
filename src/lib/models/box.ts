@@ -661,6 +661,20 @@ function arrangeTraysAuto(
   return convertToPlacement(fallback);
 }
 
+// A tray whose height is "auto": it stretches to match whatever it sits with, so the height it
+// reports (a default) must not push its neighbours taller. Cup trays with no cavity height set.
+export function isAutoHeightTray(tray: Tray): boolean {
+  return isCupTray(tray) && tray.params.cupCavityHeight === null;
+}
+
+// Shared height for trays that sit together (in a box or a section). Auto-height trays only
+// count when nothing else sets a height. fixedHeights are other items at that level (boxes).
+export function getSharedTrayHeight(items: { tray: Tray; height: number }[], fixedHeights: number[] = []): number {
+  const fixed = [...fixedHeights, ...items.filter((i) => !isAutoHeightTray(i.tray)).map((i) => i.height)];
+  if (fixed.length > 0) return Math.max(...fixed);
+  return Math.max(...items.map((i) => i.height), 0);
+}
+
 // Calculate box interior dimensions from tray placements
 export function getBoxInteriorDimensions(placements: TrayPlacement[], tolerance: number): TrayDimensions {
   if (placements.length === 0) {
@@ -669,12 +683,11 @@ export function getBoxInteriorDimensions(placements: TrayPlacement[], tolerance:
 
   let maxX = 0;
   let maxY = 0;
-  let maxHeight = 0;
+  const maxHeight = getSharedTrayHeight(placements.map((p) => ({ tray: p.tray, height: p.dimensions.height })));
 
   for (const p of placements) {
     maxX = Math.max(maxX, p.x + p.dimensions.width);
     maxY = Math.max(maxY, p.y + p.dimensions.depth);
-    maxHeight = Math.max(maxHeight, p.dimensions.height);
   }
 
   // Add tolerance around all sides

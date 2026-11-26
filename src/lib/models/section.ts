@@ -14,7 +14,7 @@ import type {
   Tray
 } from '#lib/types/project.js';
 import { packItems, stackItemsVertically, type PackingItem } from '#lib/utils/binPacking.js';
-import { getBoxExteriorDimensions, getTrayDimensionsForTray } from './box';
+import { getBoxExteriorDimensions, getSharedTrayHeight, getTrayDimensionsForTray } from './box';
 
 export interface BoxDimensions {
   width: number;
@@ -67,13 +67,13 @@ export function calculateSectionHeight(
   });
 
   // Get all loose tray content heights (minimum required height)
-  const looseTrayHeights = section.looseTrays.map((tray) => {
-    const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes, standees);
-    return dims.height;
-  });
+  const looseTrayHeights = section.looseTrays.map((tray) => ({
+    tray,
+    height: getTrayDimensionsForTray(tray, cardSizes, counterShapes, standees).height
+  }));
 
-  // Section height = max of all items
-  return Math.max(...boxHeights, ...looseTrayHeights, 0);
+  // Section height = max of all items; auto-height trays follow the rest instead of setting it
+  return getSharedTrayHeight(looseTrayHeights, boxHeights);
 }
 
 /**

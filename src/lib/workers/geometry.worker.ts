@@ -6,7 +6,7 @@
 import {
   arrangeTrays,
   calculateTraySpacers,
-  getBoxExteriorDimensions,
+  getSharedTrayHeight,
   getTrayDimensionsForTray,
   validateCustomDimensions,
   type TrayPlacement
@@ -23,6 +23,7 @@ import {
 import { createCupTray, createCupTrayLid } from '#lib/models/cupTray.js';
 import { createBoxWithLidGrooves, createLid } from '#lib/models/lid.js';
 import { getReservedSpaceDimensions } from '#lib/models/reservedSpace.js';
+import { calculateSectionHeight } from '#lib/models/section.js';
 import { createStandeeTray, getStandeePositions } from '#lib/models/standeeTray.js';
 import type { Box, CardSize, CounterShape, Section, Standee, Tray } from '#lib/types/project.js';
 import {
@@ -124,20 +125,7 @@ function calculateUnifiedSectionHeight(
   counterShapes: CounterShape[],
   standees: Standee[] = []
 ): number {
-  // Get all box exterior heights
-  const boxHeights = section.boxes.map((box) => {
-    const dims = getBoxExteriorDimensions(box, cardSizes, counterShapes, standees);
-    return dims.height;
-  });
-
-  // Get all loose tray content heights
-  const looseTrayHeights = section.looseTrays.map((tray) => {
-    const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes, standees);
-    return dims.height;
-  });
-
-  // Section height = max of all items
-  return Math.max(...boxHeights, ...looseTrayHeights, 0);
+  return calculateSectionHeight(section, { cardSizes, counterShapes, standees });
 }
 
 /**
@@ -681,7 +669,9 @@ function handleGenerate(msg: GenerateMessage): void {
 
       const spacerInfo = calculateTraySpacers(box, cardSizes, counterShapes, standees);
       // Use the section-adjusted tray height instead of natural height
-      const naturalMaxHeight = Math.max(...placements.map((p) => p.dimensions.height));
+      const naturalMaxHeight = getSharedTrayHeight(
+        placements.map((p) => ({ tray: p.tray, height: p.dimensions.height }))
+      );
       const maxHeight = selectedSectionHeight > 0 ? requiredTrayHeight : naturalMaxHeight;
 
       // Find spacer for selected tray
@@ -860,8 +850,9 @@ function handleGenerate(msg: GenerateMessage): void {
 
       const boxSpacerInfo = calculateTraySpacers(projectBox, cardSizes, counterShapes, standees);
       // Use the required tray height from section calculation, not just the box's natural height
-      const naturalTrayHeights = boxPlacements.map((p) => p.dimensions.height);
-      const maxNaturalTrayHeight = Math.max(...naturalTrayHeights, 0);
+      const maxNaturalTrayHeight = getSharedTrayHeight(
+        boxPlacements.map((p) => ({ tray: p.tray, height: p.dimensions.height }))
+      );
       const boxMaxHeight = Math.max(requiredTrayHeight, maxNaturalTrayHeight);
 
       // Cache JSCAD geometries for this box's trays

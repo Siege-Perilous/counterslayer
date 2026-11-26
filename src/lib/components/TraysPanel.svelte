@@ -40,7 +40,7 @@
   import type { StandeeTrayParams } from '#lib/models/standeeTray.js';
   import { countCups } from '#lib/types/cupLayout.js';
   import { countCells } from '#lib/types/cardWellLayout.js';
-  import { getTrayDimensionsForTray, arrangeTrays } from '#lib/models/box.js';
+  import { getTrayDimensionsForTray, getSharedTrayHeight, arrangeTrays } from '#lib/models/box.js';
   import { calculateSectionHeight } from '#lib/models/section.js';
   import {
     getProject,
@@ -192,9 +192,11 @@
     const counterShapes = getCounterShapes();
 
     // Get natural max tray height
-    const naturalMaxHeight = Math.max(
-      ...selectedBox.trays.map((tray) => getTrayDimensionsForTray(tray, cardSizes, counterShapes).height),
-      0
+    const naturalMaxHeight = getSharedTrayHeight(
+      selectedBox.trays.map((tray) => ({
+        tray,
+        height: getTrayDimensionsForTray(tray, cardSizes, counterShapes).height
+      }))
     );
 
     // If box is in a section, calculate section-adjusted height
