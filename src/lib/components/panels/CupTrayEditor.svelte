@@ -1,11 +1,12 @@
 <script lang="ts">
   import { Input, FormControl, Spacer } from '@tableslayer/ui';
   import type { CupTray } from '#lib/types/project.js';
-  import type { CupLayout } from '#lib/types/cupLayout.js';
+  import type { CupLayout, CupId } from '#lib/types/cupLayout.js';
   import { countCups } from '#lib/types/cupLayout.js';
   import {
     type CupTrayParams,
     getCupTrayDimensions,
+    computeCupPositions,
     validateCupTrayParams,
     DEFAULT_CUP_CAVITY_HEIGHT
   } from '#lib/models/cupTray.js';
@@ -45,6 +46,14 @@
       ...baseDims,
       height: actualHeight && actualHeight > baseDims.height ? actualHeight : baseDims.height
     };
+  });
+
+  // Inner dimensions of the cup selected in the layout editor
+  let selectedCupId = $state<CupId | null>(null);
+  let selectedCup = $derived.by(() => {
+    if (!selectedCupId) return null;
+    const { layout, trayWidth, trayDepth, wallThickness } = tray.params;
+    return computeCupPositions(layout, trayWidth, trayDepth, wallThickness).find((c) => c.id === selectedCupId) ?? null;
   });
 
   // Compute validation warnings
@@ -121,7 +130,13 @@
     <div class="sectionHeader">
       <h3 class="sectionTitle">Cup Layout</h3>
       <span class="calculatedInfo">
-        {cupCount} cup{cupCount !== 1 ? 's' : ''}
+        {#if selectedCup}
+          {selectedCup.width.toFixed(1)} &times; {selectedCup.depth.toFixed(1)} &times; {effectiveCupCavityHeight.toFixed(
+            1
+          )} mm
+        {:else}
+          {cupCount} cup{cupCount !== 1 ? 's' : ''}
+        {/if}
       </span>
     </div>
     <Spacer size="0.5rem" />
@@ -130,6 +145,7 @@
       trayWidth={tray.params.trayWidth}
       trayDepth={tray.params.trayDepth}
       onUpdateLayout={handleLayoutUpdate}
+      bind:selectedCupId
     />
     {#if warnings.length > 0}
       <Spacer size="0.5rem" />

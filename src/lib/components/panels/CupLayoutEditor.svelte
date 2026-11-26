@@ -10,12 +10,10 @@
     trayWidth: number;
     trayDepth: number;
     onUpdateLayout: (layout: CupLayout) => void;
+    selectedCupId?: CupId | null;
   }
 
-  let { layout, trayWidth, trayDepth, onUpdateLayout }: Props = $props();
-
-  // Selected cup state
-  let selectedCupId = $state<CupId | null>(null);
+  let { layout, trayWidth, trayDepth, onUpdateLayout, selectedCupId = $bindable(null) }: Props = $props();
 
   // Ensure selection is valid when layout changes
   $effect(() => {
