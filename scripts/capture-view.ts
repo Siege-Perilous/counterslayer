@@ -123,7 +123,7 @@ Options:
   --counters           Show counters in the trays
   --explode <0-100>    Explode amount for the all-sections view (0 = to scale)
   --project <id>       Load a community project first (omaha, burning-banners,
-                       witchcraft, red-dust-rebellion)
+                       witchcraft, red-dust-rebellion, plum-island-horror)
   --debug-export       Click "Debug for Claude" button to export project.json
 
 Examples:
