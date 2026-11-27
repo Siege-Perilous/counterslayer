@@ -1,15 +1,15 @@
 <script lang="ts">
   import { browser } from '$app/env';
+  import { replaceState } from '$app/navigation';
+  import { resolve } from '$app/paths';
   import { PaneGroup, Pane, PaneResizer, type PaneAPI } from 'paneforge';
   import {
     Button,
     Icon,
     InputCheckbox,
     InputSlider,
-    Select,
     Popover,
     Hr,
-    FormControl,
     Loader,
     addToast,
     removeToast
@@ -25,6 +25,7 @@
   import { arrangeSectionContents, type BoxPlacement, type LooseTrayPlacement } from '#lib/models/section.js';
   import { computeProjectLayout, prepareSections, reanchorPlacement } from '#lib/models/projectLayout.js';
   import { buildComputedLayout } from '#lib/utils/computedLayout.js';
+  import { fetchCommunityProjects } from '#lib/utils/communityProjects.js';
   import { jscadToBufferGeometry } from '#lib/utils/jscadToThree.js';
   import {
     getGeometryWorker,
@@ -104,13 +105,6 @@
   type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid' | 'section';
   type SelectionType = 'dimensions' | 'section' | 'box' | 'tray';
 
-  interface CommunityProject {
-    id: string;
-    name: string;
-    author: string;
-    file: string;
-  }
-
   // Mobile detection
   $effect(() => {
     if (browser) {
@@ -154,7 +148,6 @@
   let explosionAmount = $state(50);
   let allSectionsExplosionAmount = $state(50); // Default to current behavior (20mm separation)
   let showCounters = $state(false);
-  let communityProjects = $state<CommunityProject[]>([]);
   let showReferenceLabels = $state(false);
   let hidePrintBed = $state(false);
   let isMobile = $state(false);
@@ -287,36 +280,25 @@
     }
   });
 
-  // Initialize project from localStorage and fetch community projects
+  // Initialize project from localStorage
   $effect(() => {
     if (browser) {
       initProject();
-      // Fetch community projects manifest
-      fetch('/projects/manifest.json')
-        .then((res) => res.json())
-        .then((data) => {
-          communityProjects = data.projects ?? [];
-          // Debug: ?debug=1&project=<community id> loads that project (replacing the current one)
-          const params = new URLSearchParams(window.location.search);
-          const projectParam = params.get('project');
-          if (params.get('debug') === '1' && projectParam) {
-            const match = communityProjects.find((p) => p.id === projectParam);
-            if (match) {
-              loadCommunityProject(match);
-            } else {
-              console.warn(`Unknown community project: ${projectParam}`);
-            }
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to load community projects:', err);
-        });
+      // ?project=<community id> (linked from /games) loads that project, replacing the current one
+      const projectParam = new URLSearchParams(window.location.search).get('project');
+      if (projectParam) {
+        loadCommunityProject(projectParam);
+      }
     }
   });
 
-  async function loadCommunityProject(project: CommunityProject) {
+  async function loadCommunityProject(projectId: string) {
     try {
+      const projects = await fetchCommunityProjects();
+      const project = projects.find((p) => p.id === projectId);
+      if (!project) throw new Error(`Unknown game: ${projectId}`);
       const res = await fetch(`/projects/${project.file}`);
+      if (!res.ok) throw new Error(`Failed to load ${project.name}`);
       const data = (await res.json()) as Project;
       importProject(data);
       regenerate(true);
@@ -324,6 +306,14 @@
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load project';
       console.error('Load community project error:', e);
+    }
+    // Drop the param so a refresh keeps the user's edits instead of reloading the game.
+    // Debug captures keep their URL untouched.
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('debug') !== '1') {
+      url.searchParams.delete('project');
+      // eslint-disable-next-line svelte/no-navigation-without-resolve -- same page, only the query changes
+      replaceState(url, {});
     }
   }
 
@@ -2002,24 +1992,10 @@
               {/snippet}
               {#snippet content()}
                 <div class="popoverMenu">
-                  {#if communityProjects.length > 0}
-                    <FormControl label="Load community project" name="communityProject">
-                      {#snippet input({ inputProps })}
-                        <Select
-                          selected={[]}
-                          options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
-                          onSelectedChange={(selected) => {
-                            const project = communityProjects.find((p) => p.id === selected[0]);
-                            if (project) {
-                              loadCommunityProject(project);
-                            }
-                          }}
-                          {...inputProps}
-                        />
-                      {/snippet}
-                    </FormControl>
-                    <Hr />
-                  {/if}
+                  <Button variant="ghost" href={resolve('/games')} style="width: 100%; justify-content: flex-start;">
+                    Browse games
+                  </Button>
+                  <Hr />
                   <Button
                     variant="ghost"
                     onclick={() => jsonFileInput?.click()}
@@ -2255,24 +2231,10 @@
               {/snippet}
               {#snippet content()}
                 <div class="popoverMenu">
-                  {#if communityProjects.length > 0}
-                    <FormControl label="Load community project" name="communityProject">
-                      {#snippet input({ inputProps })}
-                        <Select
-                          selected={[]}
-                          options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
-                          onSelectedChange={(selected) => {
-                            const project = communityProjects.find((p) => p.id === selected[0]);
-                            if (project) {
-                              loadCommunityProject(project);
-                            }
-                          }}
-                          {...inputProps}
-                        />
-                      {/snippet}
-                    </FormControl>
-                    <Hr />
-                  {/if}
+                  <Button variant="ghost" href={resolve('/games')} style="width: 100%; justify-content: flex-start;">
+                    Browse games
+                  </Button>
+                  <Hr />
                   <Button
                     variant="ghost"
                     onclick={() => jsonFileInput?.click()}

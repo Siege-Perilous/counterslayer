@@ -1,28 +1,49 @@
 {
   "projects": [
     {
-      "id": "omaha",
-      "name": "D-Day: Omaha Beach",
+      "id": "plum-island-horror",
+      "name": "The Plum Island Horror",
+      "description": "Cooperative survival against an outbreak of horrors. A standee tray, card well and token cups stacked over the boards, with room for the expansions.",
       "author": "Dave Snider",
-      "file": "omaha.json"
-    },
-    {
-      "id": "burning-banners",
-      "name": "Burning Banners",
-      "author": "Dave Snider",
-      "file": "burning-banners.json"
-    },
-    {
-      "id": "witchcraft",
-      "name": "Witchcraft",
-      "author": "Dave Snider",
-      "file": "witchcraft.json"
+      "authorUrl": "https://davesnider.com",
+      "image": "images/plum-island-horror.webp",
+      "file": "plum-island-horror.json"
     },
     {
       "id": "red-dust-rebellion",
       "name": "Red Dust Rebellion",
+      "description": "Counterinsurgency on a colonized Mars. Stacked layers for counters, wooden pieces and cards.",
       "author": "Dave Snider",
+      "authorUrl": "https://davesnider.com",
+      "image": "images/red-dust-rebellion.webp",
       "file": "red-dust-rebellion.json"
+    },
+    {
+      "id": "witchcraft",
+      "name": "Witchcraft",
+      "description": "Solo card game of witches on trial. A single card well that keeps the decks sorted.",
+      "author": "Dave Snider",
+      "authorUrl": "https://davesnider.com",
+      "image": "images/witchcraft.webp",
+      "file": "witchcraft.json"
+    },
+    {
+      "id": "burning-banners",
+      "name": "Burning Banners",
+      "description": "Fantasy wargame of clashing kingdoms. Cup trays for each faction, a card divider and a dice tray.",
+      "author": "Dave Snider",
+      "authorUrl": "https://davesnider.com",
+      "image": "images/burning-banners.webp",
+      "file": "burning-banners.json"
+    },
+    {
+      "id": "omaha",
+      "name": "D-Day: Omaha Beach",
+      "description": "Solitaire game of the US landings on Omaha Beach. A lidded counter box with card draw and discard trays.",
+      "author": "Dave Snider",
+      "authorUrl": "https://davesnider.com",
+      "image": "images/omaha.webp",
+      "file": "omaha.json"
     }
   ]
 }

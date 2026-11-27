@@ -3,6 +3,25 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      // Dark is the default regardless of the browser's color scheme preference. mode-watcher's own
+      // head script never runs with ssr = false, and by the time its defaultMode is read it has already
+      // stored "system". The UI only ever offers light or dark, so anything else means "no choice yet".
+      (function () {
+        try {
+          var key = 'mode-watcher-mode';
+          var mode = localStorage.getItem(key);
+          if (mode !== 'light' && mode !== 'dark') {
+            mode = 'dark';
+            localStorage.setItem(key, mode);
+          }
+          document.documentElement.classList.add(mode);
+          document.documentElement.style.colorScheme = mode;
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
