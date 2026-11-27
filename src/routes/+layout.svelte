@@ -34,6 +34,7 @@
     </div>
     <div style="display: flex; align-items: center; gap: 0.75rem;">
       <div class="headerLinks">
+        <Link href="/games" color="fg">Games</Link>
         <Link href="/changelog" color="fg">Changelog</Link>
         <Link href="https://youtu.be/82d_-vjFpKw" target="_blank" rel="noopener noreferrer" color="fg">Tutorial</Link>
         <Link
@@ -54,6 +55,7 @@
           {/snippet}
           {#snippet content()}
             <div class="headerMenuContent">
+              <Link href="/games" color="fg">Games</Link>
               <Link href="/changelog" color="fg">Changelog</Link>
               <Link href="https://youtu.be/82d_-vjFpKw" target="_blank" rel="noopener noreferrer" color="fg">
                 Tutorial

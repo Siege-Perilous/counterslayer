@@ -195,7 +195,7 @@ The app also supports these URL parameters directly:
 - `?explode=<0-100>` - Explode amount for the all-sections view (0 = to scale)
 - `?project=<id>` - Load a community project (omaha, burning-banners, witchcraft, red-dust-rebellion), replacing the current one
 
-These parameters only apply together with `?debug=1`.
+These parameters only apply together with `?debug=1`, except `?project=<id>`, which the `/games` page links to. Without `debug=1` the param is removed from the URL once the project has loaded.
 
 ### Preset Angles
 
